@@ -20,8 +20,12 @@ const _speciesOptions = <String, List<String>>{
     '全黄弓背蚁',
     '日本弓背蚁',
     '广布弓背蚁',
+    '窄颈弓背蚁（窄径）',
   ],
   '猛蚁': ['横纹猛蚁', '横纹齿猛蚁', '聚纹双刺猛蚁', '大齿猛蚁', '扁头猛蚁'],
+  '蜜罐蚁': ['墨西哥蜜罐蚁', '大平眼蜜罐蚁'],
+  '孔蚁': ['巨人孔蚁'],
+  '子弹蚁': ['子弹蚁'],
   '铺道蚁': ['双隆骨铺道蚁', '铺道蚁'],
   '多刺蚁': ['黄猄蚁', '拟弓多刺蚁'],
   '大头蚁': ['中华大头蚁', '皮氏大头蚁'],
@@ -406,6 +410,35 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     }
   }
 
+  Future<void> _enterCustomSpecies() async {
+    final controller = TextEditingController();
+    final species = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('手动填写品种'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '例如：其他弓背蚁'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('确认'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (species?.isNotEmpty == true && mounted) {
+      setState(() => _selectedSpecies = species);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('新入手蚁群')),
@@ -445,6 +478,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             value: _selectedSpecies,
             options: _speciesOptions[_speciesFamily] ?? const [],
             onSelected: (species) => setState(() => _selectedSpecies = species),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _speciesFamily == null ? null : _enterCustomSpecies,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('未收录？手动填写品种'),
+            ),
           ),
           const SizedBox(height: 12),
           Row(
