@@ -131,10 +131,11 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    const titles = ['我的蚁群', '最近记录', '待办', '设置'];
+    const titles = ['我的蚁群', '最近记录', '物品', '待办', '设置'];
     final pages = [
       const ColoniesPage(),
       const RecentRecordsPage(),
+      const InventoryPage(),
       const CarePlanPage(),
       const SettingsPage(),
     ];
@@ -154,6 +155,11 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.article_outlined),
             selectedIcon: Icon(Icons.article),
             label: '记录',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.inventory_2_outlined),
+            selectedIcon: Icon(Icons.inventory_2),
+            label: '物品',
           ),
           NavigationDestination(
             icon: Icon(Icons.check_circle_outline),
@@ -1004,6 +1010,114 @@ class _RecentRecordsPageState extends State<RecentRecordsPage> {
         itemBuilder: (context, i) => _RecordCard(record: records[i]),
       );
     },
+  );
+}
+
+class InventoryPage extends StatefulWidget {
+  const InventoryPage({super.key});
+  @override
+  State<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends State<InventoryPage> {
+  late Future<List<InventoryItem>> _items;
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() => _items = AppDatabase.instance.listInventory();
+
+  Future<void> _addItem() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增物品'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '物品名称'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('新增'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name.isEmpty) return;
+    try {
+      await AppDatabase.instance.saveInventoryItem(
+        InventoryItem(
+          id: const Uuid().v4(),
+          name: name,
+          purchased: false,
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: _addItem,
+      icon: const Icon(Icons.add),
+      label: const Text('新增物品'),
+    ),
+    body: FutureBuilder<List<InventoryItem>>(
+      future: _items,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return _ErrorState('读取物品失败：${snapshot.error}');
+        }
+        final items = snapshot.data!;
+        final needed = items.where((item) => !item.purchased).toList();
+        final purchased = items.where((item) => item.purchased).toList();
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+          children: [
+            Text('待购清单', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 6),
+            ...needed.map(_itemTile),
+            const SizedBox(height: 18),
+            Text('已购', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 6),
+            if (purchased.isEmpty) const Text('还没有标记为已购的物品。'),
+            ...purchased.map(_itemTile),
+          ],
+        );
+      },
+    ),
+  );
+
+  Widget _itemTile(InventoryItem item) => Card(
+    child: CheckboxListTile(
+      title: Text(item.name),
+      value: item.purchased,
+      controlAffinity: ListTileControlAffinity.leading,
+      onChanged: (value) async {
+        await AppDatabase.instance.setInventoryPurchased(
+          item.id,
+          value ?? false,
+        );
+        if (mounted) setState(_reload);
+      },
+    ),
   );
 }
 

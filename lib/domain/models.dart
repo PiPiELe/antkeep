@@ -132,6 +132,34 @@ class CareRecord {
   };
 }
 
+class InventoryItem {
+  const InventoryItem({
+    required this.id,
+    required this.name,
+    required this.purchased,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String name;
+  final bool purchased;
+  final DateTime createdAt;
+
+  factory InventoryItem.fromMap(Map<String, Object?> map) => InventoryItem(
+    id: map['id']! as String,
+    name: map['name']! as String,
+    purchased: (map['purchased'] as int? ?? 0) == 1,
+    createdAt: DateTime.parse(map['created_at']! as String),
+  );
+
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'name': name,
+    'purchased': purchased ? 1 : 0,
+    'created_at': createdAt.toIso8601String(),
+  };
+}
+
 enum CareRecordType {
   feeding('feeding', '投喂'),
   watering('watering', '补水'),

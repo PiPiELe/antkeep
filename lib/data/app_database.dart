@@ -28,11 +28,12 @@ class AppDatabase implements AntKeepRepository {
     await directory.create(recursive: true);
     _database = await openDatabase(
       path.join(directory.path, 'antkeep.sqlite'),
-      version: 4,
+      version: 5,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
     );
+    await _seedInventory();
   }
 
   Database get _db =>
@@ -56,6 +57,7 @@ class AppDatabase implements AntKeepRepository {
       'CREATE INDEX records_by_colony_time ON care_records(colony_id, occurred_at DESC)',
     );
     await _createSettingsTable(database);
+    await _createInventoryTable(database);
   }
 
   static Future<void> _upgradeSchema(
@@ -79,12 +81,19 @@ class AppDatabase implements AntKeepRepository {
         'ALTER TABLE colonies ADD COLUMN target_humidity REAL',
       );
     }
+    if (oldVersion < 5) await _createInventoryTable(database);
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
       executor.execute('''CREATE TABLE app_settings (
         setting_key TEXT PRIMARY KEY,
         setting_value TEXT NOT NULL
+      )''');
+
+  static Future<void> _createInventoryTable(DatabaseExecutor executor) =>
+      executor.execute('''CREATE TABLE inventory_items (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+        purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
       )''');
 
   @override
@@ -149,6 +158,48 @@ class AppDatabase implements AntKeepRepository {
     'setting_key': 'dark_theme',
     'setting_value': '$enabled',
   }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+  Future<List<InventoryItem>> listInventory() async => (await _db.query(
+    'inventory_items',
+    orderBy: 'purchased ASC, name COLLATE NOCASE ASC',
+  )).map(InventoryItem.fromMap).toList();
+
+  Future<void> saveInventoryItem(InventoryItem item) => _db.insert(
+    'inventory_items',
+    item.toMap(),
+    conflictAlgorithm: ConflictAlgorithm.abort,
+  );
+
+  Future<void> setInventoryPurchased(String id, bool purchased) => _db.update(
+    'inventory_items',
+    {'purchased': purchased ? 1 : 0},
+    where: 'id = ?',
+    whereArgs: [id],
+  );
+
+  Future<void> _seedInventory() async {
+    const items = [
+      '防逃液',
+      '镊子',
+      '双钩针',
+      '离心管 50ml',
+      '离心管 20ml',
+      '离心管 5ml',
+      '离心管 2ml',
+      '3D 打印机',
+    ];
+    final now = DateTime.now().toIso8601String();
+    final batch = _db.batch();
+    for (var index = 0; index < items.length; index++) {
+      batch.insert('inventory_items', {
+        'id': 'default-$index',
+        'name': items[index],
+        'purchased': 0,
+        'created_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
+  }
 
   Future<Map<String, dynamic>> snapshot() async => {
     'colonies': await _db.query('colonies'),
