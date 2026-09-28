@@ -1104,13 +1104,22 @@ class _InventoryPageState extends State<InventoryPage> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
           children: [
-            Text('待购清单', style: Theme.of(context).textTheme.titleLarge),
+            _InventorySectionHeader(
+              title: '未购入',
+              count: needed.length,
+              icon: Icons.shopping_cart_outlined,
+            ),
             const SizedBox(height: 6),
+            if (needed.isEmpty) const Text('暂时没有待采购的物品。'),
             ...needed.map(_itemTile),
             const SizedBox(height: 18),
-            Text('已购', style: Theme.of(context).textTheme.titleLarge),
+            _InventorySectionHeader(
+              title: '已购买',
+              count: purchased.length,
+              icon: Icons.check_circle_outline,
+            ),
             const SizedBox(height: 6),
-            if (purchased.isEmpty) const Text('还没有标记为已购的物品。'),
+            if (purchased.isEmpty) const Text('还没有已购买的物品。'),
             ...purchased.map(_itemTile),
           ],
         );
@@ -1131,6 +1140,29 @@ class _InventoryPageState extends State<InventoryPage> {
         if (mounted) setState(_reload);
       },
     ),
+  );
+}
+
+class _InventorySectionHeader extends StatelessWidget {
+  const _InventorySectionHeader({
+    required this.title,
+    required this.count,
+    required this.icon,
+  });
+
+  final String title;
+  final int count;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, size: 20),
+      const SizedBox(width: 8),
+      Text(title, style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(width: 8),
+      Chip(label: Text('$count')),
+    ],
   );
 }
 
