@@ -50,4 +50,19 @@ void main() {
     expect(restored.queenCount, 1);
     expect(restored.initialWorkerCount, 18);
   });
+
+  test('shelf life expiry uses the purchase date and calendar months', () {
+    final item = InventoryItem(
+      id: 'nutrition',
+      name: '营养液',
+      purchased: true,
+      purchasedAt: DateTime(2026, 1, 31),
+      expiryType: InventoryExpiryType.shelfLife,
+      shelfLifeMonths: 3,
+      createdAt: DateTime(2026, 1, 1),
+    );
+    expect(item.effectiveExpiryDate(), DateTime(2026, 4, 30));
+    expect(item.isExpired(DateTime(2026, 4, 30)), isFalse);
+    expect(item.isExpired(DateTime(2026, 5, 1)), isTrue);
+  });
 }

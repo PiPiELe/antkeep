@@ -1253,37 +1253,116 @@ class _InventoryPageState extends State<InventoryPage> {
   void _reload() => _items = AppDatabase.instance.listInventory();
 
   Future<void> _addItem() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
+    final nameController = TextEditingController();
+    final shelfLifeController = TextEditingController(text: '3');
+    var expiryType = InventoryExpiryType.none;
+    DateTime? expiresAt;
+    final item = await showDialog<_NewInventoryItem>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('新增物品'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: '物品名称'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('新增物品'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: '物品名称'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<InventoryExpiryType>(
+                  key: ValueKey(expiryType),
+                  initialValue: expiryType,
+                  decoration: const InputDecoration(labelText: '有效期类型'),
+                  items: InventoryExpiryType.values
+                      .map(
+                        (type) => DropdownMenuItem(
+                          value: type,
+                          child: Text(type.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (type) => setDialogState(
+                    () => expiryType = type ?? InventoryExpiryType.none,
+                  ),
+                ),
+                if (expiryType == InventoryExpiryType.shelfLife) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: shelfLifeController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: '保质期（月）'),
+                  ),
+                ],
+                if (expiryType == InventoryExpiryType.fixedDate) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.event_outlined),
+                    label: Text(
+                      expiresAt == null ? '选择到期日' : '到期日：${_date(expiresAt!)}',
+                    ),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                        initialDate: expiresAt ?? DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => expiresAt = picked);
+                      }
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                if (name.isEmpty ||
+                    (expiryType == InventoryExpiryType.fixedDate &&
+                        expiresAt == null)) {
+                  return;
+                }
+                Navigator.pop(
+                  context,
+                  _NewInventoryItem(
+                    name: name,
+                    expiryType: expiryType,
+                    shelfLifeMonths: expiryType == InventoryExpiryType.shelfLife
+                        ? int.tryParse(shelfLifeController.text) ?? 3
+                        : null,
+                    expiresAt: expiresAt,
+                  ),
+                );
+              },
+              child: const Text('新增'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('新增'),
-          ),
-        ],
       ),
     );
-    controller.dispose();
-    if (name == null || name.isEmpty) return;
+    nameController.dispose();
+    shelfLifeController.dispose();
+    if (item == null) return;
     try {
       await AppDatabase.instance.saveInventoryItem(
         InventoryItem(
           id: const Uuid().v4(),
-          name: name,
+          name: item.name,
           purchased: false,
           createdAt: DateTime.now(),
+          expiryType: item.expiryType,
+          shelfLifeMonths: item.shelfLifeMonths,
+          expiresAt: item.expiresAt,
         ),
       );
       if (mounted) setState(_reload);
@@ -1337,20 +1416,70 @@ class _InventoryPageState extends State<InventoryPage> {
     ),
   );
 
-  Widget _itemTile(InventoryItem item) => Card(
-    child: CheckboxListTile(
-      title: Text(item.name),
-      value: item.purchased,
-      controlAffinity: ListTileControlAffinity.leading,
-      onChanged: (value) async {
-        await AppDatabase.instance.setInventoryPurchased(
-          item.id,
-          value ?? false,
-        );
-        if (mounted) setState(_reload);
-      },
-    ),
-  );
+  Widget _itemTile(InventoryItem item) {
+    final expired = item.isExpired();
+    final expiry = item.effectiveExpiryDate();
+    final expiryText = switch (item.expiryType) {
+      InventoryExpiryType.none => null,
+      InventoryExpiryType.shelfLife when item.purchasedAt == null =>
+        '有效期：购入后 ${item.shelfLifeMonths ?? 3} 个月（勾选已购买后开始计时）',
+      InventoryExpiryType.shelfLife when expiry == null => '有效期：未设置保质期',
+      InventoryExpiryType.shelfLife =>
+        expired ? '已过期：${_date(expiry!)}' : '有效期至：${_date(expiry!)}',
+      InventoryExpiryType.fixedDate when expiry == null => '有效期：未设置到期日',
+      InventoryExpiryType.fixedDate =>
+        expired ? '已过期：${_date(expiry!)}' : '有效期至：${_date(expiry!)}',
+    };
+    return Card(
+      child: CheckboxListTile(
+        title: Row(
+          children: [
+            Expanded(child: Text(item.name)),
+            if (expired)
+              Icon(
+                Icons.error_outline,
+                color: Theme.of(context).colorScheme.error,
+                size: 20,
+              ),
+          ],
+        ),
+        subtitle: expiryText == null
+            ? null
+            : Text(
+                expiryText,
+                style: expired
+                    ? TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w700,
+                      )
+                    : null,
+              ),
+        value: item.purchased,
+        controlAffinity: ListTileControlAffinity.leading,
+        onChanged: (value) async {
+          await AppDatabase.instance.setInventoryPurchased(
+            item,
+            value ?? false,
+          );
+          if (mounted) setState(_reload);
+        },
+      ),
+    );
+  }
+}
+
+class _NewInventoryItem {
+  const _NewInventoryItem({
+    required this.name,
+    required this.expiryType,
+    this.shelfLifeMonths,
+    this.expiresAt,
+  });
+
+  final String name;
+  final InventoryExpiryType expiryType;
+  final int? shelfLifeMonths;
+  final DateTime? expiresAt;
 }
 
 class _InventorySectionHeader extends StatelessWidget {

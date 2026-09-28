@@ -28,7 +28,7 @@ class AppDatabase implements AntKeepRepository {
     await directory.create(recursive: true);
     _database = await openDatabase(
       path.join(directory.path, 'antkeep.sqlite'),
-      version: 7,
+      version: 8,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -93,6 +93,20 @@ class AppDatabase implements AntKeepRepository {
         'ALTER TABLE colonies ADD COLUMN initial_cocoon_count INTEGER',
       );
     }
+    if (oldVersion < 8) {
+      await database.execute(
+        "ALTER TABLE inventory_items ADD COLUMN expiry_type TEXT NOT NULL DEFAULT 'none'",
+      );
+      await database.execute(
+        'ALTER TABLE inventory_items ADD COLUMN shelf_life_months INTEGER',
+      );
+      await database.execute(
+        'ALTER TABLE inventory_items ADD COLUMN purchased_at TEXT',
+      );
+      await database.execute(
+        'ALTER TABLE inventory_items ADD COLUMN expires_at TEXT',
+      );
+    }
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
@@ -104,7 +118,9 @@ class AppDatabase implements AntKeepRepository {
   static Future<void> _createInventoryTable(DatabaseExecutor executor) =>
       executor.execute('''CREATE TABLE inventory_items (
         id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
-        purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+        purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+        expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER,
+        purchased_at TEXT, expires_at TEXT
       )''');
 
   static Future<void> _createFeederRecordsTable(
@@ -195,12 +211,16 @@ class AppDatabase implements AntKeepRepository {
     conflictAlgorithm: ConflictAlgorithm.abort,
   );
 
-  Future<void> setInventoryPurchased(String id, bool purchased) => _db.update(
-    'inventory_items',
-    {'purchased': purchased ? 1 : 0},
-    where: 'id = ?',
-    whereArgs: [id],
-  );
+  Future<void> setInventoryPurchased(InventoryItem item, bool purchased) =>
+      _db.update(
+        'inventory_items',
+        {
+          'purchased': purchased ? 1 : 0,
+          'purchased_at': purchased ? DateTime.now().toIso8601String() : null,
+        },
+        where: 'id = ?',
+        whereArgs: [item.id],
+      );
 
   Future<List<FeederRecord>> listFeederRecords(FeederType feeder) async =>
       (await _db.query(
@@ -215,25 +235,28 @@ class AppDatabase implements AntKeepRepository {
 
   Future<void> _seedInventory() async {
     const items = [
-      '防逃液',
-      '镊子',
-      '双钩针',
-      '离心管 50ml',
-      '离心管 20ml',
-      '离心管 5ml',
-      '离心管 2ml',
-      '3D 打印机',
-      '微距摄像头',
-      '可食用色素',
+      (name: '防逃液', expiryType: InventoryExpiryType.none, months: null),
+      (name: '镊子', expiryType: InventoryExpiryType.none, months: null),
+      (name: '双钩针', expiryType: InventoryExpiryType.none, months: null),
+      (name: '离心管 50ml', expiryType: InventoryExpiryType.none, months: null),
+      (name: '离心管 20ml', expiryType: InventoryExpiryType.none, months: null),
+      (name: '离心管 5ml', expiryType: InventoryExpiryType.none, months: null),
+      (name: '离心管 2ml', expiryType: InventoryExpiryType.none, months: null),
+      (name: '3D 打印机', expiryType: InventoryExpiryType.none, months: null),
+      (name: '微距摄像头', expiryType: InventoryExpiryType.none, months: null),
+      (name: '可食用色素', expiryType: InventoryExpiryType.none, months: null),
+      (name: '营养液', expiryType: InventoryExpiryType.shelfLife, months: 3),
     ];
     final now = DateTime.now().toIso8601String();
     final batch = _db.batch();
     for (var index = 0; index < items.length; index++) {
       batch.insert('inventory_items', {
         'id': 'default-$index',
-        'name': items[index],
+        'name': items[index].name,
         'purchased': 0,
         'created_at': now,
+        'expiry_type': items[index].expiryType.storageValue,
+        'shelf_life_months': items[index].months,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
@@ -243,6 +266,7 @@ class AppDatabase implements AntKeepRepository {
     'colonies': await _db.query('colonies'),
     'care_records': await _db.query('care_records'),
     'feeder_records': await _db.query('feeder_records'),
+    'inventory_items': await _db.query('inventory_items'),
   };
 
   Set<String> photoPaths(Map<String, dynamic> snapshot) {
@@ -270,7 +294,11 @@ class AppDatabase implements AntKeepRepository {
     final feederRecords = (snapshot['feeder_records'] as List? ?? const [])
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
+    final inventoryItems = (snapshot['inventory_items'] as List?)
+        ?.map((row) => Map<String, Object?>.from(row as Map))
+        .toList();
     await _db.transaction((transaction) async {
+      if (inventoryItems != null) await transaction.delete('inventory_items');
       await transaction.delete('feeder_records');
       await transaction.delete('care_records');
       await transaction.delete('colonies');
@@ -282,6 +310,11 @@ class AppDatabase implements AntKeepRepository {
       }
       for (final record in feederRecords) {
         await transaction.insert('feeder_records', record);
+      }
+      if (inventoryItems != null) {
+        for (final item in inventoryItems) {
+          await transaction.insert('inventory_items', item);
+        }
       }
     });
   }

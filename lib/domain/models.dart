@@ -169,18 +169,46 @@ class InventoryItem {
     required this.name,
     required this.purchased,
     required this.createdAt,
+    this.expiryType = InventoryExpiryType.none,
+    this.shelfLifeMonths,
+    this.purchasedAt,
+    this.expiresAt,
   });
 
   final String id;
   final String name;
   final bool purchased;
   final DateTime createdAt;
+  final InventoryExpiryType expiryType;
+  final int? shelfLifeMonths;
+  final DateTime? purchasedAt;
+  final DateTime? expiresAt;
+
+  DateTime? effectiveExpiryDate() => switch (expiryType) {
+    InventoryExpiryType.none => null,
+    InventoryExpiryType.shelfLife =>
+      purchasedAt == null || shelfLifeMonths == null
+          ? null
+          : _addMonths(purchasedAt!, shelfLifeMonths!),
+    InventoryExpiryType.fixedDate => expiresAt,
+  };
+
+  bool isExpired([DateTime? now]) {
+    final expiry = effectiveExpiryDate();
+    return expiry != null && expiry.isBefore(now ?? DateTime.now());
+  }
 
   factory InventoryItem.fromMap(Map<String, Object?> map) => InventoryItem(
     id: map['id']! as String,
     name: map['name']! as String,
     purchased: (map['purchased'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(map['created_at']! as String),
+    expiryType: InventoryExpiryType.fromStorage(
+      map['expiry_type'] as String? ?? InventoryExpiryType.none.storageValue,
+    ),
+    shelfLifeMonths: map['shelf_life_months'] as int?,
+    purchasedAt: _dateOrNull(map['purchased_at']),
+    expiresAt: _dateOrNull(map['expires_at']),
   );
 
   Map<String, Object?> toMap() => {
@@ -188,7 +216,26 @@ class InventoryItem {
     'name': name,
     'purchased': purchased ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
+    'expiry_type': expiryType.storageValue,
+    'shelf_life_months': shelfLifeMonths,
+    'purchased_at': purchasedAt?.toIso8601String(),
+    'expires_at': expiresAt?.toIso8601String(),
   };
+}
+
+enum InventoryExpiryType {
+  none('none', '无有效期'),
+  shelfLife('shelf_life', '按购入后保质期'),
+  fixedDate('fixed_date', '指定到期日');
+
+  const InventoryExpiryType(this.storageValue, this.label);
+  final String storageValue;
+  final String label;
+
+  static InventoryExpiryType fromStorage(String value) => values.firstWhere(
+    (type) => type.storageValue == value,
+    orElse: () => InventoryExpiryType.none,
+  );
 }
 
 class FeederRecord {
@@ -302,6 +349,23 @@ enum CareRecordType {
 
 DateTime? _dateOrNull(Object? value) =>
     value == null ? null : DateTime.parse(value as String);
+
+DateTime _addMonths(DateTime value, int months) {
+  final offset = value.month - 1 + months;
+  final year = value.year + offset ~/ 12;
+  final month = offset % 12 + 1;
+  final lastDay = DateTime(year, month + 1, 0).day;
+  return DateTime(
+    year,
+    month,
+    value.day > lastDay ? lastDay : value.day,
+    value.hour,
+    value.minute,
+    value.second,
+    value.millisecond,
+    value.microsecond,
+  );
+}
 
 List<String> _stringList(Object? value) {
   if (value is! String || value.isEmpty) return const [];
