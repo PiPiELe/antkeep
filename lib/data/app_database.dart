@@ -28,7 +28,7 @@ class AppDatabase implements AntKeepRepository {
     await directory.create(recursive: true);
     _database = await openDatabase(
       path.join(directory.path, 'antkeep.sqlite'),
-      version: 5,
+      version: 6,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -58,6 +58,7 @@ class AppDatabase implements AntKeepRepository {
     );
     await _createSettingsTable(database);
     await _createInventoryTable(database);
+    await _createFeederRecordsTable(database);
   }
 
   static Future<void> _upgradeSchema(
@@ -82,6 +83,7 @@ class AppDatabase implements AntKeepRepository {
       );
     }
     if (oldVersion < 5) await _createInventoryTable(database);
+    if (oldVersion < 6) await _createFeederRecordsTable(database);
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
@@ -95,6 +97,20 @@ class AppDatabase implements AntKeepRepository {
         id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
         purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
       )''');
+
+  static Future<void> _createFeederRecordsTable(
+    DatabaseExecutor executor,
+  ) async {
+    await executor.execute('''CREATE TABLE feeder_records (
+      id TEXT PRIMARY KEY, feeder_type TEXT NOT NULL, record_type TEXT NOT NULL,
+      occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL,
+      juvenile_count INTEGER, adult_count INTEGER, mortality_count INTEGER,
+      created_at TEXT NOT NULL
+    )''');
+    await executor.execute(
+      'CREATE INDEX feeder_records_by_type_time ON feeder_records(feeder_type, occurred_at DESC)',
+    );
+  }
 
   @override
   Future<List<Colony>> listColonies() async => (await _db.query(
@@ -177,6 +193,17 @@ class AppDatabase implements AntKeepRepository {
     whereArgs: [id],
   );
 
+  Future<List<FeederRecord>> listFeederRecords(FeederType feeder) async =>
+      (await _db.query(
+        'feeder_records',
+        where: 'feeder_type = ?',
+        whereArgs: [feeder.storageValue],
+        orderBy: 'occurred_at DESC',
+      )).map(FeederRecord.fromMap).toList();
+
+  Future<void> saveFeederRecord(FeederRecord record) =>
+      _db.insert('feeder_records', record.toMap());
+
   Future<void> _seedInventory() async {
     const items = [
       '防逃液',
@@ -206,6 +233,7 @@ class AppDatabase implements AntKeepRepository {
   Future<Map<String, dynamic>> snapshot() async => {
     'colonies': await _db.query('colonies'),
     'care_records': await _db.query('care_records'),
+    'feeder_records': await _db.query('feeder_records'),
   };
 
   Set<String> photoPaths(Map<String, dynamic> snapshot) {
@@ -230,7 +258,11 @@ class AppDatabase implements AntKeepRepository {
     final records = (snapshot['care_records'] as List)
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
+    final feederRecords = (snapshot['feeder_records'] as List? ?? const [])
+        .map((row) => Map<String, Object?>.from(row as Map))
+        .toList();
     await _db.transaction((transaction) async {
+      await transaction.delete('feeder_records');
       await transaction.delete('care_records');
       await transaction.delete('colonies');
       for (final colony in colonies) {
@@ -238,6 +270,9 @@ class AppDatabase implements AntKeepRepository {
       }
       for (final record in records) {
         await transaction.insert('care_records', record);
+      }
+      for (final record in feederRecords) {
+        await transaction.insert('feeder_records', record);
       }
     });
   }

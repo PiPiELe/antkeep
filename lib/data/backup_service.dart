@@ -100,6 +100,7 @@ class BackupService {
         data is! Map<String, dynamic> ||
         data['colonies'] is! List ||
         data['care_records'] is! List ||
+        (data['feeder_records'] != null && data['feeder_records'] is! List) ||
         manifest['media'] is! List ||
         !(manifest['media'] as List).every((path) => path is String)) {
       throw const FormatException('备份格式、版本或数据不完整。');

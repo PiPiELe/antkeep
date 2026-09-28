@@ -160,6 +160,95 @@ class InventoryItem {
   };
 }
 
+class FeederRecord {
+  const FeederRecord({
+    required this.id,
+    required this.feeder,
+    required this.type,
+    required this.occurredAt,
+    required this.createdAt,
+    this.note,
+    this.temperature,
+    this.humidity,
+    this.juvenileCount,
+    this.adultCount,
+    this.mortalityCount,
+  });
+
+  final String id;
+  final FeederType feeder;
+  final FeederRecordType type;
+  final DateTime occurredAt;
+  final String? note;
+  final double? temperature;
+  final double? humidity;
+  final int? juvenileCount;
+  final int? adultCount;
+  final int? mortalityCount;
+  final DateTime createdAt;
+
+  factory FeederRecord.fromMap(Map<String, Object?> map) => FeederRecord(
+    id: map['id']! as String,
+    feeder: FeederType.fromStorage(map['feeder_type']! as String),
+    type: FeederRecordType.fromStorage(map['record_type']! as String),
+    occurredAt: DateTime.parse(map['occurred_at']! as String),
+    note: map['note'] as String?,
+    temperature: (map['temperature'] as num?)?.toDouble(),
+    humidity: (map['humidity'] as num?)?.toDouble(),
+    juvenileCount: map['juvenile_count'] as int?,
+    adultCount: map['adult_count'] as int?,
+    mortalityCount: map['mortality_count'] as int?,
+    createdAt: DateTime.parse(map['created_at']! as String),
+  );
+
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'feeder_type': feeder.storageValue,
+    'record_type': type.storageValue,
+    'occurred_at': occurredAt.toIso8601String(),
+    'note': note,
+    'temperature': temperature,
+    'humidity': humidity,
+    'juvenile_count': juvenileCount,
+    'adult_count': adultCount,
+    'mortality_count': mortalityCount,
+    'created_at': createdAt.toIso8601String(),
+  };
+}
+
+enum FeederType {
+  dubia('dubia', '杜比亚'),
+  cherryRoach('cherry_roach', '樱桃蟑螂'),
+  mealworm('mealworm', '面包虫'),
+  cricket('cricket', '蛐蛐');
+
+  const FeederType(this.storageValue, this.label);
+  final String storageValue;
+  final String label;
+
+  static FeederType fromStorage(String value) => values.firstWhere(
+    (type) => type.storageValue == value,
+    orElse: () => FeederType.dubia,
+  );
+}
+
+enum FeederRecordType {
+  observation('observation', '观察'),
+  feeding('feeding', '投喂'),
+  cleaning('cleaning', '清洁'),
+  breeding('breeding', '繁殖'),
+  mortality('mortality', '死亡');
+
+  const FeederRecordType(this.storageValue, this.label);
+  final String storageValue;
+  final String label;
+
+  static FeederRecordType fromStorage(String value) => values.firstWhere(
+    (type) => type.storageValue == value,
+    orElse: () => FeederRecordType.observation,
+  );
+}
+
 enum CareRecordType {
   feeding('feeding', '投喂'),
   watering('watering', '补水'),

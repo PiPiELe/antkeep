@@ -10,15 +10,7 @@ import 'data/local_media_store.dart';
 import 'domain/models.dart';
 
 const _speciesOptions = <String, List<String>>{
-  '收获蚁': [
-    '工匠收获蚁',
-    '原生收获蚁',
-    '红胸收获蚁',
-    '大头收获蚁',
-    '强壮收获蚁',
-    '针毛收获蚁',
-    '无恶齿收获蚁',
-  ],
+  '收获蚁': ['工匠收获蚁', '原生收获蚁', '红胸收获蚁', '大头收获蚁', '强壮收获蚁', '针毛收获蚁', '无恶齿收获蚁'],
   '弓背蚁': [
     '黑金弓背蚁',
     '大头弓背蚁',
@@ -29,13 +21,7 @@ const _speciesOptions = <String, List<String>>{
     '日本弓背蚁',
     '广布弓背蚁',
   ],
-  '猛蚁': [
-    '横纹猛蚁',
-    '横纹齿猛蚁',
-    '聚纹双刺猛蚁',
-    '大齿猛蚁',
-    '扁头猛蚁',
-  ],
+  '猛蚁': ['横纹猛蚁', '横纹齿猛蚁', '聚纹双刺猛蚁', '大齿猛蚁', '扁头猛蚁'],
   '铺道蚁': ['双隆骨铺道蚁', '铺道蚁'],
   '多刺蚁': ['黄猄蚁', '拟弓多刺蚁'],
   '大头蚁': ['中华大头蚁', '皮氏大头蚁'],
@@ -158,12 +144,12 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    const titles = ['我的蚁群', '最近记录', '物品', '待办', '设置'];
+    const titles = ['我的蚁群', '最近记录', '物品', 'DLC 养殖', '设置'];
     final pages = [
       const ColoniesPage(),
       const RecentRecordsPage(),
       const InventoryPage(),
-      const CarePlanPage(),
+      const DlcPage(),
       const SettingsPage(),
     ];
     return Scaffold(
@@ -189,9 +175,9 @@ class _HomePageState extends State<HomePage> {
             label: '物品',
           ),
           NavigationDestination(
-            icon: Icon(Icons.check_circle_outline),
-            selectedIcon: Icon(Icons.check_circle),
-            label: '待办',
+            icon: Icon(Icons.pets_outlined),
+            selectedIcon: Icon(Icons.pets),
+            label: 'DLC',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
@@ -1148,14 +1134,340 @@ class _InventoryPageState extends State<InventoryPage> {
   );
 }
 
-class CarePlanPage extends StatelessWidget {
-  const CarePlanPage({super.key});
+class DlcPage extends StatelessWidget {
+  const DlcPage({super.key});
+
   @override
-  Widget build(BuildContext context) => const _EmptyState(
-    icon: Icons.check_circle_outline,
-    title: '待办提醒即将加入',
-    message: '下一阶段会在本机创建投喂、补水和检查提醒，不依赖服务器推送。',
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      Text('活体饲料养殖记录', style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 6),
+      const Text('每类饲料独立记录，数据只保存在本机。'),
+      const SizedBox(height: 16),
+      ...FeederType.values.map(
+        (feeder) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Card(
+            child: ListTile(
+              leading: CircleAvatar(child: Icon(_feederIcon(feeder))),
+              title: Text(feeder.label),
+              subtitle: Text('${feeder.label}养殖记录'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => FeederDetailPage(feeder: feeder),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
   );
+}
+
+class FeederDetailPage extends StatefulWidget {
+  const FeederDetailPage({super.key, required this.feeder});
+  final FeederType feeder;
+
+  @override
+  State<FeederDetailPage> createState() => _FeederDetailPageState();
+}
+
+class _FeederDetailPageState extends State<FeederDetailPage> {
+  late Future<List<FeederRecord>> _records;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() =>
+      _records = AppDatabase.instance.listFeederRecords(widget.feeder);
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.feeder.label)),
+    floatingActionButton: FloatingActionButton.extended(
+      icon: const Icon(Icons.add),
+      label: const Text('添加记录'),
+      onPressed: () async {
+        final saved = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => FeederRecordFormPage(feeder: widget.feeder),
+          ),
+        );
+        if (saved == true && mounted) setState(_reload);
+      },
+    ),
+    body: FutureBuilder<List<FeederRecord>>(
+      future: _records,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return _ErrorState('读取养殖记录失败：${snapshot.error}');
+        }
+        final records = snapshot.data!;
+        if (records.isEmpty) {
+          return _EmptyState(
+            icon: _feederIcon(widget.feeder),
+            title: '还没有${widget.feeder.label}记录',
+            message: '从一次投喂、清洁或观察开始。',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => setState(_reload),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            itemCount: records.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (_, index) =>
+                _FeederRecordCard(record: records[index]),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class FeederRecordFormPage extends StatefulWidget {
+  const FeederRecordFormPage({super.key, required this.feeder});
+  final FeederType feeder;
+
+  @override
+  State<FeederRecordFormPage> createState() => _FeederRecordFormPageState();
+}
+
+class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
+  final _note = TextEditingController();
+  final _temperature = TextEditingController();
+  final _humidity = TextEditingController();
+  final _juveniles = TextEditingController();
+  final _adults = TextEditingController();
+  final _mortality = TextEditingController();
+  var _type = FeederRecordType.observation;
+  var _occurredAt = DateTime.now();
+  var _saving = false;
+
+  @override
+  void dispose() {
+    for (final controller in [
+      _note,
+      _temperature,
+      _humidity,
+      _juveniles,
+      _adults,
+      _mortality,
+    ]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _pickTime() async {
+    final date = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      initialDate: _occurredAt,
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+    );
+    if (time != null) {
+      setState(
+        () => _occurredAt = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        ),
+      );
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await AppDatabase.instance.saveFeederRecord(
+        FeederRecord(
+          id: const Uuid().v4(),
+          feeder: widget.feeder,
+          type: _type,
+          occurredAt: _occurredAt,
+          note: _textOrNull(_note.text),
+          temperature: double.tryParse(_temperature.text),
+          humidity: double.tryParse(_humidity.text),
+          juvenileCount: int.tryParse(_juveniles.text),
+          adultCount: int.tryParse(_adults.text),
+          mortalityCount: int.tryParse(_mortality.text),
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text('记录${widget.feeder.label}')),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('记录类型', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: FeederRecordType.values
+              .map(
+                (type) => ChoiceChip(
+                  label: Text(type.label),
+                  selected: _type == type,
+                  onSelected: (_) => setState(() => _type = type),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: _pickTime,
+          icon: const Icon(Icons.schedule),
+          label: Text('发生时间：${_dateTime(_occurredAt)}'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _note,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: '备注',
+            hintText: '例如：更换食物，活动正常',
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('环境与数量（不清楚可留空）', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _temperature,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(labelText: '温度 °C'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _humidity,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(labelText: '湿度 %'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _juveniles,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '幼体/若虫数量'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _adults,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '成体数量'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _mortality,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: '死亡数量'),
+        ),
+        const SizedBox(height: 28),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? '保存中…' : '保存记录'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _FeederRecordCard extends StatelessWidget {
+  const _FeederRecordCard({required this.record});
+  final FeederRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final facts = <String>[
+      if (record.temperature != null) '${record.temperature}°C',
+      if (record.humidity != null) '${record.humidity}%',
+      if (record.juvenileCount != null) '幼体/若虫 ${record.juvenileCount}',
+      if (record.adultCount != null) '成体 ${record.adultCount}',
+      if (record.mortalityCount != null) '死亡 ${record.mortalityCount}',
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_feederRecordIcon(record.type)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    record.type.label,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                Text(
+                  _dateTime(record.occurredAt),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+            if (record.note?.isNotEmpty == true) ...[
+              const SizedBox(height: 10),
+              Text(record.note!),
+            ],
+            if (facts.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                facts.join(' · '),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class SettingsPage extends StatefulWidget {
@@ -1339,6 +1651,22 @@ IconData _icon(CareRecordType type) => switch (type) {
   CareRecordType.mortality => Icons.remove_circle_outline,
   CareRecordType.note => Icons.edit_note_outlined,
 };
+
+IconData _feederIcon(FeederType feeder) => switch (feeder) {
+  FeederType.dubia => Icons.bug_report_outlined,
+  FeederType.cherryRoach => Icons.pest_control_outlined,
+  FeederType.mealworm => Icons.grass_outlined,
+  FeederType.cricket => Icons.music_note_outlined,
+};
+
+IconData _feederRecordIcon(FeederRecordType type) => switch (type) {
+  FeederRecordType.observation => Icons.visibility_outlined,
+  FeederRecordType.feeding => Icons.restaurant_outlined,
+  FeederRecordType.cleaning => Icons.cleaning_services_outlined,
+  FeederRecordType.breeding => Icons.egg_outlined,
+  FeederRecordType.mortality => Icons.remove_circle_outline,
+};
+
 String? _textOrNull(String value) => value.trim().isEmpty ? null : value.trim();
 String _date(DateTime value) =>
     '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
