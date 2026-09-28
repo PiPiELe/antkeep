@@ -187,6 +187,8 @@ class AppDatabase implements AntKeepRepository {
       '离心管 5ml',
       '离心管 2ml',
       '3D 打印机',
+      '微距摄像头',
+      '可食用色素',
     ];
     final now = DateTime.now().toIso8601String();
     final batch = _db.batch();
