@@ -28,9 +28,10 @@ class AppDatabase implements AntKeepRepository {
     await directory.create(recursive: true);
     _database = await openDatabase(
       path.join(directory.path, 'antkeep.sqlite'),
-      version: 1,
+      version: 2,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
+      onUpgrade: _upgradeSchema,
     );
   }
 
@@ -53,7 +54,22 @@ class AppDatabase implements AntKeepRepository {
     await database.execute(
       'CREATE INDEX records_by_colony_time ON care_records(colony_id, occurred_at DESC)',
     );
+    await _createSettingsTable(database);
   }
+
+  static Future<void> _upgradeSchema(
+    Database database,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) await _createSettingsTable(database);
+  }
+
+  static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
+      executor.execute('''CREATE TABLE app_settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT NOT NULL
+      )''');
 
   @override
   Future<List<Colony>> listColonies() async => (await _db.query(
@@ -102,6 +118,21 @@ class AppDatabase implements AntKeepRepository {
           whereArgs: [record.colonyId],
         );
       });
+
+  Future<bool> isDarkThemeEnabled() async {
+    final rows = await _db.query(
+      'app_settings',
+      columns: ['setting_value'],
+      where: 'setting_key = ?',
+      whereArgs: ['dark_theme'],
+    );
+    return rows.isNotEmpty && rows.single['setting_value'] == 'true';
+  }
+
+  Future<void> setDarkThemeEnabled(bool enabled) => _db.insert('app_settings', {
+    'setting_key': 'dark_theme',
+    'setting_value': '$enabled',
+  }, conflictAlgorithm: ConflictAlgorithm.replace);
 
   Future<Map<String, dynamic>> snapshot() async => {
     'colonies': await _db.query('colonies'),

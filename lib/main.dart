@@ -14,9 +14,36 @@ Future<void> main() async {
   try {
     await LocalMediaStore.instance.initialize();
     await AppDatabase.instance.open();
+    await themeController.load();
     runApp(const AntKeepApp());
   } catch (error) {
     runApp(_StartupError(error: error));
+  }
+}
+
+final themeController = _ThemeController();
+
+class _ThemeController extends ChangeNotifier {
+  var _darkThemeEnabled = false;
+
+  bool get darkThemeEnabled => _darkThemeEnabled;
+
+  Future<void> load() async {
+    _darkThemeEnabled = await AppDatabase.instance.isDarkThemeEnabled();
+  }
+
+  Future<void> setDarkThemeEnabled(bool enabled) async {
+    if (enabled == _darkThemeEnabled) return;
+    final previous = _darkThemeEnabled;
+    _darkThemeEnabled = enabled;
+    notifyListeners();
+    try {
+      await AppDatabase.instance.setDarkThemeEnabled(enabled);
+    } catch (_) {
+      _darkThemeEnabled = previous;
+      notifyListeners();
+      rethrow;
+    }
   }
 }
 
@@ -24,17 +51,36 @@ class AntKeepApp extends StatelessWidget {
   const AntKeepApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: '蚁记',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff3f6048)),
-      useMaterial3: true,
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: themeController,
+    builder: (context, _) => MaterialApp(
+      title: '蚁记',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff3f6048)),
+        useMaterial3: true,
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+        ),
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xff7da985),
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: const Color(0xff0d0f0d),
+        appBarTheme: const AppBarTheme(backgroundColor: Color(0xff121512)),
+        cardColor: const Color(0xff181c18),
+        useMaterial3: true,
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+        ),
+      ),
+      themeMode: themeController.darkThemeEnabled
+          ? ThemeMode.dark
+          : ThemeMode.light,
+      home: const HomePage(),
     ),
-    home: const HomePage(),
   );
 }
 
@@ -824,8 +870,13 @@ class CarePlanPage extends StatelessWidget {
   );
 }
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) => ListView(
     children: [
@@ -833,6 +884,20 @@ class SettingsPage extends StatelessWidget {
         leading: Icon(Icons.phonelink_lock_outlined),
         title: Text('本地优先'),
         subtitle: Text('蚁群、记录和照片仅保存在本设备；没有账号、服务器或自动同步。'),
+      ),
+      const Divider(),
+      SwitchListTile(
+        secondary: const Icon(Icons.dark_mode_outlined),
+        title: const Text('黑色主题'),
+        subtitle: const Text('使用深色界面，并保存在本机'),
+        value: themeController.darkThemeEnabled,
+        onChanged: (enabled) async {
+          try {
+            await themeController.setDarkThemeEnabled(enabled);
+          } catch (error) {
+            if (context.mounted) _showError(context, error);
+          }
+        },
       ),
       const Divider(),
       ListTile(
