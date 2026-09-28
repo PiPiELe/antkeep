@@ -1,2 +1,7 @@
-# antkeep
-蚁记 AntKeep — Offline ant-keeping journal for Android and iOS. Local records, photos and portable backups, without accounts or cloud sync.
+# 蚁记 AntKeep
+
+面向 Android 与 iPhone 的本地优先蚂蚁养殖记录工具。蚁群、养殖记录和照片只存于设备；首版不需要账号、服务器、广告或云同步。
+
+当前已完成首个可运行闭环：创建蚁群、添加带照片的记录、查看时间线、导出 ZIP 备份，以及覆盖式恢复备份。待办提醒、批量记录和成长统计属于下一阶段。
+
+开发说明见 [docs/PREPARATION.md](docs/PREPARATION.md)。
