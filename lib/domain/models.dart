@@ -39,6 +39,16 @@ class Colony {
 
   bool get isNewQueenColony => initialWorkerCount == 0;
 
+  ColonyScale? get scale {
+    if (isNewQueenColony) return ColonyScale.newQueen;
+    final workers = initialWorkerCount;
+    if (workers == null) return null;
+    if (workers <= 20) return ColonyScale.small;
+    if (workers <= 100) return ColonyScale.medium;
+    if (workers <= 500) return ColonyScale.large;
+    return ColonyScale.superLarge;
+  }
+
   factory Colony.fromMap(Map<String, Object?> map) => Colony(
     id: map['id']! as String,
     name: map['name']! as String,
@@ -76,6 +86,17 @@ class Colony {
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
+}
+
+enum ColonyScale {
+  newQueen('新后群'),
+  small('小群'),
+  medium('中群'),
+  large('大群'),
+  superLarge('超大群');
+
+  const ColonyScale(this.label);
+  final String label;
 }
 
 class CareRecord {

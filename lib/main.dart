@@ -271,7 +271,7 @@ class _ColonyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final details = <String>[
       if (colony.species?.isNotEmpty == true) colony.species!,
-      if (colony.isNewQueenColony) '新后群落',
+      if (colony.scale != null) colony.scale!.label,
       if (colony.queenCount != null) '${colony.queenCount} 只蚁后',
       if (colony.initialWorkerCount != null) '${colony.initialWorkerCount} 只工蚁',
       if (colony.initialEggCount != null) '卵 ${colony.initialEggCount}',
@@ -288,10 +288,45 @@ class _ColonyCard extends StatelessWidget {
                 height: 48,
                 borderRadius: 24,
               ),
-        title: Text(colony.name),
+        title: Row(
+          children: [
+            Expanded(child: Text(colony.name)),
+            if (colony.scale != null) _ColonyScaleBadge(scale: colony.scale!),
+          ],
+        ),
         subtitle: Text(details.isEmpty ? '尚未补充档案' : details.join(' · ')),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _ColonyScaleBadge extends StatelessWidget {
+  const _ColonyScaleBadge({required this.scale});
+  final ColonyScale scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = switch (scale) {
+      ColonyScale.newQueen => scheme.primary,
+      ColonyScale.small => scheme.secondary,
+      ColonyScale.medium => scheme.tertiary,
+      ColonyScale.large => scheme.primary,
+      ColonyScale.superLarge => scheme.error,
+    };
+    return Container(
+      margin: const EdgeInsets.only(left: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        scale.label,
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: color, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -756,10 +791,15 @@ class _ColonySummary extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (colony.isNewQueenColony)
-                const Chip(
-                  avatar: Icon(Icons.egg_alt_outlined, size: 18),
-                  label: Text('新后群落'),
+              if (colony.scale != null)
+                Chip(
+                  avatar: Icon(
+                    colony.scale == ColonyScale.newQueen
+                        ? Icons.egg_alt_outlined
+                        : Icons.groups_outlined,
+                    size: 18,
+                  ),
+                  label: Text(colony.scale!.label),
                 ),
               if (colony.queenCount != null)
                 Chip(label: Text('${colony.queenCount} 只蚁后')),
