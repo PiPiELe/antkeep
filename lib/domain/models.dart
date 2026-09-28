@@ -12,6 +12,8 @@ class Colony {
     this.queenCount,
     this.initialWorkerCount,
     this.nestType,
+    this.targetTemperature,
+    this.targetHumidity,
     this.coverPhotoPath,
     this.archived = false,
   });
@@ -24,6 +26,8 @@ class Colony {
   final int? queenCount;
   final int? initialWorkerCount;
   final String? nestType;
+  final double? targetTemperature;
+  final double? targetHumidity;
   final String? coverPhotoPath;
   final bool archived;
   final DateTime createdAt;
@@ -38,6 +42,8 @@ class Colony {
     queenCount: map['queen_count'] as int?,
     initialWorkerCount: map['initial_worker_count'] as int?,
     nestType: map['nest_type'] as String?,
+    targetTemperature: (map['target_temperature'] as num?)?.toDouble(),
+    targetHumidity: (map['target_humidity'] as num?)?.toDouble(),
     coverPhotoPath: map['cover_photo_path'] as String?,
     archived: (map['archived'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(map['created_at']! as String),
@@ -53,6 +59,8 @@ class Colony {
     'queen_count': queenCount,
     'initial_worker_count': initialWorkerCount,
     'nest_type': nestType,
+    'target_temperature': targetTemperature,
+    'target_humidity': targetHumidity,
     'cover_photo_path': coverPhotoPath,
     'archived': archived ? 1 : 0,
     'created_at': createdAt.toIso8601String(),

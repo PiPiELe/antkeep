@@ -9,17 +9,23 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'domain/models.dart';
 
-const _speciesOptions = [
-  '弓背蚁属 Camponotus',
-  '多刺蚁属 Polyrhachis',
-  '铺道蚁属 Tetramorium',
-  '收获蚁属 Messor',
-  '大头蚁属 Pheidole',
-  '切叶蚁属 Atta',
-  '火蚁属 Solenopsis',
-  '日本弓背蚁 Camponotus japonicus',
-  '尼科巴弓背蚁 Camponotus nicobarensis',
-  '红火蚁 Solenopsis invicta',
+const _speciesOptions = <String, List<String>>{
+  '收获蚁': ['工匠收获蚁'],
+  '弓背蚁': ['黑金弓背蚁', '大头弓背蚁'],
+  '猛蚁': ['横纹猛蚁'],
+};
+
+const _nestTypeOptions = [
+  '试管巢',
+  '平面巢',
+  '折叠巢',
+  '石膏巢',
+  '亚克力巢',
+  '沙土巢',
+  '木巢',
+  '加气砖巢',
+  '生态缸巢',
+  '3D 打印巢',
 ];
 
 Future<void> main() async {
@@ -283,6 +289,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _queens = TextEditingController();
   final _workers = TextEditingController();
   final _nest = TextEditingController();
+  final _targetTemperature = TextEditingController();
+  final _targetHumidity = TextEditingController();
+  String? _speciesFamily;
+  String? _selectedSpecies;
   DateTime? _acquiredOn;
   XFile? _cover;
   var _saving = false;
@@ -296,6 +306,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       _queens,
       _workers,
       _nest,
+      _targetTemperature,
+      _targetHumidity,
     ]) {
       controller.dispose();
     }
@@ -311,12 +323,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
         Colony(
           id: const Uuid().v4(),
           name: _name.text.trim(),
-          species: _textOrNull(_species.text),
+          species: _selectedSpecies,
           acquiredOn: _acquiredOn,
           source: _textOrNull(_source.text),
           queenCount: int.tryParse(_queens.text),
           initialWorkerCount: int.tryParse(_workers.text),
           nestType: _textOrNull(_nest.text),
+          targetTemperature: double.tryParse(_targetTemperature.text),
+          targetHumidity: double.tryParse(_targetHumidity.text),
           coverPhotoPath: _cover == null
               ? null
               : await LocalMediaStore.instance.copyImage(_cover!),
@@ -351,19 +365,41 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           ),
           const SizedBox(height: 12),
           DropdownMenu<String>(
-            controller: _species,
-            label: const Text('品种'),
-            hintText: '搜索品种',
+            label: const Text('品种分类'),
+            hintText: '搜索或选择分类',
             enableFilter: true,
             enableSearch: true,
             requestFocusOnTap: true,
             expandedInsets: EdgeInsets.zero,
-            dropdownMenuEntries: _speciesOptions
+            dropdownMenuEntries: _speciesOptions.keys
                 .map(
-                  (species) =>
-                      DropdownMenuEntry(value: species, label: species),
+                  (family) => DropdownMenuEntry(value: family, label: family),
                 )
                 .toList(),
+            onSelected: (family) {
+              setState(() {
+                _speciesFamily = family;
+                _selectedSpecies = null;
+                _species.clear();
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownMenu<String>(
+            key: ValueKey(_speciesFamily),
+            controller: _species,
+            enabled: _speciesFamily != null,
+            label: const Text('细分品种'),
+            hintText: _speciesFamily == null ? '请先选择品种分类' : '搜索或选择品种',
+            enableFilter: true,
+            enableSearch: true,
+            requestFocusOnTap: true,
+            expandedInsets: EdgeInsets.zero,
+            dropdownMenuEntries: [
+              for (final species in _speciesOptions[_speciesFamily] ?? const [])
+                DropdownMenuEntry(value: species, label: species),
+            ],
+            onSelected: (species) => setState(() => _selectedSpecies = species),
           ),
           const SizedBox(height: 12),
           Row(
@@ -386,9 +422,43 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             ],
           ),
           const SizedBox(height: 12),
-          TextField(
+          DropdownMenu<String>(
             controller: _nest,
-            decoration: const InputDecoration(labelText: '巢体类型'),
+            label: const Text('巢体类型'),
+            hintText: '搜索或选择巢体类型',
+            enableFilter: true,
+            enableSearch: true,
+            requestFocusOnTap: true,
+            expandedInsets: EdgeInsets.zero,
+            dropdownMenuEntries: _nestTypeOptions
+                .map((type) => DropdownMenuEntry(value: type, label: type))
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          Text('环境预警上限（可选）', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _targetTemperature,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: '温度上限 °C'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _targetHumidity,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: '湿度上限 %'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           TextField(
@@ -503,7 +573,9 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   message: '从一次投喂或观察开始。',
                 ),
               ),
-            ...detail.records.map((record) => _RecordCard(record: record)),
+            ...detail.records.map(
+              (record) => _RecordCard(record: record, colony: colony),
+            ),
           ],
         ),
       );
@@ -551,6 +623,10 @@ class _ColonySummary extends StatelessWidget {
                 Chip(label: Text('${colony.initialWorkerCount} 只工蚁')),
               if (colony.nestType?.isNotEmpty == true)
                 Chip(label: Text(colony.nestType!)),
+              if (colony.targetTemperature != null)
+                Chip(label: Text('温度 ≤ ${colony.targetTemperature}°C')),
+              if (colony.targetHumidity != null)
+                Chip(label: Text('湿度 ≤ ${colony.targetHumidity}%')),
               if (colony.acquiredOn != null)
                 Chip(label: Text('入手 ${_date(colony.acquiredOn!)}')),
             ],
@@ -797,10 +873,19 @@ class _RecordFormPageState extends State<RecordFormPage> {
 }
 
 class _RecordCard extends StatelessWidget {
-  const _RecordCard({required this.record});
+  const _RecordCard({required this.record, this.colony});
   final CareRecord record;
+  final Colony? colony;
   @override
   Widget build(BuildContext context) {
+    final temperatureExceeded =
+        record.temperature != null &&
+        colony?.targetTemperature != null &&
+        record.temperature! > colony!.targetTemperature!;
+    final humidityExceeded =
+        record.humidity != null &&
+        colony?.targetHumidity != null &&
+        record.humidity! > colony!.targetHumidity!;
     final facts = <String>[
       if (record.temperature != null) '${record.temperature}°C',
       if (record.humidity != null) '${record.humidity}%',
@@ -840,6 +925,21 @@ class _RecordCard extends StatelessWidget {
               Text(
                 facts.join(' · '),
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (temperatureExceeded || humidityExceeded) ...[
+              const SizedBox(height: 8),
+              Text(
+                [
+                  if (temperatureExceeded)
+                    '温度 ${record.temperature}°C 高于预设上限 ${colony!.targetTemperature}°C',
+                  if (humidityExceeded)
+                    '湿度 ${record.humidity}% 高于预设上限 ${colony!.targetHumidity}%',
+                ].join('；'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
             if (record.photos.isNotEmpty) ...[
