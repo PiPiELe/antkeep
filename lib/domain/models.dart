@@ -33,6 +33,8 @@ class Colony {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  bool get isNewQueenColony => initialWorkerCount == 0;
+
   factory Colony.fromMap(Map<String, Object?> map) => Colony(
     id: map['id']! as String,
     name: map['name']! as String,

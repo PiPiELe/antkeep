@@ -271,6 +271,7 @@ class _ColonyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final details = <String>[
       if (colony.species?.isNotEmpty == true) colony.species!,
+      if (colony.isNewQueenColony) '新后群落',
       if (colony.queenCount != null) '${colony.queenCount} 只蚁后',
       if (colony.initialWorkerCount != null) '${colony.initialWorkerCount} 只工蚁',
       if (colony.nestType?.isNotEmpty == true) colony.nestType!,
@@ -417,7 +418,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 child: TextField(
                   controller: _workers,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '初始工蚁数量'),
+                  decoration: const InputDecoration(
+                    labelText: '初始工蚁数量',
+                    helperText: '填 0 标识为新后群落',
+                  ),
                 ),
               ),
             ],
@@ -724,6 +728,11 @@ class _ColonySummary extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
+              if (colony.isNewQueenColony)
+                const Chip(
+                  avatar: Icon(Icons.egg_alt_outlined, size: 18),
+                  label: Text('新后群落'),
+                ),
               if (colony.queenCount != null)
                 Chip(label: Text('${colony.queenCount} 只蚁后')),
               if (colony.initialWorkerCount != null)
