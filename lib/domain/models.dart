@@ -11,6 +11,8 @@ class Colony {
     this.source,
     this.queenCount,
     this.initialWorkerCount,
+    this.initialEggCount,
+    this.initialCocoonCount,
     this.nestType,
     this.targetTemperature,
     this.targetHumidity,
@@ -25,6 +27,8 @@ class Colony {
   final String? source;
   final int? queenCount;
   final int? initialWorkerCount;
+  final int? initialEggCount;
+  final int? initialCocoonCount;
   final String? nestType;
   final double? targetTemperature;
   final double? targetHumidity;
@@ -43,6 +47,8 @@ class Colony {
     source: map['source'] as String?,
     queenCount: map['queen_count'] as int?,
     initialWorkerCount: map['initial_worker_count'] as int?,
+    initialEggCount: map['initial_egg_count'] as int?,
+    initialCocoonCount: map['initial_cocoon_count'] as int?,
     nestType: map['nest_type'] as String?,
     targetTemperature: (map['target_temperature'] as num?)?.toDouble(),
     targetHumidity: (map['target_humidity'] as num?)?.toDouble(),
@@ -60,6 +66,8 @@ class Colony {
     'source': source,
     'queen_count': queenCount,
     'initial_worker_count': initialWorkerCount,
+    'initial_egg_count': initialEggCount,
+    'initial_cocoon_count': initialCocoonCount,
     'nest_type': nestType,
     'target_temperature': targetTemperature,
     'target_humidity': targetHumidity,

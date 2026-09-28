@@ -274,6 +274,8 @@ class _ColonyCard extends StatelessWidget {
       if (colony.isNewQueenColony) '新后群落',
       if (colony.queenCount != null) '${colony.queenCount} 只蚁后',
       if (colony.initialWorkerCount != null) '${colony.initialWorkerCount} 只工蚁',
+      if (colony.initialEggCount != null) '卵 ${colony.initialEggCount}',
+      if (colony.initialCocoonCount != null) '茧 ${colony.initialCocoonCount}',
       if (colony.nestType?.isNotEmpty == true) colony.nestType!,
     ];
     return Card(
@@ -307,6 +309,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _source = TextEditingController();
   final _queens = TextEditingController();
   final _workers = TextEditingController();
+  final _eggs = TextEditingController();
+  final _cocoons = TextEditingController();
   final _targetTemperature = TextEditingController();
   final _targetHumidity = TextEditingController();
   String? _speciesFamily;
@@ -323,6 +327,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       _source,
       _queens,
       _workers,
+      _eggs,
+      _cocoons,
       _targetTemperature,
       _targetHumidity,
     ]) {
@@ -345,6 +351,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           source: _textOrNull(_source.text),
           queenCount: int.tryParse(_queens.text),
           initialWorkerCount: int.tryParse(_workers.text),
+          initialEggCount: int.tryParse(_eggs.text),
+          initialCocoonCount: int.tryParse(_cocoons.text),
           nestType: _selectedNest,
           targetTemperature: double.tryParse(_targetTemperature.text),
           targetHumidity: double.tryParse(_targetHumidity.text),
@@ -422,6 +430,26 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                     labelText: '初始工蚁数量',
                     helperText: '填 0 标识为新后群落',
                   ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _eggs,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '卵数量（可选）'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _cocoons,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '茧数量（可选）'),
                 ),
               ),
             ],
@@ -737,6 +765,10 @@ class _ColonySummary extends StatelessWidget {
                 Chip(label: Text('${colony.queenCount} 只蚁后')),
               if (colony.initialWorkerCount != null)
                 Chip(label: Text('${colony.initialWorkerCount} 只工蚁')),
+              if (colony.initialEggCount != null)
+                Chip(label: Text('卵 ${colony.initialEggCount}')),
+              if (colony.initialCocoonCount != null)
+                Chip(label: Text('茧 ${colony.initialCocoonCount}')),
               if (colony.nestType?.isNotEmpty == true)
                 Chip(label: Text(colony.nestType!)),
               if (colony.targetTemperature != null)

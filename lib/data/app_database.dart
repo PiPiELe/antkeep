@@ -28,7 +28,7 @@ class AppDatabase implements AntKeepRepository {
     await directory.create(recursive: true);
     _database = await openDatabase(
       path.join(directory.path, 'antkeep.sqlite'),
-      version: 6,
+      version: 7,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -43,6 +43,7 @@ class AppDatabase implements AntKeepRepository {
     await database.execute('''CREATE TABLE colonies (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT,
       source TEXT, queen_count INTEGER, initial_worker_count INTEGER,
+      initial_egg_count INTEGER, initial_cocoon_count INTEGER,
       nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT,
       archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     )''');
@@ -84,6 +85,14 @@ class AppDatabase implements AntKeepRepository {
     }
     if (oldVersion < 5) await _createInventoryTable(database);
     if (oldVersion < 6) await _createFeederRecordsTable(database);
+    if (oldVersion < 7) {
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN initial_egg_count INTEGER',
+      );
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN initial_cocoon_count INTEGER',
+      );
+    }
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
