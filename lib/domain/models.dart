@@ -10,6 +10,7 @@ class Colony {
     this.acquiredOn,
     this.source,
     this.queenCount,
+    this.initialWorkerCount,
     this.nestType,
     this.coverPhotoPath,
     this.archived = false,
@@ -21,6 +22,7 @@ class Colony {
   final DateTime? acquiredOn;
   final String? source;
   final int? queenCount;
+  final int? initialWorkerCount;
   final String? nestType;
   final String? coverPhotoPath;
   final bool archived;
@@ -34,6 +36,7 @@ class Colony {
     acquiredOn: _dateOrNull(map['acquired_on']),
     source: map['source'] as String?,
     queenCount: map['queen_count'] as int?,
+    initialWorkerCount: map['initial_worker_count'] as int?,
     nestType: map['nest_type'] as String?,
     coverPhotoPath: map['cover_photo_path'] as String?,
     archived: (map['archived'] as int? ?? 0) == 1,
@@ -48,6 +51,7 @@ class Colony {
     'acquired_on': acquiredOn?.toIso8601String(),
     'source': source,
     'queen_count': queenCount,
+    'initial_worker_count': initialWorkerCount,
     'nest_type': nestType,
     'cover_photo_path': coverPhotoPath,
     'archived': archived ? 1 : 0,

@@ -35,4 +35,19 @@ void main() {
     );
     expect(CareRecord.fromMap(record.toMap()).photos, ['a.jpg']);
   });
+
+  test('colony map retains the initial queen and worker counts', () {
+    final now = DateTime.utc(2026, 9, 28, 12);
+    final colony = Colony(
+      id: 'c',
+      name: '红土一号',
+      queenCount: 1,
+      initialWorkerCount: 18,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final restored = Colony.fromMap(colony.toMap());
+    expect(restored.queenCount, 1);
+    expect(restored.initialWorkerCount, 18);
+  });
 }

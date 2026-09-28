@@ -28,7 +28,7 @@ class AppDatabase implements AntKeepRepository {
     await directory.create(recursive: true);
     _database = await openDatabase(
       path.join(directory.path, 'antkeep.sqlite'),
-      version: 2,
+      version: 3,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -41,7 +41,8 @@ class AppDatabase implements AntKeepRepository {
   static Future<void> _createSchema(Database database, int version) async {
     await database.execute('''CREATE TABLE colonies (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT,
-      source TEXT, queen_count INTEGER, nest_type TEXT, cover_photo_path TEXT,
+      source TEXT, queen_count INTEGER, initial_worker_count INTEGER,
+      nest_type TEXT, cover_photo_path TEXT,
       archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     )''');
     await database.execute('''CREATE TABLE care_records (
@@ -62,7 +63,14 @@ class AppDatabase implements AntKeepRepository {
     int oldVersion,
     int newVersion,
   ) async {
-    if (oldVersion < 2) await _createSettingsTable(database);
+    if (oldVersion < 2) {
+      await _createSettingsTable(database);
+    }
+    if (oldVersion < 3) {
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN initial_worker_count INTEGER',
+      );
+    }
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>

@@ -9,6 +9,19 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'domain/models.dart';
 
+const _speciesOptions = [
+  '弓背蚁属 Camponotus',
+  '多刺蚁属 Polyrhachis',
+  '铺道蚁属 Tetramorium',
+  '收获蚁属 Messor',
+  '大头蚁属 Pheidole',
+  '切叶蚁属 Atta',
+  '火蚁属 Solenopsis',
+  '日本弓背蚁 Camponotus japonicus',
+  '尼科巴弓背蚁 Camponotus nicobarensis',
+  '红火蚁 Solenopsis invicta',
+];
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -234,6 +247,7 @@ class _ColonyCard extends StatelessWidget {
     final details = <String>[
       if (colony.species?.isNotEmpty == true) colony.species!,
       if (colony.queenCount != null) '${colony.queenCount} 只蚁后',
+      if (colony.initialWorkerCount != null) '${colony.initialWorkerCount} 只工蚁',
       if (colony.nestType?.isNotEmpty == true) colony.nestType!,
     ];
     return Card(
@@ -267,6 +281,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _species = TextEditingController();
   final _source = TextEditingController();
   final _queens = TextEditingController();
+  final _workers = TextEditingController();
   final _nest = TextEditingController();
   DateTime? _acquiredOn;
   XFile? _cover;
@@ -274,7 +289,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
 
   @override
   void dispose() {
-    for (final controller in [_name, _species, _source, _queens, _nest]) {
+    for (final controller in [
+      _name,
+      _species,
+      _source,
+      _queens,
+      _workers,
+      _nest,
+    ]) {
       controller.dispose();
     }
     super.dispose();
@@ -293,6 +315,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           acquiredOn: _acquiredOn,
           source: _textOrNull(_source.text),
           queenCount: int.tryParse(_queens.text),
+          initialWorkerCount: int.tryParse(_workers.text),
           nestType: _textOrNull(_nest.text),
           coverPhotoPath: _cover == null
               ? null
@@ -327,18 +350,40 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
           ),
           const SizedBox(height: 12),
-          TextField(
+          DropdownMenu<String>(
             controller: _species,
-            decoration: const InputDecoration(
-              labelText: '品种',
-              hintText: '例如：弓背蚁属',
-            ),
+            label: const Text('品种'),
+            hintText: '搜索品种',
+            enableFilter: true,
+            enableSearch: true,
+            requestFocusOnTap: true,
+            expandedInsets: EdgeInsets.zero,
+            dropdownMenuEntries: _speciesOptions
+                .map(
+                  (species) =>
+                      DropdownMenuEntry(value: species, label: species),
+                )
+                .toList(),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _queens,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: '蚁后数量'),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _queens,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '蚁后数量'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _workers,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '初始工蚁数量'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           TextField(
@@ -502,6 +547,8 @@ class _ColonySummary extends StatelessWidget {
             children: [
               if (colony.queenCount != null)
                 Chip(label: Text('${colony.queenCount} 只蚁后')),
+              if (colony.initialWorkerCount != null)
+                Chip(label: Text('${colony.initialWorkerCount} 只工蚁')),
               if (colony.nestType?.isNotEmpty == true)
                 Chip(label: Text(colony.nestType!)),
               if (colony.acquiredOn != null)
