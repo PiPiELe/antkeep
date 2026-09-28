@@ -303,15 +303,14 @@ class ColonyFormPage extends StatefulWidget {
 class _ColonyFormPageState extends State<ColonyFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _species = TextEditingController();
   final _source = TextEditingController();
   final _queens = TextEditingController();
   final _workers = TextEditingController();
-  final _nest = TextEditingController();
   final _targetTemperature = TextEditingController();
   final _targetHumidity = TextEditingController();
   String? _speciesFamily;
   String? _selectedSpecies;
+  String? _selectedNest;
   DateTime? _acquiredOn;
   XFile? _cover;
   var _saving = false;
@@ -320,11 +319,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   void dispose() {
     for (final controller in [
       _name,
-      _species,
       _source,
       _queens,
       _workers,
-      _nest,
       _targetTemperature,
       _targetHumidity,
     ]) {
@@ -347,7 +344,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           source: _textOrNull(_source.text),
           queenCount: int.tryParse(_queens.text),
           initialWorkerCount: int.tryParse(_workers.text),
-          nestType: _textOrNull(_nest.text),
+          nestType: _selectedNest,
           targetTemperature: double.tryParse(_targetTemperature.text),
           targetHumidity: double.tryParse(_targetHumidity.text),
           coverPhotoPath: _cover == null
@@ -383,41 +380,26 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
           ),
           const SizedBox(height: 12),
-          DropdownMenu<String>(
-            label: const Text('品种分类'),
-            hintText: '搜索或选择分类',
-            enableFilter: true,
-            enableSearch: true,
-            requestFocusOnTap: true,
-            expandedInsets: EdgeInsets.zero,
-            dropdownMenuEntries: _speciesOptions.keys
-                .map(
-                  (family) => DropdownMenuEntry(value: family, label: family),
-                )
-                .toList(),
+          _SearchableChoiceField(
+            label: '品种分类',
+            hintText: '点击选择分类',
+            value: _speciesFamily,
+            options: _speciesOptions.keys.toList(),
             onSelected: (family) {
               setState(() {
                 _speciesFamily = family;
                 _selectedSpecies = null;
-                _species.clear();
               });
             },
           ),
           const SizedBox(height: 12),
-          DropdownMenu<String>(
+          _SearchableChoiceField(
             key: ValueKey(_speciesFamily),
-            controller: _species,
             enabled: _speciesFamily != null,
-            label: const Text('细分品种'),
-            hintText: _speciesFamily == null ? '请先选择品种分类' : '搜索或选择品种',
-            enableFilter: true,
-            enableSearch: true,
-            requestFocusOnTap: true,
-            expandedInsets: EdgeInsets.zero,
-            dropdownMenuEntries: [
-              for (final species in _speciesOptions[_speciesFamily] ?? const [])
-                DropdownMenuEntry(value: species, label: species),
-            ],
+            label: '细分品种',
+            hintText: _speciesFamily == null ? '请先选择品种分类' : '点击搜索或选择品种',
+            value: _selectedSpecies,
+            options: _speciesOptions[_speciesFamily] ?? const [],
             onSelected: (species) => setState(() => _selectedSpecies = species),
           ),
           const SizedBox(height: 12),
@@ -441,17 +423,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             ],
           ),
           const SizedBox(height: 12),
-          DropdownMenu<String>(
-            controller: _nest,
-            label: const Text('巢体类型'),
-            hintText: '搜索或选择巢体类型',
-            enableFilter: true,
-            enableSearch: true,
-            requestFocusOnTap: true,
-            expandedInsets: EdgeInsets.zero,
-            dropdownMenuEntries: _nestTypeOptions
-                .map((type) => DropdownMenuEntry(value: type, label: type))
-                .toList(),
+          _SearchableChoiceField(
+            label: '巢体类型',
+            hintText: '点击搜索或选择巢体类型',
+            value: _selectedNest,
+            options: _nestTypeOptions,
+            onSelected: (nest) => setState(() => _selectedNest = nest),
           ),
           const SizedBox(height: 12),
           Text('环境预警上限（可选）', style: Theme.of(context).textTheme.titleSmall),
@@ -523,6 +500,117 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       ),
     ),
   );
+}
+
+class _SearchableChoiceField extends StatelessWidget {
+  const _SearchableChoiceField({
+    super.key,
+    required this.label,
+    required this.hintText,
+    required this.value,
+    required this.options,
+    required this.onSelected,
+    this.enabled = true,
+  });
+
+  final String label;
+  final String hintText;
+  final String? value;
+  final List<String> options;
+  final ValueChanged<String> onSelected;
+  final bool enabled;
+
+  Future<void> _openPicker(BuildContext context) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _ChoicePickerSheet(title: label, options: options),
+    );
+    if (picked != null) onSelected(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+    key: ValueKey('$label-$value-$enabled'),
+    initialValue: value ?? '',
+    readOnly: true,
+    enabled: enabled,
+    onTap: enabled ? () => _openPicker(context) : null,
+    decoration: InputDecoration(
+      labelText: label,
+      hintText: hintText,
+      suffixIcon: const Icon(Icons.search),
+    ),
+  );
+}
+
+class _ChoicePickerSheet extends StatefulWidget {
+  const _ChoicePickerSheet({required this.title, required this.options});
+  final String title;
+  final List<String> options;
+
+  @override
+  State<_ChoicePickerSheet> createState() => _ChoicePickerSheetState();
+}
+
+class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
+  final _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedQuery = _query.text.trim().toLowerCase();
+    final options = widget.options
+        .where((option) => option.toLowerCase().contains(normalizedQuery))
+        .toList();
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .72,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            children: [
+              Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _query,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: '输入名称搜索',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: options.isEmpty
+                    ? const _EmptyState(
+                        icon: Icons.search_off_outlined,
+                        title: '没有匹配项',
+                        message: '换一个关键词试试。',
+                      )
+                    : ListView.separated(
+                        itemCount: options.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) => ListTile(
+                          title: Text(options[index]),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => Navigator.pop(context, options[index]),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class ColonyDetailPage extends StatefulWidget {
