@@ -180,7 +180,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _newColony,
       icon: const Icon(Icons.add),
-      label: const Text('新建蚁群'),
+      label: const Text('新入手蚁群'),
     ),
     body: FutureBuilder<List<Colony>>(
       future: _colonies,
@@ -195,8 +195,8 @@ class _ColoniesPageState extends State<ColoniesPage> {
         if (colonies.isEmpty) {
           return const _EmptyState(
             icon: Icons.hive_outlined,
-            title: '从第一窝蚂蚁开始',
-            message: '创建蚁群后，可以持续记录投喂、环境、数量和照片。',
+            title: '还没有蚁群',
+            message: '新入手时建立一窝蚁群，再独立记录投喂、环境、数量和照片。',
           );
         }
         return RefreshIndicator(
@@ -311,7 +311,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('新建蚁群')),
+    appBar: AppBar(title: const Text('新入手蚁群')),
     body: Form(
       key: _formKey,
       child: ListView(
