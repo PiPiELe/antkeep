@@ -30,6 +30,7 @@ class AccountSnapshot {
 class AccountController extends ChangeNotifier {
   AccountController({
     required this.preferences,
+    this.requestsEnabled = false,
     String baseUrl = const String.fromEnvironment('ANTKEEP_ACCOUNT_BASE_URL'),
     http.Client? client,
   }) : _base = _validatedBase(baseUrl),
@@ -37,6 +38,9 @@ class AccountController extends ChangeNotifier {
     preferences.addListener(_editionChanged);
   }
 
+  // Keep disabled in the app until account-service integration is requested.
+  // Supplying a service URL alone must never enable network access.
+  final bool requestsEnabled;
   final AppPreferences preferences;
   final Uri? _base;
   final http.Client _client;
@@ -103,6 +107,11 @@ class AccountController extends ChangeNotifier {
 
   Future<void> _run(Future<void> Function(int) operation) async {
     if (busy || !online) return;
+    if (!requestsEnabled) {
+      error = '账号与签到暂未开放。';
+      notifyListeners();
+      return;
+    }
     if (!configured) {
       error = '账号服务暂未开放，请稍后再试。';
       notifyListeners();

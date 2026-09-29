@@ -137,6 +137,8 @@ class _PersonalCenterPageState extends State<PersonalCenterPage>
             children: [
               if (!controller.online)
                 const Text('个人中心仅在线版可用。请返回设置切换版本。')
+              else if (!controller.requestsEnabled)
+                const Text('账号与签到暂未开放，敬请期待。')
               else if (!controller.configured)
                 const Text('账号服务暂未开放，请稍后再试。')
               else ...[

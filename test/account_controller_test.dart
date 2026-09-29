@@ -34,6 +34,40 @@ http.Response jsonResponse(Object value, [int status = 200]) => http.Response(
 
 void main() {
   test(
+    'account requests default to disabled even with a configured service',
+    () async {
+      var requests = 0;
+      final controller = AccountController(
+        preferences: AppPreferences(Settings())..edition = AppEdition.online,
+        baseUrl: 'https://accounts.test',
+        client: MockClient((_) async {
+          requests++;
+          return jsonResponse({'token': 'test-token', ...profile()});
+        }),
+      );
+      addTearDown(controller.dispose);
+      expect(controller.configured, isTrue);
+      expect(controller.requestsEnabled, isFalse);
+      await controller.authenticate(
+        username: 'keeper',
+        password: 'test-password',
+      );
+      await controller.authenticate(
+        username: 'keeper',
+        password: 'test-password',
+        nickname: '养蚁人',
+      );
+      await controller.refresh();
+      await controller.checkIn();
+      await controller.updateNickname('新昵称');
+      await controller.logout();
+      expect(requests, 0);
+      expect(controller.signedIn, isFalse);
+      expect(controller.error, '账号与签到暂未开放。');
+    },
+  );
+
+  test(
     'server controls counts; credentials are not stored; failures allow retry',
     () async {
       final settings = Settings();
@@ -41,6 +75,7 @@ void main() {
       var checkInRequests = 0;
       var failCheckIn = true;
       final controller = AccountController(
+        requestsEnabled: true,
         preferences: preferences,
         baseUrl: 'https://accounts.test',
         client: MockClient((request) async {
@@ -90,6 +125,7 @@ void main() {
       final pending = Completer<http.Response>();
       var requests = 0;
       final controller = AccountController(
+        requestsEnabled: true,
         preferences: preferences,
         baseUrl: 'https://accounts.test',
         client: MockClient((request) {
@@ -124,6 +160,7 @@ void main() {
       var checkIns = 0;
       var logouts = 0;
       final controller = AccountController(
+        requestsEnabled: true,
         preferences: AppPreferences(Settings())..edition = AppEdition.online,
         baseUrl: 'https://accounts.test',
         client: MockClient((request) async {
@@ -163,6 +200,7 @@ void main() {
         'https://user:secret@remote.test',
       ]) {
         final controller = AccountController(
+          requestsEnabled: true,
           preferences: AppPreferences(Settings())..edition = AppEdition.online,
           baseUrl: url,
           client: MockClient(

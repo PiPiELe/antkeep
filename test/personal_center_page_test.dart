@@ -9,10 +9,35 @@ import 'account_controller_test.dart' show Settings, jsonResponse, profile;
 
 void main() {
   testWidgets(
+    'disabled integration shows a placeholder without login or traffic',
+    (tester) async {
+      var requests = 0;
+      final controller = AccountController(
+        preferences: AppPreferences(Settings())..edition = AppEdition.online,
+        baseUrl: 'https://accounts.test',
+        client: MockClient((_) async {
+          requests++;
+          return jsonResponse(profile());
+        }),
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(home: PersonalCenterPage(controller: controller)),
+      );
+      await tester.pump(const Duration(minutes: 2));
+      expect(find.text('账号与签到暂未开放，敬请期待。'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNothing);
+      expect(requests, 0);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
     'register, server sign-in, edit nickname and logout without avatar',
     (tester) async {
       final paths = <String>[];
       final controller = AccountController(
+        requestsEnabled: true,
         preferences: AppPreferences(Settings())..edition = AppEdition.online,
         baseUrl: 'https://accounts.test',
         client: MockClient((request) async {
@@ -74,6 +99,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final controller = AccountController(
+        requestsEnabled: true,
         preferences: AppPreferences(Settings())..edition = AppEdition.online,
         baseUrl: 'https://accounts.test',
         client: MockClient(
