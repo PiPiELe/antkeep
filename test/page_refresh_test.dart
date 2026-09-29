@@ -142,6 +142,30 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   }
 
+  testWidgets('husbandry duration appears in the list and colony detail', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final arrival = DateTime(now.year, now.month, now.day - 36);
+    tables['colonies']!.add(
+      Colony(
+        id: 'duration',
+        name: '到家计时',
+        acquiredOn: arrival,
+        createdAt: now,
+        updatedAt: now,
+      ).toMap(),
+    );
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
+    await tester.tap(find.text('到家计时'));
+    await tester.pumpAndSettle();
+    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
+    expect(find.textContaining('入手日期：'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('new colonies appear on returning home without reopening', (
     tester,
   ) async {

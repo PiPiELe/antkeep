@@ -2,6 +2,43 @@ import 'package:antkeep/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('husbandry duration counts calendar days from arrival', () {
+    Colony colony(DateTime? arrival) => Colony(
+      id: 'duration',
+      name: '养殖天数',
+      acquiredOn: arrival,
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+    );
+
+    expect(colony(null).husbandryDays(DateTime(2026, 9, 29)), isNull);
+    expect(
+      colony(DateTime(2026, 8, 21)).husbandryDays(DateTime(2026, 9, 26)),
+      36,
+    );
+    expect(
+      colony(DateTime(2026, 9, 29, 23)).husbandryDays(DateTime(2026, 9, 29)),
+      0,
+    );
+    expect(
+      colony(DateTime(2026, 9, 28, 23, 59))
+          .husbandryDays(DateTime(2026, 9, 29, 0, 1)),
+      1,
+    );
+    expect(
+      colony(DateTime(2024, 2, 28)).husbandryDays(DateTime(2024, 3, 1)),
+      2,
+    );
+    expect(
+      colony(DateTime(2025, 12, 31)).husbandryDays(DateTime(2026, 1, 1)),
+      1,
+    );
+    expect(
+      colony(DateTime(2026, 10, 1)).husbandryDays(DateTime(2026, 9, 29)),
+      0,
+    );
+  });
+
   test('unknown worker count remains distinct from zero', () {
     final now = DateTime.utc(2026, 9, 28, 12);
     final unknown = CareRecord(

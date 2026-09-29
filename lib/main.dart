@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'husbandry_duration.dart';
 import 'account_controller.dart';
 import 'personal_center_page.dart';
 import 'population_analysis_page.dart';
@@ -441,6 +442,8 @@ class _ColonyCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              HusbandryDuration(colony: colony),
               if (details.isNotEmpty || description.isEmpty) ...[
                 const SizedBox(height: 12),
                 Text.rich(
@@ -1107,6 +1110,8 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               colony: colony,
               workers: colony.currentWorkerCount(detail.records),
             ),
+            const SizedBox(height: 12),
+            HusbandryDuration(colony: colony, expanded: true),
             const SizedBox(height: 12),
             _ColonySummary(colony: colony),
             const SizedBox(height: 16),

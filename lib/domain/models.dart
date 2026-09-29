@@ -51,6 +51,19 @@ class Colony {
 
   ColonyScale? get scale => ColonyScale.fromWorkerCount(initialWorkerCount);
 
+  /// Elapsed calendar days; unknown arrival dates stay unknown.
+  int? husbandryDays(DateTime today) {
+    final start = acquiredOn;
+    if (start == null) return null;
+    // Use date components in UTC so daylight-saving changes do not lose a day.
+    final days = DateTime.utc(
+      today.year,
+      today.month,
+      today.day,
+    ).difference(DateTime.utc(start.year, start.month, start.day)).inDays;
+    return days < 0 ? 0 : days;
+  }
+
   int? currentWorkerCount(Iterable<CareRecord> records) {
     CareRecord? latest;
     for (final record in records) {
