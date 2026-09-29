@@ -10,6 +10,8 @@ class Colony {
     this.acquiredOn,
     this.source,
     this.queenCount,
+    this.specializedCount,
+    this.showSpecialized = false,
     this.initialWorkerCount,
     this.initialEggCount,
     this.initialCocoonCount,
@@ -26,6 +28,8 @@ class Colony {
   final DateTime? acquiredOn;
   final String? source;
   final int? queenCount;
+  final int? specializedCount;
+  final bool showSpecialized;
   final int? initialWorkerCount;
   final int? initialEggCount;
   final int? initialCocoonCount;
@@ -56,6 +60,8 @@ class Colony {
     acquiredOn: _dateOrNull(map['acquired_on']),
     source: map['source'] as String?,
     queenCount: map['queen_count'] as int?,
+    specializedCount: map['specialized_count'] as int?,
+    showSpecialized: (map['show_specialized'] as int? ?? 0) == 1,
     initialWorkerCount: map['initial_worker_count'] as int?,
     initialEggCount: map['initial_egg_count'] as int?,
     initialCocoonCount: map['initial_cocoon_count'] as int?,
@@ -75,6 +81,8 @@ class Colony {
     'acquired_on': acquiredOn?.toIso8601String(),
     'source': source,
     'queen_count': queenCount,
+    'specialized_count': specializedCount,
+    'show_specialized': showSpecialized ? 1 : 0,
     'initial_worker_count': initialWorkerCount,
     'initial_egg_count': initialEggCount,
     'initial_cocoon_count': initialCocoonCount,

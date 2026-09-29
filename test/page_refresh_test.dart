@@ -130,6 +130,7 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
     await tester.tap(find.text(label));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -163,6 +164,54 @@ void main() {
     expect(find.text('测试蚁群二'), findsOneWidget);
   });
 
+  testWidgets('species selection cascades and only fills an empty name', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
+    await tester.pumpAndSettle();
+    final familyField = find.widgetWithText(TextFormField, '品种分类');
+    final speciesField = find.widgetWithText(TextFormField, '细分品种');
+    final nameField = find.widgetWithText(TextFormField, '蚁群昵称 *');
+    expect(
+      tester.getTopLeft(familyField).dy,
+      lessThan(tester.getTopLeft(speciesField).dy),
+    );
+    expect(
+      tester.getTopLeft(speciesField).dy,
+      lessThan(tester.getTopLeft(nameField).dy),
+    );
+    await tester.tap(familyField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('收获蚁'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    await tester.tap(find.text('工匠收获蚁'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(tester.widget<TextFormField>(nameField).controller!.text, '工匠收获蚁');
+    await tester.enterText(nameField, '我的蚁群');
+    await tester.tap(speciesField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('原生收获蚁'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(nameField).controller!.text, '我的蚁群');
+    await tester.enterText(nameField, '   ');
+    await tester.tap(speciesField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('红胸收获蚁'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(nameField).controller!.text, '红胸收获蚁');
+    // Cancelling the automatic second picker leaves the name intact.
+    await tester.tap(familyField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('弓背蚁'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(nameField).controller!.text, '红胸收获蚁');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'manual species dialog confirms and cancels without close errors',
     (tester) async {
@@ -171,6 +220,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextFormField, '品种分类'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('收获蚁'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
       await tester.tap(find.text('未收录？手动填写品种'));
       await tester.pumpAndSettle();
@@ -184,13 +235,13 @@ void main() {
       await tester.tap(find.text('确认'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('测试品种'), findsOneWidget);
+      expect(find.text('测试品种'), findsNWidgets(2));
       await tester.tap(find.text('未收录？手动填写品种'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('测试品种'), findsOneWidget);
+      expect(find.text('测试品种'), findsNWidgets(2));
     },
   );
 
@@ -247,9 +298,7 @@ void main() {
           eggCount: 100,
         ),
       );
-      tester
-          .state<RefreshIndicatorState>(find.byType(RefreshIndicator))
-          .show();
+      tester.state<RefreshIndicatorState>(find.byType(RefreshIndicator)).show();
       await tester.pumpAndSettle();
       // Explicit zero overrides the archive; missing pupae fall back to 2.
       final summary = find.text('1 只蚁后 · 8 只工蚁 · 5 只卵幼茧');
@@ -265,6 +314,79 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('specialized counts are shown only after opting in and persist', (
+    tester,
+  ) async {
+    final date = DateTime(2026, 9, 1);
+    await AppDatabase.instance.saveColony(
+      Colony(
+        id: 'specialized-colony',
+        name: '特化展示',
+        queenCount: 1,
+        initialWorkerCount: 10,
+        initialEggCount: 5,
+        initialCocoonCount: 2,
+        createdAt: date,
+        updatedAt: date,
+      ),
+    );
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(find.text('1 只蚁后 · 10 只工蚁 · 7 只卵幼茧'), findsOneWidget);
+
+    Future<void> edit() async {
+      await tester.tap(find.text('特化展示'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('编辑蚁群'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('显示特化'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
+
+    await edit();
+    expect(
+      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+      isFalse,
+    );
+    expect(find.widgetWithText(TextFormField, '特化数量'), findsNothing);
+    await tester.tap(find.text('显示特化'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, '特化数量'), '3');
+    await tapSave(tester, '保存蚁群');
+    expect(find.text('3 只特化'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('1 只蚁后 · 3 只特化 · 10 只工蚁 · 7 只卵幼茧'), findsOneWidget);
+
+    await edit();
+    expect(
+      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<TextFormField>(find.widgetWithText(TextFormField, '特化数量'))
+          .controller!
+          .text,
+      '3',
+    );
+    await tester.tap(find.text('显示特化'));
+    await tester.pumpAndSettle();
+    await tapSave(tester, '保存蚁群');
+    expect(find.text('3 只特化'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('1 只蚁后 · 10 只工蚁 · 7 只卵幼茧'), findsOneWidget);
+    final saved = (await AppDatabase.instance.findColony(
+      'specialized-colony',
+    ))!;
+    expect(saved.showSpecialized, isFalse);
+    expect(saved.specializedCount, 3);
+  });
 
   testWidgets('editing a colony refreshes both pages and preserves records', (
     tester,
@@ -443,6 +565,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('已购 (1)'), findsOneWidget);
+    expect(find.text('推荐 (1)'), findsOneWidget);
+    expect(find.text('测试物品'), findsOneWidget);
+    expect(find.text('已购入'), findsOneWidget);
+    expect(find.text('暂时没有推荐的物品。'), findsNothing);
     await tester.tap(find.text('已购 (1)'));
     await tester.pumpAndSettle();
     expect(find.text('数量：5'), findsOneWidget);

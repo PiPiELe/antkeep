@@ -357,6 +357,8 @@ class _ColonyCard extends StatelessWidget {
     final details = <InlineSpan>[
       if (colony.species?.isNotEmpty == true) TextSpan(text: colony.species),
       if (colony.queenCount != null) quantity(colony.queenCount!, '蚁后'),
+      if (colony.showSpecialized && colony.specializedCount != null)
+        quantity(colony.specializedCount!, '特化'),
       if (workers != null) quantity(workers, '工蚁'),
       if (brood != null) quantity(brood, '卵幼茧'),
       if (colony.nestType?.isNotEmpty == true) TextSpan(text: colony.nestType),
@@ -438,6 +440,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _name = TextEditingController();
   final _source = TextEditingController();
   final _queens = TextEditingController();
+  final _specialized = TextEditingController(text: '0');
+  var _showSpecialized = false;
   final _workers = TextEditingController();
   final _eggs = TextEditingController();
   final _cocoons = TextEditingController();
@@ -458,6 +462,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     _name.text = colony.name;
     _source.text = colony.source ?? '';
     _queens.text = colony.queenCount?.toString() ?? '';
+    _specialized.text = colony.specializedCount?.toString() ?? '0';
+    _showSpecialized = colony.showSpecialized;
     _workers.text = colony.initialWorkerCount?.toString() ?? '';
     _eggs.text = colony.initialEggCount?.toString() ?? '';
     _cocoons.text = colony.initialCocoonCount?.toString() ?? '';
@@ -480,6 +486,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       _name,
       _source,
       _queens,
+      _specialized,
       _workers,
       _eggs,
       _cocoons,
@@ -510,6 +517,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           acquiredOn: _acquiredOn,
           source: _textOrNull(_source.text),
           queenCount: int.tryParse(_queens.text),
+          specializedCount: int.tryParse(_specialized.text.trim()),
+          showSpecialized: _showSpecialized,
           initialWorkerCount: int.tryParse(_workers.text),
           initialEggCount: int.tryParse(_eggs.text),
           initialCocoonCount: int.tryParse(_cocoons.text),
@@ -530,6 +539,31 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _selectSpecies(String species) {
+    setState(() {
+      _selectedSpecies = species;
+      if (_name.text.trim().isEmpty) _name.text = species;
+    });
+  }
+
+  Future<void> _selectFamily(String family) async {
+    if (!mounted) return;
+    setState(() {
+      _speciesFamily = family;
+      _selectedSpecies = null;
+    });
+    final species = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _ChoicePickerSheet(
+        title: '细分品种',
+        options: _speciesOptions[family] ?? const [],
+      ),
+    );
+    if (species != null && mounted) _selectSpecies(species);
   }
 
   Future<void> _enterCustomSpecies() async {
@@ -556,7 +590,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       ),
     );
     if (species?.isNotEmpty == true && mounted) {
-      setState(() => _selectedSpecies = species);
+      _selectSpecies(species!);
     }
   }
 
@@ -568,27 +602,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextFormField(
-            controller: _name,
-            decoration: const InputDecoration(
-              labelText: '蚁群昵称 *',
-              hintText: '例如：红土一号',
-            ),
-            validator: (value) =>
-                _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
-          ),
-          const SizedBox(height: 12),
           _SearchableChoiceField(
             label: '品种分类',
             hintText: '点击选择分类',
             value: _speciesFamily,
             options: _speciesOptions.keys.toList(),
-            onSelected: (family) {
-              setState(() {
-                _speciesFamily = family;
-                _selectedSpecies = null;
-              });
-            },
+            onSelected: _selectFamily,
           ),
           const SizedBox(height: 12),
           _SearchableChoiceField(
@@ -598,7 +617,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             hintText: _speciesFamily == null ? '请先选择品种分类' : '点击搜索或选择品种',
             value: _selectedSpecies,
             options: _speciesOptions[_speciesFamily] ?? const [],
-            onSelected: (species) => setState(() => _selectedSpecies = species),
+            onSelected: _selectSpecies,
           ),
           Align(
             alignment: Alignment.centerRight,
@@ -607,6 +626,16 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
               icon: const Icon(Icons.edit_outlined, size: 18),
               label: const Text('未收录？手动填写品种'),
             ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _name,
+            decoration: const InputDecoration(
+              labelText: '蚁群昵称 *',
+              hintText: '例如：红土一号',
+            ),
+            validator: (value) =>
+                _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
           ),
           const SizedBox(height: 12),
           Row(
@@ -635,6 +664,25 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             ],
           ),
           const SizedBox(height: 12),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('显示特化'),
+            value: _showSpecialized,
+            onChanged: (value) =>
+                setState(() => _showSpecialized = value ?? false),
+          ),
+          if (_showSpecialized) ...[
+            TextFormField(
+              controller: _specialized,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? '请输入特化数量'
+                  : _validateCount(value),
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: '特化数量'),
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             children: [
               Expanded(
@@ -1113,6 +1161,8 @@ class _ColonySummary extends StatelessWidget {
             children: [
               if (colony.queenCount != null)
                 Chip(label: Text('${colony.queenCount} 只蚁后')),
+              if (colony.showSpecialized && colony.specializedCount != null)
+                Chip(label: Text('${colony.specializedCount} 只特化')),
               if (colony.initialWorkerCount != null)
                 Chip(label: Text('${colony.initialWorkerCount} 只工蚁')),
               if (colony.initialEggCount != null)
@@ -1518,6 +1568,7 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   late Future<List<InventoryItem>> _items;
+  var _batchPurchasing = false;
   @override
   void initState() {
     super.initState();
@@ -1526,6 +1577,81 @@ class _InventoryPageState extends State<InventoryPage> {
 
   void _reload() {
     _items = AppDatabase.instance.listInventory();
+  }
+
+  Future<void> _batchPurchase(List<InventoryItem> items) async {
+    final selected = <String>{};
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('批量购入'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('勾选已购入的物品，数量可稍后单独填写。'),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('全选'),
+                  value: selected.length == items.length,
+                  onChanged: (value) => setDialogState(() {
+                    selected.clear();
+                    if (value == true) {
+                      selected.addAll(items.map((item) => item.id));
+                    }
+                  }),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final item in items)
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(item.name),
+                          value: selected.contains(item.id),
+                          onChanged: (value) => setDialogState(() {
+                            if (value == true) {
+                              selected.add(item.id);
+                            } else {
+                              selected.remove(item.id);
+                            }
+                          }),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty
+                  ? null
+                  : () => Navigator.pop(context, true),
+              child: Text('确认购入 (${selected.length})'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _batchPurchasing = true);
+    try {
+      await AppDatabase.instance.purchaseInventoryItems(selected);
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _batchPurchasing = false);
+    }
   }
 
   Future<void> _addItem() async {
@@ -1671,14 +1797,42 @@ class _InventoryPageState extends State<InventoryPage> {
             children: [
               TabBar(
                 tabs: [
-                  Tab(text: '推荐 (${_groupItems(needed).length})'),
+                  Tab(text: '推荐 (${_groupItems(items).length})'),
                   Tab(text: '已购 (${_groupItems(purchased).length})'),
                 ],
               ),
               Expanded(
                 child: TabBarView(
                   children: [
-                    _itemList(needed, '暂时没有推荐的物品。'),
+                    Column(
+                      children: [
+                        if (needed.isNotEmpty)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: TextButton.icon(
+                                onPressed: _batchPurchasing
+                                    ? null
+                                    : () => _batchPurchase(needed),
+                                icon: const Icon(Icons.checklist_outlined),
+                                label: Text(
+                                  _batchPurchasing ? '正在购入…' : '批量购入',
+                                ),
+                              ),
+                            ),
+                          ),
+                        Expanded(
+                          child: _itemList(
+                            needed,
+                            '暂时没有推荐的物品。',
+                            purchasedItems: purchased,
+                          ),
+                        ),
+                      ],
+                    ),
                     _itemList(purchased, '还没有已购的物品。'),
                   ],
                 ),
@@ -1703,26 +1857,39 @@ class _InventoryPageState extends State<InventoryPage> {
     return groups;
   }
 
-  Widget _itemList(List<InventoryItem> items, String emptyMessage) => ListView(
+  Widget _itemList(
+    List<InventoryItem> items,
+    String emptyMessage, {
+    List<InventoryItem> purchasedItems = const [],
+  }) => ListView(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
     children: [
-      if (items.isEmpty) Text(emptyMessage),
-      for (final group in _groupItems(items).entries)
-        if (group.key == '离心管' || group.key == '试管')
-          Card(
-            child: ExpansionTile(
-              key: PageStorageKey('${items.first.purchased}-${group.key}'),
-              title: Text(group.key),
-              subtitle: Text(
-                group.value
-                    .map((item) => item.name.substring(group.key.length).trim())
-                    .join(' · '),
+      if (items.isEmpty && purchasedItems.isEmpty) Text(emptyMessage),
+      for (final section in [items, purchasedItems])
+        for (final group in _groupItems(section).entries)
+          if (group.key == '离心管' || group.key == '试管')
+            Card(
+              child: ExpansionTile(
+                key: PageStorageKey(
+                  '$emptyMessage-${group.value.first.purchased}-${group.key}',
+                ),
+                title: Text(
+                  group.value.first.purchased
+                      ? '${group.key} · 已购入'
+                      : group.key,
+                ),
+                subtitle: Text(
+                  group.value
+                      .map(
+                        (item) => item.name.substring(group.key.length).trim(),
+                      )
+                      .join(' · '),
+                ),
+                children: group.value.map(_itemTile).toList(),
               ),
-              children: group.value.map(_itemTile).toList(),
-            ),
-          )
-        else
-          _itemTile(group.value.single),
+            )
+          else
+            _itemTile(group.value.single),
     ],
   );
 
@@ -1767,6 +1934,7 @@ class _InventoryPageState extends State<InventoryPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (item.purchased) const Text('已购入'),
             Text(
               item.purchased
                   ? '数量：${item.quantity?.toString() ?? '未填写'}'

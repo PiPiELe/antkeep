@@ -26,7 +26,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 9,
+      version: 10,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -41,6 +41,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await database.execute('''CREATE TABLE colonies (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT,
       source TEXT, queen_count INTEGER, initial_worker_count INTEGER,
+      specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0,
       initial_egg_count INTEGER, initial_cocoon_count INTEGER,
       nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT,
       archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -108,6 +109,14 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     if (oldVersion >= 5 && oldVersion < 9) {
       await database.execute(
         'ALTER TABLE inventory_items ADD COLUMN quantity INTEGER CHECK (quantity >= 0)',
+      );
+    }
+    if (oldVersion < 10) {
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN specialized_count INTEGER',
+      );
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN show_specialized INTEGER NOT NULL DEFAULT 0',
       );
     }
   }
@@ -245,6 +254,22 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       },
       where: 'id = ?',
       whereArgs: [item.id],
+    );
+  }
+
+  Future<void> purchaseInventoryItems(Iterable<String> itemIds) async {
+    final ids = itemIds.toSet().toList();
+    if (ids.isEmpty) return;
+    await _db.update(
+      'inventory_items',
+      {
+        'purchased': 1,
+        'purchased_at': DateTime.now().toIso8601String(),
+        'quantity': null,
+      },
+      where:
+          'purchased = 0 AND id IN (${List.filled(ids.length, '?').join(', ')})',
+      whereArgs: ids,
     );
   }
 

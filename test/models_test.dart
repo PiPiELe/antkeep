@@ -42,13 +42,23 @@ void main() {
       id: 'c',
       name: '红土一号',
       queenCount: 1,
+      specializedCount: 3,
+      showSpecialized: true,
       initialWorkerCount: 18,
       createdAt: now,
       updatedAt: now,
     );
     final restored = Colony.fromMap(colony.toMap());
     expect(restored.queenCount, 1);
+    expect(restored.specializedCount, 3);
+    expect(restored.showSpecialized, isTrue);
     expect(restored.initialWorkerCount, 18);
+    final legacyMap = colony.toMap()
+      ..remove('specialized_count')
+      ..remove('show_specialized');
+    final legacy = Colony.fromMap(legacyMap);
+    expect(legacy.specializedCount, isNull);
+    expect(legacy.showSpecialized, isFalse);
   });
 
   test('colony scale follows the worker count boundaries', () {

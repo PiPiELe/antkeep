@@ -39,6 +39,8 @@ void main() {
         id: 'colony',
         name: '原档案',
         initialWorkerCount: 0,
+        specializedCount: 3,
+        showSpecialized: true,
         createdAt: now,
         updatedAt: now,
         coverPhotoPath: 'cover.jpg',
@@ -64,12 +66,19 @@ void main() {
       expect(await AppDatabase.instance.listColonies(), hasLength(1));
       final restored = (await AppDatabase.instance.findColony(colony.id))!;
       expect(restored.name, '修改后的档案');
+      expect(restored.specializedCount, 3);
+      expect(restored.showSpecialized, isTrue);
       expect(restored.scale, ColonyScale.superLarge);
       expect(restored.coverPhotoPath, 'cover.jpg');
       expect(restored.createdAt, now);
       final record = (await AppDatabase.instance.listRecords(colony.id)).single;
       expect(record.note, '保留历史记录');
       expect(record.photos, ['record.jpg']);
+      final snapshot = await AppDatabase.instance.snapshot();
+      await AppDatabase.instance.replaceAll(snapshot);
+      final imported = (await AppDatabase.instance.findColony(colony.id))!;
+      expect(imported.specializedCount, 3);
+      expect(imported.showSpecialized, isTrue);
     },
   );
 }
