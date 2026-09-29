@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/models.dart';
+import '../domain/spending_analysis.dart';
 import '../app_preferences.dart';
 import 'database_factory.dart';
 import 'database_path.dart';
@@ -26,7 +27,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 10,
+      version: 13,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -41,6 +42,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await database.execute('''CREATE TABLE colonies (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT,
       source TEXT, queen_count INTEGER, initial_worker_count INTEGER,
+      purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0),
       specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0,
       initial_egg_count INTEGER, initial_cocoon_count INTEGER,
       nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT,
@@ -119,6 +121,35 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'ALTER TABLE colonies ADD COLUMN show_specialized INTEGER NOT NULL DEFAULT 0',
       );
     }
+    if (oldVersion < 11) {
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0)',
+      );
+      if (oldVersion >= 6) {
+        await database.execute(
+          'ALTER TABLE feeder_records ADD COLUMN purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0)',
+        );
+      }
+    }
+    if (oldVersion >= 5 && oldVersion < 12) {
+      await database.execute(
+        'ALTER TABLE inventory_items ADD COLUMN purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0)',
+      );
+    }
+    if (oldVersion >= 5 && oldVersion < 13) {
+      // Replace the global name constraint with uniqueness within each group.
+      await database.execute(
+        'ALTER TABLE inventory_items RENAME TO inventory_items_old',
+      );
+      await _createInventoryTable(database);
+      await database.execute('''INSERT INTO inventory_items
+        (id, name, purchased, created_at, expiry_type, shelf_life_months,
+         purchased_at, expires_at, quantity, purchase_price_cents)
+        SELECT id, name, purchased, created_at, expiry_type, shelf_life_months,
+         purchased_at, expires_at, quantity, purchase_price_cents
+        FROM inventory_items_old''');
+      await database.execute('DROP TABLE inventory_items_old');
+    }
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
@@ -127,14 +158,18 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         setting_value TEXT NOT NULL
       )''');
 
-  static Future<void> _createInventoryTable(DatabaseExecutor executor) =>
-      executor.execute('''CREATE TABLE inventory_items (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+  static Future<void> _createInventoryTable(DatabaseExecutor executor) async {
+    await executor.execute('''CREATE TABLE inventory_items (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, group_name TEXT,
         purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
         expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER,
         purchased_at TEXT, expires_at TEXT,
-        quantity INTEGER CHECK (quantity >= 0)
+        quantity INTEGER CHECK (quantity >= 0),
+        purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0)
       )''');
+    await executor.execute('''CREATE UNIQUE INDEX inventory_name_in_group
+        ON inventory_items(COALESCE(group_name, ''), name)''');
+  }
 
   static Future<void> _createFeederRecordsTable(
     DatabaseExecutor executor,
@@ -143,6 +178,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       id TEXT PRIMARY KEY, feeder_type TEXT NOT NULL, record_type TEXT NOT NULL,
       occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL,
       juvenile_count INTEGER, adult_count INTEGER, mortality_count INTEGER,
+      purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0),
       created_at TEXT NOT NULL
     )''');
     await executor.execute(
@@ -223,6 +259,25 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         }
       });
 
+  Future<SpendingSummary> loadSpendingSummary() =>
+      _db.transaction((transaction) async {
+        Future<int> sum(String table, {String? where}) async {
+          final rows = await transaction.query(
+            table,
+            columns: ['COALESCE(SUM(purchase_price_cents), 0) AS total'],
+            where: where,
+          );
+          return rows.single['total'] as int;
+        }
+
+        return SpendingSummary(
+          // Archived colonies still represent money already spent.
+          coloniesCents: await sum('colonies'),
+          inventoryCents: await sum('inventory_items', where: 'purchased = 1'),
+          feedersCents: await sum('feeder_records'),
+        );
+      });
+
   Future<List<InventoryItem>> listInventory() async => (await _db.query(
     'inventory_items',
     orderBy: 'purchased ASC, name COLLATE NOCASE ASC',
@@ -234,13 +289,39 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     conflictAlgorithm: ConflictAlgorithm.abort,
   );
 
+  Future<void> saveInventoryGroup(List<InventoryItem> items) async {
+    if (items.isEmpty ||
+        items.first.groupName == null ||
+        items.first.groupName!.trim().isEmpty ||
+        items.any(
+          (item) =>
+              item.groupName != items.first.groupName ||
+              item.name.trim().isEmpty,
+        )) {
+      throw ArgumentError('请填写聚合名称和至少一个子物品');
+    }
+    await _db.transaction((transaction) async {
+      for (final item in items) {
+        await transaction.insert('inventory_items', item.toMap());
+      }
+    });
+  }
+
   Future<void> setInventoryPurchased(
     InventoryItem item,
     bool purchased, {
     int? quantity,
+    int? purchasePriceCents,
   }) async {
     if (quantity != null && quantity < 0) {
       throw ArgumentError.value(quantity, 'quantity', '数量不能小于零');
+    }
+    if (purchasePriceCents != null && purchasePriceCents < 0) {
+      throw ArgumentError.value(
+        purchasePriceCents,
+        'purchasePriceCents',
+        '购入价不能小于零',
+      );
     }
     await _db.update(
       'inventory_items',
@@ -251,26 +332,42 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
                   ?.toIso8601String()
             : null,
         'quantity': purchased ? quantity : null,
+        'purchase_price_cents': purchased ? purchasePriceCents : null,
       },
       where: 'id = ?',
       whereArgs: [item.id],
     );
   }
 
-  Future<void> purchaseInventoryItems(Iterable<String> itemIds) async {
-    final ids = itemIds.toSet().toList();
+  Future<void> purchaseInventoryItems(
+    Iterable<String> itemIds, {
+    Map<String, ({int? quantity, int? purchasePriceCents})> details = const {},
+  }) async {
+    final ids = itemIds.toSet();
     if (ids.isEmpty) return;
-    await _db.update(
-      'inventory_items',
-      {
-        'purchased': 1,
-        'purchased_at': DateTime.now().toIso8601String(),
-        'quantity': null,
-      },
-      where:
-          'purchased = 0 AND id IN (${List.filled(ids.length, '?').join(', ')})',
-      whereArgs: ids,
-    );
+    for (final id in ids) {
+      final detail = details[id];
+      if ((detail?.quantity ?? 0) < 0 ||
+          (detail?.purchasePriceCents ?? 0) < 0) {
+        throw ArgumentError('数量和购入价不能小于零');
+      }
+    }
+    final purchasedAt = DateTime.now().toIso8601String();
+    await _db.transaction((transaction) async {
+      for (final id in ids) {
+        await transaction.update(
+          'inventory_items',
+          {
+            'purchased': 1,
+            'purchased_at': purchasedAt,
+            'quantity': details[id]?.quantity,
+            'purchase_price_cents': details[id]?.purchasePriceCents,
+          },
+          where: 'purchased = 0 AND id = ?',
+          whereArgs: [id],
+        );
+      }
+    });
   }
 
   Future<List<FeederRecord>> listFeederRecords(FeederType feeder) async =>

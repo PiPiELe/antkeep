@@ -65,7 +65,7 @@ void main() {
     final now = DateTime(2026, 9, 29);
     final cases = <int?, ColonyScale?>{
       null: null,
-      0: ColonyScale.newQueen,
+      0: ColonyScale.small,
       1: ColonyScale.small,
       10: ColonyScale.small,
       100: ColonyScale.small,
@@ -87,6 +87,54 @@ void main() {
       );
       expect(colony.scale, entry.value, reason: 'workers: ${entry.key}');
     }
+  });
+
+  test('new queen origin stays independent of current worker scale', () {
+    final date = DateTime(2026, 9, 1);
+    final colony = Colony(
+      id: 'queen-origin',
+      name: '从新后养起',
+      initialWorkerCount: 0,
+      createdAt: date,
+      updatedAt: date,
+    );
+    CareRecord record(String id, int days, int? workers, {String? colonyId}) =>
+        CareRecord(
+          id: id,
+          colonyId: colonyId ?? colony.id,
+          type: CareRecordType.observation,
+          occurredAt: date.add(Duration(days: days)),
+          createdAt: date,
+          workerCount: workers,
+        );
+    final records = [
+      record('brood-only', 4, null),
+      record('older', 1, 20),
+      record('latest-workers', 3, 1000),
+      record('other-colony', 5, 10000, colonyId: 'other'),
+    ];
+    expect(colony.isNewQueenColony, isTrue);
+    expect(colony.currentWorkerCount([]), 0);
+    expect(colony.currentWorkerCount(records), 1000);
+    expect(
+      ColonyScale.fromWorkerCount(colony.currentWorkerCount(records)),
+      ColonyScale.large,
+    );
+    records.add(record('zero-workers', 6, 0));
+    expect(colony.currentWorkerCount(records), 0);
+    expect(colony.isNewQueenColony, isTrue);
+    final unknown = Colony.fromMap({
+      ...colony.toMap(),
+      'initial_worker_count': null,
+    });
+    expect(unknown.isNewQueenColony, isFalse);
+    expect(unknown.currentWorkerCount([]), isNull);
+    final established = Colony.fromMap({
+      ...colony.toMap(),
+      'initial_worker_count': 20,
+    });
+    expect(established.currentWorkerCount(records), 0);
+    expect(established.isNewQueenColony, isFalse);
   });
 
   test('shelf life expiry uses the purchase date and calendar months', () {

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'data/app_database.dart';
 import 'domain/models.dart';
 import 'domain/population_analysis.dart';
+import 'domain/spending_analysis.dart';
+import 'spending_analysis_view.dart';
 
 class PopulationAnalysisPage extends StatefulWidget {
   const PopulationAnalysisPage({
@@ -12,8 +14,10 @@ class PopulationAnalysisPage extends StatefulWidget {
     this.loadColonies,
     this.loadRecords,
     this.loadFeederRecords,
+    this.loadSpending,
   });
 
+  final Future<SpendingSummary> Function()? loadSpending;
   final Future<List<Colony>> Function()? loadColonies;
   final Future<List<CareRecord>> Function(String)? loadRecords;
   final Future<List<FeederRecord>> Function(FeederType)? loadFeederRecords;
@@ -29,6 +33,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   FeederType? _feeder;
   PopulationMetric _metric = PopulationMetric.workers;
   String? _selectedId;
+  bool _showSpending = false;
 
   @override
   void initState() {
@@ -82,113 +87,132 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('数量分析')),
-    body: FutureBuilder<List<Colony>>(
-      future: _colonies,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: TextButton(
-              onPressed: () => setState(_reloadColonies),
-              child: const Text('读取失败，点击重试'),
-            ),
-          );
-        }
-        final colonies = snapshot.data!;
-        final metrics = _colony != null
-            ? PopulationMetric.colonyMetrics
-            : PopulationMetric.feederMetrics;
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            DropdownButtonFormField<String>(
-              key: const ValueKey('analysis-subject'),
-              initialValue: _selectedId,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: '选择蚁群或 DLC 养殖'),
-              items: [
-                for (final colony in colonies)
-                  DropdownMenuItem(
-                    value: 'colony:${colony.id}',
-                    child: Text(
-                      '蚁群 · ${colony.name}${colony.species == null ? "" : "（${colony.species}）"}',
-                      overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) => DefaultTabController(
+    length: 2,
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('分析'),
+        bottom: TabBar(
+          onTap: (index) => setState(() => _showSpending = index == 1),
+          tabs: const [
+            Tab(text: '数量分析'),
+            Tab(text: '消费占比'),
+          ],
+        ),
+      ),
+      body: _showSpending
+          ? SpendingAnalysisView(loadSummary: widget.loadSpending)
+          : FutureBuilder<List<Colony>>(
+              future: _colonies,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: TextButton(
+                      onPressed: () => setState(_reloadColonies),
+                      child: const Text('读取失败，点击重试'),
                     ),
-                  ),
-                for (final feeder in FeederType.values)
-                  DropdownMenuItem(
-                    value: 'feeder:${feeder.name}',
-                    child: Text('DLC · ${feeder.label}'),
-                  ),
-              ],
-              onChanged: (id) {
-                if (id != null) _select(id, colonies);
+                  );
+                }
+                final colonies = snapshot.data!;
+                final metrics = _colony != null
+                    ? PopulationMetric.colonyMetrics
+                    : PopulationMetric.feederMetrics;
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    DropdownButtonFormField<String>(
+                      key: const ValueKey('analysis-subject'),
+                      initialValue: _selectedId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: '选择蚁群或 DLC 养殖',
+                      ),
+                      items: [
+                        for (final colony in colonies)
+                          DropdownMenuItem(
+                            value: 'colony:${colony.id}',
+                            child: Text(
+                              '蚁群 · ${colony.name}${colony.species == null ? "" : "（${colony.species}）"}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        for (final feeder in FeederType.values)
+                          DropdownMenuItem(
+                            value: 'feeder:${feeder.name}',
+                            child: Text('DLC · ${feeder.label}'),
+                          ),
+                      ],
+                      onChanged: (id) {
+                        if (id != null) _select(id, colonies);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    if (_selectedId == null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 48),
+                        child: Text(
+                          '选择一窝蚁群或一种 DLC 养殖，查看数量变化。',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    else ...[
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final metric in metrics)
+                            ChoiceChip(
+                              label: Text(metric.label),
+                              selected: _metric == metric,
+                              onSelected: (_) => setState(() {
+                                _metric = metric;
+                                _reloadPoints();
+                              }),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      FutureBuilder<List<PopulationPoint>>(
+                        future: _points,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState !=
+                              ConnectionState.done) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (snapshot.hasError) {
+                            return TextButton(
+                              onPressed: () => setState(_reloadPoints),
+                              child: const Text('数量读取失败，点击重试'),
+                            );
+                          }
+                          return _PopulationResult(
+                            points: snapshot.data!,
+                            metric: _metric,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '按全部有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
+                        '${_colony != null ? "初始数量以入手日期（未填写时用建档时间）计入。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
+                        '同一时刻的同一指标使用最后录入的有效值。连线仅连接记录点，不代表期间每天的数量。',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '趋势规则：至少 3 个时间点；数量相同为平稳，只增不减为稳定上升，'
+                        '只减不增为稳定下降，有升有降为数量波动。估计数量也会参与分析，结果仅描述已有记录。',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
+                );
               },
             ),
-            const SizedBox(height: 16),
-            if (_selectedId == null)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Text(
-                  '选择一窝蚁群或一种 DLC 养殖，查看数量变化。',
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else ...[
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final metric in metrics)
-                    ChoiceChip(
-                      label: Text(metric.label),
-                      selected: _metric == metric,
-                      onSelected: (_) => setState(() {
-                        _metric = metric;
-                        _reloadPoints();
-                      }),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FutureBuilder<List<PopulationPoint>>(
-                future: _points,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return TextButton(
-                      onPressed: () => setState(_reloadPoints),
-                      child: const Text('数量读取失败，点击重试'),
-                    );
-                  }
-                  return _PopulationResult(
-                    points: snapshot.data!,
-                    metric: _metric,
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '按全部有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
-                '${_colony != null ? "初始数量以入手日期（未填写时用建档时间）计入。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
-                '同一时刻的同一指标使用最后录入的有效值。连线仅连接记录点，不代表期间每天的数量。',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '趋势规则：至少 3 个时间点；数量相同为平稳，只增不减为稳定上升，'
-                '只减不增为稳定下降，有升有降为数量波动。估计数量也会参与分析，结果仅描述已有记录。',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ],
-        );
-      },
     ),
   );
 }

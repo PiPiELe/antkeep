@@ -121,6 +121,12 @@ void main() {
         'ALTER TABLE inventory_items ADD COLUMN quantity INTEGER CHECK (quantity >= 0)',
       ),
     );
+    expect(
+      migrations,
+      contains(
+        'ALTER TABLE inventory_items ADD COLUMN purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0)',
+      ),
+    );
     final items = await AppDatabase.instance.listInventory();
     expect(
       items.map((item) => item.name),
@@ -155,25 +161,41 @@ void main() {
       await tester.ensureVisible(find.text('离心管 50ml'));
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(SwitchListTile));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField), '-2');
-      await tester.tap(find.text('保存'));
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '数量（选填）'),
+        '-2',
+      );
+      await tester.tap(find.text('购买'));
       await tester.pumpAndSettle();
       expect(find.text('请输入非负整数'), findsWidgets);
       expect(
         rows.singleWhere((row) => row['name'] == '离心管 50ml')['purchased'],
         0,
       );
-      await tester.enterText(find.byType(TextFormField), '12');
-      await tester.tap(find.text('保存'));
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '数量（选填）'),
+        '12',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '购入价（选填）'),
+        '-1',
+      );
+      await tester.tap(find.text('购买'));
+      await tester.pumpAndSettle();
+      expect(find.text('请输入非负金额，最多两位小数'), findsOneWidget);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '购入价（选填）'),
+        '19.90',
+      );
+      await tester.tap(find.text('购买'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('离心管 · 已购入'));
       await tester.tap(find.text('离心管 · 已购入'));
       await tester.pumpAndSettle();
       expect(find.text('离心管 50ml'), findsOneWidget);
       expect(find.text('已购入'), findsOneWidget);
-      expect(find.text('数量：12'), findsOneWidget);
+      expect(find.textContaining('数量：'), findsNothing);
+      expect(find.textContaining('有效期'), findsNothing);
       expect(
         tester.getTopLeft(find.text('离心管 · 已购入')).dy,
         greaterThan(tester.getTopLeft(find.text('离心管')).dy),
@@ -182,16 +204,23 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('离心管 · 已购入'));
       await tester.pumpAndSettle();
-      expect(find.text('数量：12'), findsOneWidget);
+      expect(find.textContaining('数量：'), findsNothing);
+      expect(
+        rows.singleWhere(
+          (row) => row['name'] == '离心管 50ml',
+        )['purchase_price_cents'],
+        1990,
+      );
       final purchasedAt = rows.singleWhere(
         (row) => row['name'] == '离心管 50ml',
       )['purchased_at'];
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField), '8');
+      expect(find.text('19.90'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextFormField, '数量（选填）'), '8');
       await tester.tap(find.text('保存'));
       await tester.pumpAndSettle();
-      expect(find.text('数量：8'), findsOneWidget);
+      expect(find.textContaining('数量：'), findsNothing);
       expect(
         rows.singleWhere((row) => row['name'] == '离心管 50ml')['purchased_at'],
         purchasedAt,
@@ -207,91 +236,144 @@ void main() {
       );
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField), '99');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '数量（选填）'),
+        '99',
+      );
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
-      expect(find.text('数量：8'), findsOneWidget);
+      expect(find.textContaining('数量：'), findsNothing);
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(SwitchListTile));
-      await tester.tap(find.text('保存'));
+      await tester.tap(find.text('撤销购入'));
       await tester.pumpAndSettle();
       expect(find.text('还没有已购的物品。'), findsOneWidget);
       final row = rows.singleWhere((row) => row['name'] == '离心管 50ml');
       expect(row['quantity'], isNull);
+      expect(row['purchase_price_cents'], isNull);
       expect(row['purchased_at'], isNull);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('batch purchase selects sizes, cancels and saves once', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
-    await tester.pumpAndSettle();
-    final before = rows.map((row) => Map<String, Object?>.from(row)).toList();
-    await tester.tap(find.text('批量购入'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, '确认购入 (0)'))
-          .onPressed,
-      isNull,
-    );
-    await tester.tap(find.text('全选'));
-    await tester.pumpAndSettle();
-    expect(find.text('确认购入 (${rows.length})'), findsOneWidget);
-    await tester.tap(find.text('全选'));
-    await tester.pumpAndSettle();
-    expect(find.text('确认购入 (0)'), findsOneWidget);
-    await tester.tap(find.text('全选'));
-    await tester.tap(find.text('取消'));
-    await tester.pumpAndSettle();
-    expect(rows, before);
-
-    await tester.tap(find.text('批量购入'));
-    await tester.pumpAndSettle();
-    for (final name in ['离心管 50ml', 'EPP 泡沫箱']) {
-      final checkbox = find.widgetWithText(CheckboxListTile, name);
-      await tester.scrollUntilVisible(
-        checkbox,
-        150,
-        scrollable: find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.byType(Scrollable),
-        ),
-      );
-      await tester.tap(checkbox);
+  testWidgets(
+    'cart adds, removes, cancels and purchases selected items with prices',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
       await tester.pumpAndSettle();
-    }
-    await tester.tap(find.text('确认购入 (2)'));
-    await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
-    final purchased = rows.where((row) => row['purchased'] == 1).toList();
-    expect(
-      purchased.map((row) => row['name']),
-      unorderedEquals(['离心管 50ml', 'EPP 泡沫箱']),
-    );
-    expect(
-      purchased.every(
-        (row) => row['purchased_at'] != null && row['quantity'] == null,
-      ),
-      isTrue,
-    );
-    expect(purchased.map((row) => row['purchased_at']).toSet(), hasLength(1));
-    expect(find.text('已购 (2)'), findsOneWidget);
-    await tester.tap(find.text('批量购入'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(CheckboxListTile, 'EPP 泡沫箱'), findsNothing);
-    expect(find.widgetWithText(CheckboxListTile, '离心管 50ml'), findsNothing);
-    await tester.tap(find.text('取消'));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
+      expect(find.text('批量购入'), findsNothing);
+      expect(find.text('查看购物车'), findsNothing);
+      Finder addButton(String name) => find.descendant(
+        of: find.widgetWithText(ListTile, name),
+        matching: find.byType(IconButton),
+      );
+      await tester.tap(addButton('EPP 泡沫箱'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('已选 1 件物品'), findsOneWidget);
+      await tester.tap(addButton('EPP 泡沫箱'));
+      await tester.pumpAndSettle();
+      expect(find.text('查看购物车'), findsNothing);
+      await tester.tap(addButton('EPP 泡沫箱'));
+      await tester.tap(find.text('离心管'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(addButton('离心管 50ml'));
+      await tester.tap(addButton('离心管 50ml'));
+      await tester.pumpAndSettle();
+      expect(find.text('已选 2 件物品'), findsOneWidget);
+      final before = rows.map((row) => Map<String, Object?>.from(row)).toList();
+      await tester.tap(find.text('查看购物车'));
+      await tester.pumpAndSettle();
+      expect(find.text('购物车 (2)'), findsOneWidget);
+      expect(find.byType(SwitchListTile), findsNothing);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(rows, before);
+      expect(find.text('已选 2 件物品'), findsOneWidget);
+      await tester.tap(find.text('查看购物车'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('移除EPP 泡沫箱'));
+      await tester.pumpAndSettle();
+      expect(find.text('购物车 (1)'), findsOneWidget);
+      await tester.tap(find.byTooltip('移除离心管 50ml'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, '购买'))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(find.text('查看购物车'), findsNothing);
+      await tester.ensureVisible(addButton('EPP 泡沫箱'));
+      await tester.tap(addButton('EPP 泡沫箱'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(addButton('离心管 50ml'));
+      await tester.tap(addButton('离心管 50ml'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('查看购物车'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '购入价（选填）').first,
+        '1.234',
+      );
+      await tester.tap(find.text('购买'));
+      await tester.pumpAndSettle();
+      expect(find.text('请输入非负金额，最多两位小数'), findsOneWidget);
+      expect(rows, before);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '购入价（选填）').first,
+        '0',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '购入价（选填）').last,
+        '23.45',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '数量（选填）').last,
+        '4',
+      );
+      await tester.tap(find.text('购买'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('查看购物车'), findsNothing);
+      final purchased = rows.where((row) => row['purchased'] == 1).toList();
+      expect(
+        purchased.map((row) => row['name']),
+        unorderedEquals(['离心管 50ml', 'EPP 泡沫箱']),
+      );
+      expect(purchased.map((row) => row['purchased_at']).toSet(), hasLength(1));
+      expect(
+        purchased.map((row) => row['purchase_price_cents']),
+        unorderedEquals([0, 2345]),
+      );
+      expect(purchased.last['quantity'], 4);
+      expect(find.text('已购 (2)'), findsOneWidget);
+      expect(tester.takeException(), isNull);
 
-    final item = InventoryItem.fromMap(purchased.first);
-    await AppDatabase.instance.setInventoryPurchased(item, true, quantity: 7);
-    final existing = Map<String, Object?>.from(purchased.first);
-    await AppDatabase.instance.purchaseInventoryItems([item.id]);
-    expect(purchased.first, existing);
-  });
+      final item = InventoryItem.fromMap(purchased.first);
+      await AppDatabase.instance.setInventoryPurchased(
+        item,
+        true,
+        quantity: 7,
+        purchasePriceCents: 1250,
+      );
+      final existing = Map<String, Object?>.from(purchased.first);
+      await AppDatabase.instance.purchaseInventoryItems([item.id]);
+      expect(purchased.first, existing);
+      final snapshot = await AppDatabase.instance.snapshot();
+      final saved = (snapshot['inventory_items'] as List)
+          .cast<Map<String, Object?>>();
+      expect(
+        InventoryItem.fromMap(saved.singleWhere((row) => row['id'] == item.id))
+            .toMap()['purchase_price_cents'],
+        1250,
+      );
+    },
+  );
 }

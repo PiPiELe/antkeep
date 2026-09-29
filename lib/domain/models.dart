@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'purchase_price.dart';
+
 class Colony {
   const Colony({
     required this.id,
@@ -9,6 +11,7 @@ class Colony {
     this.species,
     this.acquiredOn,
     this.source,
+    this.purchasePriceCents,
     this.queenCount,
     this.specializedCount,
     this.showSpecialized = false,
@@ -27,6 +30,9 @@ class Colony {
   final String? species;
   final DateTime? acquiredOn;
   final String? source;
+  final int? purchasePriceCents;
+
+  String? get purchasePriceText => formatPurchasePrice(purchasePriceCents);
   final int? queenCount;
   final int? specializedCount;
   final bool showSpecialized;
@@ -43,14 +49,17 @@ class Colony {
 
   bool get isNewQueenColony => initialWorkerCount == 0;
 
-  ColonyScale? get scale {
-    if (isNewQueenColony) return ColonyScale.newQueen;
-    final workers = initialWorkerCount;
-    if (workers == null) return null;
-    if (workers <= 100) return ColonyScale.small;
-    if (workers < 500) return ColonyScale.medium;
-    if (workers < 10000) return ColonyScale.large;
-    return ColonyScale.superLarge;
+  ColonyScale? get scale => ColonyScale.fromWorkerCount(initialWorkerCount);
+
+  int? currentWorkerCount(Iterable<CareRecord> records) {
+    CareRecord? latest;
+    for (final record in records) {
+      if (record.colonyId != id || record.workerCount == null) continue;
+      if (latest == null || record.occurredAt.isAfter(latest.occurredAt)) {
+        latest = record;
+      }
+    }
+    return latest?.workerCount ?? initialWorkerCount;
   }
 
   factory Colony.fromMap(Map<String, Object?> map) => Colony(
@@ -59,6 +68,7 @@ class Colony {
     species: map['species'] as String?,
     acquiredOn: _dateOrNull(map['acquired_on']),
     source: map['source'] as String?,
+    purchasePriceCents: map['purchase_price_cents'] as int?,
     queenCount: map['queen_count'] as int?,
     specializedCount: map['specialized_count'] as int?,
     showSpecialized: (map['show_specialized'] as int? ?? 0) == 1,
@@ -80,6 +90,7 @@ class Colony {
     'species': species,
     'acquired_on': acquiredOn?.toIso8601String(),
     'source': source,
+    'purchase_price_cents': purchasePriceCents,
     'queen_count': queenCount,
     'specialized_count': specializedCount,
     'show_specialized': showSpecialized ? 1 : 0,
@@ -97,7 +108,6 @@ class Colony {
 }
 
 enum ColonyScale {
-  newQueen('新后群'),
   small('小群'),
   medium('中群'),
   large('大群'),
@@ -105,6 +115,14 @@ enum ColonyScale {
 
   const ColonyScale(this.label);
   final String label;
+
+  static ColonyScale? fromWorkerCount(int? workers) {
+    if (workers == null) return null;
+    if (workers <= 100) return ColonyScale.small;
+    if (workers < 500) return ColonyScale.medium;
+    if (workers < 10000) return ColonyScale.large;
+    return ColonyScale.superLarge;
+  }
 }
 
 class CareRecord {
@@ -182,6 +200,8 @@ class InventoryItem {
     this.purchasedAt,
     this.expiresAt,
     this.quantity,
+    this.purchasePriceCents,
+    this.groupName,
   });
 
   final String id;
@@ -193,6 +213,24 @@ class InventoryItem {
   final DateTime? purchasedAt;
   final DateTime? expiresAt;
   final int? quantity;
+  final int? purchasePriceCents;
+  final String? groupName;
+
+  String? get groupLabel =>
+      groupName ??
+      (name.startsWith('离心管 ')
+          ? '离心管'
+          : name.startsWith('试管 ')
+          ? '试管'
+          : null);
+
+  String get childLabel => groupName == null && groupLabel != null
+      ? name.substring(groupLabel!.length).trim()
+      : name;
+
+  String get fullName => groupName == null ? name : '$groupName · $name';
+
+  String? get purchasePriceText => formatPurchasePrice(purchasePriceCents);
 
   DateTime? effectiveExpiryDate() => switch (expiryType) {
     InventoryExpiryType.none => null,
@@ -220,6 +258,8 @@ class InventoryItem {
     purchasedAt: _dateOrNull(map['purchased_at']),
     expiresAt: _dateOrNull(map['expires_at']),
     quantity: map['quantity'] as int?,
+    purchasePriceCents: map['purchase_price_cents'] as int?,
+    groupName: map['group_name'] as String?,
   );
 
   Map<String, Object?> toMap() => {
@@ -232,6 +272,8 @@ class InventoryItem {
     'purchased_at': purchasedAt?.toIso8601String(),
     'expires_at': expiresAt?.toIso8601String(),
     'quantity': quantity,
+    'purchase_price_cents': purchasePriceCents,
+    'group_name': groupName,
   };
 }
 
@@ -258,6 +300,7 @@ class FeederRecord {
     required this.occurredAt,
     required this.createdAt,
     this.note,
+    this.purchasePriceCents,
     this.temperature,
     this.humidity,
     this.juvenileCount,
@@ -270,6 +313,9 @@ class FeederRecord {
   final FeederRecordType type;
   final DateTime occurredAt;
   final String? note;
+  final int? purchasePriceCents;
+
+  String? get purchasePriceText => formatPurchasePrice(purchasePriceCents);
   final double? temperature;
   final double? humidity;
   final int? juvenileCount;
@@ -283,6 +329,7 @@ class FeederRecord {
     type: FeederRecordType.fromStorage(map['record_type']! as String),
     occurredAt: DateTime.parse(map['occurred_at']! as String),
     note: map['note'] as String?,
+    purchasePriceCents: map['purchase_price_cents'] as int?,
     temperature: (map['temperature'] as num?)?.toDouble(),
     humidity: (map['humidity'] as num?)?.toDouble(),
     juvenileCount: map['juvenile_count'] as int?,
@@ -297,6 +344,7 @@ class FeederRecord {
     'record_type': type.storageValue,
     'occurred_at': occurredAt.toIso8601String(),
     'note': note,
+    'purchase_price_cents': purchasePriceCents,
     'temperature': temperature,
     'humidity': humidity,
     'juvenile_count': juvenileCount,

@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'account_controller.dart';
+import 'personal_center_page.dart';
 import 'population_analysis_page.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
@@ -12,6 +14,7 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
 
 const _speciesOptions = <String, List<String>>{
@@ -73,6 +76,7 @@ Future<void> main() async {
 }
 
 final themeController = AppPreferences(AppDatabase.instance);
+final accountController = AccountController(preferences: themeController);
 
 class AntKeepApp extends StatelessWidget {
   const AntKeepApp({super.key});
@@ -133,12 +137,12 @@ class _HomePageState extends State<HomePage> {
   );
 
   Widget _buildPage(BuildContext context) {
-    const titles = ['我的蚁群', '最近记录', '物品', 'DLC 养殖', '设置'];
+    const titles = ['我的蚁群', '物品', 'DLC 养殖', '发现', '设置'];
     final pages = [
       const ColoniesPage(),
-      const RecentRecordsPage(),
       const InventoryPage(),
       const DlcPage(),
+      const DiscoverPage(),
       const SettingsPage(),
     ];
     return Scaffold(
@@ -203,11 +207,6 @@ class _HomePageState extends State<HomePage> {
             label: '蚁群',
           ),
           NavigationDestination(
-            icon: Icon(Icons.article_outlined),
-            selectedIcon: Icon(Icons.article),
-            label: '记录',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.inventory_2_outlined),
             selectedIcon: Icon(Icons.inventory_2),
             label: '物品',
@@ -216,6 +215,11 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.pets_outlined),
             selectedIcon: Icon(Icons.pets),
             label: 'DLC',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: '发现',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
@@ -234,7 +238,11 @@ class ColoniesPage extends StatefulWidget {
   State<ColoniesPage> createState() => _ColoniesPageState();
 }
 
-typedef _ColonyListEntry = ({Colony colony, CareRecord? latestPopulation});
+typedef _ColonyListEntry = ({
+  Colony colony,
+  CareRecord? latestPopulation,
+  int? workers,
+});
 
 class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
@@ -262,7 +270,11 @@ class _ColoniesPageState extends State<ColoniesPage> {
               record.workerCount != null,
           orElse: () => null,
         );
-        return (colony: colony, latestPopulation: latestPopulation);
+        return (
+          colony: colony,
+          latestPopulation: latestPopulation,
+          workers: colony.currentWorkerCount(records),
+        );
       }),
     );
   }
@@ -306,6 +318,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
             itemBuilder: (context, index) => _ColonyCard(
               colony: colonies[index].colony,
               latestPopulation: colonies[index].latestPopulation,
+              workers: colonies[index].workers,
               onTap: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
@@ -327,15 +340,16 @@ class _ColonyCard extends StatelessWidget {
   const _ColonyCard({
     required this.colony,
     required this.latestPopulation,
+    required this.workers,
     required this.onTap,
   });
   final Colony colony;
   final CareRecord? latestPopulation;
+  final int? workers;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final workers = latestPopulation?.workerCount ?? colony.initialWorkerCount;
     final broodCounts = [
       latestPopulation?.eggCount ?? colony.initialEggCount,
       latestPopulation?.larvaCount,
@@ -344,8 +358,9 @@ class _ColonyCard extends StatelessWidget {
     final brood = broodCounts.isEmpty
         ? null
         : broodCounts.fold<int>(0, (sum, count) => sum + count);
+    final theme = Theme.of(context);
     final numberStyle = TextStyle(
-      color: Theme.of(context).colorScheme.onSurface,
+      color: theme.colorScheme.onSurface,
       fontWeight: FontWeight.w700,
     );
     TextSpan quantity(int count, String label) => TextSpan(
@@ -355,75 +370,148 @@ class _ColonyCard extends StatelessWidget {
       ],
     );
     final details = <InlineSpan>[
-      if (colony.species?.isNotEmpty == true) TextSpan(text: colony.species),
       if (colony.queenCount != null) quantity(colony.queenCount!, '蚁后'),
       if (colony.showSpecialized && colony.specializedCount != null)
         quantity(colony.specializedCount!, '特化'),
-      if (workers != null) quantity(workers, '工蚁'),
+      if (workers != null) quantity(workers!, '工蚁'),
       if (brood != null) quantity(brood, '卵幼茧'),
-      if (colony.nestType?.isNotEmpty == true) TextSpan(text: colony.nestType),
     ];
+    final description = [
+      colony.species,
+      colony.nestType,
+    ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
     return Card(
-      child: ListTile(
-        leading: colony.coverPhotoPath == null
-            ? const CircleAvatar(child: Icon(Icons.hive_outlined))
-            : _StoredImage(
-                relativePath: colony.coverPhotoPath!,
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-              ),
-        title: Row(
-          children: [
-            Expanded(child: Text(colony.name)),
-            if (colony.scale != null) _ColonyScaleBadge(scale: colony.scale!),
-          ],
-        ),
-        subtitle: details.isEmpty
-            ? const Text('尚未补充档案')
-            : Text.rich(
-                TextSpan(
-                  children: [
-                    for (var i = 0; i < details.length; i++) ...[
-                      if (i > 0) const TextSpan(text: ' · '),
-                      details[i],
-                    ],
-                  ],
-                ),
-              ),
-        trailing: const Icon(Icons.chevron_right),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  colony.coverPhotoPath == null
+                      ? const CircleAvatar(
+                          radius: 24,
+                          child: Icon(Icons.hive_outlined),
+                        )
+                      : _StoredImage(
+                          relativePath: colony.coverPhotoPath!,
+                          width: 48,
+                          height: 48,
+                          borderRadius: 24,
+                        ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              colony.name,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            _ColonyTags(colony: colony, workers: workers),
+                          ],
+                        ),
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            description,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              if (details.isNotEmpty || description.isEmpty) ...[
+                const SizedBox(height: 12),
+                Text.rich(
+                  TextSpan(
+                    children: details.isEmpty
+                        ? [const TextSpan(text: '尚未补充档案')]
+                        : [
+                            for (var i = 0; i < details.length; i++) ...[
+                              if (i > 0) const TextSpan(text: ' · '),
+                              details[i],
+                            ],
+                          ],
+                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _ColonyScaleBadge extends StatelessWidget {
-  const _ColonyScaleBadge({required this.scale});
-  final ColonyScale scale;
+class _ColonyTags extends StatelessWidget {
+  const _ColonyTags({required this.colony, required this.workers});
+  final Colony colony;
+  final int? workers;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final scale = ColonyScale.fromWorkerCount(workers);
     final color = switch (scale) {
-      ColonyScale.newQueen => scheme.primary,
       ColonyScale.small => scheme.secondary,
       ColonyScale.medium => scheme.tertiary,
       ColonyScale.large => scheme.primary,
       ColonyScale.superLarge => scheme.error,
+      null => scheme.onSurfaceVariant,
     };
-    return Container(
-      margin: const EdgeInsets.only(left: 8),
+    Widget badge(String label, Color color, {bool crown = false}) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .14),
         borderRadius: BorderRadius.circular(99),
       ),
-      child: Text(
-        scale.label,
-        style: Theme.of(context).textTheme.labelSmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w700),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (crown) ...[
+            const Text('👑', style: TextStyle(fontSize: 12)),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: color, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
+    );
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        if (colony.isNewQueenColony) badge('新后群', scheme.primary, crown: true),
+        if (scale != null) badge(scale.label, color),
+      ],
     );
   }
 }
@@ -439,6 +527,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _source = TextEditingController();
+  final _purchasePrice = TextEditingController();
   final _queens = TextEditingController();
   final _specialized = TextEditingController(text: '0');
   var _showSpecialized = false;
@@ -461,6 +550,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     if (colony == null) return;
     _name.text = colony.name;
     _source.text = colony.source ?? '';
+    _purchasePrice.text = colony.purchasePriceText ?? '';
     _queens.text = colony.queenCount?.toString() ?? '';
     _specialized.text = colony.specializedCount?.toString() ?? '0';
     _showSpecialized = colony.showSpecialized;
@@ -485,6 +575,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     for (final controller in [
       _name,
       _source,
+      _purchasePrice,
       _queens,
       _specialized,
       _workers,
@@ -516,6 +607,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           species: _selectedSpecies,
           acquiredOn: _acquiredOn,
           source: _textOrNull(_source.text),
+          purchasePriceCents: parsePurchasePrice(_purchasePrice.text),
           queenCount: int.tryParse(_queens.text),
           specializedCount: int.tryParse(_specialized.text.trim()),
           showSpecialized: _showSpecialized,
@@ -657,7 +749,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: '初始工蚁数量',
-                    helperText: '群规模按此数量自动判断，0 为新后群',
+                    helperText: '初始工蚁为 0 表示从新后开始养；群规模随数量记录更新',
+                    helperMaxLines: 3,
                   ),
                 ),
               ),
@@ -757,6 +850,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             ),
           ),
           const SizedBox(height: 12),
+          _PurchasePriceField(controller: _purchasePrice),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             icon: const Icon(Icons.calendar_today_outlined),
             label: Text(
@@ -800,6 +895,27 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
         ],
       ),
     ),
+  );
+}
+
+class _PurchasePriceField extends StatelessWidget {
+  const _PurchasePriceField({required this.controller});
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+    controller: controller,
+    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    decoration: const InputDecoration(
+      labelText: '购入价（可选）',
+      prefixText: '¥ ',
+      suffixText: '元',
+    ),
+    validator: (value) => value == null || value.trim().isEmpty
+        ? null
+        : parsePurchasePrice(value) == null
+        ? '请输入有效的非负金额，最多两位小数'
+        : null,
   );
 }
 
@@ -987,7 +1103,10 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            _ColonyScaleSummary(colony: colony),
+            _ColonyScaleSummary(
+              colony: colony,
+              workers: colony.currentWorkerCount(detail.records),
+            ),
             const SizedBox(height: 12),
             _ColonySummary(colony: colony),
             const SizedBox(height: 16),
@@ -1104,8 +1223,9 @@ class _GrowthMetric extends StatelessWidget {
 }
 
 class _ColonyScaleSummary extends StatelessWidget {
-  const _ColonyScaleSummary({required this.colony});
+  const _ColonyScaleSummary({required this.colony, required this.workers});
   final Colony colony;
+  final int? workers;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -1116,15 +1236,8 @@ class _ColonyScaleSummary extends StatelessWidget {
         children: [
           Text('群规模', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
-          Chip(
-            avatar: Icon(
-              colony.scale == ColonyScale.newQueen
-                  ? Icons.workspace_premium_outlined
-                  : Icons.groups_outlined,
-              size: 18,
-            ),
-            label: Text(colony.scale?.label ?? '待填写工蚁数量'),
-          ),
+          _ColonyTags(colony: colony, workers: workers),
+          if (workers == null) const Text('待填写工蚁数量'),
         ],
       ),
     ),
@@ -1177,6 +1290,8 @@ class _ColonySummary extends StatelessWidget {
                 Chip(label: Text('湿度 ≤ ${colony.targetHumidity}%')),
               if (colony.acquiredOn != null)
                 Chip(label: Text('入手 ${_date(colony.acquiredOn!)}')),
+              if (colony.purchasePriceCents != null)
+                Chip(label: Text('购入价 ¥${colony.purchasePriceText}')),
             ],
           ),
         ],
@@ -1519,44 +1634,49 @@ class _RecordCard extends StatelessWidget {
   }
 }
 
-class RecentRecordsPage extends StatefulWidget {
-  const RecentRecordsPage({super.key});
-  @override
-  State<RecentRecordsPage> createState() => _RecentRecordsPageState();
-}
-
-class _RecentRecordsPageState extends State<RecentRecordsPage> {
-  late Future<List<CareRecord>> _records;
-  @override
-  void initState() {
-    super.initState();
-    _records = AppDatabase.instance.listRecentRecords();
-  }
+class DiscoverPage extends StatelessWidget {
+  const DiscoverPage({super.key});
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<List<CareRecord>>(
-    future: _records,
-    builder: (context, snapshot) {
-      if (snapshot.connectionState != ConnectionState.done) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (snapshot.hasError) {
-        return _ErrorState('读取记录失败：${snapshot.error}');
-      }
-      final records = snapshot.data!;
-      if (records.isEmpty) {
-        return const _EmptyState(
-          icon: Icons.article_outlined,
-          title: '还没有养殖记录',
-          message: '进入一窝蚂蚁后，点击“添加记录”。',
-        );
-      }
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: records.length,
-        itemBuilder: (context, i) => _RecordCard(record: records[i]),
-      );
-    },
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      Text('发现养蚁的更多乐趣', style: Theme.of(context).textTheme.headlineSmall),
+      const SizedBox(height: 8),
+      Text('活动与实用工具将在这里陆续开放。', style: Theme.of(context).textTheme.bodyMedium),
+      const SizedBox(height: 24),
+      for (final entry in const [
+        (
+          icon: Icons.emoji_events_outlined,
+          title: '蚁友比赛',
+          subtitle: '分享养殖成果，参与主题挑战',
+        ),
+        (
+          icon: Icons.card_giftcard_outlined,
+          title: '抽奖活动',
+          subtitle: '发现活动，收获养蚁小惊喜',
+        ),
+        (icon: Icons.handyman_outlined, title: '养殖工具', subtitle: '让日常养护更方便'),
+      ])
+        Card(
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            leading: Icon(
+              entry.icon,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            title: Text(entry.title),
+            subtitle: Text(entry.subtitle),
+            trailing: Text(
+              '敬请期待',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+        ),
+    ],
   );
 }
 
@@ -1568,7 +1688,8 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   late Future<List<InventoryItem>> _items;
-  var _batchPurchasing = false;
+  var _purchasing = false;
+  final _cart = <String>{};
   @override
   void initState() {
     super.initState();
@@ -1579,83 +1700,46 @@ class _InventoryPageState extends State<InventoryPage> {
     _items = AppDatabase.instance.listInventory();
   }
 
-  Future<void> _batchPurchase(List<InventoryItem> items) async {
-    final selected = <String>{};
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('批量购入'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('勾选已购入的物品，数量可稍后单独填写。'),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('全选'),
-                  value: selected.length == items.length,
-                  onChanged: (value) => setDialogState(() {
-                    selected.clear();
-                    if (value == true) {
-                      selected.addAll(items.map((item) => item.id));
-                    }
-                  }),
-                ),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final item in items)
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(item.name),
-                          value: selected.contains(item.id),
-                          onChanged: (value) => setDialogState(() {
-                            if (value == true) {
-                              selected.add(item.id);
-                            } else {
-                              selected.remove(item.id);
-                            }
-                          }),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+  Future<void> _checkout() async {
+    final items = (await _items)
+        .where((item) => !item.purchased && _cart.contains(item.id))
+        .toList();
+    if (!mounted || items.isEmpty || _purchasing) return;
+    final details =
+        await showDialog<
+          Map<String, ({int? quantity, int? purchasePriceCents})>
+        >(
+          context: context,
+          builder: (context) => _InventoryCartDialog(
+            items: items,
+            onRemove: (id) => setState(() => _cart.remove(id)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: selected.isEmpty
-                  ? null
-                  : () => Navigator.pop(context, true),
-              child: Text('确认购入 (${selected.length})'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    setState(() => _batchPurchasing = true);
+        );
+    if (details == null || details.isEmpty || !mounted) return;
+    setState(() => _purchasing = true);
     try {
-      await AppDatabase.instance.purchaseInventoryItems(selected);
-      if (mounted) setState(_reload);
+      await AppDatabase.instance.purchaseInventoryItems(
+        details.keys,
+        details: details,
+      );
+      if (mounted) {
+        setState(() {
+          _cart.removeAll(details.keys);
+          _reload();
+        });
+      }
     } catch (error) {
       if (mounted) _showError(context, error);
     } finally {
-      if (mounted) setState(() => _batchPurchasing = false);
+      if (mounted) setState(() => _purchasing = false);
     }
   }
 
   Future<void> _addItem() async {
     var itemName = '';
+    var isGroup = false;
+    var childNames = '';
+    String? validationError;
     var shelfLifeMonths = '3';
     var expiryType = InventoryExpiryType.none;
     DateTime? expiresAt;
@@ -1668,11 +1752,44 @@ class _InventoryPageState extends State<InventoryPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('聚合物品'),
+                  subtitle: const Text('一级名称下包含多个可单独购买的子物品'),
+                  value: isGroup,
+                  onChanged: (value) => setDialogState(() {
+                    isGroup = value;
+                    validationError = null;
+                  }),
+                ),
                 TextField(
                   onChanged: (value) => itemName = value,
                   autofocus: true,
-                  decoration: const InputDecoration(labelText: '物品名称'),
+                  decoration: InputDecoration(
+                    labelText: isGroup ? '一级物品名称' : '物品名称',
+                  ),
                 ),
+                if (isGroup) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: childNames,
+                    onChanged: (value) => childNames = value,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: '子物品（每行一个）',
+                      hintText: '干巢\n湿巢\n中活动区',
+                    ),
+                  ),
+                  const Text('有效期设置应用于各子物品；同名一级物品可继续追加子物品。'),
+                ],
+                if (validationError != null)
+                  Text(
+                    validationError!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<InventoryExpiryType>(
                   key: ValueKey(expiryType),
@@ -1730,6 +1847,25 @@ class _InventoryPageState extends State<InventoryPage> {
             FilledButton(
               onPressed: () {
                 final name = itemName.trim();
+                final children = isGroup
+                    ? childNames
+                          .split('\n')
+                          .map((value) => value.trim())
+                          .where((value) => value.isNotEmpty)
+                          .toList()
+                    : <String>[];
+                if (name.isEmpty ||
+                    (isGroup && children.isEmpty) ||
+                    children.toSet().length != children.length) {
+                  setDialogState(
+                    () => validationError = name.isEmpty
+                        ? '请填写物品名称'
+                        : children.isEmpty
+                        ? '请至少填写一个子物品'
+                        : '子物品名称不能重复',
+                  );
+                  return;
+                }
                 if (name.isEmpty ||
                     (expiryType == InventoryExpiryType.fixedDate &&
                         expiresAt == null)) {
@@ -1739,6 +1875,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   context,
                   _NewInventoryItem(
                     name: name,
+                    children: children,
                     expiryType: expiryType,
                     shelfLifeMonths: expiryType == InventoryExpiryType.shelfLife
                         ? int.tryParse(shelfLifeMonths) ?? 3
@@ -1755,17 +1892,23 @@ class _InventoryPageState extends State<InventoryPage> {
     );
     if (item == null) return;
     try {
-      await AppDatabase.instance.saveInventoryItem(
-        InventoryItem(
-          id: const Uuid().v4(),
-          name: item.name,
-          purchased: false,
-          createdAt: DateTime.now(),
-          expiryType: item.expiryType,
-          shelfLifeMonths: item.shelfLifeMonths,
-          expiresAt: item.expiresAt,
-        ),
+      InventoryItem createItem(String name) => InventoryItem(
+        id: const Uuid().v4(),
+        name: name,
+        groupName: item.children.isEmpty ? null : item.name,
+        purchased: false,
+        createdAt: DateTime.now(),
+        expiryType: item.expiryType,
+        shelfLifeMonths: item.shelfLifeMonths,
+        expiresAt: item.expiresAt,
       );
+      if (item.children.isEmpty) {
+        await AppDatabase.instance.saveInventoryItem(createItem(item.name));
+      } else {
+        await AppDatabase.instance.saveInventoryGroup(
+          item.children.map(createItem).toList(),
+        );
+      }
       if (mounted) setState(_reload);
     } catch (error) {
       if (mounted) _showError(context, error);
@@ -1779,6 +1922,28 @@ class _InventoryPageState extends State<InventoryPage> {
       icon: const Icon(Icons.add),
       label: const Text('新增物品'),
     ),
+    bottomNavigationBar: _cart.isEmpty
+        ? null
+        : SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('已选 ${_cart.length} 件物品')),
+                  FilledButton(
+                    onPressed: _purchasing ? null : _checkout,
+                    child: Text(_purchasing ? '正在购买…' : '查看购物车'),
+                  ),
+                ],
+              ),
+            ),
+          ),
     body: DefaultTabController(
       length: 2,
       child: FutureBuilder<List<InventoryItem>>(
@@ -1804,35 +1969,7 @@ class _InventoryPageState extends State<InventoryPage> {
               Expanded(
                 child: TabBarView(
                   children: [
-                    Column(
-                      children: [
-                        if (needed.isNotEmpty)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: TextButton.icon(
-                                onPressed: _batchPurchasing
-                                    ? null
-                                    : () => _batchPurchase(needed),
-                                icon: const Icon(Icons.checklist_outlined),
-                                label: Text(
-                                  _batchPurchasing ? '正在购入…' : '批量购入',
-                                ),
-                              ),
-                            ),
-                          ),
-                        Expanded(
-                          child: _itemList(
-                            needed,
-                            '暂时没有推荐的物品。',
-                            purchasedItems: purchased,
-                          ),
-                        ),
-                      ],
-                    ),
+                    _itemList(needed, '暂时没有推荐的物品。', purchasedItems: purchased),
                     _itemList(purchased, '还没有已购的物品。'),
                   ],
                 ),
@@ -1847,11 +1984,9 @@ class _InventoryPageState extends State<InventoryPage> {
   Map<String, List<InventoryItem>> _groupItems(List<InventoryItem> items) {
     final groups = <String, List<InventoryItem>>{};
     for (final item in items) {
-      final name = item.name.startsWith('离心管 ')
-          ? '离心管'
-          : item.name.startsWith('试管 ')
-          ? '试管'
-          : item.name;
+      final name = item.groupLabel == null
+          ? 'item:${item.id}'
+          : 'group:${item.groupLabel}';
       groups.putIfAbsent(name, () => []).add(item);
     }
     return groups;
@@ -1867,23 +2002,23 @@ class _InventoryPageState extends State<InventoryPage> {
       if (items.isEmpty && purchasedItems.isEmpty) Text(emptyMessage),
       for (final section in [items, purchasedItems])
         for (final group in _groupItems(section).entries)
-          if (group.key == '离心管' || group.key == '试管')
+          if (group.value.first.groupLabel != null)
             Card(
               child: ExpansionTile(
                 key: PageStorageKey(
                   '$emptyMessage-${group.value.first.purchased}-${group.key}',
                 ),
+                leading: SizedBox(
+                  width: group.value.first.purchased ? 24 : 48,
+                  child: const Icon(Icons.layers_outlined),
+                ),
                 title: Text(
                   group.value.first.purchased
-                      ? '${group.key} · 已购入'
-                      : group.key,
+                      ? '${group.value.first.groupLabel} · 已购入'
+                      : group.value.first.groupLabel!,
                 ),
                 subtitle: Text(
-                  group.value
-                      .map(
-                        (item) => item.name.substring(group.key.length).trim(),
-                      )
-                      .join(' · '),
+                  group.value.map((item) => item.childLabel).join(' · '),
                 ),
                 children: group.value.map(_itemTile).toList(),
               ),
@@ -1894,68 +2029,68 @@ class _InventoryPageState extends State<InventoryPage> {
   );
 
   Future<void> _editItem(InventoryItem item) async {
-    final result = await showDialog<({bool purchased, int? quantity})>(
-      context: context,
-      builder: (context) => _InventoryPurchaseDialog(item: item),
-    );
+    final result =
+        await showDialog<
+          ({bool purchased, int? quantity, int? purchasePriceCents})
+        >(
+          context: context,
+          builder: (context) => _InventoryPurchaseDialog(item: item),
+        );
     if (result == null || !mounted) return;
+    setState(() => _purchasing = true);
     try {
       await AppDatabase.instance.setInventoryPurchased(
         item,
         result.purchased,
         quantity: result.quantity,
+        purchasePriceCents: result.purchasePriceCents,
       );
-      if (mounted) setState(_reload);
+      if (mounted) {
+        setState(() {
+          _cart.remove(item.id);
+          _reload();
+        });
+      }
     } catch (error) {
       if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _purchasing = false);
     }
   }
 
   Widget _itemTile(InventoryItem item) {
-    final expired = item.isExpired();
-    final expiry = item.effectiveExpiryDate();
-    final expiryText = switch (item.expiryType) {
-      InventoryExpiryType.none => null,
-      InventoryExpiryType.shelfLife when item.purchasedAt == null =>
-        '有效期：购入后 ${item.shelfLifeMonths ?? 3} 个月（购入后开始计时）',
-      InventoryExpiryType.shelfLife when expiry == null => '有效期：未设置保质期',
-      InventoryExpiryType.shelfLife =>
-        expired ? '已过期：${_date(expiry!)}' : '有效期至：${_date(expiry!)}',
-      InventoryExpiryType.fixedDate when expiry == null => '有效期：未设置到期日',
-      InventoryExpiryType.fixedDate =>
-        expired ? '已过期：${_date(expiry!)}' : '有效期至：${_date(expiry!)}',
-    };
     return Card(
       child: ListTile(
-        leading: Icon(
-          item.purchased ? Icons.check_circle : Icons.shopping_bag_outlined,
-        ),
-        title: Text(item.name),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item.purchased) const Text('已购入'),
-            Text(
-              item.purchased
-                  ? '数量：${item.quantity?.toString() ?? '未填写'}'
-                  : '点击选择购入',
-            ),
-            if (expiryText != null)
-              Text(
-                expiryText,
-                style: expired
-                    ? TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontWeight: FontWeight.w700,
-                      )
+        leading: item.purchased
+            ? const Icon(Icons.check_circle)
+            : IconButton(
+                tooltip: _cart.contains(item.id) ? '移出购物车' : '加入购物车',
+                icon: Icon(
+                  _cart.contains(item.id)
+                      ? Icons.shopping_cart
+                      : Icons.add_shopping_cart_outlined,
+                ),
+                color: _cart.contains(item.id)
+                    ? Theme.of(context).colorScheme.primary
                     : null,
+                onPressed: _purchasing
+                    ? null
+                    : () => setState(() {
+                        if (!_cart.add(item.id)) _cart.remove(item.id);
+                      }),
               ),
-          ],
+        title: Text(item.name),
+        subtitle: Text(
+          item.purchased
+              ? '已购入'
+              : _cart.contains(item.id)
+              ? '已加入购物车'
+              : '点击购买',
         ),
         trailing: Icon(
           item.purchased ? Icons.edit_outlined : Icons.chevron_right,
         ),
-        onTap: () => _editItem(item),
+        onTap: _purchasing ? null : () => _editItem(item),
       ),
     );
   }
@@ -1972,55 +2107,172 @@ class _InventoryPurchaseDialog extends StatefulWidget {
 
 class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _quantity;
-  late bool _purchased;
+  late String _quantity;
+  late String _price;
 
   @override
   void initState() {
     super.initState();
-    _purchased = widget.item.purchased;
-    _quantity = TextEditingController(
-      text: widget.item.quantity?.toString() ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _quantity.dispose();
-    super.dispose();
+    _quantity = widget.item.quantity?.toString() ?? '';
+    _price = widget.item.purchasePriceText ?? '';
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.item.name),
+    title: Text(widget.item.fullName),
     content: SingleChildScrollView(
       child: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('已购入'),
-              value: _purchased,
-              onChanged: (value) => setState(() => _purchased = value),
-            ),
-            if (_purchased)
-              TextFormField(
-                controller: _quantity,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '数量（选填）',
-                  hintText: '请输入非负整数',
+        child: _InventoryPurchaseFields(
+          quantity: _quantity,
+          price: _price,
+          onQuantityChanged: (value) => _quantity = value,
+          onPriceChanged: (value) => _price = value,
+        ),
+      ),
+    ),
+    actions: [
+      if (widget.item.purchased)
+        TextButton(
+          onPressed: () => Navigator.pop(context, (
+            purchased: false,
+            quantity: null,
+            purchasePriceCents: null,
+          )),
+          child: const Text('撤销购入'),
+        ),
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: () {
+          if (!_formKey.currentState!.validate()) return;
+          Navigator.pop(context, (
+            purchased: true,
+            quantity: int.tryParse(_quantity.trim()),
+            purchasePriceCents: parsePurchasePrice(_price),
+          ));
+        },
+        child: Text(widget.item.purchased ? '保存' : '购买'),
+      ),
+    ],
+  );
+}
+
+class _InventoryPurchaseFields extends StatelessWidget {
+  const _InventoryPurchaseFields({
+    required this.quantity,
+    required this.price,
+    required this.onQuantityChanged,
+    required this.onPriceChanged,
+  });
+
+  final String quantity;
+  final String price;
+  final ValueChanged<String> onQuantityChanged;
+  final ValueChanged<String> onPriceChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      TextFormField(
+        initialValue: quantity,
+        onChanged: onQuantityChanged,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(labelText: '数量（选填）'),
+        validator: (value) {
+          final text = value?.trim() ?? '';
+          if (text.isEmpty) return null;
+          final quantity = int.tryParse(text);
+          return quantity == null || quantity < 0 ? '请输入非负整数' : null;
+        },
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        initialValue: price,
+        onChanged: onPriceChanged,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          labelText: '购入价（选填）',
+          prefixText: '¥ ',
+          helperText: '本次购买总价（元）',
+        ),
+        validator: (value) =>
+            (value?.trim().isEmpty ?? true) ||
+                parsePurchasePrice(value!) != null
+            ? null
+            : '请输入非负金额，最多两位小数',
+      ),
+    ],
+  );
+}
+
+class _InventoryCartDialog extends StatefulWidget {
+  const _InventoryCartDialog({required this.items, required this.onRemove});
+  final List<InventoryItem> items;
+  final ValueChanged<String> onRemove;
+
+  @override
+  State<_InventoryCartDialog> createState() => _InventoryCartDialogState();
+}
+
+class _InventoryCartDialogState extends State<_InventoryCartDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final List<InventoryItem> _items = List.of(widget.items);
+  final _quantities = <String, String>{};
+  final _prices = <String, String>{};
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text('购物车 (${_items.length})'),
+    content: SizedBox(
+      width: double.maxFinite,
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_items.isEmpty) const Text('购物车是空的，去添加心仪的物品吧。'),
+              for (final item in _items)
+                Padding(
+                  key: ValueKey(item.id),
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.fullName,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '移除${item.name}',
+                            onPressed: () {
+                              widget.onRemove(item.id);
+                              setState(() => _items.remove(item));
+                            },
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      _InventoryPurchaseFields(
+                        quantity: _quantities[item.id] ?? '',
+                        price: _prices[item.id] ?? '',
+                        onQuantityChanged: (value) =>
+                            _quantities[item.id] = value,
+                        onPriceChanged: (value) => _prices[item.id] = value,
+                      ),
+                    ],
+                  ),
                 ),
-                validator: (value) {
-                  final text = value?.trim() ?? '';
-                  if (text.isEmpty) return null;
-                  final quantity = int.tryParse(text);
-                  return quantity == null || quantity < 0 ? '请输入非负整数' : null;
-                },
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
@@ -2030,14 +2282,23 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
         child: const Text('取消'),
       ),
       FilledButton(
-        onPressed: () {
-          if (!_formKey.currentState!.validate()) return;
-          Navigator.pop(context, (
-            purchased: _purchased,
-            quantity: _purchased ? int.tryParse(_quantity.text.trim()) : null,
-          ));
-        },
-        child: const Text('保存'),
+        onPressed: _items.isEmpty
+            ? null
+            : () {
+                if (!_formKey.currentState!.validate()) return;
+                Navigator.pop(context, {
+                  for (final item in _items)
+                    item.id: (
+                      quantity: int.tryParse(
+                        (_quantities[item.id] ?? '').trim(),
+                      ),
+                      purchasePriceCents: parsePurchasePrice(
+                        _prices[item.id] ?? '',
+                      ),
+                    ),
+                });
+              },
+        child: const Text('购买'),
       ),
     ],
   );
@@ -2049,12 +2310,14 @@ class _NewInventoryItem {
     required this.expiryType,
     this.shelfLifeMonths,
     this.expiresAt,
+    this.children = const [],
   });
 
   final String name;
   final InventoryExpiryType expiryType;
   final int? shelfLifeMonths;
   final DateTime? expiresAt;
+  final List<String> children;
 }
 
 class DlcPage extends StatefulWidget {
@@ -2107,7 +2370,7 @@ class _DlcPageState extends State<DlcPage> {
                   final juveniles = record.juvenileCount;
                   final adults = record.adultCount;
                   return _FeederSummary(
-                    time: _dateTime(record.occurredAt),
+                    time: _date(record.occurredAt),
                     count: juveniles != null && adults != null
                         ? '${juveniles + adults} 只'
                         : '部分未记录',
@@ -2250,6 +2513,8 @@ class FeederRecordFormPage extends StatefulWidget {
 }
 
 class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _purchasePrice = TextEditingController();
   final _note = TextEditingController();
   final _temperature = TextEditingController();
   final _humidity = TextEditingController();
@@ -2263,6 +2528,7 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
   @override
   void dispose() {
     for (final controller in [
+      _purchasePrice,
       _note,
       _temperature,
       _humidity,
@@ -2301,6 +2567,7 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
   }
 
   Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
       await AppDatabase.instance.saveFeederRecord(
@@ -2314,6 +2581,7 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
           humidity: double.tryParse(_humidity.text),
           juvenileCount: int.tryParse(_juveniles.text),
           adultCount: int.tryParse(_adults.text),
+          purchasePriceCents: parsePurchasePrice(_purchasePrice.text),
           mortalityCount: int.tryParse(_mortality.text),
           createdAt: DateTime.now(),
         ),
@@ -2329,104 +2597,109 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('记录${widget.feeder.label}')),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('记录类型', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: FeederRecordType.values
-              .map(
-                (type) => ChoiceChip(
-                  label: Text(type.label),
-                  selected: _type == type,
-                  onSelected: (_) => setState(() => _type = type),
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: _pickTime,
-          icon: const Icon(Icons.schedule),
-          label: Text('发生时间：${_dateTime(_occurredAt)}'),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _note,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: '备注',
-            hintText: '例如：更换食物，活动正常',
+    body: Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('记录类型', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: FeederRecordType.values
+                .map(
+                  (type) => ChoiceChip(
+                    label: Text(type.label),
+                    selected: _type == type,
+                    onSelected: (_) => setState(() => _type = type),
+                  ),
+                )
+                .toList(),
           ),
-        ),
-        const SizedBox(height: 16),
-        Text('数量（不清楚可留空）', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _juveniles,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '幼体/若虫数量'),
-              ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _pickTime,
+            icon: const Icon(Icons.schedule),
+            label: Text('发生时间：${_dateTime(_occurredAt)}'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _note,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: '备注',
+              hintText: '例如：更换食物，活动正常',
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _adults,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '成体数量'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _mortality,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: '死亡数量'),
-        ),
-        const SizedBox(height: 16),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: const Text('环境（选填）'),
-          childrenPadding: const EdgeInsets.only(bottom: 12),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _temperature,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(labelText: '温度 °C'),
-                  ),
+          ),
+          const SizedBox(height: 16),
+          _PurchasePriceField(controller: _purchasePrice),
+          const SizedBox(height: 16),
+          Text('数量（不清楚可留空）', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _juveniles,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '幼体/若虫数量'),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _humidity,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(labelText: '湿度 %'),
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _adults,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '成体数量'),
                 ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: Text(_saving ? '保存中…' : '保存记录'),
-        ),
-      ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _mortality,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: '死亡数量'),
+          ),
+          const SizedBox(height: 16),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('环境（选填）'),
+            childrenPadding: const EdgeInsets.only(bottom: 12),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _temperature,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: '温度 °C'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _humidity,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: '湿度 %'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? '保存中…' : '保存记录'),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -2438,6 +2711,7 @@ class _FeederRecordCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facts = <String>[
+      if (record.purchasePriceCents != null) '购入价 ¥${record.purchasePriceText}',
       if (record.juvenileCount != null) '幼体/若虫 ${record.juvenileCount}',
       if (record.adultCount != null) '成体 ${record.adultCount}',
       if (record.mortalityCount != null) '死亡 ${record.mortalityCount}',
@@ -2491,237 +2765,350 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  bool _savingEdition = false;
+
+  Future<void> _setEdition(AppEdition edition) async {
+    if (_savingEdition || themeController.edition == edition) return;
+    setState(() => _savingEdition = true);
+    try {
+      await themeController.setEdition(edition);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _savingEdition = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: themeController,
     builder: (context, _) => _buildSettings(context),
   );
 
-  Widget _buildSettings(BuildContext context) => ListView(
-    children: [
-      ListTile(
-        leading: Icon(
-          themeController.edition == AppEdition.offline
-              ? Icons.phonelink_lock_outlined
-              : Icons.cloud_download_outlined,
-        ),
-        title: Text(themeController.edition.label),
-        subtitle: Text(
-          themeController.edition == AppEdition.offline
-              ? '使用 App 内置资料；蚁群、记录和照片仅保存在本设备。'
-              : '养殖记录和照片仍仅保存在本设备；可获取后台发布的最新资料和配置。',
-        ),
-      ),
-      const Divider(),
-      const ListTile(
-        leading: Icon(Icons.palette_outlined),
-        title: Text('主题色'),
-        subtitle: Text('选择喜欢的颜色，保存在本机'),
-      ),
+  Widget _section(BuildContext context, String title, List<Widget> children) =>
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: ThemeColorPicker(
-          selected: themeController.themeColor,
-          onChanged: (color) async {
-            try {
-              await themeController.setThemeColor(color);
-            } catch (error) {
-              if (context.mounted) _showError(context, error);
-            }
-          },
+        padding: const EdgeInsets.only(bottom: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Card(
+              margin: EdgeInsets.zero,
+              elevation: 0,
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
+                ),
+              ),
+            ),
+          ],
         ),
-      ),
-      SwitchListTile(
-        secondary: const Icon(Icons.lightbulb_outline),
-        title: const Text('新手注意事项'),
-        subtitle: const Text('在蚁群首页显示养蚁新手注意事项'),
-        value: themeController.beginner,
-        onChanged: (enabled) async {
-          try {
-            await themeController.setBeginner(enabled);
-          } catch (error) {
-            if (context.mounted) _showError(context, error);
-          }
-        },
-      ),
-      const ListTile(
-        leading: Icon(Icons.dark_mode_outlined),
-        title: Text('外观模式'),
-        subtitle: Text('跟随系统，或固定使用浅色、深色界面'),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: ThemeModePicker(
-          selected: themeController.themeMode,
-          onChanged: (mode) async {
-            try {
-              await themeController.setThemeMode(mode);
-            } catch (error) {
-              if (context.mounted) _showError(context, error);
-            }
-          },
-        ),
-      ),
-      const Divider(),
-      SwitchListTile(
-        secondary: const Icon(Icons.notifications_active_outlined),
-        title: const Text('本地养护提醒'),
-        subtitle: Text(
-          themeController.careRemindersEnabled
-              ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
-              : '关闭；开启后仅向系统申请通知权限',
-        ),
-        value: themeController.careRemindersEnabled,
-        onChanged: (enabled) async {
-          try {
-            if (enabled) {
-              final granted = await LocalNotificationService.instance
-                  .requestPermission();
-              if (!granted) {
-                if (context.mounted) _showInfo(context, '未获得通知权限，提醒没有开启。');
-                return;
-              }
-              await LocalNotificationService.instance.scheduleDailyCareReminder(
-                themeController.careReminderMinuteOfDay,
-              );
-            } else {
-              await LocalNotificationService.instance.cancelDailyCareReminder();
-            }
-            await themeController.setCareReminder(
-              enabled: enabled,
-              minuteOfDay: themeController.careReminderMinuteOfDay,
-            );
-          } catch (error) {
-            if (context.mounted) _showError(context, error);
-          }
-        },
-      ),
-      ListTile(
-        enabled: themeController.careRemindersEnabled,
-        leading: const Icon(Icons.schedule_outlined),
-        title: const Text('提醒时间'),
-        subtitle: Text(
-          '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}',
-        ),
-        onTap: !themeController.careRemindersEnabled
-            ? null
-            : () async {
-                final picked = await showTimePicker(
-                  context: context,
-                  initialTime: TimeOfDay(
-                    hour: themeController.careReminderMinuteOfDay ~/ 60,
-                    minute: themeController.careReminderMinuteOfDay % 60,
+      );
+
+  Widget _buildSettings(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 640),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          _section(context, '使用版本', [
+            ListTile(
+              leading: Icon(
+                themeController.edition == AppEdition.offline
+                    ? Icons.phonelink_lock_outlined
+                    : Icons.cloud_download_outlined,
+              ),
+              title: const Text('资料模式'),
+              subtitle: Text(
+                themeController.edition == AppEdition.offline
+                    ? '使用 App 内置资料，断网也能查看。'
+                    : '已选择在线版，在线资料更新暂不可用。',
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final edition in AppEdition.values)
+                    ChoiceChip(
+                      label: Text(edition.label),
+                      selected: themeController.edition == edition,
+                      onSelected: _savingEdition
+                          ? null
+                          : (_) => _setEdition(edition),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                '两种模式下，蚁群、记录和照片都只保存在本设备。',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ]),
+          if (themeController.edition == AppEdition.online)
+            _section(context, '个人中心', [
+              ListTile(
+                leading: const Icon(Icons.manage_accounts_outlined),
+                title: const Text('个人中心与签到'),
+                subtitle: const Text('登录账号，查看每日签到记录'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        PersonalCenterPage(controller: accountController),
                   ),
-                );
-                if (picked == null || !context.mounted) return;
-                final minuteOfDay = picked.hour * 60 + picked.minute;
+                ),
+              ),
+            ]),
+          _section(context, '外观与偏好', [
+            const ListTile(
+              leading: Icon(Icons.palette_outlined),
+              title: Text('主题色'),
+              subtitle: Text('选择喜欢的颜色，保存在本机'),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ThemeColorPicker(
+                selected: themeController.themeColor,
+                onChanged: (color) async {
+                  try {
+                    await themeController.setThemeColor(color);
+                  } catch (error) {
+                    if (context.mounted) _showError(context, error);
+                  }
+                },
+              ),
+            ),
+            const ListTile(
+              leading: Icon(Icons.dark_mode_outlined),
+              title: Text('外观模式'),
+              subtitle: Text('跟随系统，或固定使用浅色、深色界面'),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ThemeModePicker(
+                selected: themeController.themeMode,
+                onChanged: (mode) async {
+                  try {
+                    await themeController.setThemeMode(mode);
+                  } catch (error) {
+                    if (context.mounted) _showError(context, error);
+                  }
+                },
+              ),
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              secondary: const Icon(Icons.lightbulb_outline),
+              title: const Text('新手注意事项'),
+              subtitle: const Text('在蚁群首页显示养蚁新手注意事项'),
+              value: themeController.beginner,
+              onChanged: (enabled) async {
                 try {
-                  await LocalNotificationService.instance
-                      .scheduleDailyCareReminder(minuteOfDay);
+                  await themeController.setBeginner(enabled);
+                } catch (error) {
+                  if (context.mounted) _showError(context, error);
+                }
+              },
+            ),
+          ]),
+          _section(context, '养护提醒', [
+            SwitchListTile(
+              secondary: const Icon(Icons.notifications_active_outlined),
+              title: const Text('本地养护提醒'),
+              subtitle: Text(
+                themeController.careRemindersEnabled
+                    ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
+                    : '关闭；开启后仅向系统申请通知权限',
+              ),
+              value: themeController.careRemindersEnabled,
+              onChanged: (enabled) async {
+                try {
+                  if (enabled) {
+                    final granted = await LocalNotificationService.instance
+                        .requestPermission();
+                    if (!granted) {
+                      if (context.mounted) {
+                        _showInfo(context, '未获得通知权限，提醒没有开启。');
+                      }
+                      return;
+                    }
+                    await LocalNotificationService.instance
+                        .scheduleDailyCareReminder(
+                          themeController.careReminderMinuteOfDay,
+                        );
+                  } else {
+                    await LocalNotificationService.instance
+                        .cancelDailyCareReminder();
+                  }
                   await themeController.setCareReminder(
-                    enabled: true,
-                    minuteOfDay: minuteOfDay,
+                    enabled: enabled,
+                    minuteOfDay: themeController.careReminderMinuteOfDay,
                   );
                 } catch (error) {
                   if (context.mounted) _showError(context, error);
                 }
               },
-      ),
-      const Divider(),
-      ListTile(
-        leading: const Icon(Icons.upload_file_outlined),
-        title: const Text('导出备份'),
-        subtitle: const Text('生成包含记录和照片的 .zip 文件'),
-        onTap: () async {
-          try {
-            final exported = await BackupService(
-              AppDatabase.instance,
-              LocalMediaStore.instance,
-            ).exportBackup();
-            if (exported && context.mounted) _showInfo(context, '已完成备份导出。');
-          } catch (error) {
-            if (context.mounted) _showError(context, error);
-          }
-        },
-      ),
-      ListTile(
-        leading: const Icon(Icons.download_outlined),
-        title: const Text('恢复备份'),
-        subtitle: const Text('恢复会替换本机现有蚁群与记录'),
-        onTap: () async {
-          final approved = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('恢复并替换本地数据？'),
-              content: const Text('当前蚁群和记录会被选中的备份替换。请先导出当前数据。'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('选择备份'),
-                ),
-              ],
             ),
-          );
-          if (approved != true || !context.mounted) return;
-          try {
-            final restored = await BackupService(
-              AppDatabase.instance,
-              LocalMediaStore.instance,
-            ).restoreBackup();
-            if (restored && context.mounted) {
-              _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
-            }
-          } catch (error) {
-            if (context.mounted) _showError(context, error);
-          }
-        },
-      ),
-      ListTile(
-        leading: const Icon(Icons.undo_outlined),
-        title: const Text('撤销上一次恢复'),
-        subtitle: const Text('恢复覆盖前自动保留的本地回退副本'),
-        onTap: () async {
-          final service = BackupService(
-            AppDatabase.instance,
-            LocalMediaStore.instance,
-          );
-          final hasRollback = await service.hasRollback();
-          if (!context.mounted) return;
-          if (!hasRollback) {
-            _showInfo(context, '没有可撤销的恢复操作。');
-            return;
-          }
-          final approved = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('撤销上一次恢复？'),
-              content: const Text('当前数据会被恢复前自动保存的本地副本替换。'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('撤销恢复'),
-                ),
-              ],
+            ListTile(
+              enabled: themeController.careRemindersEnabled,
+              leading: const Icon(Icons.schedule_outlined),
+              title: const Text('提醒时间'),
+              trailing: const Icon(Icons.chevron_right),
+              subtitle: Text(
+                '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}',
+              ),
+              onTap: !themeController.careRemindersEnabled
+                  ? null
+                  : () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay(
+                          hour: themeController.careReminderMinuteOfDay ~/ 60,
+                          minute: themeController.careReminderMinuteOfDay % 60,
+                        ),
+                      );
+                      if (picked == null || !context.mounted) return;
+                      final minuteOfDay = picked.hour * 60 + picked.minute;
+                      try {
+                        await LocalNotificationService.instance
+                            .scheduleDailyCareReminder(minuteOfDay);
+                        await themeController.setCareReminder(
+                          enabled: true,
+                          minuteOfDay: minuteOfDay,
+                        );
+                      } catch (error) {
+                        if (context.mounted) _showError(context, error);
+                      }
+                    },
             ),
-          );
-          if (approved != true || !context.mounted) return;
-          try {
-            await service.undoLastRestore();
-            if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
-          } catch (error) {
-            if (context.mounted) _showError(context, error);
-          }
-        },
+          ]),
+          _section(context, '数据与备份', [
+            ListTile(
+              leading: const Icon(Icons.upload_file_outlined),
+              title: const Text('导出备份'),
+              trailing: const Icon(Icons.chevron_right),
+              subtitle: const Text('生成包含记录和照片的 .zip 文件'),
+              onTap: () async {
+                try {
+                  final exported = await BackupService(
+                    AppDatabase.instance,
+                    LocalMediaStore.instance,
+                  ).exportBackup();
+                  if (exported && context.mounted) {
+                    _showInfo(context, '已完成备份导出。');
+                  }
+                } catch (error) {
+                  if (context.mounted) _showError(context, error);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download_outlined),
+              title: const Text('恢复备份'),
+              trailing: const Icon(Icons.chevron_right),
+              subtitle: const Text('恢复会替换本机现有蚁群与记录'),
+              onTap: () async {
+                final approved = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('恢复并替换本地数据？'),
+                    content: const Text('当前蚁群和记录会被选中的备份替换。请先导出当前数据。'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('取消'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('选择备份'),
+                      ),
+                    ],
+                  ),
+                );
+                if (approved != true || !context.mounted) return;
+                try {
+                  final restored = await BackupService(
+                    AppDatabase.instance,
+                    LocalMediaStore.instance,
+                  ).restoreBackup();
+                  if (restored && context.mounted) {
+                    _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
+                  }
+                } catch (error) {
+                  if (context.mounted) _showError(context, error);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.undo_outlined),
+              title: const Text('撤销上一次恢复'),
+              trailing: const Icon(Icons.chevron_right),
+              subtitle: const Text('恢复覆盖前自动保留的本地回退副本'),
+              onTap: () async {
+                final service = BackupService(
+                  AppDatabase.instance,
+                  LocalMediaStore.instance,
+                );
+                final hasRollback = await service.hasRollback();
+                if (!context.mounted) return;
+                if (!hasRollback) {
+                  _showInfo(context, '没有可撤销的恢复操作。');
+                  return;
+                }
+                final approved = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('撤销上一次恢复？'),
+                    content: const Text('当前数据会被恢复前自动保存的本地副本替换。'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('取消'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('撤销恢复'),
+                      ),
+                    ],
+                  ),
+                );
+                if (approved != true || !context.mounted) return;
+                try {
+                  await service.undoLastRestore();
+                  if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
+                } catch (error) {
+                  if (context.mounted) _showError(context, error);
+                }
+              },
+            ),
+          ]),
+        ],
       ),
-    ],
+    ),
   );
 }
 

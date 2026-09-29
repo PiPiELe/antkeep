@@ -60,17 +60,20 @@ void main() {
               final sql = call.arguments['sql'] as String;
               final values = call.arguments['arguments'] as List<dynamic>;
               final table = RegExp(r'UPDATE (\w+)').firstMatch(sql)!.group(1)!;
-              final columns = RegExp(r'(\w+) = \?')
-                  .allMatches(sql.split('WHERE').first)
-                  .map((match) => match.group(1)!)
-                  .toList();
+              final columns = RegExp(
+                r'(\w+) = (\?|NULL)',
+                caseSensitive: false,
+              ).allMatches(sql.split('WHERE').first).toList();
               final matching = tables[table]!.where(
                 (row) => row['id'] == values.last,
               );
               if (matching.isEmpty) return 0;
               final row = matching.single;
-              for (var index = 0; index < columns.length; index++) {
-                row[columns[index]] = values[index];
+              var valueIndex = 0;
+              for (final column in columns) {
+                row[column.group(1)!] = column.group(2) == '?'
+                    ? values[valueIndex++]
+                    : null;
               }
               return 1;
             case 'insert':
@@ -125,6 +128,8 @@ void main() {
   });
 
   Future<void> tapSave(WidgetTester tester, String label) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text(label),
       200,
@@ -163,6 +168,82 @@ void main() {
     expect(tables['colonies'], hasLength(2));
     expect(find.text('测试蚁群二'), findsOneWidget);
   });
+
+  testWidgets('colony purchase prices validate, save, edit and clear', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新入手蚁群'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '蚁群昵称 *'),
+      '购入价测试',
+    );
+    final price = find.widgetWithText(TextFormField, '购入价（可选）');
+    await tester.scrollUntilVisible(
+      price,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(price, '-1');
+    await tapSave(tester, '保存蚁群');
+    expect(tables['colonies'], isEmpty);
+    expect(find.text('请输入有效的非负金额，最多两位小数'), findsOneWidget);
+    await tester.ensureVisible(price);
+    await tester.enterText(price, '19.99');
+    await tapSave(tester, '保存蚁群');
+    expect(tables['colonies']!.single['purchase_price_cents'], 1999);
+    await tester.tap(find.text('购入价测试'));
+    await tester.pumpAndSettle();
+    expect(find.text('购入价 ¥19.99'), findsOneWidget);
+    for (final value in ['0', '']) {
+      await tester.tap(find.byTooltip('编辑蚁群'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        price,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        tester.widget<TextFormField>(price).controller!.text,
+        value == '0' ? '19.99' : '0.00',
+      );
+      await tester.enterText(price, value);
+      await tapSave(tester, '保存蚁群');
+      expect(
+        tables['colonies']!.single['purchase_price_cents'],
+        value.isEmpty ? null : 0,
+      );
+      expect(
+        find.text('购入价 ¥0.00'),
+        value.isEmpty ? findsNothing : findsOneWidget,
+      );
+    }
+  });
+
+  for (final feeder in FeederType.values) {
+    testWidgets('${feeder.name} purchase price is saved and displayed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(home: FeederDetailPage(feeder: feeder)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('添加记录'));
+      await tester.pumpAndSettle();
+      final price = find.widgetWithText(TextFormField, '购入价（可选）');
+      await tester.ensureVisible(price);
+      await tester.enterText(price, '1.234');
+      await tapSave(tester, '保存记录');
+      expect(tables['feeder_records'], isEmpty);
+      await tester.ensureVisible(price);
+      await tester.enterText(price, '0.29');
+      await tapSave(tester, '保存记录');
+      expect(tables['feeder_records']!.single['purchase_price_cents'], 29);
+      expect(find.text('购入价 ¥0.29'), findsOneWidget);
+    });
+  }
 
   testWidgets('species selection cascades and only fills an empty name', (
     tester,
@@ -314,6 +395,65 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final entry in {
+    0: '小群',
+    20: '小群',
+    101: '中群',
+    500: '大群',
+    10000: '超大群',
+  }.entries) {
+    testWidgets(
+      'new queen and ${entry.value} labels coexist at ${entry.key} workers',
+      (tester) async {
+        final date = DateTime(2026, 9, 1);
+        await AppDatabase.instance.saveColony(
+          Colony(
+            id: 'queen-tags',
+            name: '从新后养起',
+            initialWorkerCount: 0,
+            createdAt: date,
+            updatedAt: date,
+          ),
+        );
+        await AppDatabase.instance.saveRecord(
+          CareRecord(
+            id: 'current-workers',
+            colonyId: 'queen-tags',
+            type: CareRecordType.observation,
+            occurredAt: date.add(const Duration(days: 1)),
+            createdAt: date,
+            workerCount: entry.key,
+          ),
+        );
+        tester.view.physicalSize = const Size(320, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+        await tester.pumpAndSettle();
+        expect(find.text('新后群'), findsOneWidget);
+        expect(find.text(entry.value), findsOneWidget);
+        expect(find.text('${entry.key} 只工蚁'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('从新后养起'));
+        await tester.pumpAndSettle();
+        final scaleCard = find.ancestor(
+          of: find.text('群规模'),
+          matching: find.byType(Card),
+        );
+        expect(
+          find.descendant(of: scaleCard, matching: find.text('新后群')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: scaleCard, matching: find.text(entry.value)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('specialized counts are shown only after opting in and persist', (
     tester,
@@ -544,6 +684,59 @@ void main() {
     },
   );
 
+  testWidgets('aggregate items expand and purchase children independently', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新增物品'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('聚合物品'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, '一级物品名称'), '5 元蚁巢');
+    await tester.tap(find.text('新增'));
+    await tester.pumpAndSettle();
+    expect(find.text('请至少填写一个子物品'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '子物品（每行一个）'),
+      '干巢\n干巢',
+    );
+    await tester.tap(find.text('新增'));
+    await tester.pumpAndSettle();
+    expect(find.text('子物品名称不能重复'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '子物品（每行一个）'),
+      '干巢\n湿巢\n中活动区',
+    );
+    await tester.tap(find.text('新增'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tables['inventory_items'], hasLength(3));
+    expect(
+      tables['inventory_items']!.every((row) => row['group_name'] == '5 元蚁巢'),
+      isTrue,
+    );
+    expect(find.text('推荐 (1)'), findsOneWidget);
+    await tester.tap(find.text('5 元蚁巢'));
+    await tester.pumpAndSettle();
+    expect(find.text('干巢'), findsOneWidget);
+    expect(find.text('湿巢'), findsOneWidget);
+    expect(find.text('中活动区'), findsOneWidget);
+    await tester.tap(find.text('干巢'));
+    await tester.pumpAndSettle();
+    expect(find.text('5 元蚁巢 · 干巢'), findsOneWidget);
+    await tester.tap(find.text('购买'));
+    await tester.pumpAndSettle();
+    expect(
+      tables['inventory_items']!
+          .where((row) => row['purchased'] == 1)
+          .single['name'],
+      '干巢',
+    );
+    expect(find.text('已购 (1)'), findsOneWidget);
+    expect(find.text('5 元蚁巢 · 已购入'), findsOneWidget);
+  });
+
   testWidgets('inventory purchase changes refresh immediately', (tester) async {
     await AppDatabase.instance.saveInventoryItem(
       InventoryItem(
@@ -555,13 +748,11 @@ void main() {
     );
     await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
     await tester.pumpAndSettle();
-    expect(find.text('点击选择购入'), findsOneWidget);
+    expect(find.text('点击购买'), findsOneWidget);
     await tester.tap(find.text('测试物品'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(SwitchListTile));
-    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, '数量（选填）'), '5');
-    await tester.tap(find.text('保存'));
+    await tester.tap(find.text('购买'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('已购 (1)'), findsOneWidget);
@@ -571,7 +762,8 @@ void main() {
     expect(find.text('暂时没有推荐的物品。'), findsNothing);
     await tester.tap(find.text('已购 (1)'));
     await tester.pumpAndSettle();
-    expect(find.text('数量：5'), findsOneWidget);
+    expect(find.text('已购入'), findsOneWidget);
+    expect(find.textContaining('数量：'), findsNothing);
   });
 
   testWidgets(
