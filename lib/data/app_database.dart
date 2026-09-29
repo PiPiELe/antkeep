@@ -94,7 +94,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'ALTER TABLE colonies ADD COLUMN initial_cocoon_count INTEGER',
       );
     }
-    if (oldVersion < 8) {
+    if (oldVersion >= 5 && oldVersion < 8) {
       await database.execute(
         "ALTER TABLE inventory_items ADD COLUMN expiry_type TEXT NOT NULL DEFAULT 'none'",
       );

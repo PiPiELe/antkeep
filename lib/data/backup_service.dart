@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 
 import 'app_database.dart';
 import 'backup_archive.dart';
+import 'backup_data.dart';
 import 'local_media_store.dart';
 import 'rollback_store.dart';
 
@@ -29,7 +30,15 @@ class BackupService {
 
   Future<Uint8List> createBackupBytes() async {
     final data = await _database.snapshot();
-    final media = await _mediaStore.readFiles(_database.photoPaths(data));
+    BackupData.validate(data);
+    final paths = _database.photoPaths(data);
+    if (paths.length + 1 > BackupArchive.maxEntries) {
+      throw const FormatException('备份最多支持 499 张照片，当前照片数量超出上限。');
+    }
+    for (final path in paths) {
+      BackupArchive.validateMediaPath(path);
+    }
+    final media = await _mediaStore.readFiles(paths);
     final archive = Archive();
     final manifestBytes = utf8.encode(
       jsonEncode({
@@ -48,7 +57,7 @@ class BackupService {
         ArchiveFile('media/${entry.key}', entry.value.length, entry.value),
       );
     }
-    return Uint8List.fromList(ZipEncoder().encodeBytes(archive));
+    return BackupArchive.encode(archive);
   }
 
   Future<bool> restoreBackup() async {
@@ -79,10 +88,13 @@ class BackupService {
     if (manifestFile == null) throw const FormatException('不是有效的蚁记备份。');
     final manifestBytes = manifestFile.readBytes();
     if (manifestBytes == null) throw const FormatException('备份清单无法读取。');
-    final manifest =
-        jsonDecode(utf8.decode(manifestBytes)) as Map<String, dynamic>;
+    final manifest = jsonDecode(utf8.decode(manifestBytes));
+    if (manifest is! Map<String, dynamic>) {
+      throw const FormatException('备份清单格式无效。');
+    }
     _validate(manifest);
     final data = manifest['data'] as Map<String, dynamic>;
+    BackupData.validate(data);
     final declaredMedia = (manifest['media'] as List).cast<String>().toSet();
     final referencedMedia = _database.photoPaths(data);
     if (!declaredMedia.containsAll(referencedMedia) ||
@@ -102,7 +114,6 @@ class BackupService {
       media[relativePath] = content;
     }
     final rollbackBytes = await createBackupBytes();
-    BackupArchive.decode(rollbackBytes);
     await RollbackStore.instance.save(rollbackBytes);
     final mediaRestore = await _mediaStore.replaceFilesWithRollback(media);
     try {

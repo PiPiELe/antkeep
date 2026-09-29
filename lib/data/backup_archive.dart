@@ -11,10 +11,21 @@ class BackupArchive {
   static const maxSingleFileBytes = 24 * 1024 * 1024;
   static const maxManifestBytes = 1024 * 1024;
 
-  static Archive decode(Uint8List bytes) {
+  static Uint8List encode(Archive archive) {
+    validateArchive(archive);
+    final bytes = Uint8List.fromList(ZipEncoder().encodeBytes(archive));
+    _validateInputSize(bytes);
+    return bytes;
+  }
+
+  static void _validateInputSize(Uint8List bytes) {
     if (bytes.length > maxInputBytes) {
-      throw const FormatException('备份文件超过 128 MB 的导入上限。');
+      throw const FormatException('备份文件超过 128 MB 的大小上限。');
     }
+  }
+
+  static Archive decode(Uint8List bytes) {
+    _validateInputSize(bytes);
     _preflightZip(bytes);
     final archive = ZipDecoder().decodeBytes(bytes, verify: true);
     validateArchive(archive);

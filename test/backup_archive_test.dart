@@ -5,6 +5,40 @@ import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('export rejects an oversized manifest before encoding', () {
+    final archive = Archive()
+      ..addFile(
+        ArchiveFile(
+          'manifest.json',
+          BackupArchive.maxManifestBytes + 1,
+          const [],
+        ),
+      );
+    expect(() => BackupArchive.encode(archive), throwsFormatException);
+  });
+
+  test('export rejects oversized media before encoding', () {
+    final archive = Archive()
+      ..addFile(
+        ArchiveFile(
+          'media/large.jpg',
+          BackupArchive.maxSingleFileBytes + 1,
+          const [],
+        ),
+      );
+    expect(() => BackupArchive.encode(archive), throwsFormatException);
+  });
+
+  test('export rejects excessive total uncompressed size', () {
+    final archive = Archive();
+    for (var i = 0; i < 9; i++) {
+      archive.addFile(
+        ArchiveFile('media/$i.jpg', BackupArchive.maxSingleFileBytes, const []),
+      );
+    }
+    expect(() => BackupArchive.encode(archive), throwsFormatException);
+  });
+
   test('accepts a normal archive before reading its contents', () {
     final archive = Archive()
       ..add(ArchiveFile('manifest.json', 2, [123, 125]))
