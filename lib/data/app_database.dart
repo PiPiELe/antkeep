@@ -26,7 +26,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 8,
+      version: 9,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -105,6 +105,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'ALTER TABLE inventory_items ADD COLUMN expires_at TEXT',
       );
     }
+    if (oldVersion >= 5 && oldVersion < 9) {
+      await database.execute(
+        'ALTER TABLE inventory_items ADD COLUMN quantity INTEGER CHECK (quantity >= 0)',
+      );
+    }
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
@@ -118,7 +123,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
         purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
         expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER,
-        purchased_at TEXT, expires_at TEXT
+        purchased_at TEXT, expires_at TEXT,
+        quantity INTEGER CHECK (quantity >= 0)
       )''');
 
   static Future<void> _createFeederRecordsTable(
@@ -150,11 +156,18 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   @override
-  Future<void> saveColony(Colony colony) => _db.insert(
-    'colonies',
-    colony.toMap(),
-    conflictAlgorithm: ConflictAlgorithm.replace,
-  );
+  Future<void> saveColony(Colony colony) =>
+      _db.transaction((transaction) async {
+        final updated = await transaction.update(
+          'colonies',
+          colony.toMap(),
+          where: 'id = ?',
+          whereArgs: [colony.id],
+        );
+        if (updated == 0) {
+          await transaction.insert('colonies', colony.toMap());
+        }
+      });
 
   @override
   Future<List<CareRecord>> listRecords(String colonyId) async =>
@@ -212,16 +225,28 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     conflictAlgorithm: ConflictAlgorithm.abort,
   );
 
-  Future<void> setInventoryPurchased(InventoryItem item, bool purchased) =>
-      _db.update(
-        'inventory_items',
-        {
-          'purchased': purchased ? 1 : 0,
-          'purchased_at': purchased ? DateTime.now().toIso8601String() : null,
-        },
-        where: 'id = ?',
-        whereArgs: [item.id],
-      );
+  Future<void> setInventoryPurchased(
+    InventoryItem item,
+    bool purchased, {
+    int? quantity,
+  }) async {
+    if (quantity != null && quantity < 0) {
+      throw ArgumentError.value(quantity, 'quantity', '数量不能小于零');
+    }
+    await _db.update(
+      'inventory_items',
+      {
+        'purchased': purchased ? 1 : 0,
+        'purchased_at': purchased
+            ? (item.purchased ? item.purchasedAt : DateTime.now())
+                  ?.toIso8601String()
+            : null,
+        'quantity': purchased ? quantity : null,
+      },
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
 
   Future<List<FeederRecord>> listFeederRecords(FeederType feeder) async =>
       (await _db.query(
@@ -258,6 +283,15 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       (name: '微距摄像头', expiryType: InventoryExpiryType.none, months: null),
       (name: '可食用色素', expiryType: InventoryExpiryType.none, months: null),
       (name: '营养液', expiryType: InventoryExpiryType.shelfLife, months: 3),
+      (name: '试管 15cm', expiryType: InventoryExpiryType.none, months: null),
+      (name: '试管 18cm', expiryType: InventoryExpiryType.none, months: null),
+      (name: '试管 20cm', expiryType: InventoryExpiryType.none, months: null),
+      (name: '白菜巢', expiryType: InventoryExpiryType.none, months: null),
+      (name: '堵水海绵', expiryType: InventoryExpiryType.none, months: null),
+      (name: '蚂蚁吸尘器', expiryType: InventoryExpiryType.none, months: null),
+      (name: '棉花团', expiryType: InventoryExpiryType.none, months: null),
+      (name: '恒温箱', expiryType: InventoryExpiryType.none, months: null),
+      (name: 'EPP 泡沫箱', expiryType: InventoryExpiryType.none, months: null),
     ];
     final now = DateTime.now().toIso8601String();
     final batch = _db.batch();

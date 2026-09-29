@@ -43,9 +43,9 @@ class Colony {
     if (isNewQueenColony) return ColonyScale.newQueen;
     final workers = initialWorkerCount;
     if (workers == null) return null;
-    if (workers <= 20) return ColonyScale.small;
-    if (workers <= 100) return ColonyScale.medium;
-    if (workers <= 500) return ColonyScale.large;
+    if (workers <= 100) return ColonyScale.small;
+    if (workers < 500) return ColonyScale.medium;
+    if (workers < 10000) return ColonyScale.large;
     return ColonyScale.superLarge;
   }
 
@@ -173,6 +173,7 @@ class InventoryItem {
     this.shelfLifeMonths,
     this.purchasedAt,
     this.expiresAt,
+    this.quantity,
   });
 
   final String id;
@@ -183,6 +184,7 @@ class InventoryItem {
   final int? shelfLifeMonths;
   final DateTime? purchasedAt;
   final DateTime? expiresAt;
+  final int? quantity;
 
   DateTime? effectiveExpiryDate() => switch (expiryType) {
     InventoryExpiryType.none => null,
@@ -209,6 +211,7 @@ class InventoryItem {
     shelfLifeMonths: map['shelf_life_months'] as int?,
     purchasedAt: _dateOrNull(map['purchased_at']),
     expiresAt: _dateOrNull(map['expires_at']),
+    quantity: map['quantity'] as int?,
   );
 
   Map<String, Object?> toMap() => {
@@ -220,6 +223,7 @@ class InventoryItem {
     'shelf_life_months': shelfLifeMonths,
     'purchased_at': purchasedAt?.toIso8601String(),
     'expires_at': expiresAt?.toIso8601String(),
+    'quantity': quantity,
   };
 }
 

@@ -51,6 +51,34 @@ void main() {
     expect(restored.initialWorkerCount, 18);
   });
 
+  test('colony scale follows the worker count boundaries', () {
+    final now = DateTime(2026, 9, 29);
+    final cases = <int?, ColonyScale?>{
+      null: null,
+      0: ColonyScale.newQueen,
+      1: ColonyScale.small,
+      10: ColonyScale.small,
+      100: ColonyScale.small,
+      101: ColonyScale.medium,
+      499: ColonyScale.medium,
+      500: ColonyScale.large,
+      1000: ColonyScale.large,
+      9999: ColonyScale.large,
+      10000: ColonyScale.superLarge,
+      10001: ColonyScale.superLarge,
+    };
+    for (final entry in cases.entries) {
+      final colony = Colony(
+        id: 'scale',
+        name: '分级测试',
+        initialWorkerCount: entry.key,
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(colony.scale, entry.value, reason: 'workers: ${entry.key}');
+    }
+  });
+
   test('shelf life expiry uses the purchase date and calendar months', () {
     final item = InventoryItem(
       id: 'nutrition',

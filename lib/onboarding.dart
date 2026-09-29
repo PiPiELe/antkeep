@@ -11,6 +11,7 @@ class OnboardingPage extends StatefulWidget {
 }
 
 class _OnboardingPageState extends State<OnboardingPage> {
+  AppEdition? _edition;
   bool? _beginner;
   var _step = 0;
   var _saving = false;
@@ -25,6 +26,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     });
     try {
       await widget.preferences.completeOnboarding(
+        edition: _edition!,
         beginner: _beginner!,
         color: _color,
         mode: _mode,
@@ -97,6 +99,31 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                   children: [
                                     if (_step == 0) ...[
                                       Text(
+                                        '选择使用版本',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        '离线版使用内置资料；在线版可获取后台发布的最新资料和配置。',
+                                      ),
+                                      const SizedBox(height: 24),
+                                      _editionCard(
+                                        context,
+                                        AppEdition.offline,
+                                        '使用 App 内封装好的资料；蚁群、记录和照片始终只保存在本机。',
+                                        Icons.phonelink_lock_outlined,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _editionCard(
+                                        context,
+                                        AppEdition.online,
+                                        '保留本地养殖记录；联网时可获取后台发布的最新资料和配置。',
+                                        Icons.cloud_download_outlined,
+                                      ),
+                                    ] else if (_step == 1) ...[
+                                      Text(
                                         '选择你喜欢的主题色',
                                         style: Theme.of(context)
                                             .textTheme
@@ -127,7 +154,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                           trailing: Icon(Icons.check_circle),
                                         ),
                                       ),
-                                    ] else if (_step == 1) ...[
+                                    ] else if (_step == 2) ...[
                                       Center(
                                         child: Container(
                                           padding: const EdgeInsets.all(20),
@@ -199,8 +226,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                       const SizedBox(height: 16),
                                       const BeginnerTips(),
                                     ],
-                                    if (_step == 2 ||
-                                        (_step == 1 && _beginner == false)) ...[
+                                    if (_step == 3 ||
+                                        (_step == 2 && _beginner == false)) ...[
                                       const SizedBox(height: 24),
                                       const Text('无需账号，记录和照片保存在本机。记得定期导出备份。'),
                                       if (_error != null) ...[
@@ -224,11 +251,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             vertical: 14,
                           ),
                         ),
-                        onPressed: _saving || (_step == 1 && _beginner == null)
+                        onPressed:
+                            _saving ||
+                                (_step == 0 && _edition == null) ||
+                                (_step == 2 && _beginner == null)
                             ? null
                             : () {
-                                if (_step == 2 ||
-                                    (_step == 1 && _beginner == false)) {
+                                if (_step == 3 ||
+                                    (_step == 2 && _beginner == false)) {
                                   _finish();
                                 } else {
                                   setState(() => _step++);
@@ -237,7 +267,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         child: Text(
                           _saving
                               ? '正在保存…'
-                              : _step == 2 || (_step == 1 && _beginner == false)
+                              : _step == 3 || (_step == 2 && _beginner == false)
                               ? '开始使用'
                               : '下一步',
                           textAlign: TextAlign.center,
@@ -253,6 +283,90 @@ class _OnboardingPageState extends State<OnboardingPage> {
       ),
     ),
   );
+
+  Widget _editionCard(
+    BuildContext context,
+    AppEdition edition,
+    String subtitle,
+    IconData icon,
+  ) {
+    final selected = _edition == edition;
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      checked: selected,
+      inMutuallyExclusiveGroup: true,
+      child: Material(
+        color: selected ? colors.primaryContainer : colors.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: selected ? colors.primary : colors.outlineVariant,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _saving
+              ? null
+              : () => setState(() {
+                  _edition = edition;
+                  _error = null;
+                }),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 112),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: selected ? colors.primary : colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          edition.label,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: selected
+                                    ? colors.onPrimaryContainer
+                                    : colors.onSurface,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          subtitle,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                height: 1.5,
+                                color: selected
+                                    ? colors.onPrimaryContainer
+                                    : colors.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: selected ? colors.primary : colors.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _experienceCard(
     BuildContext context,

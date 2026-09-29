@@ -1,0 +1,343 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import 'data/app_database.dart';
+import 'domain/models.dart';
+import 'domain/population_analysis.dart';
+
+class PopulationAnalysisPage extends StatefulWidget {
+  const PopulationAnalysisPage({
+    super.key,
+    this.loadColonies,
+    this.loadRecords,
+    this.loadFeederRecords,
+  });
+
+  final Future<List<Colony>> Function()? loadColonies;
+  final Future<List<CareRecord>> Function(String)? loadRecords;
+  final Future<List<FeederRecord>> Function(FeederType)? loadFeederRecords;
+
+  @override
+  State<PopulationAnalysisPage> createState() => _PopulationAnalysisPageState();
+}
+
+class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
+  late Future<List<Colony>> _colonies;
+  Future<List<PopulationPoint>>? _points;
+  Colony? _colony;
+  FeederType? _feeder;
+  PopulationMetric _metric = PopulationMetric.workers;
+  String? _selectedId;
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadColonies();
+  }
+
+  void _reloadColonies() {
+    _colonies = (widget.loadColonies ?? AppDatabase.instance.listColonies)();
+    _colonies.ignore();
+  }
+
+  Future<List<PopulationPoint>> _loadPoints() async {
+    final colony = _colony;
+    final feeder = _feeder;
+    final metric = _metric;
+    if (colony != null) {
+      final records =
+          await (widget.loadRecords ?? AppDatabase.instance.listRecords)(
+            colony.id,
+          );
+      return colonyPopulation(colony, records, metric);
+    }
+    final records =
+        await (widget.loadFeederRecords ??
+            AppDatabase.instance.listFeederRecords)(feeder!);
+    return feederPopulation(feeder, records, metric);
+  }
+
+  void _reloadPoints() {
+    _points = _loadPoints();
+    // A read can fail before the next frame attaches FutureBuilder's listener.
+    // Keep its error available to the builder without an unhandled async error.
+    _points!.ignore();
+  }
+
+  void _select(String id, List<Colony> colonies) {
+    setState(() {
+      _selectedId = id;
+      _colony = id.startsWith('colony:')
+          ? colonies.firstWhere((c) => 'colony:${c.id}' == id)
+          : null;
+      _feeder = _colony == null
+          ? FeederType.values.firstWhere((f) => 'feeder:${f.name}' == id)
+          : null;
+      _metric = _colony != null
+          ? PopulationMetric.workers
+          : PopulationMetric.total;
+      _reloadPoints();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('数量分析')),
+    body: FutureBuilder<List<Colony>>(
+      future: _colonies,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: TextButton(
+              onPressed: () => setState(_reloadColonies),
+              child: const Text('读取失败，点击重试'),
+            ),
+          );
+        }
+        final colonies = snapshot.data!;
+        final metrics = _colony != null
+            ? PopulationMetric.colonyMetrics
+            : PopulationMetric.feederMetrics;
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            DropdownButtonFormField<String>(
+              key: const ValueKey('analysis-subject'),
+              initialValue: _selectedId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: '选择蚁群或 DLC 养殖'),
+              items: [
+                for (final colony in colonies)
+                  DropdownMenuItem(
+                    value: 'colony:${colony.id}',
+                    child: Text(
+                      '蚁群 · ${colony.name}${colony.species == null ? "" : "（${colony.species}）"}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                for (final feeder in FeederType.values)
+                  DropdownMenuItem(
+                    value: 'feeder:${feeder.name}',
+                    child: Text('DLC · ${feeder.label}'),
+                  ),
+              ],
+              onChanged: (id) {
+                if (id != null) _select(id, colonies);
+              },
+            ),
+            const SizedBox(height: 16),
+            if (_selectedId == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Text(
+                  '选择一窝蚁群或一种 DLC 养殖，查看数量变化。',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else ...[
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final metric in metrics)
+                    ChoiceChip(
+                      label: Text(metric.label),
+                      selected: _metric == metric,
+                      onSelected: (_) => setState(() {
+                        _metric = metric;
+                        _reloadPoints();
+                      }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              FutureBuilder<List<PopulationPoint>>(
+                future: _points,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return TextButton(
+                      onPressed: () => setState(_reloadPoints),
+                      child: const Text('数量读取失败，点击重试'),
+                    );
+                  }
+                  return _PopulationResult(
+                    points: snapshot.data!,
+                    metric: _metric,
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '按全部有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
+                '${_colony != null ? "初始数量以入手日期（未填写时用建档时间）计入。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
+                '同一时刻的同一指标使用最后录入的有效值。连线仅连接记录点，不代表期间每天的数量。',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '趋势规则：至少 3 个时间点；数量相同为平稳，只增不减为稳定上升，'
+                '只减不增为稳定下降，有升有降为数量波动。估计数量也会参与分析，结果仅描述已有记录。',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _PopulationResult extends StatelessWidget {
+  const _PopulationResult({required this.points, required this.metric});
+  final List<PopulationPoint> points;
+  final PopulationMetric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    if (points.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('暂无有效数量记录\n请先在该对象的记录中填写所选指标的数量。'),
+        ),
+      );
+    }
+    final trend = populationTrend(points);
+    final delta = points.last.count - points.first.count;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(trend.label, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              '${metric.label} · 最近 ${points.last.count} 只 · ${points.length} 个时间点',
+            ),
+            if (points.length > 1)
+              Text('较首次数量 ${delta > 0 ? "+" : ""}$delta 只'),
+            if (points.length < 3) const Text('至少需要 3 个不同时间点的有效数量，才能判断趋势。'),
+            const SizedBox(height: 20),
+            Semantics(
+              label: '${metric.label}数量折线图，${trend.label}。详细数据见下方数量记录。',
+              child: SizedBox(
+                height: 220,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _PopulationChartPainter(
+                    points,
+                    Theme.of(context).colorScheme,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('${_date(points.first.time)} — ${_date(points.last.time)}'),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('数量记录'),
+              children: [
+                for (final point in points.reversed)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${_date(point.time)} ${_time(point.time)}'),
+                    trailing: Text('${point.count} 只'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _date(DateTime time) {
+  final local = time.toLocal();
+  return '${local.year}/${local.month}/${local.day}';
+}
+
+String _time(DateTime time) {
+  final local = time.toLocal();
+  return '${local.hour.toString().padLeft(2, "0")}:${local.minute.toString().padLeft(2, "0")}:${local.second.toString().padLeft(2, "0")}';
+}
+
+class _PopulationChartPainter extends CustomPainter {
+  _PopulationChartPainter(this.points, this.colors);
+  final List<PopulationPoint> points;
+  final ColorScheme colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final maximum = points.fold<int>(1, (value, p) => math.max(value, p.count));
+    TextPainter label(String text) => TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final left = math.min(label('$maximum').width + 10, size.width / 3);
+    final plot = Rect.fromLTRB(left, 10, size.width - 6, size.height - 26);
+    final grid = Paint()..color = colors.outlineVariant;
+    final ticks = <int>{0, maximum ~/ 2, maximum};
+    for (final tick in ticks) {
+      final y = plot.bottom - plot.height * tick / maximum;
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
+      final text = label('$tick');
+      text.paint(canvas, Offset(0, y - text.height / 2));
+    }
+    final duration = points.last.time
+        .difference(points.first.time)
+        .inMicroseconds;
+    final locations = [
+      for (final point in points)
+        Offset(
+          duration == 0
+              ? plot.center.dx
+              : plot.left +
+                    plot.width *
+                        point.time
+                            .difference(points.first.time)
+                            .inMicroseconds /
+                        duration,
+          plot.bottom - plot.height * point.count / maximum,
+        ),
+    ];
+    final path = Path()..moveTo(locations.first.dx, locations.first.dy);
+    for (final point in locations.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = colors.primary
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke,
+    );
+    for (final point in locations) {
+      canvas.drawCircle(point, 3.5, Paint()..color = colors.primary);
+    }
+    final start = label(
+      '${points.first.time.toLocal().month}/${points.first.time.toLocal().day}',
+    );
+    start.paint(canvas, Offset(plot.left, plot.bottom + 8));
+    if (points.length > 1) {
+      final end = label(
+        '${points.last.time.toLocal().month}/${points.last.time.toLocal().day}',
+      );
+      end.paint(canvas, Offset(plot.right - end.width, plot.bottom + 8));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PopulationChartPainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.colors != colors;
+}

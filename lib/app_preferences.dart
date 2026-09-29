@@ -17,6 +17,14 @@ enum ThemeColor {
   final Color color;
 }
 
+enum AppEdition {
+  offline('离线版'),
+  online('在线版');
+
+  const AppEdition(this.label);
+  final String label;
+}
+
 class AppPreferences extends ChangeNotifier {
   AppPreferences(this.store);
   final AppSettingsStore store;
@@ -25,6 +33,7 @@ class AppPreferences extends ChangeNotifier {
   bool beginner = false;
   bool careRemindersEnabled = false;
   int careReminderMinuteOfDay = 20 * 60;
+  AppEdition edition = AppEdition.offline;
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
 
@@ -35,6 +44,10 @@ class AppPreferences extends ChangeNotifier {
     careRemindersEnabled = values['care_reminders_enabled'] == 'true';
     careReminderMinuteOfDay =
         int.tryParse(values['care_reminder_minute_of_day'] ?? '') ?? 20 * 60;
+    edition = AppEdition.values.firstWhere(
+      (edition) => edition.name == values['app_edition'],
+      orElse: () => AppEdition.offline,
+    );
     themeMode = ThemeMode.values.firstWhere(
       (mode) => mode.name == values['theme_mode'],
       orElse: () => switch (values['dark_theme']) {
@@ -51,20 +64,29 @@ class AppPreferences extends ChangeNotifier {
   }
 
   Future<void> completeOnboarding({
+    required AppEdition edition,
     required bool beginner,
     required ThemeColor color,
     required ThemeMode mode,
   }) async {
     await store.writeSettings({
       'keeper_experience': beginner ? 'beginner' : 'experienced',
+      'app_edition': edition.name,
       'theme_color': color.name,
       'theme_mode': mode.name,
       'onboarding_completed': 'true',
     });
     this.beginner = beginner;
+    this.edition = edition;
     themeColor = color;
     themeMode = mode;
     onboardingCompleted = true;
+    notifyListeners();
+  }
+
+  Future<void> setEdition(AppEdition edition) async {
+    await store.writeSettings({'app_edition': edition.name});
+    this.edition = edition;
     notifyListeners();
   }
 

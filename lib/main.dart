@@ -5,12 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'population_analysis_page.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
 import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/beginner_care_notice.dart';
 
 const _speciesOptions = <String, List<String>>{
   '收获蚁': ['工匠收获蚁', '原生收获蚁', '红胸收获蚁', '大头收获蚁', '强壮收获蚁', '针毛收获蚁', '无恶齿收获蚁'],
@@ -47,27 +49,6 @@ const _nestTypeOptions = [
   '生态缸巢',
   '3D 打印巢',
 ];
-
-class BeginnerCareNotice {
-  const BeginnerCareNotice({required this.title, required this.description});
-
-  final String title;
-  final String description;
-}
-
-const _beginnerCareNotices = [
-  BeginnerCareNotice(
-    title: '尽量减少打扰',
-    description: '新入手、繁殖期或状态不稳定的蚁群尤其需要安静环境；除必要的投喂、补水和观察外，尽量少开巢、少搬动。',
-  ),
-  BeginnerCareNotice(
-    title: '注意饲养温度',
-    description: '先了解所养品种适宜的温度范围，避免暴晒、骤冷骤热和长时间贴近热源；温度异常时优先让环境恢复稳定。',
-  ),
-];
-
-BeginnerCareNotice beginnerCareNoticeFor(DateTime date) =>
-    _beginnerCareNotices[(date.day - 1) % _beginnerCareNotices.length];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -137,12 +118,12 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   var _index = 0;
-  late final BeginnerCareNotice _beginnerCareNotice;
+  late BeginnerCareNotice _beginnerCareNotice;
 
   @override
   void initState() {
     super.initState();
-    _beginnerCareNotice = beginnerCareNoticeFor(DateTime.now());
+    _beginnerCareNotice = randomBeginnerCareNotice();
   }
 
   @override
@@ -161,7 +142,18 @@ class _HomePageState extends State<HomePage> {
       const SettingsPage(),
     ];
     return Scaffold(
-      appBar: AppBar(title: Text(titles[_index])),
+      appBar: AppBar(
+        title: Text(titles[_index]),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PopulationAnalysisPage()),
+            ),
+            icon: const Icon(Icons.show_chart),
+            label: const Text('分析'),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           if (_index == 0 && themeController.beginner)
@@ -172,20 +164,23 @@ class _HomePageState extends State<HomePage> {
                 title: const Text('新手注意事项'),
                 subtitle: Text(_beginnerCareNotice.title),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  builder: (_) => SingleChildScrollView(
-                    padding: EdgeInsets.all(24),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.lightbulb_outline),
-                      title: Text(_beginnerCareNotice.title),
-                      subtitle: Text(_beginnerCareNotice.description),
+                onTap: () {
+                  final notice = _beginnerCareNotice;
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => SingleChildScrollView(
+                      padding: EdgeInsets.all(24),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.lightbulb_outline),
+                        title: Text(notice.title),
+                        subtitle: Text(notice.description),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           Expanded(child: pages[_index]),
@@ -193,7 +188,14 @@ class _HomePageState extends State<HomePage> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
+        onDestinationSelected: (value) => setState(() {
+          if (value == 0 && _index != 0) {
+            _beginnerCareNotice = randomBeginnerCareNotice(
+              previous: _beginnerCareNotice,
+            );
+          }
+          _index = value;
+        }),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.hive_outlined),
@@ -232,8 +234,10 @@ class ColoniesPage extends StatefulWidget {
   State<ColoniesPage> createState() => _ColoniesPageState();
 }
 
+typedef _ColonyListEntry = ({Colony colony, CareRecord? latestPopulation});
+
 class _ColoniesPageState extends State<ColoniesPage> {
-  late Future<List<Colony>> _colonies;
+  late Future<List<_ColonyListEntry>> _colonies;
 
   @override
   void initState() {
@@ -241,7 +245,27 @@ class _ColoniesPageState extends State<ColoniesPage> {
     _reload();
   }
 
-  void _reload() => _colonies = AppDatabase.instance.listColonies();
+  void _reload() {
+    _colonies = _loadColonies();
+  }
+
+  Future<List<_ColonyListEntry>> _loadColonies() async {
+    final colonies = await AppDatabase.instance.listColonies();
+    return Future.wait(
+      colonies.map((colony) async {
+        final records = await AppDatabase.instance.listRecords(colony.id);
+        final latestPopulation = records.cast<CareRecord?>().firstWhere(
+          (record) =>
+              record!.eggCount != null ||
+              record.larvaCount != null ||
+              record.pupaCount != null ||
+              record.workerCount != null,
+          orElse: () => null,
+        );
+        return (colony: colony, latestPopulation: latestPopulation);
+      }),
+    );
+  }
 
   Future<void> _newColony() async {
     final saved = await Navigator.of(context)
@@ -256,7 +280,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
       icon: const Icon(Icons.add),
       label: const Text('新入手蚁群'),
     ),
-    body: FutureBuilder<List<Colony>>(
+    body: FutureBuilder<List<_ColonyListEntry>>(
       future: _colonies,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
@@ -280,12 +304,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
             itemCount: colonies.length,
             separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (context, index) => _ColonyCard(
-              colony: colonies[index],
+              colony: colonies[index].colony,
+              latestPopulation: colonies[index].latestPopulation,
               onTap: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) =>
-                        ColonyDetailPage(colonyId: colonies[index].id),
+                        ColonyDetailPage(colonyId: colonies[index].colony.id),
                   ),
                 );
                 if (mounted) setState(_reload);
@@ -299,20 +324,42 @@ class _ColoniesPageState extends State<ColoniesPage> {
 }
 
 class _ColonyCard extends StatelessWidget {
-  const _ColonyCard({required this.colony, required this.onTap});
+  const _ColonyCard({
+    required this.colony,
+    required this.latestPopulation,
+    required this.onTap,
+  });
   final Colony colony;
+  final CareRecord? latestPopulation;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final details = <String>[
-      if (colony.species?.isNotEmpty == true) colony.species!,
-      if (colony.scale != null) colony.scale!.label,
-      if (colony.queenCount != null) '${colony.queenCount} 只蚁后',
-      if (colony.initialWorkerCount != null) '${colony.initialWorkerCount} 只工蚁',
-      if (colony.initialEggCount != null) '卵 ${colony.initialEggCount}',
-      if (colony.initialCocoonCount != null) '茧 ${colony.initialCocoonCount}',
-      if (colony.nestType?.isNotEmpty == true) colony.nestType!,
+    final workers = latestPopulation?.workerCount ?? colony.initialWorkerCount;
+    final broodCounts = [
+      latestPopulation?.eggCount ?? colony.initialEggCount,
+      latestPopulation?.larvaCount,
+      latestPopulation?.pupaCount ?? colony.initialCocoonCount,
+    ].whereType<int>();
+    final brood = broodCounts.isEmpty
+        ? null
+        : broodCounts.fold<int>(0, (sum, count) => sum + count);
+    final numberStyle = TextStyle(
+      color: Theme.of(context).colorScheme.onSurface,
+      fontWeight: FontWeight.w700,
+    );
+    TextSpan quantity(int count, String label) => TextSpan(
+      children: [
+        TextSpan(text: '$count', style: numberStyle),
+        TextSpan(text: ' 只$label'),
+      ],
+    );
+    final details = <InlineSpan>[
+      if (colony.species?.isNotEmpty == true) TextSpan(text: colony.species),
+      if (colony.queenCount != null) quantity(colony.queenCount!, '蚁后'),
+      if (workers != null) quantity(workers, '工蚁'),
+      if (brood != null) quantity(brood, '卵幼茧'),
+      if (colony.nestType?.isNotEmpty == true) TextSpan(text: colony.nestType),
     ];
     return Card(
       child: ListTile(
@@ -330,7 +377,18 @@ class _ColonyCard extends StatelessWidget {
             if (colony.scale != null) _ColonyScaleBadge(scale: colony.scale!),
           ],
         ),
-        subtitle: Text(details.isEmpty ? '尚未补充档案' : details.join(' · ')),
+        subtitle: details.isEmpty
+            ? const Text('尚未补充档案')
+            : Text.rich(
+                TextSpan(
+                  children: [
+                    for (var i = 0; i < details.length; i++) ...[
+                      if (i > 0) const TextSpan(text: ' · '),
+                      details[i],
+                    ],
+                  ],
+                ),
+              ),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
@@ -369,7 +427,8 @@ class _ColonyScaleBadge extends StatelessWidget {
 }
 
 class ColonyFormPage extends StatefulWidget {
-  const ColonyFormPage({super.key});
+  const ColonyFormPage({super.key, this.colony});
+  final Colony? colony;
   @override
   State<ColonyFormPage> createState() => _ColonyFormPageState();
 }
@@ -392,6 +451,30 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   var _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    final colony = widget.colony;
+    if (colony == null) return;
+    _name.text = colony.name;
+    _source.text = colony.source ?? '';
+    _queens.text = colony.queenCount?.toString() ?? '';
+    _workers.text = colony.initialWorkerCount?.toString() ?? '';
+    _eggs.text = colony.initialEggCount?.toString() ?? '';
+    _cocoons.text = colony.initialCocoonCount?.toString() ?? '';
+    _targetTemperature.text = colony.targetTemperature?.toString() ?? '';
+    _targetHumidity.text = colony.targetHumidity?.toString() ?? '';
+    _selectedSpecies = colony.species;
+    for (final entry in _speciesOptions.entries) {
+      if (entry.value.contains(colony.species)) {
+        _speciesFamily = entry.key;
+        break;
+      }
+    }
+    _selectedNest = colony.nestType;
+    _acquiredOn = colony.acquiredOn;
+  }
+
+  @override
   void dispose() {
     for (final controller in [
       _name,
@@ -408,6 +491,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     super.dispose();
   }
 
+  String? _validateCount(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final count = int.tryParse(value.trim());
+    return count == null || count < 0 ? '请输入非负整数，未知可留空' : null;
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -415,7 +504,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       final now = DateTime.now();
       await AppDatabase.instance.saveColony(
         Colony(
-          id: const Uuid().v4(),
+          id: widget.colony?.id ?? const Uuid().v4(),
           name: _name.text.trim(),
           species: _selectedSpecies,
           acquiredOn: _acquiredOn,
@@ -428,9 +517,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           targetTemperature: double.tryParse(_targetTemperature.text),
           targetHumidity: double.tryParse(_targetHumidity.text),
           coverPhotoPath: _cover == null
-              ? null
+              ? widget.colony?.coverPhotoPath
               : await LocalMediaStore.instance.copyImage(_cover!),
-          createdAt: now,
+          archived: widget.colony?.archived ?? false,
+          createdAt: widget.colony?.createdAt ?? now,
           updatedAt: now,
         ),
       );
@@ -443,13 +533,13 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   }
 
   Future<void> _enterCustomSpecies() async {
-    final controller = TextEditingController();
+    var speciesName = '';
     final species = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('手动填写品种'),
         content: TextField(
-          controller: controller,
+          onChanged: (value) => speciesName = value,
           autofocus: true,
           decoration: const InputDecoration(hintText: '例如：其他弓背蚁'),
         ),
@@ -459,13 +549,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            onPressed: () => Navigator.pop(context, speciesName.trim()),
             child: const Text('确认'),
           ),
         ],
       ),
     );
-    controller.dispose();
     if (species?.isNotEmpty == true && mounted) {
       setState(() => _selectedSpecies = species);
     }
@@ -473,7 +562,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('新入手蚁群')),
+    appBar: AppBar(title: Text(widget.colony == null ? '新入手蚁群' : '编辑蚁群')),
     body: Form(
       key: _formKey,
       child: ListView(
@@ -514,7 +603,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: _speciesFamily == null ? null : _enterCustomSpecies,
+              onPressed: _enterCustomSpecies,
               icon: const Icon(Icons.edit_outlined, size: 18),
               label: const Text('未收录？手动填写品种'),
             ),
@@ -524,20 +613,22 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextField(
+                child: TextFormField(
                   controller: _queens,
+                  validator: _validateCount,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: '蚁后数量'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
+                child: TextFormField(
                   controller: _workers,
+                  validator: _validateCount,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: '初始工蚁数量',
-                    helperText: '填 0 标识为新后群落',
+                    helperText: '群规模按此数量自动判断，0 为新后群',
                   ),
                 ),
               ),
@@ -547,16 +638,18 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: TextFormField(
                   controller: _eggs,
+                  validator: _validateCount,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: '卵数量（可选）'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
+                child: TextFormField(
                   controller: _cocoons,
+                  validator: _validateCount,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: '茧数量（可选）'),
                 ),
@@ -636,7 +729,13 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           const SizedBox(height: 12),
           OutlinedButton.icon(
             icon: const Icon(Icons.photo_outlined),
-            label: Text(_cover == null ? '添加封面照片（可选）' : '已选择封面照片'),
+            label: Text(
+              _cover != null
+                  ? '已选择封面照片'
+                  : widget.colony?.coverPhotoPath != null
+                  ? '更换封面照片'
+                  : '添加封面照片（可选）',
+            ),
             onPressed: () async {
               final image = await ImagePicker().pickImage(
                 source: ImageSource.gallery,
@@ -782,7 +881,10 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
     _reload();
   }
 
-  void _reload() => _detail = _load();
+  void _reload() {
+    _detail = _load();
+  }
+
   Future<_Detail> _load() async => _Detail(
     await AppDatabase.instance.findColony(widget.colonyId),
     await AppDatabase.instance.listRecords(widget.colonyId),
@@ -807,7 +909,23 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
       }
       final colony = detail!.colony!;
       return Scaffold(
-        appBar: AppBar(title: Text(colony.name)),
+        appBar: AppBar(
+          title: Text(colony.name),
+          actions: [
+            IconButton(
+              tooltip: '编辑蚁群',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () async {
+                final saved = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => ColonyFormPage(colony: colony),
+                  ),
+                );
+                if (saved == true && mounted) setState(_reload);
+              },
+            ),
+          ],
+        ),
         floatingActionButton: FloatingActionButton.extended(
           icon: const Icon(Icons.add),
           label: const Text('添加记录'),
@@ -821,6 +939,8 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
+            _ColonyScaleSummary(colony: colony),
+            const SizedBox(height: 12),
             _ColonySummary(colony: colony),
             const SizedBox(height: 16),
             _GrowthArchive(colony: colony, records: detail.records),
@@ -935,6 +1055,34 @@ class _GrowthMetric extends StatelessWidget {
   }
 }
 
+class _ColonyScaleSummary extends StatelessWidget {
+  const _ColonyScaleSummary({required this.colony});
+  final Colony colony;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('群规模', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 10),
+          Chip(
+            avatar: Icon(
+              colony.scale == ColonyScale.newQueen
+                  ? Icons.workspace_premium_outlined
+                  : Icons.groups_outlined,
+              size: 18,
+            ),
+            label: Text(colony.scale?.label ?? '待填写工蚁数量'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _ColonySummary extends StatelessWidget {
   const _ColonySummary({required this.colony});
   final Colony colony;
@@ -959,18 +1107,6 @@ class _ColonySummary extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 10),
-          if (colony.scale != null) ...[
-            Chip(
-              avatar: Icon(
-                colony.scale == ColonyScale.newQueen
-                    ? Icons.workspace_premium_outlined
-                    : Icons.groups_outlined,
-                size: 18,
-              ),
-              label: Text(colony.scale!.label),
-            ),
-            const SizedBox(height: 8),
-          ],
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1388,11 +1524,13 @@ class _InventoryPageState extends State<InventoryPage> {
     _reload();
   }
 
-  void _reload() => _items = AppDatabase.instance.listInventory();
+  void _reload() {
+    _items = AppDatabase.instance.listInventory();
+  }
 
   Future<void> _addItem() async {
-    final nameController = TextEditingController();
-    final shelfLifeController = TextEditingController(text: '3');
+    var itemName = '';
+    var shelfLifeMonths = '3';
     var expiryType = InventoryExpiryType.none;
     DateTime? expiresAt;
     final item = await showDialog<_NewInventoryItem>(
@@ -1405,7 +1543,7 @@ class _InventoryPageState extends State<InventoryPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  controller: nameController,
+                  onChanged: (value) => itemName = value,
                   autofocus: true,
                   decoration: const InputDecoration(labelText: '物品名称'),
                 ),
@@ -1428,8 +1566,9 @@ class _InventoryPageState extends State<InventoryPage> {
                 ),
                 if (expiryType == InventoryExpiryType.shelfLife) ...[
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: shelfLifeController,
+                  TextFormField(
+                    initialValue: shelfLifeMonths,
+                    onChanged: (value) => shelfLifeMonths = value,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: '保质期（月）'),
                   ),
@@ -1464,7 +1603,7 @@ class _InventoryPageState extends State<InventoryPage> {
             ),
             FilledButton(
               onPressed: () {
-                final name = nameController.text.trim();
+                final name = itemName.trim();
                 if (name.isEmpty ||
                     (expiryType == InventoryExpiryType.fixedDate &&
                         expiresAt == null)) {
@@ -1476,7 +1615,7 @@ class _InventoryPageState extends State<InventoryPage> {
                     name: name,
                     expiryType: expiryType,
                     shelfLifeMonths: expiryType == InventoryExpiryType.shelfLife
-                        ? int.tryParse(shelfLifeController.text) ?? 3
+                        ? int.tryParse(shelfLifeMonths) ?? 3
                         : null,
                     expiresAt: expiresAt,
                   ),
@@ -1488,8 +1627,6 @@ class _InventoryPageState extends State<InventoryPage> {
         ),
       ),
     );
-    nameController.dispose();
-    shelfLifeController.dispose();
     if (item == null) return;
     try {
       await AppDatabase.instance.saveInventoryItem(
@@ -1534,8 +1671,8 @@ class _InventoryPageState extends State<InventoryPage> {
             children: [
               TabBar(
                 tabs: [
-                  Tab(text: '推荐 (${needed.length})'),
-                  Tab(text: '已购 (${purchased.length})'),
+                  Tab(text: '推荐 (${_groupItems(needed).length})'),
+                  Tab(text: '已购 (${_groupItems(purchased).length})'),
                 ],
               ),
               Expanded(
@@ -1553,10 +1690,59 @@ class _InventoryPageState extends State<InventoryPage> {
     ),
   );
 
+  Map<String, List<InventoryItem>> _groupItems(List<InventoryItem> items) {
+    final groups = <String, List<InventoryItem>>{};
+    for (final item in items) {
+      final name = item.name.startsWith('离心管 ')
+          ? '离心管'
+          : item.name.startsWith('试管 ')
+          ? '试管'
+          : item.name;
+      groups.putIfAbsent(name, () => []).add(item);
+    }
+    return groups;
+  }
+
   Widget _itemList(List<InventoryItem> items, String emptyMessage) => ListView(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-    children: [if (items.isEmpty) Text(emptyMessage), ...items.map(_itemTile)],
+    children: [
+      if (items.isEmpty) Text(emptyMessage),
+      for (final group in _groupItems(items).entries)
+        if (group.key == '离心管' || group.key == '试管')
+          Card(
+            child: ExpansionTile(
+              key: PageStorageKey('${items.first.purchased}-${group.key}'),
+              title: Text(group.key),
+              subtitle: Text(
+                group.value
+                    .map((item) => item.name.substring(group.key.length).trim())
+                    .join(' · '),
+              ),
+              children: group.value.map(_itemTile).toList(),
+            ),
+          )
+        else
+          _itemTile(group.value.single),
+    ],
   );
+
+  Future<void> _editItem(InventoryItem item) async {
+    final result = await showDialog<({bool purchased, int? quantity})>(
+      context: context,
+      builder: (context) => _InventoryPurchaseDialog(item: item),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await AppDatabase.instance.setInventoryPurchased(
+        item,
+        result.purchased,
+        quantity: result.quantity,
+      );
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    }
+  }
 
   Widget _itemTile(InventoryItem item) {
     final expired = item.isExpired();
@@ -1564,7 +1750,7 @@ class _InventoryPageState extends State<InventoryPage> {
     final expiryText = switch (item.expiryType) {
       InventoryExpiryType.none => null,
       InventoryExpiryType.shelfLife when item.purchasedAt == null =>
-        '有效期：购入后 ${item.shelfLifeMonths ?? 3} 个月（勾选已购买后开始计时）',
+        '有效期：购入后 ${item.shelfLifeMonths ?? 3} 个月（购入后开始计时）',
       InventoryExpiryType.shelfLife when expiry == null => '有效期：未设置保质期',
       InventoryExpiryType.shelfLife =>
         expired ? '已过期：${_date(expiry!)}' : '有效期至：${_date(expiry!)}',
@@ -1573,21 +1759,21 @@ class _InventoryPageState extends State<InventoryPage> {
         expired ? '已过期：${_date(expiry!)}' : '有效期至：${_date(expiry!)}',
     };
     return Card(
-      child: CheckboxListTile(
-        title: Row(
-          children: [
-            Expanded(child: Text(item.name)),
-            if (expired)
-              Icon(
-                Icons.error_outline,
-                color: Theme.of(context).colorScheme.error,
-                size: 20,
-              ),
-          ],
+      child: ListTile(
+        leading: Icon(
+          item.purchased ? Icons.check_circle : Icons.shopping_bag_outlined,
         ),
-        subtitle: expiryText == null
-            ? null
-            : Text(
+        title: Text(item.name),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.purchased
+                  ? '数量：${item.quantity?.toString() ?? '未填写'}'
+                  : '点击选择购入',
+            ),
+            if (expiryText != null)
+              Text(
                 expiryText,
                 style: expired
                     ? TextStyle(
@@ -1596,18 +1782,97 @@ class _InventoryPageState extends State<InventoryPage> {
                       )
                     : null,
               ),
-        value: item.purchased,
-        controlAffinity: ListTileControlAffinity.leading,
-        onChanged: (value) async {
-          await AppDatabase.instance.setInventoryPurchased(
-            item,
-            value ?? false,
-          );
-          if (mounted) setState(_reload);
-        },
+          ],
+        ),
+        trailing: Icon(
+          item.purchased ? Icons.edit_outlined : Icons.chevron_right,
+        ),
+        onTap: () => _editItem(item),
       ),
     );
   }
+}
+
+class _InventoryPurchaseDialog extends StatefulWidget {
+  const _InventoryPurchaseDialog({required this.item});
+  final InventoryItem item;
+
+  @override
+  State<_InventoryPurchaseDialog> createState() =>
+      _InventoryPurchaseDialogState();
+}
+
+class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _quantity;
+  late bool _purchased;
+
+  @override
+  void initState() {
+    super.initState();
+    _purchased = widget.item.purchased;
+    _quantity = TextEditingController(
+      text: widget.item.quantity?.toString() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _quantity.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.item.name),
+    content: SingleChildScrollView(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('已购入'),
+              value: _purchased,
+              onChanged: (value) => setState(() => _purchased = value),
+            ),
+            if (_purchased)
+              TextFormField(
+                controller: _quantity,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '数量（选填）',
+                  hintText: '请输入非负整数',
+                ),
+                validator: (value) {
+                  final text = value?.trim() ?? '';
+                  if (text.isEmpty) return null;
+                  final quantity = int.tryParse(text);
+                  return quantity == null || quantity < 0 ? '请输入非负整数' : null;
+                },
+              ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: () {
+          if (!_formKey.currentState!.validate()) return;
+          Navigator.pop(context, (
+            purchased: _purchased,
+            quantity: _purchased ? int.tryParse(_quantity.text.trim()) : null,
+          ));
+        },
+        child: const Text('保存'),
+      ),
+    ],
+  );
 }
 
 class _NewInventoryItem {
@@ -1660,43 +1925,27 @@ class _DlcPageState extends State<DlcPage> {
             child: ListTile(
               leading: CircleAvatar(child: Icon(_feederIcon(feeder))),
               title: Text(feeder.label),
-              subtitle: FutureBuilder<FeederRecord?>(
+              trailing: FutureBuilder<FeederRecord?>(
                 future: _counts[feeder],
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
-                    return const Text('数量读取中…');
+                    return const _FeederSummary(text: '读取中…');
                   }
                   if (snapshot.hasError) {
-                    return const Text('数量读取失败，点击进入重试');
+                    return const _FeederSummary(text: '读取失败');
                   }
                   final record = snapshot.data;
-                  if (record == null) return const Text('暂未记录数量');
+                  if (record == null) return const _FeederSummary(text: '暂未记录');
                   final juveniles = record.juvenileCount;
                   final adults = record.adultCount;
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          juveniles != null && adults != null
-                              ? '最近数量：${juveniles + adults} 只'
-                              : '最近数量：部分未记录',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '幼体/若虫 ${juveniles ?? "未知"} · 成体 ${adults ?? "未知"}',
-                        ),
-                        Text('记录于 ${_dateTime(record.occurredAt)}'),
-                      ],
-                    ),
+                  return _FeederSummary(
+                    time: _dateTime(record.occurredAt),
+                    count: juveniles != null && adults != null
+                        ? '${juveniles + adults} 只'
+                        : '部分未记录',
                   );
                 },
               ),
-              trailing: const Icon(Icons.chevron_right),
               onTap: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
@@ -1710,6 +1959,49 @@ class _DlcPageState extends State<DlcPage> {
         ),
       ),
     ],
+  );
+}
+
+class _FeederSummary extends StatelessWidget {
+  const _FeederSummary({this.time, this.count, this.text});
+
+  final String? time;
+  final String? count;
+  final String? text;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 190,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Expanded(
+          child: text == null
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(time!, style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      count!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                )
+              : Text(
+                  text!,
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+        ),
+        const SizedBox(width: 8),
+        const Icon(Icons.chevron_right),
+      ],
+    ),
   );
 }
 
@@ -1730,8 +2022,9 @@ class _FeederDetailPageState extends State<FeederDetailPage> {
     _reload();
   }
 
-  void _reload() =>
-      _records = AppDatabase.instance.listFeederRecords(widget.feeder);
+  void _reload() {
+    _records = AppDatabase.instance.listFeederRecords(widget.feeder);
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -1902,32 +2195,8 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
           ),
         ),
         const SizedBox(height: 16),
-        Text('环境与数量（不清楚可留空）', style: Theme.of(context).textTheme.titleSmall),
+        Text('数量（不清楚可留空）', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _temperature,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(labelText: '温度 °C'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _humidity,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(labelText: '湿度 %'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -1953,6 +2222,37 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(labelText: '死亡数量'),
         ),
+        const SizedBox(height: 16),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text('环境（选填）'),
+          childrenPadding: const EdgeInsets.only(bottom: 12),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _temperature,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: '温度 °C'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _humidity,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: '湿度 %'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
         const SizedBox(height: 28),
         FilledButton(
           onPressed: _saving ? null : _save,
@@ -1970,11 +2270,11 @@ class _FeederRecordCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facts = <String>[
-      if (record.temperature != null) '${record.temperature}°C',
-      if (record.humidity != null) '${record.humidity}%',
       if (record.juvenileCount != null) '幼体/若虫 ${record.juvenileCount}',
       if (record.adultCount != null) '成体 ${record.adultCount}',
       if (record.mortalityCount != null) '死亡 ${record.mortalityCount}',
+      if (record.temperature != null) '${record.temperature}°C',
+      if (record.humidity != null) '${record.humidity}%',
     ];
     return Card(
       child: Padding(
@@ -2031,10 +2331,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildSettings(BuildContext context) => ListView(
     children: [
-      const ListTile(
-        leading: Icon(Icons.phonelink_lock_outlined),
-        title: Text('本地优先'),
-        subtitle: Text('蚁群、记录和照片仅保存在本设备；没有账号、服务器或自动同步。'),
+      ListTile(
+        leading: Icon(
+          themeController.edition == AppEdition.offline
+              ? Icons.phonelink_lock_outlined
+              : Icons.cloud_download_outlined,
+        ),
+        title: Text(themeController.edition.label),
+        subtitle: Text(
+          themeController.edition == AppEdition.offline
+              ? '使用 App 内置资料；蚁群、记录和照片仅保存在本设备。'
+              : '养殖记录和照片仍仅保存在本设备；可获取后台发布的最新资料和配置。',
+        ),
       ),
       const Divider(),
       const ListTile(

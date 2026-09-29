@@ -112,6 +112,8 @@ void main() {
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       await tester.pumpWidget(testApp(preferences));
+      await tapText(tester, '离线版');
+      await tapText(tester, '下一步');
       Brightness previewBrightness() =>
           Theme.of(tester.element(find.text('我的蚁群'))).brightness;
       expect(previewBrightness(), Brightness.light);
@@ -152,8 +154,17 @@ void main() {
     final preferences = AppPreferences(store);
     await preferences.load();
     await tester.pumpWidget(testApp(preferences));
-    expect(find.text('选择你喜欢的主题色'), findsOneWidget);
+    expect(find.text('选择使用版本'), findsOneWidget);
     expect(find.byType(BackButton), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '下一步'))
+          .onPressed,
+      isNull,
+    );
+    await tapText(tester, '在线版');
+    await tapText(tester, '下一步');
+    expect(find.text('选择你喜欢的主题色'), findsOneWidget);
     await tapText(tester, '海洋蓝');
     final previewContext = tester.element(find.text('我的蚁群'));
     expect(
@@ -186,6 +197,7 @@ void main() {
     expect(restarted.themeColor, ThemeColor.ocean);
     expect(restarted.themeMode, ThemeMode.dark);
     expect(restarted.beginner, isTrue);
+    expect(restarted.edition, AppEdition.online);
   });
 
   testWidgets(
@@ -193,6 +205,8 @@ void main() {
     (tester) async {
       final preferences = AppPreferences(MemorySettings());
       await tester.pumpWidget(testApp(preferences));
+      await tapText(tester, '离线版');
+      await tapText(tester, '下一步');
       await tapText(tester, '琥珀橙');
       await tapText(tester, '下一步');
       await tapText(tester, '我是老玩家');
@@ -225,6 +239,8 @@ void main() {
     final store = MemorySettings()..failWrites = true;
     final preferences = AppPreferences(store);
     await tester.pumpWidget(testApp(preferences));
+    await tapText(tester, '离线版');
+    await tapText(tester, '下一步');
     await tapText(tester, '玫瑰粉');
     await tapText(tester, '下一步');
     await tapText(tester, '我是老玩家');
@@ -244,6 +260,8 @@ void main() {
       final store = MemorySettings()..pendingWrite = Completer<void>();
       final preferences = AppPreferences(store);
       await tester.pumpWidget(testApp(preferences));
+      await tapText(tester, '离线版');
+      await tapText(tester, '下一步');
       await tapText(tester, '下一步');
       await tapText(tester, '我是老玩家');
       await tapText(tester, '开始使用');
@@ -270,6 +288,8 @@ void main() {
   ) async {
     final store = MemorySettings();
     await tester.pumpWidget(testApp(AppPreferences(store)));
+    await tapText(tester, '离线版');
+    await tapText(tester, '下一步');
     await tapText(tester, '琥珀橙');
     await tapText(tester, '下一步');
     await tapText(tester, '我是新手');
@@ -278,7 +298,7 @@ void main() {
     final restarted = AppPreferences(store);
     await restarted.load();
     await tester.pumpWidget(testApp(restarted));
-    expect(find.text('选择你喜欢的主题色'), findsOneWidget);
+    expect(find.text('选择使用版本'), findsOneWidget);
     expect(restarted.onboardingCompleted, isFalse);
   });
 
@@ -292,6 +312,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(testApp(AppPreferences(MemorySettings())));
+    await tapText(tester, '离线版');
+    await tapText(tester, '下一步');
     await tapText(tester, '薰衣草紫');
     expect(
       tester
@@ -314,11 +336,13 @@ void main() {
       final store = MemorySettings();
       final preferences = AppPreferences(store);
       await preferences.setThemeColor(ThemeColor.lavender);
+      await preferences.setEdition(AppEdition.online);
       await preferences.setBeginner(true);
       await preferences.setThemeMode(ThemeMode.dark);
       final restarted = AppPreferences(store);
       await restarted.load();
       expect(restarted.themeColor, ThemeColor.lavender);
+      expect(restarted.edition, AppEdition.online);
       expect(restarted.beginner, isTrue);
       expect(restarted.themeMode, ThemeMode.dark);
       store.failWrites = true;
