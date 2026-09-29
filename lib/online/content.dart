@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../domain/beginner_care_notice.dart';
+
 class ItemTemplate {
   const ItemTemplate({
     required this.id,
@@ -26,11 +28,13 @@ class PublicContent {
     required this.title,
     required this.summary,
     required this.steps,
+    this.beginnerCareNotices = bundledBeginnerCareNotices,
   });
   final int version;
   final List<ItemTemplate> templates;
   final String title, summary;
   final List<HelpStep> steps;
+  final List<BeginnerCareNotice> beginnerCareNotices;
 
   static const bundled = PublicContent(
     version: 0,
@@ -114,12 +118,39 @@ class PublicContent {
           return HelpStep(id, _text(m['title'], 200), _text(m['body'], 4000));
         })
         .toList(growable: false);
+    final notices = <BeginnerCareNotice>[];
+    final texts = data['texts'];
+    if (texts != null) {
+      if (texts is! Map<String, dynamic> || texts.length > 200) {
+        throw const FormatException('无效公共文案');
+      }
+      for (final entry in texts.entries) {
+        if (!entry.key.startsWith('beginner-care.')) continue;
+        if (!RegExp(r'^beginner-care\.[a-z0-9][a-z0-9._-]*$')
+                .hasMatch(entry.key) ||
+            entry.key.length > 128 ||
+            entry.value is! Map<String, dynamic>) {
+          throw const FormatException('无效新手注意事项');
+        }
+        final value = entry.value as Map<String, dynamic>;
+        notices.add(
+          BeginnerCareNotice(
+            id: entry.key,
+            title: _text(value['title'], 200),
+            description: _text(value['body'], 4000),
+          ),
+        );
+      }
+    }
     return PublicContent(
       version: version,
       templates: templates,
       title: _text(help['title'], 200),
       summary: _text(help['summary'], 2000),
       steps: steps,
+      beginnerCareNotices: notices.isEmpty
+          ? bundledBeginnerCareNotices
+          : List.unmodifiable(notices),
     );
   }
 

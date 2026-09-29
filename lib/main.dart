@@ -16,6 +16,7 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/beginner_care_notice.dart';
 
 const _speciesOptions = <String, List<String>>{
   '收获蚁': ['工匠收获蚁', '原生收获蚁', '红胸收获蚁', '大头收获蚁', '强壮收获蚁', '针毛收获蚁', '无恶齿收获蚁'],
@@ -52,27 +53,6 @@ const _nestTypeOptions = [
   '生态缸巢',
   '3D 打印巢',
 ];
-
-class BeginnerCareNotice {
-  const BeginnerCareNotice({required this.title, required this.description});
-
-  final String title;
-  final String description;
-}
-
-const _beginnerCareNotices = [
-  BeginnerCareNotice(
-    title: '尽量减少打扰',
-    description: '新入手、繁殖期或状态不稳定的蚁群尤其需要安静环境；除必要的投喂、补水和观察外，尽量少开巢、少搬动。',
-  ),
-  BeginnerCareNotice(
-    title: '注意饲养温度',
-    description: '先了解所养品种适宜的温度范围，避免暴晒、骤冷骤热和长时间贴近热源；温度异常时优先让环境恢复稳定。',
-  ),
-];
-
-BeginnerCareNotice beginnerCareNoticeFor(DateTime date) =>
-    _beginnerCareNotices[(date.day - 1) % _beginnerCareNotices.length];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -147,17 +127,33 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   var _index = 0;
-  late final BeginnerCareNotice _beginnerCareNotice;
+  late BeginnerCareNotice _beginnerCareNotice;
+  late List<BeginnerCareNotice> _careNotices;
+
+  void _updateCareNotices() {
+    final notices = onlineController.content.beginnerCareNotices;
+    if (identical(notices, _careNotices)) return;
+    setState(() {
+      _careNotices = notices;
+      _beginnerCareNotice = randomBeginnerCareNotice(
+        notices: notices,
+        previous: _beginnerCareNotice,
+      );
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _beginnerCareNotice = beginnerCareNoticeFor(DateTime.now());
+    _careNotices = onlineController.content.beginnerCareNotices;
+    _beginnerCareNotice = randomBeginnerCareNotice(notices: _careNotices);
+    onlineController.addListener(_updateCareNotices);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    onlineController.removeListener(_updateCareNotices);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -196,20 +192,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 title: const Text('新手注意事项'),
                 subtitle: Text(_beginnerCareNotice.title),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  builder: (_) => SingleChildScrollView(
-                    padding: EdgeInsets.all(24),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.lightbulb_outline),
-                      title: Text(_beginnerCareNotice.title),
-                      subtitle: Text(_beginnerCareNotice.description),
+                onTap: () {
+                  final notice = _beginnerCareNotice;
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => SingleChildScrollView(
+                      padding: EdgeInsets.all(24),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.lightbulb_outline),
+                        title: Text(notice.title),
+                        subtitle: Text(notice.description),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           Expanded(child: pages[_index]),
@@ -217,7 +216,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
+        onDestinationSelected: (value) => setState(() {
+          if (value == 0 && _index != 0) {
+            _beginnerCareNotice = randomBeginnerCareNotice(
+              previous: _beginnerCareNotice,
+              notices: _careNotices,
+            );
+          }
+          _index = value;
+        }),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.hive_outlined),

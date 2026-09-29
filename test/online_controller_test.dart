@@ -78,6 +78,80 @@ http.Response response(String body, int status) => http.Response.bytes(
 );
 
 void main() {
+  test(
+    'care notices use published texts, cached content and offline fallback',
+    () async {
+      final payload = jsonDecode(snapshot()) as Map<String, dynamic>;
+      payload['texts'] = {
+        'inventory.help': {'title': '物品帮助', 'body': '不能出现在新手提示'},
+        'beginner-care.water': {'title': '检查供水', 'body': '供水详情'},
+        'beginner-care.quiet': {'title': '减少打扰', 'body': '安静详情'},
+      };
+      final raw = jsonEncode(payload);
+      final decoded = PublicContent.decode(raw);
+      expect(decoded.beginnerCareNotices.map((n) => n.title), ['检查供水', '减少打扰']);
+      expect(decoded.beginnerCareNotices.first.description, '供水详情');
+      final store = MemoryOnlineStore();
+      final live = controller(store, (_) async => response(raw, 200));
+      await live.setEnabled(true);
+      expect(live.content.beginnerCareNotices.length, 2);
+      expect(store.content, raw);
+      live.dispose();
+      final restarted = controller(store, (_) async => response('{}', 503));
+      await restarted.setEnabled(true);
+      expect(restarted.content.beginnerCareNotices.first.title, '检查供水');
+      await restarted.setEnabled(false);
+      expect(restarted.content.beginnerCareNotices.length, 8);
+      restarted.dispose();
+    },
+  );
+
+  test(
+    'old snapshots and unrelated or empty texts use bundled care notices',
+    () {
+      final payload = jsonDecode(snapshot()) as Map<String, dynamic>;
+      for (final texts in [
+        null,
+        <String, dynamic>{},
+        {
+          'inventory.help': {'title': '帮助', 'body': '说明'},
+        },
+      ]) {
+        payload['texts'] = texts;
+        expect(
+          PublicContent.decode(jsonEncode(payload)).beginnerCareNotices,
+          same(PublicContent.bundled.beginnerCareNotices),
+        );
+      }
+    },
+  );
+
+  test('invalid care text never replaces valid cached content', () async {
+    final payload = jsonDecode(snapshot()) as Map<String, dynamic>;
+    payload['texts'] = {
+      'beginner-care.valid': {'title': '有效提示', 'body': '正文'},
+    };
+    final store = MemoryOnlineStore()..content = jsonEncode(payload);
+    payload['texts'] = {
+      'beginner-care.invalid': {'title': ' ', 'body': '正文'},
+    };
+    expect(
+      () => PublicContent.decode(jsonEncode(payload)),
+      throwsFormatException,
+    );
+    final app = controller(
+      store,
+      (_) async => response(jsonEncode(payload), 200),
+    );
+    await app.setEnabled(true);
+    expect(app.content.beginnerCareNotices.single.title, '有效提示');
+    expect(
+      PublicContent.decode(store.content!).beginnerCareNotices.single.title,
+      '有效提示',
+    );
+    app.dispose();
+  });
+
   test('offline sends no requests and always uses bundled content', () async {
     var calls = 0;
     final c = controller(MemoryOnlineStore(), (r) async {
