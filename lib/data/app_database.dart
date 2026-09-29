@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/models.dart';
+import 'database_factory.dart';
+import 'database_path.dart';
 
 abstract class AntKeepRepository {
   Future<List<Colony>> listColonies();
@@ -23,11 +22,9 @@ class AppDatabase implements AntKeepRepository {
 
   Future<void> open() async {
     if (_database != null) return;
-    final root = await getApplicationSupportDirectory();
-    final directory = Directory(path.join(root.path, 'antkeep'));
-    await directory.create(recursive: true);
+    initializeDatabaseFactory();
     _database = await openDatabase(
-      path.join(directory.path, 'antkeep.sqlite'),
+      await applicationDatabasePath(),
       version: 8,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,

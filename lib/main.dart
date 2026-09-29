@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -1081,11 +1081,16 @@ class _RecordFormPageState extends State<RecordFormPage> {
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) => ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(_photos[index].path),
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
+                child: FutureBuilder<Uint8List>(
+                  future: _photos[index].readAsBytes(),
+                  builder: (context, snapshot) => snapshot.hasData
+                      ? Image.memory(
+                          snapshot.data!,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        )
+                      : const SizedBox(width: 80, height: 80),
                 ),
               ),
             ),
@@ -1939,8 +1944,8 @@ class _StoredImage extends StatelessWidget {
   final double borderRadius;
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<File>(
-    future: LocalMediaStore.instance.fileFor(relativePath),
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+    future: LocalMediaStore.instance.readImage(relativePath),
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
         return SizedBox(
@@ -1954,7 +1959,7 @@ class _StoredImage extends StatelessWidget {
       }
       return ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
-        child: Image.file(
+        child: Image.memory(
           snapshot.data!,
           width: width,
           height: height,
