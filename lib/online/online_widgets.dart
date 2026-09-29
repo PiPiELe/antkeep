@@ -1,0 +1,277 @@
+import 'package:flutter/material.dart';
+
+import '../app_preferences.dart';
+import 'content.dart';
+import 'online_controller.dart';
+
+class OnlineSettings extends StatelessWidget {
+  const OnlineSettings({
+    super.key,
+    required this.preferences,
+    required this.controller,
+  });
+  final AppPreferences preferences;
+  final OnlineController controller;
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: controller,
+    builder: (context, _) => Column(
+      children: [
+        SwitchListTile(
+          title: const Text('在线模式'),
+          subtitle: const Text('联网读取公共资料，登录后可签到；养殖数据始终留在本机。'),
+          value: preferences.edition == AppEdition.online,
+          onChanged: (value) async {
+            try {
+              await preferences.setEdition(
+                value ? AppEdition.online : AppEdition.offline,
+              );
+            } catch (_) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('模式保存失败，请重试。')));
+              }
+            }
+          },
+        ),
+        if (controller.enabled) ...[
+          ListTile(
+            leading: const Icon(Icons.account_circle_outlined),
+            title: Text(controller.user?.username ?? '游客 · 未登录'),
+            subtitle: const Text('账号只关联签到，不关联本机养殖数据。'),
+            trailing: controller.user == null
+                ? TextButton(
+                    onPressed: controller.busy
+                        ? null
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => LoginPage(controller: controller),
+                            ),
+                          ),
+                    child: const Text('登录 / 注册'),
+                  )
+                : TextButton(
+                    onPressed: controller.busy ? null : controller.logout,
+                    child: const Text('退出'),
+                  ),
+          ),
+          if (controller.user == null && controller.hasSession)
+            TextButton(
+              onPressed: controller.busy ? null : controller.logout,
+              child: const Text('清除本机会话'),
+            ),
+          if (controller.user != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('每日签到 · 北京时间'),
+                    Text(
+                      controller.checkin == null
+                          ? '签到状态尚未读取'
+                          : '${controller.checkin!.date} · 连续 ${controller.checkin!.consecutiveDays} 天 · 累计 ${controller.checkin!.totalDays} 天',
+                    ),
+                    Wrap(
+                      spacing: 12,
+                      children: [
+                        FilledButton(
+                          onPressed: controller.busy
+                              ? null
+                              : () => controller.refreshCheckin(submit: true),
+                          child: Text(
+                            controller.checkin?.checkedInToday == true
+                                ? '已签到 · 再次确认'
+                                : '签到',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: controller.busy
+                              ? null
+                              : controller.refreshCheckin,
+                          child: const Text('刷新状态'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (controller.error != null)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                controller.error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          ListTile(
+            title: Text(
+              controller.content.version == 0
+                  ? '公共资料 · 内置版本'
+                  : '公共资料 · 版本 ${controller.content.version}',
+            ),
+            subtitle: Text(controller.contentNotice ?? '物品模板与新手资料'),
+            trailing: TextButton(
+              onPressed: controller.refreshing
+                  ? null
+                  : controller.refreshContent,
+              child: Text(controller.refreshing ? '更新中…' : '更新'),
+            ),
+          ),
+        ],
+        ListTile(
+          leading: const Icon(Icons.help_outline),
+          title: const Text('使用指南'),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => Scaffold(
+                appBar: AppBar(title: const Text('使用指南')),
+                body: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: AnimatedBuilder(
+                    animation: controller,
+                    builder: (_, _) => HelpContent(content: controller.content),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class HelpContent extends StatelessWidget {
+  const HelpContent({super.key, required this.content});
+  final PublicContent content;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(content.title, style: Theme.of(context).textTheme.titleLarge),
+      Text(content.summary),
+      for (final step in content.steps)
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.check_circle_outline),
+          title: Text(step.title),
+          subtitle: Text(step.body),
+        ),
+    ],
+  );
+}
+
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key, required this.controller});
+  final OnlineController controller;
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _username = TextEditingController(),
+      _password = TextEditingController();
+  final _form = GlobalKey<FormState>();
+  bool _register = false;
+  @override
+  void dispose() {
+    _username.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    await widget.controller.login(
+      _username.text,
+      _password.text,
+      register: _register,
+    );
+    if (!mounted) return;
+    _password.clear();
+    if (widget.controller.user != null) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.controller,
+    builder: (context, _) {
+      final controller = widget.controller;
+      return Scaffold(
+        appBar: AppBar(title: Text(_register ? '创建账号' : '登录')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _form,
+            child: Column(
+              children: [
+                const Text('登录仅用于签到，蚁群、记录和照片不会上传。'),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _username,
+                  autocorrect: false,
+                  autofillHints: const [AutofillHints.username],
+                  decoration: const InputDecoration(
+                    labelText: '用户名',
+                    helperText: '3–32 位字母、数字或下划线',
+                  ),
+                  validator: (v) =>
+                      RegExp(r'^[a-zA-Z0-9_]{3,32}$').hasMatch((v ?? '').trim())
+                      ? null
+                      : '请检查用户名格式',
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _password,
+                  obscureText: true,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: const InputDecoration(
+                    labelText: '密码',
+                    helperText: '8–64 位',
+                  ),
+                  validator: (v) =>
+                      v != null && v.runes.length >= 8 && v.runes.length <= 64
+                      ? null
+                      : '密码需为 8–64 位',
+                ),
+                if (controller.error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      controller.error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: controller.busy || !controller.enabled
+                      ? null
+                      : _submit,
+                  child: Text(
+                    controller.busy
+                        ? '处理中…'
+                        : _register
+                        ? '注册并登录'
+                        : '登录',
+                  ),
+                ),
+                TextButton(
+                  onPressed: controller.busy
+                      ? null
+                      : () => setState(() => _register = !_register),
+                  child: Text(_register ? '已有账号，去登录' : '没有账号，去注册'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
