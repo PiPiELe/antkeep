@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
+import 'app_preferences.dart';
+import 'onboarding.dart';
 import 'data/app_database.dart';
 import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
+import 'data/local_notification_service.dart';
 import 'domain/models.dart';
 
 const _speciesOptions = <String, List<String>>{
@@ -45,43 +48,50 @@ const _nestTypeOptions = [
   '3D 打印巢',
 ];
 
+class BeginnerCareNotice {
+  const BeginnerCareNotice({required this.title, required this.description});
+
+  final String title;
+  final String description;
+}
+
+const _beginnerCareNotices = [
+  BeginnerCareNotice(
+    title: '尽量减少打扰',
+    description: '新入手、繁殖期或状态不稳定的蚁群尤其需要安静环境；除必要的投喂、补水和观察外，尽量少开巢、少搬动。',
+  ),
+  BeginnerCareNotice(
+    title: '注意饲养温度',
+    description: '先了解所养品种适宜的温度范围，避免暴晒、骤冷骤热和长时间贴近热源；温度异常时优先让环境恢复稳定。',
+  ),
+];
+
+BeginnerCareNotice beginnerCareNoticeFor(DateTime date) =>
+    _beginnerCareNotices[(date.day - 1) % _beginnerCareNotices.length];
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await LocalMediaStore.instance.initialize();
     await AppDatabase.instance.open();
     await themeController.load();
+    try {
+      await LocalNotificationService.instance.initialize();
+      if (themeController.careRemindersEnabled) {
+        await LocalNotificationService.instance.scheduleDailyCareReminder(
+          themeController.careReminderMinuteOfDay,
+        );
+      }
+    } catch (_) {
+      // A notification integration failure must not block access to local data.
+    }
     runApp(const AntKeepApp());
   } catch (error) {
     runApp(_StartupError(error: error));
   }
 }
 
-final themeController = _ThemeController();
-
-class _ThemeController extends ChangeNotifier {
-  var _darkThemeEnabled = false;
-
-  bool get darkThemeEnabled => _darkThemeEnabled;
-
-  Future<void> load() async {
-    _darkThemeEnabled = await AppDatabase.instance.isDarkThemeEnabled();
-  }
-
-  Future<void> setDarkThemeEnabled(bool enabled) async {
-    if (enabled == _darkThemeEnabled) return;
-    final previous = _darkThemeEnabled;
-    _darkThemeEnabled = enabled;
-    notifyListeners();
-    try {
-      await AppDatabase.instance.setDarkThemeEnabled(enabled);
-    } catch (_) {
-      _darkThemeEnabled = previous;
-      notifyListeners();
-      rethrow;
-    }
-  }
-}
+final themeController = AppPreferences(AppDatabase.instance);
 
 class AntKeepApp extends StatelessWidget {
   const AntKeepApp({super.key});
@@ -92,30 +102,12 @@ class AntKeepApp extends StatelessWidget {
     builder: (context, _) => MaterialApp(
       title: '蚁记',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff3f6048)),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff7da985),
-          brightness: Brightness.dark,
-        ),
-        scaffoldBackgroundColor: const Color(0xff0d0f0d),
-        appBarTheme: const AppBarTheme(backgroundColor: Color(0xff121512)),
-        cardColor: const Color(0xff181c18),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-      ),
-      themeMode: themeController.darkThemeEnabled
-          ? ThemeMode.dark
-          : ThemeMode.light,
-      home: const HomePage(),
+      theme: antKeepTheme(themeController.themeColor),
+      darkTheme: antKeepTheme(themeController.themeColor, dark: true),
+      themeMode: themeController.themeMode,
+      home: themeController.onboardingCompleted
+          ? const HomePage()
+          : OnboardingPage(preferences: themeController),
     ),
   );
 }
@@ -145,9 +137,21 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   var _index = 0;
+  late final BeginnerCareNotice _beginnerCareNotice;
 
   @override
-  Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
+    _beginnerCareNotice = beginnerCareNoticeFor(DateTime.now());
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: themeController,
+    builder: (context, _) => _buildPage(context),
+  );
+
+  Widget _buildPage(BuildContext context) {
     const titles = ['我的蚁群', '最近记录', '物品', 'DLC 养殖', '设置'];
     final pages = [
       const ColoniesPage(),
@@ -158,7 +162,35 @@ class _HomePageState extends State<HomePage> {
     ];
     return Scaffold(
       appBar: AppBar(title: Text(titles[_index])),
-      body: pages[_index],
+      body: Column(
+        children: [
+          if (_index == 0 && themeController.beginner)
+            Material(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: ListTile(
+                leading: const Icon(Icons.lightbulb_outline),
+                title: const Text('新手注意事项'),
+                subtitle: Text(_beginnerCareNotice.title),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  builder: (_) => SingleChildScrollView(
+                    padding: EdgeInsets.all(24),
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.lightbulb_outline),
+                      title: Text(_beginnerCareNotice.title),
+                      subtitle: Text(_beginnerCareNotice.description),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Expanded(child: pages[_index]),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
@@ -489,6 +521,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           ),
           const SizedBox(height: 12),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: TextField(
@@ -567,7 +600,20 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           const SizedBox(height: 12),
           TextField(
             controller: _source,
-            decoration: const InputDecoration(labelText: '来源'),
+            decoration: InputDecoration(
+              labelText: '来源',
+              hintText: '选择或填写来源',
+              suffixIcon: PopupMenuButton<String>(
+                tooltip: '选择来源',
+                icon: const Icon(Icons.arrow_drop_down),
+                onSelected: (source) => setState(() => _source.text = source),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: '野采', child: Text('野采')),
+                  PopupMenuItem(value: '网购', child: Text('网购')),
+                  PopupMenuItem(value: '蚁友赠送', child: Text('蚁友赠送')),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -776,8 +822,10 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
             _ColonySummary(colony: colony),
+            const SizedBox(height: 16),
+            _GrowthArchive(colony: colony, records: detail.records),
             const SizedBox(height: 22),
-            Text('养殖时间线', style: Theme.of(context).textTheme.titleLarge),
+            Text('养蚁日记', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             if (detail.records.isEmpty)
               const Padding(
@@ -804,6 +852,89 @@ class _Detail {
   final List<CareRecord> records;
 }
 
+class _GrowthArchive extends StatelessWidget {
+  const _GrowthArchive({required this.colony, required this.records});
+  final Colony colony;
+  final List<CareRecord> records;
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = records.cast<CareRecord?>().firstWhere(
+      (record) =>
+          record!.eggCount != null ||
+          record.larvaCount != null ||
+          record.pupaCount != null ||
+          record.workerCount != null,
+      orElse: () => null,
+    );
+    final latestDate = latest == null ? null : _date(latest.occurredAt);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.trending_up_outlined),
+                const SizedBox(width: 8),
+                Text('成长档案', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              latestDate == null ? '记录一次数量，成长变化会显示在这里。' : '最近数量记录：$latestDate',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _GrowthMetric(
+                  label: '工蚁',
+                  initial: colony.initialWorkerCount,
+                  latest: latest?.workerCount,
+                ),
+                _GrowthMetric(
+                  label: '卵',
+                  initial: colony.initialEggCount,
+                  latest: latest?.eggCount,
+                ),
+                _GrowthMetric(label: '幼虫', latest: latest?.larvaCount),
+                _GrowthMetric(
+                  label: '蛹',
+                  initial: colony.initialCocoonCount,
+                  latest: latest?.pupaCount,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GrowthMetric extends StatelessWidget {
+  const _GrowthMetric({required this.label, this.initial, this.latest});
+  final String label;
+  final int? initial;
+  final int? latest;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = latest ?? initial;
+    final delta = initial != null && latest != null ? latest! - initial! : null;
+    final deltaLabel = switch (delta) {
+      null || 0 => '',
+      > 0 => '（+$delta）',
+      _ => '（$delta）',
+    };
+    return Chip(label: Text('$label ${value ?? '未记录'}$deltaLabel'));
+  }
+}
+
 class _ColonySummary extends StatelessWidget {
   const _ColonySummary({required this.colony});
   final Colony colony;
@@ -828,20 +959,22 @@ class _ColonySummary extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 10),
+          if (colony.scale != null) ...[
+            Chip(
+              avatar: Icon(
+                colony.scale == ColonyScale.newQueen
+                    ? Icons.workspace_premium_outlined
+                    : Icons.groups_outlined,
+                size: 18,
+              ),
+              label: Text(colony.scale!.label),
+            ),
+            const SizedBox(height: 8),
+          ],
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (colony.scale != null)
-                Chip(
-                  avatar: Icon(
-                    colony.scale == ColonyScale.newQueen
-                        ? Icons.egg_alt_outlined
-                        : Icons.groups_outlined,
-                    size: 18,
-                  ),
-                  label: Text(colony.scale!.label),
-                ),
               if (colony.queenCount != null)
                 Chip(label: Text('${colony.queenCount} 只蚁后')),
               if (colony.initialWorkerCount != null)
@@ -1383,42 +1516,46 @@ class _InventoryPageState extends State<InventoryPage> {
       icon: const Icon(Icons.add),
       label: const Text('新增物品'),
     ),
-    body: FutureBuilder<List<InventoryItem>>(
-      future: _items,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return _ErrorState('读取物品失败：${snapshot.error}');
-        }
-        final items = snapshot.data!;
-        final needed = items.where((item) => !item.purchased).toList();
-        final purchased = items.where((item) => item.purchased).toList();
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-          children: [
-            _InventorySectionHeader(
-              title: '未购入',
-              count: needed.length,
-              icon: Icons.shopping_cart_outlined,
-            ),
-            const SizedBox(height: 6),
-            if (needed.isEmpty) const Text('暂时没有待采购的物品。'),
-            ...needed.map(_itemTile),
-            const SizedBox(height: 18),
-            _InventorySectionHeader(
-              title: '已购买',
-              count: purchased.length,
-              icon: Icons.check_circle_outline,
-            ),
-            const SizedBox(height: 6),
-            if (purchased.isEmpty) const Text('还没有已购买的物品。'),
-            ...purchased.map(_itemTile),
-          ],
-        );
-      },
+    body: DefaultTabController(
+      length: 2,
+      child: FutureBuilder<List<InventoryItem>>(
+        future: _items,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _ErrorState('读取物品失败：${snapshot.error}');
+          }
+          final items = snapshot.data!;
+          final needed = items.where((item) => !item.purchased).toList();
+          final purchased = items.where((item) => item.purchased).toList();
+          return Column(
+            children: [
+              TabBar(
+                tabs: [
+                  Tab(text: '推荐 (${needed.length})'),
+                  Tab(text: '已购 (${purchased.length})'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _itemList(needed, '暂时没有推荐的物品。'),
+                    _itemList(purchased, '还没有已购的物品。'),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     ),
+  );
+
+  Widget _itemList(List<InventoryItem> items, String emptyMessage) => ListView(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+    children: [if (items.isEmpty) Text(emptyMessage), ...items.map(_itemTile)],
   );
 
   Widget _itemTile(InventoryItem item) {
@@ -1487,31 +1624,26 @@ class _NewInventoryItem {
   final DateTime? expiresAt;
 }
 
-class _InventorySectionHeader extends StatelessWidget {
-  const _InventorySectionHeader({
-    required this.title,
-    required this.count,
-    required this.icon,
-  });
-
-  final String title;
-  final int count;
-  final IconData icon;
+class DlcPage extends StatefulWidget {
+  const DlcPage({super.key});
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, size: 20),
-      const SizedBox(width: 8),
-      Text(title, style: Theme.of(context).textTheme.titleLarge),
-      const SizedBox(width: 8),
-      Chip(label: Text('$count')),
-    ],
-  );
+  State<DlcPage> createState() => _DlcPageState();
 }
 
-class DlcPage extends StatelessWidget {
-  const DlcPage({super.key});
+class _DlcPageState extends State<DlcPage> {
+  late Map<FeederType, Future<FeederRecord?>> _counts;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() => _counts = {
+    for (final feeder in FeederType.values)
+      feeder: AppDatabase.instance.latestFeederCountRecord(feeder),
+  };
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -1528,13 +1660,51 @@ class DlcPage extends StatelessWidget {
             child: ListTile(
               leading: CircleAvatar(child: Icon(_feederIcon(feeder))),
               title: Text(feeder.label),
-              subtitle: Text('${feeder.label}养殖记录'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => FeederDetailPage(feeder: feeder),
-                ),
+              subtitle: FutureBuilder<FeederRecord?>(
+                future: _counts[feeder],
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Text('数量读取中…');
+                  }
+                  if (snapshot.hasError) {
+                    return const Text('数量读取失败，点击进入重试');
+                  }
+                  final record = snapshot.data;
+                  if (record == null) return const Text('暂未记录数量');
+                  final juveniles = record.juvenileCount;
+                  final adults = record.adultCount;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          juveniles != null && adults != null
+                              ? '最近数量：${juveniles + adults} 只'
+                              : '最近数量：部分未记录',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '幼体/若虫 ${juveniles ?? "未知"} · 成体 ${adults ?? "未知"}',
+                        ),
+                        Text('记录于 ${_dateTime(record.occurredAt)}'),
+                      ],
+                    ),
+                  );
+                },
               ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FeederDetailPage(feeder: feeder),
+                  ),
+                );
+                if (mounted) setState(_reload);
+              },
             ),
           ),
         ),
@@ -1854,7 +2024,12 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: themeController,
+    builder: (context, _) => _buildSettings(context),
+  );
+
+  Widget _buildSettings(BuildContext context) => ListView(
     children: [
       const ListTile(
         leading: Icon(Icons.phonelink_lock_outlined),
@@ -1862,18 +2037,119 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: Text('蚁群、记录和照片仅保存在本设备；没有账号、服务器或自动同步。'),
       ),
       const Divider(),
+      const ListTile(
+        leading: Icon(Icons.palette_outlined),
+        title: Text('主题色'),
+        subtitle: Text('选择喜欢的颜色，保存在本机'),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: ThemeColorPicker(
+          selected: themeController.themeColor,
+          onChanged: (color) async {
+            try {
+              await themeController.setThemeColor(color);
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+      ),
       SwitchListTile(
-        secondary: const Icon(Icons.dark_mode_outlined),
-        title: const Text('黑色主题'),
-        subtitle: const Text('使用深色界面，并保存在本机'),
-        value: themeController.darkThemeEnabled,
+        secondary: const Icon(Icons.lightbulb_outline),
+        title: const Text('新手注意事项'),
+        subtitle: const Text('在蚁群首页显示养蚁新手注意事项'),
+        value: themeController.beginner,
         onChanged: (enabled) async {
           try {
-            await themeController.setDarkThemeEnabled(enabled);
+            await themeController.setBeginner(enabled);
           } catch (error) {
             if (context.mounted) _showError(context, error);
           }
         },
+      ),
+      const ListTile(
+        leading: Icon(Icons.dark_mode_outlined),
+        title: Text('外观模式'),
+        subtitle: Text('跟随系统，或固定使用浅色、深色界面'),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: ThemeModePicker(
+          selected: themeController.themeMode,
+          onChanged: (mode) async {
+            try {
+              await themeController.setThemeMode(mode);
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+      ),
+      const Divider(),
+      SwitchListTile(
+        secondary: const Icon(Icons.notifications_active_outlined),
+        title: const Text('本地养护提醒'),
+        subtitle: Text(
+          themeController.careRemindersEnabled
+              ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
+              : '关闭；开启后仅向系统申请通知权限',
+        ),
+        value: themeController.careRemindersEnabled,
+        onChanged: (enabled) async {
+          try {
+            if (enabled) {
+              final granted = await LocalNotificationService.instance
+                  .requestPermission();
+              if (!granted) {
+                if (context.mounted) _showInfo(context, '未获得通知权限，提醒没有开启。');
+                return;
+              }
+              await LocalNotificationService.instance.scheduleDailyCareReminder(
+                themeController.careReminderMinuteOfDay,
+              );
+            } else {
+              await LocalNotificationService.instance.cancelDailyCareReminder();
+            }
+            await themeController.setCareReminder(
+              enabled: enabled,
+              minuteOfDay: themeController.careReminderMinuteOfDay,
+            );
+          } catch (error) {
+            if (context.mounted) _showError(context, error);
+          }
+        },
+      ),
+      ListTile(
+        enabled: themeController.careRemindersEnabled,
+        leading: const Icon(Icons.schedule_outlined),
+        title: const Text('提醒时间'),
+        subtitle: Text(
+          '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}',
+        ),
+        onTap: !themeController.careRemindersEnabled
+            ? null
+            : () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay(
+                    hour: themeController.careReminderMinuteOfDay ~/ 60,
+                    minute: themeController.careReminderMinuteOfDay % 60,
+                  ),
+                );
+                if (picked == null || !context.mounted) return;
+                final minuteOfDay = picked.hour * 60 + picked.minute;
+                try {
+                  await LocalNotificationService.instance
+                      .scheduleDailyCareReminder(minuteOfDay);
+                  await themeController.setCareReminder(
+                    enabled: true,
+                    minuteOfDay: minuteOfDay,
+                  );
+                } catch (error) {
+                  if (context.mounted) _showError(context, error);
+                }
+              },
       ),
       const Divider(),
       ListTile(
@@ -2091,6 +2367,8 @@ String _date(DateTime value) =>
     '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 String _dateTime(DateTime value) =>
     '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+String _timeOfDay(int minuteOfDay) =>
+    '${(minuteOfDay ~/ 60).toString().padLeft(2, '0')}:${(minuteOfDay % 60).toString().padLeft(2, '0')}';
 void _showError(BuildContext context, Object error) =>
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('操作未完成：$error')));

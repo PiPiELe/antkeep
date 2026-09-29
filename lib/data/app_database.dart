@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/models.dart';
+import '../app_preferences.dart';
 import 'database_factory.dart';
 import 'database_path.dart';
 
@@ -15,7 +16,7 @@ abstract class AntKeepRepository {
   Future<void> saveRecord(CareRecord record);
 }
 
-class AppDatabase implements AntKeepRepository {
+class AppDatabase implements AntKeepRepository, AppSettingsStore {
   AppDatabase._();
   static final instance = AppDatabase._();
   Database? _database;
@@ -138,7 +139,8 @@ class AppDatabase implements AntKeepRepository {
   Future<List<Colony>> listColonies() async => (await _db.query(
     'colonies',
     where: 'archived = 0',
-    orderBy: 'updated_at DESC',
+    orderBy:
+        'CASE WHEN initial_worker_count = 0 THEN 0 ELSE 1 END, updated_at DESC',
   )).map(Colony.fromMap).toList();
 
   @override
@@ -182,20 +184,22 @@ class AppDatabase implements AntKeepRepository {
         );
       });
 
-  Future<bool> isDarkThemeEnabled() async {
-    final rows = await _db.query(
-      'app_settings',
-      columns: ['setting_value'],
-      where: 'setting_key = ?',
-      whereArgs: ['dark_theme'],
-    );
-    return rows.isNotEmpty && rows.single['setting_value'] == 'true';
-  }
+  @override
+  Future<Map<String, String>> readSettings() async => {
+    for (final row in await _db.query('app_settings'))
+      row['setting_key'] as String: row['setting_value'] as String,
+  };
 
-  Future<void> setDarkThemeEnabled(bool enabled) => _db.insert('app_settings', {
-    'setting_key': 'dark_theme',
-    'setting_value': '$enabled',
-  }, conflictAlgorithm: ConflictAlgorithm.replace);
+  @override
+  Future<void> writeSettings(Map<String, String> values) =>
+      _db.transaction((transaction) async {
+        for (final entry in values.entries) {
+          await transaction.insert('app_settings', {
+            'setting_key': entry.key,
+            'setting_value': entry.value,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      });
 
   Future<List<InventoryItem>> listInventory() async => (await _db.query(
     'inventory_items',
@@ -229,6 +233,17 @@ class AppDatabase implements AntKeepRepository {
 
   Future<void> saveFeederRecord(FeederRecord record) =>
       _db.insert('feeder_records', record.toMap());
+
+  Future<FeederRecord?> latestFeederCountRecord(FeederType feeder) async {
+    final rows = await _db.query(
+      'feeder_records',
+      where: 'feeder_type = ? AND (juvenile_count IS NOT NULL OR adult_count IS NOT NULL)',
+      whereArgs: [feeder.storageValue],
+      orderBy: 'occurred_at DESC, created_at DESC, id DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : FeederRecord.fromMap(rows.single);
+  }
 
   Future<void> _seedInventory() async {
     const items = [
