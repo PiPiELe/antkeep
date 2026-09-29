@@ -1882,11 +1882,11 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: const Text('生成包含记录和照片的 .zip 文件'),
         onTap: () async {
           try {
-            await BackupService(
+            final exported = await BackupService(
               AppDatabase.instance,
               LocalMediaStore.instance,
             ).exportBackup();
-            if (context.mounted) _showInfo(context, '已完成备份导出。');
+            if (exported && context.mounted) _showInfo(context, '已完成备份导出。');
           } catch (error) {
             if (context.mounted) _showError(context, error);
           }
@@ -1916,11 +1916,54 @@ class _SettingsPageState extends State<SettingsPage> {
           );
           if (approved != true || !context.mounted) return;
           try {
-            await BackupService(
+            final restored = await BackupService(
               AppDatabase.instance,
               LocalMediaStore.instance,
             ).restoreBackup();
-            if (context.mounted) _showInfo(context, '已恢复备份，请返回蚁群页查看。');
+            if (restored && context.mounted) {
+              _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
+            }
+          } catch (error) {
+            if (context.mounted) _showError(context, error);
+          }
+        },
+      ),
+      ListTile(
+        leading: const Icon(Icons.undo_outlined),
+        title: const Text('撤销上一次恢复'),
+        subtitle: const Text('恢复覆盖前自动保留的本地回退副本'),
+        onTap: () async {
+          final service = BackupService(
+            AppDatabase.instance,
+            LocalMediaStore.instance,
+          );
+          final hasRollback = await service.hasRollback();
+          if (!context.mounted) return;
+          if (!hasRollback) {
+            _showInfo(context, '没有可撤销的恢复操作。');
+            return;
+          }
+          final approved = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('撤销上一次恢复？'),
+              content: const Text('当前数据会被恢复前自动保存的本地副本替换。'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('撤销恢复'),
+                ),
+              ],
+            ),
+          );
+          if (approved != true || !context.mounted) return;
+          try {
+            await service.undoLastRestore();
+            if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
           } catch (error) {
             if (context.mounted) _showError(context, error);
           }
