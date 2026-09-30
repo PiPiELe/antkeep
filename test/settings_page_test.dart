@@ -86,28 +86,26 @@ void main() {
       .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label))
       .selected;
 
-  testWidgets('edition switches both ways and survives preferences reload', (
+  testWidgets('online edition shows preview notice and remains offline', (
     tester,
   ) async {
     await tester.pumpWidget(app());
     expect(selected(tester, '离线版'), isTrue);
+    expect(find.text('在线模式'), findsNothing);
     expect(find.text('个人中心与签到'), findsNothing);
     await tester.tap(find.text('在线版'));
     await tester.pumpAndSettle();
-    expect(selected(tester, '在线版'), isTrue);
-    expect(find.text('个人中心与签到'), findsOneWidget);
+    expect(find.text('测试中，期待后续开放o(^▽^)o'), findsOneWidget);
+    expect(selected(tester, '离线版'), isTrue);
+    expect(selected(tester, '在线版'), isFalse);
+    await tester.tap(find.text('知道了'));
+    await tester.pumpAndSettle();
     final restarted = AppPreferences(AppDatabase.instance);
     await restarted.load();
-    expect(restarted.edition, AppEdition.online);
-    expect(find.text('已选择在线版，在线资料更新暂不可用。'), findsOneWidget);
-    await tester.tap(find.text('离线版'));
-    await tester.pumpAndSettle();
-    await restarted.load();
     expect(restarted.edition, AppEdition.offline);
-    expect(find.text('个人中心与签到'), findsNothing);
   });
 
-  testWidgets('failed edition save retains selection and can retry', (
+  testWidgets('online edition preview does not write preferences', (
     tester,
   ) async {
     await tester.pumpWidget(app());
@@ -115,11 +113,10 @@ void main() {
     await tester.tap(find.text('在线版'));
     await tester.pumpAndSettle();
     expect(selected(tester, '离线版'), isTrue);
-    expect(find.textContaining('操作未完成'), findsOneWidget);
-    failWrites = false;
-    await tester.tap(find.text('在线版'));
+    expect(find.text('测试中，期待后续开放o(^▽^)o'), findsOneWidget);
+    await tester.tap(find.text('知道了'));
     await tester.pumpAndSettle();
-    expect(selected(tester, '在线版'), isTrue);
+    expect(find.textContaining('操作未完成'), findsNothing);
   });
 
   for (final dark in [false, true]) {

@@ -1,39 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../app_preferences.dart';
 import 'content.dart';
 import 'online_controller.dart';
 
 class OnlineSettings extends StatelessWidget {
-  const OnlineSettings({
-    super.key,
-    required this.preferences,
-    required this.controller,
-  });
-  final AppPreferences preferences;
+  const OnlineSettings({super.key, required this.controller});
   final OnlineController controller;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
     builder: (context, _) => Column(
       children: [
-        SwitchListTile(
-          title: const Text('在线模式'),
-          subtitle: const Text('联网读取公共资料，登录后可签到；养殖数据始终留在本机。'),
-          value: preferences.edition == AppEdition.online,
-          onChanged: (value) async {
-            try {
-              await preferences.setEdition(
-                value ? AppEdition.online : AppEdition.offline,
-              );
-            } catch (_) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('模式保存失败，请重试。')));
-              }
-            }
-          },
-        ),
         if (controller.enabled) ...[
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),
