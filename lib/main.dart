@@ -1558,6 +1558,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   bool _deleting = false;
   bool _editingAcquiredOn = false;
   bool _includeBrood = false;
+  bool _populationExpanded = true;
   @override
   void initState() {
     super.initState();
@@ -1695,8 +1696,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               colony: colony,
               records: detail.records,
               includeBrood: _includeBrood,
+              expanded: _populationExpanded,
               onIncludeBroodChanged: (value) {
                 setState(() => _includeBrood = value);
+              },
+              onExpandedChanged: (value) {
+                setState(() => _populationExpanded = value);
               },
             ),
             const SizedBox(height: 22),
@@ -1874,12 +1879,16 @@ class _PopulationTimeline extends StatelessWidget {
     required this.colony,
     required this.records,
     required this.includeBrood,
+    required this.expanded,
     required this.onIncludeBroodChanged,
+    required this.onExpandedChanged,
   });
   final Colony colony;
   final List<CareRecord> records;
   final bool includeBrood;
+  final bool expanded;
   final ValueChanged<bool> onIncludeBroodChanged;
+  final ValueChanged<bool> onExpandedChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1905,46 +1914,69 @@ class _PopulationTimeline extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                FilterChip(
-                  label: const Text('带卵幼'),
-                  selected: includeBrood,
-                  onSelected: onIncludeBroodChanged,
+                IconButton(
+                  tooltip: expanded ? '折叠种群数量' : '展开种群数量',
+                  onPressed: () => onExpandedChanged(!expanded),
+                  icon: Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(description, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 14),
-            if (points.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text('暂无有效数量，添加记录后会显示变化。'),
-              )
-            else ...[
-              Text('最近 ${points.last.count} · ${points.length} 个时间点'),
-              const SizedBox(height: 12),
-              Semantics(
-                label: '种群数量时间折线图，$description。',
-                child: SizedBox(
-                  key: const ValueKey('colony-population-chart'),
-                  height: 180,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: _ColonyPopulationChartPainter(
-                      points,
-                      Theme.of(context).colorScheme,
+            if (expanded) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      description,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  FilterChip(
+                    avatar: const Icon(Icons.circle_outlined, size: 18),
+                    label: const Text('带卵幼'),
+                    selected: includeBrood,
+                    onSelected: onIncludeBroodChanged,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (points.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text('暂无有效数量，添加记录后会显示变化。'),
+                )
+              else ...[
+                Text('最近 ${points.last.count} · ${points.length} 个时间点'),
+                const SizedBox(height: 12),
+                Semantics(
+                  label: '种群数量时间折线图，$description。',
+                  child: SizedBox(
+                    key: const ValueKey('colony-population-chart'),
+                    height: 180,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _ColonyPopulationChartPainter(
+                        points,
+                        Theme.of(context).colorScheme,
+                      ),
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_date(points.first.time)} — ${_date(points.last.time)}',
+                ),
+              ],
               const SizedBox(height: 8),
-              Text('${_date(points.first.time)} — ${_date(points.last.time)}'),
+              Text(
+                '未填写的数量不会按 0 计算；两次记录之间沿用最近一次已填写的数量。',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
-            const SizedBox(height: 8),
-            Text(
-              '未填写的数量不会按 0 计算；两次记录之间沿用最近一次已填写的数量。',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
           ],
         ),
       ),
