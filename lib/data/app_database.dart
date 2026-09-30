@@ -12,6 +12,7 @@ abstract class AntKeepRepository {
   Future<List<Colony>> listColonies();
   Future<Colony?> findColony(String id);
   Future<void> saveColony(Colony colony);
+  Future<void> deleteColony(String id);
   Future<List<CareRecord>> listRecords(String colonyId);
   Future<List<CareRecord>> listRecentRecords();
   Future<void> saveRecord(CareRecord record);
@@ -222,6 +223,12 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
           await transaction.insert('colonies', colony.toMap());
         }
       });
+
+  @override
+  Future<void> deleteColony(String id) async {
+    // Foreign keys cascade the deletion to this colony's care records.
+    await _db.delete('colonies', where: 'id = ?', whereArgs: [id]);
+  }
 
   @override
   Future<List<CareRecord>> listRecords(String colonyId) async =>
