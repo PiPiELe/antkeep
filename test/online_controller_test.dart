@@ -11,15 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 class MemoryOnlineStore implements OnlineStore {
-  String? token, content;
-  bool failDelete = false;
-  @override
-  Future<String?> readToken() async => token;
-  @override
-  Future<void> writeToken(String? value) async {
-    if (value == null && failDelete) throw StateError('storage failure');
-    token = value;
-  }
+  String? content;
 
   @override
   Future<String?> readContent() async => content;
@@ -239,12 +231,12 @@ void main() {
     });
     await c.setEnabled(true);
     await c.login('alice', 'password', register: true);
-    expect(store.token, 'session-a');
+    expect(c.hasSession, isTrue);
     expect(c.user?.id, 'alice');
     await c.refreshCheckin(submit: true);
     expect(c.checkin?.totalDays, 1);
     await c.logout();
-    expect(store.token, isNull);
+    expect(c.hasSession, isFalse);
     expect(c.user, isNull);
     expect(c.checkin, isNull);
     expect(
@@ -253,53 +245,45 @@ void main() {
     );
     c.dispose();
   });
-  test(
-    'expired session clears credentials; ordinary network failure does not',
-    () async {
-      final store = MemoryOnlineStore()..token = 'expired';
-      var status = 503;
-      final c = controller(
-        store,
-        (r) async => r.url.path == '/api/public/content'
-            ? response(snapshot(), 200)
-            : response('{"message":"failed"}', status),
-      );
-      await c.setEnabled(true);
-      expect(store.token, 'expired');
-      expect(c.user, isNull);
-      await c.setEnabled(false);
-      status = 401;
-      await c.setEnabled(true);
-      expect(store.token, isNull);
-      expect(c.checkin, isNull);
-      c.dispose();
-    },
-  );
+  test('session failure clears in-memory credentials; ordinary network failure does not', () async {
+    final store = MemoryOnlineStore();
+    var status = 503;
+    final c = controller(store, (r) async {
+      if (r.url.path == '/api/public/content') return response(snapshot(), 200);
+      if (r.url.path == '/api/app/auth/login') {
+        return response(
+          jsonEncode({'token': 'session-a', 'user': user('alice')}),
+          200,
+        );
+      }
+      return response('{"message":"failed"}', status);
+    });
+    await c.setEnabled(true);
+    await c.login('alice', 'password');
+    await c.refreshCheckin();
+    expect(c.hasSession, isTrue);
+    status = 401;
+    await c.refreshCheckin();
+    expect(c.hasSession, isFalse);
+    expect(c.checkin, isNull);
+    c.dispose();
+  });
   test(
     'switching offline ignores pending content and auth responses',
     () async {
-      final store = MemoryOnlineStore()..token = 'old';
-      final pendingContent = Completer<http.Response>(),
-          pendingMe = Completer<http.Response>();
-      final meStarted = Completer<void>();
+      final store = MemoryOnlineStore();
+      final pendingContent = Completer<http.Response>();
       final c = controller(store, (r) {
         if (r.url.path == '/api/public/content') return pendingContent.future;
-        if (r.url.path == '/api/app/me') {
-          meStarted.complete();
-          return pendingMe.future;
-        }
         throw StateError('must not send followup after mode change');
       });
       final start = c.setEnabled(true);
-      await meStarted.future;
       await c.setEnabled(false);
       pendingContent.complete(response(snapshot(), 200));
-      pendingMe.complete(response(jsonEncode(user('old')), 200));
       await start;
       expect(c.user, isNull);
       expect(c.content.version, 0);
       expect(store.content, isNull);
-      expect(store.token, 'old');
       c.dispose();
     },
   );
@@ -322,48 +306,71 @@ void main() {
       response(jsonEncode({'token': 'late', 'user': user('alice')}), 200),
     );
     await login;
-    expect(store.token, isNull);
+    expect(c.hasSession, isFalse);
     expect(c.user, isNull);
     c.dispose();
   });
-  test(
-    'account switch replaces checkin state; failed logout can be retried',
-    () async {
-      final store = MemoryOnlineStore();
-      final c = controller(store, (r) async {
-        if (r.url.path == '/api/public/content') {
-          return response(snapshot(), 200);
-        }
-        if (r.url.path == '/api/app/auth/login') {
-          final name = jsonDecode(r.body)['username'] as String;
-          return response(jsonEncode({'token': name, 'user': user(name)}), 200);
-        }
-        if (r.url.path == '/api/app/check-ins/summary') {
-          return response(
-            jsonEncode(
-              summary(r.headers['authorization'] == 'Bearer alice' ? 5 : 0),
-            ),
-            200,
-          );
-        }
-        return response('{"ok":true}', 200);
-      });
-      await c.setEnabled(true);
-      await c.login('alice', 'password');
-      expect(c.checkin?.totalDays, 5);
-      store.failDelete = true;
-      await c.logout();
-      expect(c.hasSession, true);
-      expect(c.user, isNull);
-      store.failDelete = false;
-      await c.logout();
-      expect(store.token, isNull);
-      await c.login('bob', 'password');
-      expect(c.user?.id, 'bob');
-      expect(c.checkin?.totalDays, 0);
-      c.dispose();
-    },
-  );
+  test('a session does not survive a controller restart', () async {
+    final store = MemoryOnlineStore();
+    final paths = <String>[];
+    Future<http.Response> handler(http.Request request) async {
+      paths.add(request.url.path);
+      if (request.url.path == '/api/public/content') {
+        return response(snapshot(), 200);
+      }
+      if (request.url.path == '/api/app/auth/login') {
+        return response(
+          jsonEncode({'token': 'session-a', 'user': user('alice')}),
+          200,
+        );
+      }
+      throw StateError(request.url.path);
+    }
+
+    final first = controller(store, handler);
+    await first.setEnabled(true);
+    await first.login('alice', 'password');
+    expect(first.hasSession, isTrue);
+    first.dispose();
+
+    final restarted = controller(store, handler);
+    await restarted.setEnabled(true);
+    expect(restarted.hasSession, isFalse);
+    expect(restarted.user, isNull);
+    expect(paths, isNot(contains('/api/app/me')));
+    restarted.dispose();
+  });
+  test('account switch replaces checkin state after logout', () async {
+    final store = MemoryOnlineStore();
+    final c = controller(store, (r) async {
+      if (r.url.path == '/api/public/content') {
+        return response(snapshot(), 200);
+      }
+      if (r.url.path == '/api/app/auth/login') {
+        final name = jsonDecode(r.body)['username'] as String;
+        return response(jsonEncode({'token': name, 'user': user(name)}), 200);
+      }
+      if (r.url.path == '/api/app/check-ins/summary') {
+        return response(
+          jsonEncode(
+            summary(r.headers['authorization'] == 'Bearer alice' ? 5 : 0),
+          ),
+          200,
+        );
+      }
+      return response('{"ok":true}', 200);
+    });
+    await c.setEnabled(true);
+    await c.login('alice', 'password');
+    expect(c.checkin?.totalDays, 5);
+    await c.logout();
+    expect(c.hasSession, isFalse);
+    expect(c.user, isNull);
+    await c.login('bob', 'password');
+    expect(c.user?.id, 'bob');
+    expect(c.checkin?.totalDays, 0);
+    c.dispose();
+  });
   test('content rejects duplicate templates and unsupported expiry', () {
     final data = jsonDecode(snapshot()) as Map<String, dynamic>;
     (data['itemTemplates'] as List).add(data['itemTemplates'][0]);

@@ -37,12 +37,6 @@ class OnlineController extends ChangeNotifier {
   PublicContent _cached = PublicContent.bundled;
   PublicContent get content => enabled ? _cached : PublicContent.bundled;
   int _generation = 0;
-  Future<void> _storageTail = Future.value();
-  Future<void> _saveToken(String? token) {
-    final write = _storageTail.then((_) => store.writeToken(token));
-    _storageTail = write.catchError((Object _) {});
-    return write;
-  }
 
   Future<void> setEnabled(bool value) async {
     if (enabled == value) return;
@@ -55,31 +49,14 @@ class OnlineController extends ChangeNotifier {
     checkin = null;
     error = null;
     notifyListeners();
-    if (!value) return;
-    // Content failures and credential storage failures must remain independent.
-    final contentLoad = _loadContent(generation);
-    try {
-      await _storageTail;
-      final token = await store.readToken();
-      if (!_current(generation)) return;
-      _token = token;
-      if (token != null) {
-        final restored = OnlineUser.fromJson(
-          jsonDecode(await api.request('/api/app/me', token: token))
-              as Map<String, dynamic>,
-        );
-        if (!_current(generation)) return;
-        user = restored;
-        await _summary(generation);
-      }
-    } catch (e) {
-      if (_current(generation)) await _failure(e);
-    } finally {
-      await contentLoad;
-      if (_current(generation)) {
-        busy = false;
-        notifyListeners();
-      }
+    if (!value) {
+      _token = null;
+      return;
+    }
+    await _loadContent(generation);
+    if (_current(generation)) {
+      busy = false;
+      notifyListeners();
     }
   }
 
@@ -163,8 +140,6 @@ class OnlineController extends ChangeNotifier {
       final nextUser = OnlineUser.fromJson(
         payload['user'] as Map<String, dynamic>,
       );
-      await _saveToken(token);
-      if (!_current(generation)) return;
       _token = token;
       user = nextUser;
       checkin = null;
@@ -192,7 +167,6 @@ class OnlineController extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      await _saveToken(null);
       if (_current(generation) && token != null) {
         try {
           await api.request(
@@ -203,11 +177,6 @@ class OnlineController extends ChangeNotifier {
         } catch (_) {
           if (_current(generation)) error = '已在本机退出；服务器会话未确认撤销，将按原有效期失效。';
         }
-      }
-    } catch (_) {
-      if (_current(generation)) {
-        _token = token;
-        error = '安全存储清理失败，请重试退出。';
       }
     } finally {
       if (_current(generation)) {
@@ -253,11 +222,6 @@ class OnlineController extends ChangeNotifier {
       user = null;
       checkin = null;
       _token = null;
-      try {
-        await _saveToken(null);
-      } catch (_) {
-        /* Report session failure without touching local data. */
-      }
     }
     error = e is ApiFailure ? e.message : '在线状态读取或保存失败，请重试。';
   }

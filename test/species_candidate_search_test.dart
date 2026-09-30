@@ -55,7 +55,7 @@ void main() {
             .widget<TextFormField>(find.byKey(const ValueKey('colony-name')))
             .controller!
             .text,
-        expected.keys.last,
+        expected.keys.last.split('（').first,
       );
       expect(tester.takeException(), isNull);
     });

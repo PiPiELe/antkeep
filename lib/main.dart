@@ -931,7 +931,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   String _speciesNickname(String species) {
     final displayName = _speciesAliases[species] ?? species;
     final match = RegExp(r'（([^（）]+)）').firstMatch(displayName);
-    return match?.group(1) ?? displayName;
+    if (match == null) return displayName;
+
+    final parenthetical = match.group(1) ?? displayName;
+    if (!RegExp(r'[A-Za-z]').hasMatch(parenthetical)) return parenthetical;
+
+    return displayName.substring(0, match.start);
   }
 
   Future<void> _selectFamily(String family) async {

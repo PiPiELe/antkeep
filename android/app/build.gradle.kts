@@ -3,12 +3,10 @@ import java.util.Properties
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
-if (!keystorePropertiesFile.exists()) {
-    throw GradleException(
-        "Missing Android release signing configuration: android/key.properties",
-    )
+val hasReleaseSigning = keystorePropertiesFile.isFile
+if (hasReleaseSigning) {
+    FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
 }
-FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
 
 plugins {
     id("com.android.application")
@@ -44,17 +42,35 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
+        if (hasReleaseSigning) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Configure debug tasks without a local release keystore; all release
+            // tasks below still fail explicitly before an artifact is produced.
+            signingConfig = signingConfigs.getByName(
+                if (hasReleaseSigning) "release" else "debug",
+            )
+        }
+    }
+}
+
+if (!hasReleaseSigning) {
+    tasks.configureEach {
+        if (name.contains("Release")) {
+            doFirst {
+                throw GradleException(
+                    "Missing Android release signing configuration: android/key.properties",
+                )
+            }
         }
     }
 }

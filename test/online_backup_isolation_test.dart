@@ -101,7 +101,6 @@ void main() {
       expect(await media.readImage('sample.jpg'), [1, 2, 3, 4]);
       await backup.restoreBytes(bytes);
       expect(await db.snapshot(), before);
-      expect(store.token, isNull);
       expect(store.content, isNotNull);
       online.dispose();
     } finally {
