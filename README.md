@@ -8,6 +8,8 @@
 
 开发说明见 [docs/PREPARATION.md](docs/PREPARATION.md)。
 
+Android APK 通过 GitHub Release 分发；发布配置、签名 Secrets 和固定下载链接见 [docs/GITHUB_RELEASE.md](docs/GITHUB_RELEASE.md)。
+
 备份导入与导出使用相同限制：最多 499 张照片，ZIP 最大 128 MB，单个附件最大
 24 MB，清单最大 1 MB，解压后总量最大 192 MB。超限时导出会报错，不生成无法恢复的备份。
 恢复会先校验记录字段、日期和关联关系；无效备份不会覆盖现有数据或上次回退副本。
