@@ -70,6 +70,82 @@ List<PopulationPoint> colonyPopulation(
   return values.values.toList()..sort((a, b) => a.time.compareTo(b.time));
 }
 
+/// Reconstructs the latest known colony total at every quantity observation.
+///
+/// A blank field is kept unknown instead of becoming zero. Once a quantity has
+/// been recorded it remains the latest known value until that quantity is
+/// recorded again; this makes a total useful even when a care record updates
+/// only workers or only brood.
+List<PopulationPoint> colonyPopulationTotal(
+  Colony colony,
+  List<CareRecord> records, {
+  required bool includeBrood,
+}) {
+  int? valid(int? value) => value != null && value >= 0 ? value : null;
+
+  final queen = valid(colony.queenCount);
+  final specialized = colony.showSpecialized
+      ? valid(colony.specializedCount)
+      : null;
+  var workers = valid(colony.initialWorkerCount);
+  var eggs = valid(colony.initialEggCount);
+  int? larvae;
+  var pupae = valid(colony.initialCocoonCount);
+  final values = <int, PopulationPoint>{};
+
+  int? total() {
+    final counts = <int?>[
+      queen,
+      specialized,
+      workers,
+      if (includeBrood) ...[eggs, larvae, pupae],
+    ].whereType<int>().toList();
+    if (counts.isEmpty) return null;
+    return counts.fold<int>(0, (sum, count) => sum + count);
+  }
+
+  void add(DateTime time) {
+    final count = total();
+    if (count != null) {
+      values[time.microsecondsSinceEpoch] = PopulationPoint(time, count);
+    }
+  }
+
+  add(colony.acquiredOn ?? colony.createdAt);
+  final ordered = records.where((r) => r.colonyId == colony.id).toList()
+    ..sort((a, b) {
+      final order = a.createdAt.compareTo(b.createdAt);
+      return order != 0 ? order : a.id.compareTo(b.id);
+    });
+  for (final record in ordered) {
+    var changed = false;
+    final worker = valid(record.workerCount);
+    if (worker != null) {
+      workers = worker;
+      changed = true;
+    }
+    if (includeBrood) {
+      final egg = valid(record.eggCount);
+      if (egg != null) {
+        eggs = egg;
+        changed = true;
+      }
+      final larva = valid(record.larvaCount);
+      if (larva != null) {
+        larvae = larva;
+        changed = true;
+      }
+      final pupa = valid(record.pupaCount);
+      if (pupa != null) {
+        pupae = pupa;
+        changed = true;
+      }
+    }
+    if (changed) add(record.occurredAt);
+  }
+  return values.values.toList()..sort((a, b) => a.time.compareTo(b.time));
+}
+
 List<PopulationPoint> feederPopulation(
   FeederType feeder,
   List<FeederRecord> records,

@@ -647,7 +647,7 @@ void main() {
 
         final hint = fromList
             ? find.byIcon(Icons.calendar_today_outlined)
-            : find.text('补充入手日期后显示养殖天数').hitTestable();
+            : find.text('入手日期待补充').hitTestable();
         await tester.tap(hint);
         await tester.pumpAndSettle();
         expect(find.text('填写入手日期'), findsOneWidget);
@@ -827,16 +827,23 @@ void main() {
         expect(tester.takeException(), isNull);
         await tester.tap(find.text('从新后养起'));
         await tester.pumpAndSettle();
-        final scaleCard = find.ancestor(
-          of: find.text('群规模'),
+        final profileCard = find.ancestor(
+          of: find.text('蚂蚁品种'),
           matching: find.byType(Card),
         );
         expect(
-          find.descendant(of: scaleCard, matching: find.text('新后群')),
+          find.descendant(of: profileCard, matching: find.text('新后群')),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: scaleCard, matching: find.text(entry.value)),
+          find.descendant(of: profileCard, matching: find.text(entry.value)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: profileCard,
+            matching: find.text('${entry.key} 工蚁'),
+          ),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
@@ -889,7 +896,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(specialized, '3');
     await tapSave(tester, '保存蚁群');
-    expect(find.text('3 只特化'), findsOneWidget);
+    expect(find.text('3 特化'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     for (final text in ['1 只蚁后', '3 只特化', '10 只工蚁', '7 只卵幼茧']) {
@@ -958,28 +965,35 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('编辑前'));
     await tester.pumpAndSettle();
-    final scaleCard = find.ancestor(
-      of: find.text('群规模'),
+    final profileCard = find.ancestor(
+      of: find.text('蚂蚁品种'),
       matching: find.byType(Card),
     );
     expect(
-      find.descendant(of: scaleCard, matching: find.text('新后群')),
+      find.descendant(of: profileCard, matching: find.text('新后群')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: scaleCard, matching: find.text('1 只蚁后')),
-      findsNothing,
+      find.descendant(of: profileCard, matching: find.text('1 蚁后')),
+      findsOneWidget,
     );
     final infoCard = find.ancestor(
       of: find.text('试管巢'),
       matching: find.byType(Card),
     );
     expect(
-      find.descendant(of: infoCard, matching: find.text('1 只蚁后')),
+      find.descendant(of: infoCard, matching: find.text('入手 2026年9月1日')),
+      findsNothing,
+    );
+    expect(find.text('种群数量'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,
     );
+    await tester.tap(find.text('带卵幼'));
+    await tester.pumpAndSettle();
     expect(
-      find.descendant(of: infoCard, matching: find.text('0 只工蚁')),
+      find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,
     );
     await tester.tap(find.byTooltip('编辑蚁群'));

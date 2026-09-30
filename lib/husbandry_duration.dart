@@ -10,11 +10,13 @@ class HusbandryDuration extends StatefulWidget {
     super.key,
     required this.colony,
     this.expanded = false,
+    this.showAcquiredDate = false,
     this.onTap,
   });
 
   final Colony colony;
   final bool expanded;
+  final bool showAcquiredDate;
   final VoidCallback? onTap;
 
   @override
@@ -85,7 +87,7 @@ class _HusbandryDurationState extends State<HusbandryDuration>
           ],
         );
       }
-      return FittedBox(
+      final duration = FittedBox(
         fit: BoxFit.scaleDown,
         alignment: Alignment.centerRight,
         child: Text.rich(
@@ -109,6 +111,22 @@ class _HusbandryDurationState extends State<HusbandryDuration>
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
+      );
+      if (!widget.showAcquiredDate || start == null) return duration;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          duration,
+          const SizedBox(height: 4),
+          Text(
+            '入手日期：${chineseDate(start)}',
+            textAlign: TextAlign.end,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       );
     }
     return SizedBox(
