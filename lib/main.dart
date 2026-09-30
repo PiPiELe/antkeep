@@ -12,6 +12,7 @@ import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'account_controller.dart';
 import 'personal_center_page.dart';
+import 'lottery_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'online/runtime.dart';
@@ -2425,16 +2426,29 @@ class DiscoverPage extends StatelessWidget {
           ),
         ),
       ),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Icon(
+            Icons.casino_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('数字抽奖'),
+          subtitle: const Text('转盘随机抽取，或直接显示范围内数字'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const LotteryPage()),
+          ),
+        ),
+      ),
       for (final entry in const [
         (
           icon: Icons.emoji_events_outlined,
           title: '蚁友比赛',
           subtitle: '分享养殖成果，参与主题挑战',
-        ),
-        (
-          icon: Icons.card_giftcard_outlined,
-          title: '抽奖活动',
-          subtitle: '发现活动，收获养蚁小惊喜',
         ),
         (icon: Icons.handyman_outlined, title: '养殖工具', subtitle: '让日常养护更方便'),
       ])
