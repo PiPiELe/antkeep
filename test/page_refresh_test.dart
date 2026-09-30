@@ -1064,6 +1064,16 @@ void main() {
       find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,
     );
+    await tester.tap(find.byTooltip('折叠种群数量'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('colony-population-chart')), findsNothing);
+    expect(find.byTooltip('展开种群数量'), findsOneWidget);
+    await tester.tap(find.byTooltip('展开种群数量'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('colony-population-chart')),
+      findsOneWidget,
+    );
     await tester.tap(find.text('带卵幼'));
     await tester.pumpAndSettle();
     expect(
