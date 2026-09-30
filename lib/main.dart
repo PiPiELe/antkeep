@@ -21,26 +21,98 @@ import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
 
 const _speciesOptions = <String, List<String>>{
-  '收获蚁': ['工匠收获蚁', '原生收获蚁', '红胸收获蚁', '大头收获蚁', '强壮收获蚁', '针毛收获蚁', '无恶齿收获蚁'],
+  '收获蚁': [
+    '工匠收获蚁',
+    '野蛮收获蚁（原生收获蚁）',
+    '红胸收获蚁',
+    '大头收获蚁',
+    '强壮收获蚁',
+    '针毛收获蚁',
+    '无颚齿收获蚁',
+    '勤劳收获蚁',
+    '白刺收获蚁',
+    '东方收获蚁',
+    '巨首收获蚁（肯尼亚收获蚁）',
+    '希伯来收获蚁',
+  ],
   '弓背蚁': [
-    '黑金弓背蚁',
+    '费氏弓背蚁（黑金弓背蚁）',
     '大头弓背蚁',
     '尼科巴弓背蚁',
     '巴瑞弓背蚁',
     '拟光腹弓背蚁',
-    '全黄弓背蚁',
+    '全黄土耳其弓背蚁',
     '日本弓背蚁',
     '广布弓背蚁',
     '窄颈弓背蚁（窄径）',
+    '红头弓背蚁',
+    '沃斯曼弓背蚁',
+    '神圣弓背蚁',
+    '统领弓背蚁（统领蚁）',
+    '白纵斑弓背蚁（白纵斑蚁）',
   ],
-  '猛蚁': ['横纹猛蚁', '横纹齿猛蚁', '聚纹双刺猛蚁', '大齿猛蚁', '扁头猛蚁'],
+  '猛蚁': [
+    '横纹猛蚁',
+    '横纹齿猛蚁',
+    '聚纹双刺猛蚁',
+    '大齿猛蚁',
+    '扁头猛蚁',
+    '红足穴猛蚁',
+    '山大齿猛蚁',
+    '双色曲颊猛蚁',
+    '中华细猛蚁',
+    '条纹细猛蚁',
+    '金属皱突蚁（金属蚁）',
+  ],
   '蜜罐蚁': ['墨西哥蜜罐蚁', '大平眼蜜罐蚁'],
   '孔蚁': ['巨人孔蚁'],
   '子弹蚁': ['子弹蚁'],
-  '铺道蚁': ['双隆骨铺道蚁', '铺道蚁'],
-  '多刺蚁': ['黄猄蚁', '拟弓多刺蚁'],
-  '大头蚁': ['中华大头蚁', '皮氏大头蚁'],
-  '毛蚁': ['玉米毛蚁'],
+  '铺道蚁': ['双隆骨铺道蚁', '草地铺道蚁'],
+  '多刺蚁': ['拟弓多刺蚁', '拟黑多刺蚁', '双齿多刺蚁', '梅氏多刺蚁'],
+  '大头蚁': ['中华大头蚁', '皮氏大头蚁', '伊大头蚁', '宽结大头蚁', '史氏大头蚁'],
+  '毛蚁': ['玉米毛蚁', '黑毛蚁', '黄墩蚁', '亮毛蚁'],
+  '细长蚁': ['红黑细长蚁', '黑细长蚁', '宾氏细长蚁'],
+  '巨首蚁': ['全异巨首蚁', '近缘巨首蚁'],
+  '虹臭蚁': ['扁平虹臭蚁', '紫彩虹臭蚁'],
+  '盾胸切叶蚁': ['二色盾胸切叶蚁'],
+  '原蚁': ['蒙古原蚁'],
+  '举腹蚁': ['大阪举腹蚁', '黑褐举腹蚁'],
+  '林蚁': ['日本黑褐蚁', '丝光蚁', '红须蚁'],
+  '织叶蚁': ['黄猄蚁'],
+  '须蚁': ['红胡须蚁（巴巴特斯）'],
+  '箭蚁': ['银丝箭蚁（银丝蚁）'],
+};
+
+// Retain recognition of saved names and common input variants without duplicate
+// picker entries. Existing colony records are not rewritten.
+const _speciesAliases = <String, String>{
+  '全黄弓背蚁': '全黄土耳其弓背蚁',
+  '无恶齿收获蚁': '无颚齿收获蚁',
+  '铺道蚁': '草地铺道蚁',
+  '全蚁巨首蚁': '全异巨首蚁',
+  '拟广腹弓背蚁': '拟光腹弓背蚁',
+  '费氏弓背蚁': '费氏弓背蚁（黑金弓背蚁）',
+  '费事弓背蚁': '费氏弓背蚁（黑金弓背蚁）',
+  '黑金弓背蚁': '费氏弓背蚁（黑金弓背蚁）',
+  '野蛮收获蚁': '野蛮收获蚁（原生收获蚁）',
+  '原生收获蚁': '野蛮收获蚁（原生收获蚁）',
+  '巨首收获蚁': '巨首收获蚁（肯尼亚收获蚁）',
+  '肯尼亚收获蚁': '巨首收获蚁（肯尼亚收获蚁）',
+  '希伯来': '希伯来收获蚁',
+  '统领弓背蚁': '统领弓背蚁（统领蚁）',
+  '统领蚁': '统领弓背蚁（统领蚁）',
+  '白纵斑弓背蚁': '白纵斑弓背蚁（白纵斑蚁）',
+  '白纵斑蚁': '白纵斑弓背蚁（白纵斑蚁）',
+  '金属皱突蚁': '金属皱突蚁（金属蚁）',
+  '金属皱猛蚁': '金属皱突蚁（金属蚁）',
+  '金属蚁': '金属皱突蚁（金属蚁）',
+  '红胡须蚁': '红胡须蚁（巴巴特斯）',
+  '巴巴特斯': '红胡须蚁（巴巴特斯）',
+  '巴巴斯特': '红胡须蚁（巴巴特斯）',
+  '银丝箭蚁': '银丝箭蚁（银丝蚁）',
+  '银丝蚁': '银丝箭蚁（银丝蚁）',
+  '紫菜蚁': '紫彩虹臭蚁',
+  '紫菜虹臭蚁': '紫彩虹臭蚁',
 };
 
 const _nestTypeOptions = [
@@ -572,7 +644,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     _targetHumidity.text = colony.targetHumidity?.toString() ?? '';
     _selectedSpecies = colony.species;
     for (final entry in _speciesOptions.entries) {
-      if (entry.value.contains(colony.species)) {
+      if (entry.value.contains(
+        _speciesAliases[colony.species] ?? colony.species,
+      )) {
         _speciesFamily = entry.key;
         break;
       }
@@ -670,15 +744,48 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   }
 
   Future<void> _enterCustomSpecies() async {
-    var speciesName = '';
+    final currentName =
+        _speciesAliases[_selectedSpecies] ?? _selectedSpecies ?? '';
+    final names = RegExp(r'^(.*?)（([^（）]+)）$').firstMatch(currentName);
+    var speciesName = names?.group(1) ?? currentName;
+    var commonName = names?.group(2) ?? '';
+    final formKey = GlobalKey<FormState>();
     final species = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('手动填写品种'),
-        content: TextField(
-          onChanged: (value) => speciesName = value,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '例如：其他弓背蚁'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  initialValue: speciesName,
+                  onChanged: (value) => speciesName = value,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: '学名 / 正式名',
+                    hintText: '例如：费氏弓背蚁',
+                    helperText: '可填写中文正式名或拉丁学名',
+                  ),
+                  validator: (_) =>
+                      speciesName.trim().isEmpty && commonName.trim().isEmpty
+                      ? '请至少填写一个名称'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: commonName,
+                  onChanged: (value) => commonName = value,
+                  decoration: const InputDecoration(
+                    labelText: '通用名（可选）',
+                    hintText: '例如：黑金弓背蚁',
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -686,7 +793,17 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, speciesName.trim()),
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              final formal = speciesName.trim();
+              final common = commonName.trim();
+              final value = formal.isEmpty
+                  ? common
+                  : common.isEmpty || common == formal
+                  ? formal
+                  : '$formal（$common）';
+              Navigator.pop(context, value);
+            },
             child: const Text('确认'),
           ),
         ],
@@ -995,7 +1112,15 @@ class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
   Widget build(BuildContext context) {
     final normalizedQuery = _query.text.trim().toLowerCase();
     final options = widget.options
-        .where((option) => option.toLowerCase().contains(normalizedQuery))
+        .where(
+          (option) =>
+              option.toLowerCase().contains(normalizedQuery) ||
+              _speciesAliases.entries.any(
+                (alias) =>
+                    alias.value == option &&
+                    alias.key.toLowerCase().contains(normalizedQuery),
+              ),
+        )
         .toList();
     return SafeArea(
       child: SizedBox(
