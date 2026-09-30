@@ -120,7 +120,7 @@ class _HusbandryDurationState extends State<HusbandryDuration>
           duration,
           const SizedBox(height: 4),
           Text(
-            '入手日期：${chineseDate(start)}',
+            '入手日期：${dottedDate(start)}',
             textAlign: TextAlign.end,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -166,7 +166,7 @@ class _HusbandryDurationState extends State<HusbandryDuration>
                 if (widget.expanded && start != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '入手日期：${chineseDate(start)}',
+                    '入手日期：${dottedDate(start)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onPrimaryContainer,
                     ),

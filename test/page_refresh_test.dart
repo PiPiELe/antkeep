@@ -258,7 +258,10 @@ void main() {
     await tester.tap(find.text('到家计时'));
     await tester.pumpAndSettle();
     expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
-    expect(find.textContaining('入手日期：'), findsOneWidget);
+    expect(
+      find.text('入手日期：${arrival.year}.${arrival.month}.${arrival.day}'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
