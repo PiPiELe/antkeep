@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app_preferences.dart';
+import 'online/online_widgets.dart';
+import 'online/runtime.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key, required this.preferences});
@@ -310,6 +314,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ? null
               : () => setState(() {
                   _edition = edition;
+                  unawaited(
+                    onlineController.setEnabled(edition == AppEdition.online),
+                  );
                   _error = null;
                 }),
           child: ConstrainedBox(
@@ -511,26 +518,8 @@ class BeginnerTips extends StatelessWidget {
   const BeginnerTips({super.key});
 
   @override
-  Widget build(BuildContext context) => const Column(
-    children: [
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.hive_outlined),
-        title: Text('一窝蚁群，一份档案'),
-        subtitle: Text('在「蚁群」中点击「+ 蚁群」，填写品种和入手日期；不清楚的数量可以留空。'),
-      ),
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.edit_note_outlined),
-        title: Text('从日常观察开始记录'),
-        subtitle: Text('进入对应蚁群，记录投喂、补水、环境和数量变化，也可以添加照片或补记过去的事件。'),
-      ),
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.save_alt_outlined),
-        title: Text('定期备份，留住成长'),
-        subtitle: Text('在「设置」中导出备份。记录仅存于本机，卸载或换机前请先备份。'),
-      ),
-    ],
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: onlineController,
+    builder: (_, _) => HelpContent(content: onlineController.content),
   );
 }

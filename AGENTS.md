@@ -12,8 +12,9 @@ the issue instead of guessing a base.
 ## Scope
 
 - Android and iOS first; no WeChat mini program in the initial implementation.
-- All husbandry records and media remain local. No account, backend, analytics,
-  ads, automatic upload or cloud synchronization in the initial release.
+- All husbandry records and media remain local. Optional online mode may use
+  accounts, daily check-ins and published public content. No husbandry upload,
+  cloud synchronization, analytics or ads. Local features never require login.
 - Read docs/PREPARATION.md before implementation.
 - Prefer the smallest sufficient implementation; preserve unrelated work.
 - Do not commit real husbandry records, personal photos, backups, credentials,

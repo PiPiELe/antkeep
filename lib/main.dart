@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,8 @@ import 'account_controller.dart';
 import 'personal_center_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
+import 'online/runtime.dart';
+import 'online/online_widgets.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
 import 'data/backup_service.dart';
@@ -153,6 +156,11 @@ Future<void> main() async {
     await LocalMediaStore.instance.initialize();
     await AppDatabase.instance.open();
     await themeController.load();
+    void updateOnlineMode() => unawaited(
+      onlineController.setEnabled(themeController.edition == AppEdition.online),
+    );
+    themeController.addListener(updateOnlineMode);
+    updateOnlineMode();
     try {
       await LocalNotificationService.instance.initialize();
       if (themeController.careRemindersEnabled) {
@@ -220,14 +228,44 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   var _index = 0;
   late BeginnerCareNotice _beginnerCareNotice;
+  late List<BeginnerCareNotice> _careNotices;
+
+  void _updateCareNotices() {
+    final notices = onlineController.content.beginnerCareNotices;
+    if (identical(notices, _careNotices)) return;
+    setState(() {
+      _careNotices = notices;
+      _beginnerCareNotice = randomBeginnerCareNotice(
+        notices: notices,
+        previous: _beginnerCareNotice,
+      );
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _beginnerCareNotice = randomBeginnerCareNotice();
+    _careNotices = onlineController.content.beginnerCareNotices;
+    _beginnerCareNotice = randomBeginnerCareNotice(notices: _careNotices);
+    onlineController.addListener(_updateCareNotices);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    onlineController.removeListener(_updateCareNotices);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(onlineController.refreshCheckin());
+    }
   }
 
   @override
@@ -296,6 +334,7 @@ class _HomePageState extends State<HomePage> {
           if (value == 0 && _index != 0) {
             _beginnerCareNotice = randomBeginnerCareNotice(
               previous: _beginnerCareNotice,
+              notices: _careNotices,
             );
           }
           _index = value;
@@ -3402,6 +3441,10 @@ class _SettingsPageState extends State<SettingsPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
+          OnlineSettings(
+            preferences: themeController,
+            controller: onlineController,
+          ),
           _section(context, '使用版本', [
             ListTile(
               leading: Icon(
