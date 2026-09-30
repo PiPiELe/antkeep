@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'account_controller.dart';
 import 'personal_center_page.dart';
@@ -87,6 +89,9 @@ class AntKeepApp extends StatelessWidget {
     animation: themeController,
     builder: (context, _) => MaterialApp(
       title: '蚁记',
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: const [Locale('zh', 'CN')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       debugShowCheckedModeBanner: false,
       theme: antKeepTheme(themeController.themeColor),
       darkTheme: antKeepTheme(themeController.themeColor, dark: true),
@@ -104,6 +109,9 @@ class _StartupError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    locale: const Locale('zh', 'CN'),
+    supportedLocales: const [Locale('zh', 'CN')],
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
     home: Scaffold(
       body: Center(
         child: Padding(
@@ -3231,8 +3239,7 @@ IconData _feederRecordIcon(FeederRecordType type) => switch (type) {
 };
 
 String? _textOrNull(String value) => value.trim().isEmpty ? null : value.trim();
-String _date(DateTime value) =>
-    '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+String _date(DateTime value) => chineseDate(value);
 String _dateTime(DateTime value) =>
     '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 String _timeOfDay(int minuteOfDay) =>

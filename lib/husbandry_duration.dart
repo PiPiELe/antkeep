@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'domain/models.dart';
+import 'date_display.dart';
 
 class HusbandryDuration extends StatefulWidget {
   const HusbandryDuration({
@@ -94,7 +95,7 @@ class _HusbandryDurationState extends State<HusbandryDuration>
           if (widget.expanded && start != null) ...[
             const SizedBox(height: 4),
             Text(
-              '入手日期：${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}',
+              '入手日期：${chineseDate(start)}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onPrimaryContainer,
               ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'account_controller.dart';
+import 'date_display.dart';
 
 class PersonalCenterPage extends StatefulWidget {
   const PersonalCenterPage({super.key, required this.controller});
@@ -289,7 +290,7 @@ class _PersonalCenterPageState extends State<PersonalCenterPage>
             children: [
               Text('每日签到', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text('${account.serverDate} · 北京时间'),
+              Text('${chineseServerDate(account.serverDate)} · 北京时间'),
               const SizedBox(height: 20),
               Wrap(
                 spacing: 28,
@@ -334,7 +335,10 @@ class _PersonalCenterPageState extends State<PersonalCenterPage>
           runSpacing: 8,
           children: [
             for (final date in account.recentDates)
-              Chip(label: Text(date), avatar: const Icon(Icons.done, size: 16)),
+              Chip(
+                label: Text(chineseServerDate(date)),
+                avatar: const Icon(Icons.done, size: 16),
+              ),
           ],
         ),
       const SizedBox(height: 24),

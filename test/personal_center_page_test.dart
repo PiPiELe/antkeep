@@ -71,6 +71,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('今日已签到'), findsOneWidget);
       expect(find.text('累计 1 天'), findsOneWidget);
+      expect(find.text('2026年9月29日 · 北京时间'), findsOneWidget);
+      expect(find.text('2026年9月29日'), findsOneWidget);
       await tester.ensureVisible(find.byTooltip('修改昵称'));
       await tester.tap(find.byTooltip('修改昵称'));
       await tester.pumpAndSettle();

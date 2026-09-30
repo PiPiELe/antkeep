@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'data/app_database.dart';
+import 'date_display.dart';
 import 'domain/models.dart';
 import 'domain/population_analysis.dart';
 import 'domain/spending_analysis.dart';
@@ -285,7 +286,7 @@ class _PopulationResult extends StatelessWidget {
 
 String _date(DateTime time) {
   final local = time.toLocal();
-  return '${local.year}/${local.month}/${local.day}';
+  return chineseDate(local);
 }
 
 String _time(DateTime time) {
@@ -350,12 +351,12 @@ class _PopulationChartPainter extends CustomPainter {
       canvas.drawCircle(point, 3.5, Paint()..color = colors.primary);
     }
     final start = label(
-      '${points.first.time.toLocal().month}/${points.first.time.toLocal().day}',
+      chineseDate(points.first.time.toLocal(), includeYear: false),
     );
     start.paint(canvas, Offset(plot.left, plot.bottom + 8));
     if (points.length > 1) {
       final end = label(
-        '${points.last.time.toLocal().month}/${points.last.time.toLocal().day}',
+        chineseDate(points.last.time.toLocal(), includeYear: false),
       );
       end.paint(canvas, Offset(plot.right - end.width, plot.bottom + 8));
     }
