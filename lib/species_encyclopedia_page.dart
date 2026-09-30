@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'domain/antden_species_directory.dart';
 import 'domain/species_profile.dart';
 
 class SpeciesEncyclopediaPage extends StatefulWidget {
-  const SpeciesEncyclopediaPage({super.key, this.initialQuery = ''});
+  const SpeciesEncyclopediaPage({
+    super.key,
+    this.initialQuery = '',
+    this.directoryLoader,
+  });
 
   final String initialQuery;
+  final Future<List<AntDenSpeciesReference>> Function()? directoryLoader;
 
   @override
   State<SpeciesEncyclopediaPage> createState() =>
@@ -14,6 +21,8 @@ class SpeciesEncyclopediaPage extends StatefulWidget {
 
 class _SpeciesEncyclopediaPageState extends State<SpeciesEncyclopediaPage> {
   late final _search = TextEditingController(text: widget.initialQuery);
+  late final _directory =
+      widget.directoryLoader?.call() ?? AntDenSpeciesDirectory.load();
 
   @override
   void dispose() {
@@ -23,102 +32,192 @@ class _SpeciesEncyclopediaPageState extends State<SpeciesEncyclopediaPage> {
 
   @override
   Widget build(BuildContext context) {
-    final profiles = speciesProfiles
+    final localProfiles = speciesProfiles
         .where((profile) => profile.matches(_search.text))
         .toList();
-    return Scaffold(
-      appBar: AppBar(title: const Text('蚂蚁百科')),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _search,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        labelText: '搜索名称、别名或学名',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _search.text.isEmpty
-                            ? null
-                            : IconButton(
-                                tooltip: '清除搜索',
-                                onPressed: () => setState(_search.clear),
-                                icon: const Icon(Icons.close),
-                              ),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '已收录 ${speciesProfiles.length} 种 · 离线可查',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (profiles.isEmpty)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Icon(Icons.search_off, size: 40),
-                      SizedBox(height: 12),
-                      Text('暂无匹配的物种'),
-                      SizedBox(height: 8),
-                      Text('试试其他名称或别名，更多资料将陆续补充。'),
-                    ],
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: SliverList.builder(
-                  itemCount: profiles.length,
-                  itemBuilder: (context, index) {
-                    final profile = profiles[index];
-                    return Card(
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        title: Text(profile.name),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              profile.scientificName,
-                              style: const TextStyle(
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text('别名：${profile.aliases.join('、')}'),
-                            const SizedBox(height: 6),
-                            Text('饲养难度 ${profile.difficulty}/5'),
-                          ],
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => SpeciesDetailPage(profile: profile),
+    return FutureBuilder<List<AntDenSpeciesReference>>(
+      future: _directory,
+      builder: (context, snapshot) {
+        final hasSearch = _search.text.trim().isNotEmpty;
+        final onlineReferences =
+            snapshot.data
+                ?.where((reference) => reference.matches(_search.text))
+                .where(
+                  (reference) =>
+                      findSpeciesProfile(reference.name) == null &&
+                      findSpeciesProfile(reference.scientificName) == null,
+                )
+                .toList() ??
+            const <AntDenSpeciesReference>[];
+        final showOnlineResults = hasSearch && snapshot.hasData;
+        final hasResults =
+            localProfiles.isNotEmpty ||
+            (showOnlineResults && onlineReferences.isNotEmpty);
+        return Scaffold(
+          appBar: AppBar(title: const Text('蚂蚁百科')),
+          body: SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _search,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: '搜索名称、别名或学名',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _search.text.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: '清除搜索',
+                                    onPressed: () => setState(_search.clear),
+                                    icon: const Icon(Icons.close),
+                                  ),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                        const SizedBox(height: 12),
+                        Text(
+                          snapshot.hasData
+                              ? '${speciesProfiles.length} 种热门资料离线可查 · ${snapshot.data!.length} 种可联网查看'
+                              : '${speciesProfiles.length} 种热门资料离线可查',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (!hasSearch && snapshot.hasData) ...[
+                          const SizedBox(height: 12),
+                          const _OnlineDirectoryHint(),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-          ],
-        ),
-      ),
+                if (!hasResults)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.search_off, size: 40),
+                          const SizedBox(height: 12),
+                          const Text('暂无匹配的物种'),
+                          const SizedBox(height: 8),
+                          Text(
+                            snapshot.hasError
+                                ? '物种目录暂不可用，请稍后重试。'
+                                : snapshot.connectionState ==
+                                      ConnectionState.waiting
+                                ? '正在准备在线物种目录，请稍后再试。'
+                                : '试试其他名称或别名，非热门物种需联网查看完整资料。',
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        for (final profile in localProfiles)
+                          _BundledSpeciesCard(profile: profile),
+                        for (final reference
+                            in showOnlineResults
+                                ? onlineReferences
+                                : const <AntDenSpeciesReference>[])
+                          _OnlineSpeciesCard(reference: reference),
+                      ]),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
+}
+
+class _OnlineDirectoryHint extends StatelessWidget {
+  const _OnlineDirectoryHint();
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: ListTile(
+      contentPadding: const EdgeInsets.all(16),
+      leading: const Icon(Icons.cloud_outlined),
+      title: const Text('非热门物种在线查阅'),
+      subtitle: const Text('搜索后可打开蚁丘公开详情；文字和图片会在联网后加载。'),
+    ),
+  );
+}
+
+class _BundledSpeciesCard extends StatelessWidget {
+  const _BundledSpeciesCard({required this.profile});
+
+  final SpeciesProfile profile;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: ListTile(
+      contentPadding: const EdgeInsets.all(16),
+      title: Text(profile.name),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            profile.scientificName,
+            style: const TextStyle(fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: 6),
+          Text('别名：${profile.aliases.join('、')}'),
+          const SizedBox(height: 6),
+          Text('饲养难度 ${profile.difficulty}/5 · 主要信息已离线内置'),
+        ],
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SpeciesDetailPage(profile: profile),
+        ),
+      ),
+    ),
+  );
+}
+
+class _OnlineSpeciesCard extends StatelessWidget {
+  const _OnlineSpeciesCard({required this.reference});
+
+  final AntDenSpeciesReference reference;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: ListTile(
+      contentPadding: const EdgeInsets.all(16),
+      leading: const Icon(Icons.cloud_outlined),
+      title: Text(reference.displayName),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            reference.scientificName,
+            style: const TextStyle(fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: 6),
+          Text('${reference.category} · 联网查看完整资料和图片'),
+        ],
+      ),
+      trailing: const Icon(Icons.open_in_new),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => OnlineSpeciesDetailPage(reference: reference),
+        ),
+      ),
+    ),
+  );
 }
 
 class SpeciesDetailPage extends StatelessWidget {
@@ -214,13 +313,70 @@ class SpeciesDetailPage extends StatelessWidget {
             _InfoSection(
               title: '资料说明',
               icon: Icons.info_outline,
-              children: [Text(profile.source)],
+              children: [
+                Text(profile.source),
+                const SizedBox(height: 12),
+                _SourceLinkButton(sourceUrl: profile.sourceUrl),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class OnlineSpeciesDetailPage extends StatelessWidget {
+  const OnlineSpeciesDetailPage({super.key, required this.reference});
+
+  final AntDenSpeciesReference reference;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(reference.displayName)),
+    body: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _InfoSection(
+            title: '在线资料',
+            icon: Icons.cloud_outlined,
+            children: [
+              _InfoRow('物种', reference.displayName),
+              _InfoRow('学名', reference.scientificName),
+              _InfoRow('分类', reference.category),
+              const SizedBox(height: 8),
+              const Text('此物种未内置完整资料。打开蚁丘公开页面后，文字和图片将通过网络加载。'),
+              const SizedBox(height: 12),
+              _SourceLinkButton(sourceUrl: reference.sourceUrl),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _SourceLinkButton extends StatelessWidget {
+  const _SourceLinkButton({required this.sourceUrl});
+
+  final Uri sourceUrl;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: () async {
+      final opened = await launchUrl(
+        sourceUrl,
+        mode: LaunchMode.externalApplication,
+      );
+      if (context.mounted && !opened) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('请联网后查看蚁丘资料和图片。')));
+      }
+    },
+    icon: const Icon(Icons.open_in_new),
+    label: const Text('查看蚁丘最新资料和图片'),
+  );
 }
 
 class _InfoSection extends StatelessWidget {

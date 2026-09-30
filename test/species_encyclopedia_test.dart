@@ -1,4 +1,5 @@
 import 'package:antkeep/app_preferences.dart';
+import 'package:antkeep/domain/antden_species_directory.dart';
 import 'package:antkeep/domain/species_profile.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/species_encyclopedia_page.dart';
@@ -6,6 +7,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('bundles the previously consulted species for offline use', () {
+    expect(
+      speciesProfiles.map((profile) => profile.name),
+      containsAll(['费氏弓背蚁', '猎镰猛蚁', '窄颈弓背蚁', '横纹齿猛蚁']),
+    );
+  });
+
+  test('AntDen directory only exposes validated public detail links', () async {
+    final directory = await AntDenSpeciesDirectory.load();
+    final reference = directory.singleWhere(
+      (item) => item.scientificName == 'Harpegnathos venator',
+    );
+
+    expect(reference.displayName, '猎镰猛蚁');
+    expect(reference.sourceUrl, Uri.parse('https://antden.net/antShow/33'));
+    expect(reference.matches('猎镰'), isTrue);
+  });
+
   test('direct lookup accepts identities but never broad search terms', () {
     for (final name in [
       '费氏弓背蚁',
@@ -17,6 +36,9 @@ void main() {
     ]) {
       expect(findSpeciesProfile(name), same(speciesProfiles.first));
     }
+    expect(findSpeciesProfile('猎镰猛蚁')!.name, '猎镰猛蚁');
+    expect(findSpeciesProfile('Camponotus angusticollis')!.name, '窄颈弓背蚁');
+    expect(findSpeciesProfile('横纹齿针蚁')!.name, '横纹齿猛蚁');
     for (final name in [
       '',
       ' ',
@@ -67,6 +89,29 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(DiscoverPage), findsOneWidget);
+  });
+
+  testWidgets('non-bundled species opens its online AntDen entry', (
+    tester,
+  ) async {
+    final directory = await AntDenSpeciesDirectory.load();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SpeciesEncyclopediaPage(
+          directoryLoader: () => Future.value(directory),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), '三尖叉多刺蚁');
+    await tester.pumpAndSettle();
+    expect(find.text('联网查看完整资料和图片'), findsOneWidget);
+    await tester.tap(find.text('三尖叉多刺蚁'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OnlineSpeciesDetailPage), findsOneWidget);
+    expect(find.text('查看蚁丘最新资料和图片'), findsOneWidget);
   });
 
   for (final dark in [false, true]) {
