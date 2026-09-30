@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/population_analysis.dart';
 import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
 import 'domain/species_profile.dart';
@@ -372,6 +374,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 }
 
 Future<bool> _editColonyAcquiredOn(BuildContext context, Colony colony) async {
+  if (colony.acquiredOn != null) return false;
   try {
     final today = DateUtils.dateOnly(DateTime.now());
     final firstDate = DateTime(2000);
@@ -638,7 +641,7 @@ class _ColonyCard extends StatelessWidget {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final duration = InkWell(
-                    onTap: onDurationTap,
+                    onTap: colony.acquiredOn == null ? onDurationTap : null,
                     borderRadius: BorderRadius.circular(8),
                     child: HusbandryDuration(colony: colony),
                   );
@@ -921,8 +924,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           break;
         }
       }
-      if (_name.text.trim().isEmpty) _name.text = species;
+      _name.text = _speciesNickname(species);
     });
+  }
+
+  String _speciesNickname(String species) {
+    final displayName = _speciesAliases[species] ?? species;
+    final match = RegExp(r'（([^（）]+)）').firstMatch(displayName);
+    return match?.group(1) ?? displayName;
   }
 
   Future<void> _selectFamily(String family) async {
@@ -1147,27 +1156,35 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           ),
           const SizedBox(height: 12),
           Card(
-            child: CheckboxListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              controlAffinity: ListTileControlAffinity.leading,
-              title: const Text('特化'),
-              value: _showSpecialized,
-              onChanged: (value) =>
-                  setState(() => _showSpecialized = value ?? false),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _showSpecialized,
+                    onChanged: (value) =>
+                        setState(() => _showSpecialized = value ?? false),
+                  ),
+                  const Text('特化'),
+                  if (_showSpecialized) ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _specialized,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? '请输入特化数量'
+                            : _validateCount(value),
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '特化数量'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          if (_showSpecialized) ...[
-            TextFormField(
-              controller: _specialized,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? '请输入特化数量'
-                  : _validateCount(value),
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '特化数量'),
-            ),
-            const SizedBox(height: 12),
-          ],
           _section(
             icon: Icons.home_outlined,
             title: '巢体',
@@ -1533,6 +1550,7 @@ class ColonyDetailPage extends StatefulWidget {
 class _ColonyDetailPageState extends State<ColonyDetailPage> {
   late Future<_Detail> _detail;
   bool _editingAcquiredOn = false;
+  bool _includeBrood = false;
   @override
   void initState() {
     super.initState();
@@ -1610,20 +1628,23 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
-            _ColonyScaleSummary(
+            _ColonyProfileSummary(
               colony: colony,
               workers: colony.currentWorkerCount(detail.records),
-            ),
-            const SizedBox(height: 12),
-            HusbandryDuration(
-              colony: colony,
-              expanded: true,
-              onTap: () => _editAcquiredOn(colony),
+              records: detail.records,
+              onDurationTap: () => _editAcquiredOn(colony),
             ),
             const SizedBox(height: 12),
             _ColonySummary(colony: colony),
             const SizedBox(height: 16),
-            _GrowthArchive(colony: colony, records: detail.records),
+            _PopulationTimeline(
+              colony: colony,
+              records: detail.records,
+              includeBrood: _includeBrood,
+              onIncludeBroodChanged: (value) {
+                setState(() => _includeBrood = value);
+              },
+            ),
             const SizedBox(height: 22),
             Text('养蚁日记', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
@@ -1652,10 +1673,17 @@ class _Detail {
   final List<CareRecord> records;
 }
 
-class _GrowthArchive extends StatelessWidget {
-  const _GrowthArchive({required this.colony, required this.records});
+class _ColonyProfileSummary extends StatelessWidget {
+  const _ColonyProfileSummary({
+    required this.colony,
+    required this.workers,
+    required this.records,
+    required this.onDurationTap,
+  });
   final Colony colony;
+  final int? workers;
   final List<CareRecord> records;
+  final VoidCallback onDurationTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1667,46 +1695,117 @@ class _GrowthArchive extends StatelessWidget {
           record.workerCount != null,
       orElse: () => null,
     );
-    final latestDate = latest == null ? null : _date(latest.occurredAt);
+    final brood = [
+      latest?.eggCount ?? colony.initialEggCount,
+      latest?.larvaCount,
+      latest?.pupaCount ?? colony.initialCocoonCount,
+    ].whereType<int>();
+    final broodCount = brood.isEmpty
+        ? null
+        : brood.fold<int>(0, (sum, count) => sum + count);
+    final quantities = <String>[
+      if (colony.queenCount != null) '${colony.queenCount} 蚁后',
+      if (colony.showSpecialized && colony.specializedCount != null)
+        '${colony.specializedCount} 特化',
+      if (workers != null) '$workers 工蚁',
+      if (broodCount != null) '$broodCount 卵幼茧',
+    ];
+    final scheme = Theme.of(context).colorScheme;
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('蚂蚁品种', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                colony.species ?? '未填写品种',
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (colony.species?.trim().isNotEmpty == true)
+              TextButton.icon(
+                icon: const Icon(Icons.menu_book_outlined),
+                label: const Text('百科'),
+                onPressed: () {
+                  final species = colony.species!.trim();
+                  final query = _speciesAliases[species] ?? species;
+                  final profile = findSpeciesProfile(query);
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => profile == null
+                          ? SpeciesEncyclopediaPage(initialQuery: query)
+                          : SpeciesDetailPage(profile: profile),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+        if (colony.isNewQueenColony || workers != null) ...[
+          const SizedBox(height: 8),
+          _ColonyTags(colony: colony, workers: workers),
+        ],
+      ],
+    );
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Icon(Icons.trending_up_outlined),
-                const SizedBox(width: 8),
-                Text('成长档案', style: Theme.of(context).textTheme.titleMedium),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final duration = InkWell(
+                  onTap: onDurationTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: HusbandryDuration(
+                    colony: colony,
+                    showAcquiredDate: true,
+                  ),
+                );
+                if (constraints.maxWidth < 320 ||
+                    MediaQuery.textScalerOf(context).scale(12) > 18) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [identity, const SizedBox(height: 12), duration],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: identity),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 1,
+                      height: 72,
+                      color: scheme.outlineVariant.withValues(alpha: .3),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(width: 138, child: duration),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 4),
-            Text(
-              latestDate == null ? '记录一次数量，成长变化会显示在这里。' : '最近数量记录：$latestDate',
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 12),
+            Divider(
+              height: 1,
+              color: scheme.outlineVariant.withValues(alpha: .3),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 20,
+              runSpacing: 6,
               children: [
-                _GrowthMetric(
-                  label: '工蚁',
-                  initial: colony.initialWorkerCount,
-                  latest: latest?.workerCount,
-                ),
-                _GrowthMetric(
-                  label: '卵',
-                  initial: colony.initialEggCount,
-                  latest: latest?.eggCount,
-                ),
-                _GrowthMetric(label: '幼虫', latest: latest?.larvaCount),
-                _GrowthMetric(
-                  label: '蛹',
-                  initial: colony.initialCocoonCount,
-                  latest: latest?.pupaCount,
-                ),
+                for (final quantity
+                    in quantities.isEmpty ? ['尚未补充数量'] : quantities)
+                  Text(
+                    quantity,
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
               ],
             ),
           ],
@@ -1716,45 +1815,163 @@ class _GrowthArchive extends StatelessWidget {
   }
 }
 
-class _GrowthMetric extends StatelessWidget {
-  const _GrowthMetric({required this.label, this.initial, this.latest});
-  final String label;
-  final int? initial;
-  final int? latest;
+class _PopulationTimeline extends StatelessWidget {
+  const _PopulationTimeline({
+    required this.colony,
+    required this.records,
+    required this.includeBrood,
+    required this.onIncludeBroodChanged,
+  });
+  final Colony colony;
+  final List<CareRecord> records;
+  final bool includeBrood;
+  final ValueChanged<bool> onIncludeBroodChanged;
 
   @override
   Widget build(BuildContext context) {
-    final value = latest ?? initial;
-    final delta = initial != null && latest != null ? latest! - initial! : null;
-    final deltaLabel = switch (delta) {
-      null || 0 => '',
-      > 0 => '（+$delta）',
-      _ => '（$delta）',
-    };
-    return Chip(label: Text('$label ${value ?? '未记录'}$deltaLabel'));
+    final points = colonyPopulationTotal(
+      colony,
+      records,
+      includeBrood: includeBrood,
+    );
+    final description = includeBrood ? '蚁后、特化、工蚁与卵幼茧' : '蚁后、特化与工蚁';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.show_chart_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '种群数量',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                FilterChip(
+                  label: const Text('带卵幼'),
+                  selected: includeBrood,
+                  onSelected: onIncludeBroodChanged,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(description, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 14),
+            if (points.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text('暂无有效数量，添加记录后会显示变化。'),
+              )
+            else ...[
+              Text('最近 ${points.last.count} · ${points.length} 个时间点'),
+              const SizedBox(height: 12),
+              Semantics(
+                label: '种群数量时间折线图，$description。',
+                child: SizedBox(
+                  key: const ValueKey('colony-population-chart'),
+                  height: 180,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    painter: _ColonyPopulationChartPainter(
+                      points,
+                      Theme.of(context).colorScheme,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text('${_date(points.first.time)} — ${_date(points.last.time)}'),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              '未填写的数量不会按 0 计算；两次记录之间沿用最近一次已填写的数量。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
-class _ColonyScaleSummary extends StatelessWidget {
-  const _ColonyScaleSummary({required this.colony, required this.workers});
-  final Colony colony;
-  final int? workers;
+class _ColonyPopulationChartPainter extends CustomPainter {
+  _ColonyPopulationChartPainter(this.points, this.colors);
+  final List<PopulationPoint> points;
+  final ColorScheme colors;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('群规模', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 10),
-          _ColonyTags(colony: colony, workers: workers),
-          if (workers == null) const Text('待填写工蚁数量'),
-        ],
+  void paint(Canvas canvas, Size size) {
+    final maximum = points.fold<int>(
+      1,
+      (value, point) => math.max(value, point.count),
+    );
+    TextPainter label(String text) => TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
       ),
-    ),
-  );
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final left = math.min(label('$maximum').width + 10, size.width / 3);
+    final plot = Rect.fromLTRB(left, 10, size.width - 6, size.height - 26);
+    final grid = Paint()..color = colors.outlineVariant;
+    final ticks = <int>{0, maximum ~/ 2, maximum};
+    for (final tick in ticks) {
+      final y = plot.bottom - plot.height * tick / maximum;
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
+      final text = label('$tick');
+      text.paint(canvas, Offset(0, y - text.height / 2));
+    }
+    final duration = points.last.time
+        .difference(points.first.time)
+        .inMicroseconds;
+    final locations = [
+      for (final point in points)
+        Offset(
+          duration == 0
+              ? plot.center.dx
+              : plot.left +
+                    plot.width *
+                        point.time
+                            .difference(points.first.time)
+                            .inMicroseconds /
+                        duration,
+          plot.bottom - plot.height * point.count / maximum,
+        ),
+    ];
+    final path = Path()..moveTo(locations.first.dx, locations.first.dy);
+    for (final location in locations.skip(1)) {
+      path.lineTo(location.dx, location.dy);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = colors.primary
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke,
+    );
+    for (final location in locations) {
+      canvas.drawCircle(location, 3.5, Paint()..color = colors.primary);
+    }
+    final start = label(
+      chineseDate(points.first.time.toLocal(), includeYear: false),
+    );
+    start.paint(canvas, Offset(plot.left, plot.bottom + 8));
+    if (points.length > 1) {
+      final end = label(
+        chineseDate(points.last.time.toLocal(), includeYear: false),
+      );
+      end.paint(canvas, Offset(plot.right - end.width, plot.bottom + 8));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ColonyPopulationChartPainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.colors != colors;
 }
 
 class _ColonySummary extends StatelessWidget {
@@ -1800,57 +2017,15 @@ class _ColonySummary extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    colony.species ?? '未填写品种',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                if (colony.species?.trim().isNotEmpty == true) ...[
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    icon: const Icon(Icons.menu_book_outlined),
-                    label: const Text('百科'),
-                    onPressed: () {
-                      final species = colony.species!.trim();
-                      final query = _speciesAliases[species] ?? species;
-                      final profile = findSpeciesProfile(query);
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => profile == null
-                              ? SpeciesEncyclopediaPage(initialQuery: query)
-                              : SpeciesDetailPage(profile: profile),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (colony.queenCount != null)
-                  Chip(label: Text('${colony.queenCount} 只蚁后')),
-                if (colony.showSpecialized && colony.specializedCount != null)
-                  Chip(label: Text('${colony.specializedCount} 只特化')),
-                if (colony.initialWorkerCount != null)
-                  Chip(label: Text('${colony.initialWorkerCount} 只工蚁')),
-                if (colony.initialEggCount != null)
-                  Chip(label: Text('卵 ${colony.initialEggCount}')),
-                if (colony.initialCocoonCount != null)
-                  Chip(label: Text('茧 ${colony.initialCocoonCount}')),
                 if (colony.nestType?.isNotEmpty == true)
                   Chip(label: Text(colony.nestType!)),
                 if (temperatureRange != null)
                   Chip(label: Text(temperatureRange)),
                 if (humidityRange != null) Chip(label: Text(humidityRange)),
-                if (colony.acquiredOn != null)
-                  Chip(label: Text('入手 ${_date(colony.acquiredOn!)}')),
                 if (colony.purchasePriceCents != null)
                   Chip(label: Text('购入价 ¥${colony.purchasePriceText}')),
               ],

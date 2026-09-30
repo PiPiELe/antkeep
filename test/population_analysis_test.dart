@@ -95,6 +95,55 @@ void main() {
     },
   );
 
+  test('colony total keeps latest known counts and can include brood', () {
+    final totalColony = Colony(
+      id: 'total',
+      name: '总数测试',
+      queenCount: 1,
+      initialWorkerCount: 5,
+      initialEggCount: 2,
+      initialCocoonCount: 3,
+      createdAt: start,
+      updatedAt: start,
+    );
+    final records = [
+      CareRecord(
+        id: 'workers-and-eggs',
+        colonyId: totalColony.id,
+        type: CareRecordType.observation,
+        occurredAt: start.add(const Duration(days: 1)),
+        createdAt: start.add(const Duration(days: 1)),
+        workerCount: 6,
+        eggCount: 4,
+      ),
+      CareRecord(
+        id: 'larvae',
+        colonyId: totalColony.id,
+        type: CareRecordType.observation,
+        occurredAt: start.add(const Duration(days: 2)),
+        createdAt: start.add(const Duration(days: 2)),
+        larvaCount: 1,
+      ),
+    ];
+
+    expect(
+      colonyPopulationTotal(
+        totalColony,
+        records,
+        includeBrood: false,
+      ).map((point) => point.count),
+      [6, 7],
+    );
+    expect(
+      colonyPopulationTotal(
+        totalColony,
+        records,
+        includeBrood: true,
+      ).map((point) => point.count),
+      [11, 14, 15],
+    );
+  });
+
   test('DLC totals require both counts and never subtract event mortality', () {
     final records = [
       feederRecord('first', 0, 10, 2),
