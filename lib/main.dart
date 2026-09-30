@@ -374,6 +374,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 }
 
 Future<bool> _editColonyAcquiredOn(BuildContext context, Colony colony) async {
+  if (colony.acquiredOn != null) return false;
   try {
     final today = DateUtils.dateOnly(DateTime.now());
     final firstDate = DateTime(2000);
@@ -640,7 +641,7 @@ class _ColonyCard extends StatelessWidget {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final duration = InkWell(
-                    onTap: onDurationTap,
+                    onTap: colony.acquiredOn == null ? onDurationTap : null,
                     borderRadius: BorderRadius.circular(8),
                     child: HusbandryDuration(colony: colony),
                   );
@@ -923,8 +924,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           break;
         }
       }
-      if (_name.text.trim().isEmpty) _name.text = species;
+      _name.text = _speciesNickname(species);
     });
+  }
+
+  String _speciesNickname(String species) {
+    final displayName = _speciesAliases[species] ?? species;
+    final match = RegExp(r'（([^（）]+)）').firstMatch(displayName);
+    return match?.group(1) ?? displayName;
   }
 
   Future<void> _selectFamily(String family) async {
@@ -1149,27 +1156,35 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           ),
           const SizedBox(height: 12),
           Card(
-            child: CheckboxListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              controlAffinity: ListTileControlAffinity.leading,
-              title: const Text('特化'),
-              value: _showSpecialized,
-              onChanged: (value) =>
-                  setState(() => _showSpecialized = value ?? false),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _showSpecialized,
+                    onChanged: (value) =>
+                        setState(() => _showSpecialized = value ?? false),
+                  ),
+                  const Text('特化'),
+                  if (_showSpecialized) ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _specialized,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? '请输入特化数量'
+                            : _validateCount(value),
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '特化数量'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          if (_showSpecialized) ...[
-            TextFormField(
-              controller: _specialized,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? '请输入特化数量'
-                  : _validateCount(value),
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '特化数量'),
-            ),
-            const SizedBox(height: 12),
-          ],
           _section(
             icon: Icons.home_outlined,
             title: '巢体',
