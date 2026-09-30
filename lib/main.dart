@@ -21,8 +21,9 @@ import 'domain/models.dart';
 import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
 import 'domain/species_profile.dart';
+import 'domain/imported_species_catalog.dart';
 
-const _speciesOptions = <String, List<String>>{
+const _builtInSpeciesOptions = <String, List<String>>{
   '收获蚁': [
     '工匠收获蚁',
     '野蛮收获蚁（原生收获蚁）',
@@ -87,7 +88,7 @@ const _speciesOptions = <String, List<String>>{
 
 // Retain recognition of saved names and common input variants without duplicate
 // picker entries. Existing colony records are not rewritten.
-const _speciesAliases = <String, String>{
+const _builtInSpeciesAliases = <String, String>{
   '全黄弓背蚁': '全黄土耳其弓背蚁',
   '无恶齿收获蚁': '无颚齿收获蚁',
   '铺道蚁': '草地铺道蚁',
@@ -115,6 +116,22 @@ const _speciesAliases = <String, String>{
   '银丝蚁': '银丝箭蚁（银丝蚁）',
   '紫菜蚁': '紫彩虹臭蚁',
   '紫菜虹臭蚁': '紫彩虹臭蚁',
+};
+
+final _speciesOptions = <String, List<String>>{
+  for (final category in {
+    ..._builtInSpeciesOptions.keys,
+    ...importedSpeciesOptions.keys,
+  })
+    category: [
+      ...?_builtInSpeciesOptions[category],
+      ...?importedSpeciesOptions[category],
+    ],
+};
+
+final _speciesAliases = <String, String>{
+  ...importedSpeciesAliases,
+  ..._builtInSpeciesAliases,
 };
 
 const _nestTypeOptions = [
@@ -315,6 +332,40 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+Future<bool> _editColonyAcquiredOn(BuildContext context, Colony colony) async {
+  try {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final firstDate = DateTime(2000);
+    final initialDate = colony.acquiredOn ?? today;
+    final date = await showDatePicker(
+      context: context,
+      helpText: '填写入手日期',
+      confirmText: '保存',
+      cancelText: '取消',
+      initialEntryMode: DatePickerEntryMode.input,
+      firstDate: firstDate,
+      lastDate: today,
+      initialDate: initialDate.isBefore(firstDate)
+          ? firstDate
+          : initialDate.isAfter(today)
+          ? today
+          : initialDate,
+    );
+    if (date == null || !context.mounted) return false;
+    await AppDatabase.instance.saveColony(
+      Colony.fromMap({
+        ...colony.toMap(),
+        'acquired_on': date.toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }),
+    );
+    return true;
+  } catch (error) {
+    if (context.mounted) _showError(context, error);
+    return false;
+  }
+}
+
 class ColoniesPage extends StatefulWidget {
   const ColoniesPage({super.key});
   @override
@@ -329,6 +380,7 @@ typedef _ColonyListEntry = ({
 
 class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
+  bool _editingAcquiredOn = false;
 
   @override
   void initState() {
@@ -362,6 +414,17 @@ class _ColoniesPageState extends State<ColoniesPage> {
     );
   }
 
+  Future<void> _editAcquiredOn(Colony colony) async {
+    if (_editingAcquiredOn) return;
+    _editingAcquiredOn = true;
+    try {
+      final saved = await _editColonyAcquiredOn(context, colony);
+      if (saved && mounted) setState(_reload);
+    } finally {
+      _editingAcquiredOn = false;
+    }
+  }
+
   Future<void> _newColony() async {
     final saved = await Navigator.of(context)
         .push<bool>(MaterialPageRoute(builder: (_) => const ColonyFormPage()));
@@ -373,7 +436,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _newColony,
       icon: const Icon(Icons.add),
-      label: const Text('新入手蚁群'),
+      label: const Text('蚁群'),
     ),
     body: FutureBuilder<List<_ColonyListEntry>>(
       future: _colonies,
@@ -402,6 +465,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
               colony: colonies[index].colony,
               latestPopulation: colonies[index].latestPopulation,
               workers: colonies[index].workers,
+              onDurationTap: () => _editAcquiredOn(colonies[index].colony),
               onTap: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
@@ -425,11 +489,13 @@ class _ColonyCard extends StatelessWidget {
     required this.latestPopulation,
     required this.workers,
     required this.onTap,
+    required this.onDurationTap,
   });
   final Colony colony;
   final CareRecord? latestPopulation;
   final int? workers;
   final VoidCallback onTap;
+  final VoidCallback onDurationTap;
 
   @override
   Widget build(BuildContext context) {
@@ -463,88 +529,147 @@ class _ColonyCard extends StatelessWidget {
       colony.species,
       colony.nestType,
     ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            colony.coverPhotoPath == null
+                ? CircleAvatar(
+                    radius: 16,
+                    backgroundColor: theme.colorScheme.primary.withValues(
+                      alpha: .12,
+                    ),
+                    child: Icon(
+                      Icons.hive_outlined,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                  )
+                : _StoredImage(
+                    relativePath: colony.coverPhotoPath!,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                  ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                colony.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (description.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+        ],
+        if (colony.isNewQueenColony || workers != null) ...[
+          const SizedBox(height: 6),
+          _ColonyTags(colony: colony, workers: workers),
+        ],
+      ],
+    );
     return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final duration = InkWell(
+                    onTap: onDurationTap,
+                    borderRadius: BorderRadius.circular(8),
+                    child: HusbandryDuration(colony: colony),
+                  );
+                  if (constraints.maxWidth < 280 ||
+                      MediaQuery.textScalerOf(context).scale(12) > 18) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        identity,
+                        const SizedBox(height: 10),
+                        duration,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: identity),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 1,
+                        height: 62,
+                        color: theme.colorScheme.outlineVariant.withValues(
+                          alpha: .3,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: (constraints.maxWidth * .43).clamp(120.0, 160.0),
+                        child: duration,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: .3),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
-                  colony.coverPhotoPath == null
-                      ? const CircleAvatar(
-                          radius: 24,
-                          child: Icon(Icons.hive_outlined),
-                        )
-                      : _StoredImage(
-                          relativePath: colony.coverPhotoPath!,
-                          width: 48,
-                          height: 48,
-                          borderRadius: 24,
-                        ),
-                  const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Wrap(
+                      spacing: 20,
+                      runSpacing: 6,
                       children: [
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              colony.name,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            _ColonyTags(colony: colony, workers: workers),
-                          ],
-                        ),
-                        if (description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            description,
-                            style: theme.textTheme.bodySmall?.copyWith(
+                        for (final detail
+                            in details.isEmpty
+                                ? [const TextSpan(text: '尚未补充数量')]
+                                : details)
+                          Text.rich(
+                            detail,
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
-                        ],
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
                   Icon(
                     Icons.chevron_right,
-                    size: 20,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: .7,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              HusbandryDuration(colony: colony),
-              if (details.isNotEmpty || description.isEmpty) ...[
-                const SizedBox(height: 12),
-                Text.rich(
-                  TextSpan(
-                    children: details.isEmpty
-                        ? [const TextSpan(text: '尚未补充档案')]
-                        : [
-                            for (var i = 0; i < details.length; i++) ...[
-                              if (i > 0) const TextSpan(text: ' · '),
-                              details[i],
-                            ],
-                          ],
-                  ),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.5,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -723,6 +848,13 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   void _selectSpecies(String species) {
     setState(() {
       _selectedSpecies = species;
+      _speciesFamily = null;
+      for (final entry in _speciesOptions.entries) {
+        if (entry.value.contains(_speciesAliases[species] ?? species)) {
+          _speciesFamily = entry.key;
+          break;
+        }
+      }
       if (_name.text.trim().isEmpty) _name.text = species;
     });
   }
@@ -733,16 +865,17 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       _speciesFamily = family;
       _selectedSpecies = null;
     });
-    final species = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _ChoicePickerSheet(
-        title: '细分品种',
-        options: _speciesOptions[family] ?? const [],
-      ),
-    );
-    if (species != null && mounted) _selectSpecies(species);
+    final species =
+        await showModalBottomSheet<({String value, bool isSearchResult})>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (_) => _ChoicePickerSheet(
+            title: '细分品种',
+            options: _speciesOptions[family] ?? const [],
+          ),
+        );
+    if (species != null && mounted) _selectSpecies(species.value);
   }
 
   Future<void> _enterCustomSpecies() async {
@@ -825,21 +958,16 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
         padding: const EdgeInsets.all(16),
         children: [
           _SearchableChoiceField(
-            label: '品种分类',
-            hintText: '点击选择分类',
-            value: _speciesFamily,
+            label: '品种分类/细分种类',
+            hintText: '点击选择或搜索品种',
+            value: [?_speciesFamily, ?_selectedSpecies].join(' / '),
             options: _speciesOptions.keys.toList(),
+            searchOptions: {
+              for (final entry in _speciesOptions.entries)
+                for (final species in entry.value) species: entry.key,
+            },
             onSelected: _selectFamily,
-          ),
-          const SizedBox(height: 12),
-          _SearchableChoiceField(
-            key: ValueKey(_speciesFamily),
-            enabled: _speciesFamily != null,
-            label: '细分品种',
-            hintText: _speciesFamily == null ? '请先选择品种分类' : '点击搜索或选择品种',
-            value: _selectedSpecies,
-            options: _speciesOptions[_speciesFamily] ?? const [],
-            onSelected: _selectSpecies,
+            onSearchSelected: _selectSpecies,
           ),
           Align(
             alignment: Alignment.centerRight,
@@ -967,6 +1095,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             decoration: InputDecoration(
               labelText: '来源',
               hintText: '选择或填写来源',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              helperText: '点击右侧箭头选择，也可手动填写',
+              helperMaxLines: 2,
               suffixIcon: PopupMenuButton<String>(
                 tooltip: '选择来源',
                 icon: const Icon(Icons.arrow_drop_down),
@@ -1051,13 +1182,13 @@ class _PurchasePriceField extends StatelessWidget {
 
 class _SearchableChoiceField extends StatelessWidget {
   const _SearchableChoiceField({
-    super.key,
     required this.label,
     required this.hintText,
     required this.value,
     required this.options,
     required this.onSelected,
-    this.enabled = true,
+    this.searchOptions = const {},
+    this.onSearchSelected,
   });
 
   final String label;
@@ -1065,25 +1196,35 @@ class _SearchableChoiceField extends StatelessWidget {
   final String? value;
   final List<String> options;
   final ValueChanged<String> onSelected;
-  final bool enabled;
+  final Map<String, String> searchOptions;
+  final ValueChanged<String>? onSearchSelected;
 
   Future<void> _openPicker(BuildContext context) async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _ChoicePickerSheet(title: label, options: options),
-    );
-    if (picked != null) onSelected(picked);
+    final picked =
+        await showModalBottomSheet<({String value, bool isSearchResult})>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (_) => _ChoicePickerSheet(
+            title: label,
+            options: options,
+            searchOptions: searchOptions,
+          ),
+        );
+    if (picked == null || !context.mounted) return;
+    if (picked.isSearchResult) {
+      onSearchSelected?.call(picked.value);
+    } else {
+      onSelected(picked.value);
+    }
   }
 
   @override
   Widget build(BuildContext context) => TextFormField(
-    key: ValueKey('$label-$value-$enabled'),
+    key: ValueKey('$label-$value'),
     initialValue: value ?? '',
     readOnly: true,
-    enabled: enabled,
-    onTap: enabled ? () => _openPicker(context) : null,
+    onTap: () => _openPicker(context),
     decoration: InputDecoration(
       labelText: label,
       hintText: hintText,
@@ -1093,9 +1234,14 @@ class _SearchableChoiceField extends StatelessWidget {
 }
 
 class _ChoicePickerSheet extends StatefulWidget {
-  const _ChoicePickerSheet({required this.title, required this.options});
+  const _ChoicePickerSheet({
+    required this.title,
+    required this.options,
+    this.searchOptions = const {},
+  });
   final String title;
   final List<String> options;
+  final Map<String, String> searchOptions;
 
   @override
   State<_ChoicePickerSheet> createState() => _ChoicePickerSheetState();
@@ -1113,17 +1259,29 @@ class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
   @override
   Widget build(BuildContext context) {
     final normalizedQuery = _query.text.trim().toLowerCase();
-    final options = widget.options
-        .where(
-          (option) =>
-              option.toLowerCase().contains(normalizedQuery) ||
-              _speciesAliases.entries.any(
-                (alias) =>
-                    alias.value == option &&
-                    alias.key.toLowerCase().contains(normalizedQuery),
-              ),
-        )
-        .toList();
+    final options =
+        <({String value, String? category})>[
+              for (final option in widget.options)
+                (value: option, category: null),
+              if (normalizedQuery.isNotEmpty)
+                for (final entry in widget.searchOptions.entries)
+                  (value: entry.key, category: entry.value),
+            ]
+            .where(
+              (option) =>
+                  option.value.toLowerCase().contains(normalizedQuery) ||
+                  _speciesAliases.entries.any(
+                    (alias) =>
+                        alias.value == option.value &&
+                        alias.key.toLowerCase().contains(normalizedQuery),
+                  ) ||
+                  importedSpeciesSearchAliases.entries.any(
+                    (alias) =>
+                        alias.value.contains(option.value) &&
+                        alias.key.toLowerCase().contains(normalizedQuery),
+                  ),
+            )
+            .toList();
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.sizeOf(context).height * .72,
@@ -1137,9 +1295,11 @@ class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
                 controller: _query,
                 autofocus: true,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: '输入名称搜索',
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: widget.searchOptions.isEmpty
+                      ? '输入名称搜索'
+                      : '搜索分类或细分品种',
                 ),
               ),
               const SizedBox(height: 8),
@@ -1154,9 +1314,23 @@ class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
                         itemCount: options.length,
                         separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (context, index) => ListTile(
-                          title: Text(options[index]),
+                          title: Text(options[index].value),
+                          subtitle: options[index].category != null ||
+                                  importedSpeciesDisambiguation.containsKey(
+                                    options[index].value,
+                                  )
+                              ? Text([
+                                  ?options[index].category,
+                                  ?importedSpeciesDisambiguation[
+                                    options[index].value
+                                  ],
+                                ].join(' · '))
+                              : null,
                           trailing: const Icon(Icons.chevron_right),
-                          onTap: () => Navigator.pop(context, options[index]),
+                          onTap: () => Navigator.pop(context, (
+                            value: options[index].value,
+                            isSearchResult: options[index].category != null,
+                          )),
                         ),
                       ),
               ),
@@ -1177,6 +1351,7 @@ class ColonyDetailPage extends StatefulWidget {
 
 class _ColonyDetailPageState extends State<ColonyDetailPage> {
   late Future<_Detail> _detail;
+  bool _editingAcquiredOn = false;
   @override
   void initState() {
     super.initState();
@@ -1191,6 +1366,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
     await AppDatabase.instance.findColony(widget.colonyId),
     await AppDatabase.instance.listRecords(widget.colonyId),
   );
+
+  Future<void> _editAcquiredOn(Colony colony) async {
+    if (_editingAcquiredOn) return;
+    _editingAcquiredOn = true;
+    try {
+      final saved = await _editColonyAcquiredOn(context, colony);
+      if (saved && mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      _editingAcquiredOn = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) => FutureBuilder<_Detail>(
@@ -1246,7 +1434,11 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               workers: colony.currentWorkerCount(detail.records),
             ),
             const SizedBox(height: 12),
-            HusbandryDuration(colony: colony, expanded: true),
+            HusbandryDuration(
+              colony: colony,
+              expanded: true,
+              onTap: () => _editAcquiredOn(colony),
+            ),
             const SizedBox(height: 12),
             _ColonySummary(colony: colony),
             const SizedBox(height: 16),
@@ -1808,11 +2000,17 @@ class DiscoverPage extends StatelessWidget {
     children: [
       Text('发现养蚁的更多乐趣', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 8),
-      Text('查阅物种资料，探索养蚁活动与实用工具。', style: Theme.of(context).textTheme.bodyMedium),
+      Text(
+        '查阅物种资料，探索养蚁活动与实用工具。',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
       const SizedBox(height: 24),
       Card(
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
           leading: Icon(
             Icons.menu_book_outlined,
             color: Theme.of(context).colorScheme.primary,
@@ -2241,6 +2439,8 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _itemTile(InventoryItem item) {
+    final expiry = item.purchased ? item.effectiveExpiryDate() : null;
+    final expired = item.purchased && item.isExpired();
     return Card(
       child: ListTile(
         leading: item.purchased
@@ -2262,12 +2462,24 @@ class _InventoryPageState extends State<InventoryPage> {
                       }),
               ),
         title: Text(item.name),
-        subtitle: Text(
-          item.purchased
-              ? '已购入'
-              : _cart.contains(item.id)
-              ? '已加入购物车'
-              : '点击购买',
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.purchased
+                  ? '已购入'
+                  : _cart.contains(item.id)
+                  ? '已加入购物车'
+                  : '点击购买',
+            ),
+            if (expiry != null)
+              Text(
+                '有效期至：${_date(expiry)}${expired ? ' · 已过期' : ''}',
+                style: expired
+                    ? TextStyle(color: Theme.of(context).colorScheme.error)
+                    : null,
+              ),
+          ],
         ),
         trailing: Icon(
           item.purchased ? Icons.edit_outlined : Icons.chevron_right,

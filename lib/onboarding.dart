@@ -517,7 +517,7 @@ class BeginnerTips extends StatelessWidget {
         contentPadding: EdgeInsets.zero,
         leading: Icon(Icons.hive_outlined),
         title: Text('一窝蚁群，一份档案'),
-        subtitle: Text('在「蚁群」中点击「新入手蚁群」，填写品种和入手日期；不清楚的数量可以留空。'),
+        subtitle: Text('在「蚁群」中点击「+ 蚁群」，填写品种和入手日期；不清楚的数量可以留空。'),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,

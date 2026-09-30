@@ -256,6 +256,52 @@ void main() {
     },
   );
 
+  testWidgets('purchased items display expiry dates and highlight expiration', (
+    tester,
+  ) async {
+    final originalRows = rows
+        .map((row) => Map<String, Object?>.from(row))
+        .toList();
+    addTearDown(() {
+      rows
+        ..clear()
+        ..addAll(originalRows);
+    });
+    rows
+      ..clear()
+      ..addAll([
+        InventoryItem(
+          id: 'nutrition',
+          name: '营养液',
+          purchased: true,
+          purchasedAt: DateTime(2099, 1, 31),
+          expiryType: InventoryExpiryType.shelfLife,
+          shelfLifeMonths: 3,
+          createdAt: DateTime(2026),
+        ).toMap(),
+        InventoryItem(
+          id: 'expired',
+          name: '过期物品',
+          purchased: true,
+          expiryType: InventoryExpiryType.fixedDate,
+          expiresAt: DateTime(2020, 1, 1),
+          createdAt: DateTime(2020),
+        ).toMap(),
+      ]);
+    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('已购 (2)'));
+    await tester.pumpAndSettle();
+    final valid = find.text('有效期至：2099年4月30日');
+    final expired = find.text('有效期至：2020年1月1日 · 已过期');
+    expect(valid, findsOneWidget);
+    expect(expired, findsOneWidget);
+    final errorColor = Theme.of(tester.element(expired)).colorScheme.error;
+    expect(tester.widget<Text>(expired).style?.color, errorColor);
+    expect(tester.widget<Text>(valid).style?.color, isNot(errorColor));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'cart adds, removes, cancels and purchases selected items with prices',
     (tester) async {

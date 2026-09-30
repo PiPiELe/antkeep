@@ -10,10 +10,12 @@ class HusbandryDuration extends StatefulWidget {
     super.key,
     required this.colony,
     this.expanded = false,
+    this.onTap,
   });
 
   final Colony colony;
   final bool expanded;
+  final VoidCallback? onTap;
 
   @override
   State<HusbandryDuration> createState() => _HusbandryDurationState();
@@ -61,47 +63,101 @@ class _HusbandryDurationState extends State<HusbandryDuration>
     final theme = Theme.of(context);
     final days = widget.colony.husbandryDays(DateTime.now());
     final start = widget.colony.acquiredOn;
-    return Container(
-      width: widget.expanded ? double.infinity : null,
-      padding: EdgeInsets.all(widget.expanded ? 16 : 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text.rich(
-            TextSpan(
-              children: days == null
-                  ? [const TextSpan(text: '补充入手日期后显示养殖天数')]
-                  : [
-                      const TextSpan(text: '已养殖 '),
-                      TextSpan(
-                        text: '$days',
-                        style: TextStyle(
-                          fontSize: widget.expanded ? 36 : 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const TextSpan(text: ' 天'),
-                    ],
+    if (!widget.expanded) {
+      if (days == null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 22,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: .6),
             ),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onPrimaryContainer,
-            ),
-          ),
-          if (widget.expanded && start != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
-              '入手日期：${chineseDate(start)}',
+              '入手日期待补充',
+              textAlign: TextAlign.end,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onPrimaryContainer,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
-        ],
+        );
+      }
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerRight,
+        child: Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(text: '已养殖 '),
+              TextSpan(
+                text: '$days',
+                style: TextStyle(
+                  fontSize: 72,
+                  height: 1,
+                  letterSpacing: -3,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const TextSpan(text: ' 天'),
+            ],
+          ),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+    return SizedBox(
+      width: widget.expanded ? double.infinity : null,
+      child: Material(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: EdgeInsets.all(widget.expanded ? 16 : 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: days == null
+                        ? [const TextSpan(text: '补充入手日期后显示养殖天数')]
+                        : [
+                            const TextSpan(text: '已养殖 '),
+                            TextSpan(
+                              text: '$days',
+                              style: TextStyle(
+                                fontSize: widget.expanded ? 36 : 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const TextSpan(text: ' 天'),
+                          ],
+                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                if (widget.expanded && start != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '入手日期：${chineseDate(start)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,0 +1,7073 @@
+{
+  "source": "https://antden.net/",
+  "retrievedAt": "2026-09-30T11:48:19.991242+00:00",
+  "sourceSha256": "7a327f6f284c059ba94fb12e3464450b2a4a59d24fc547f93bebaa7791260ca5",
+  "filter": "All source rows retained. Identical Chinese/scientific-name pairs share one option; same Chinese name with different scientific names is qualified with the scientific name. Shared aliases return multiple search candidates and are not automatic identity mappings. Unidentified taxa are labeled. Existing keeper names remain unchanged; taxonomy is not independently verified.",
+  "summary": {
+    "source": 772,
+    "accepted": 772,
+    "excluded": 0,
+    "uniqueImportedOptions": 770,
+    "mergedDuplicateRows": 2,
+    "existingMatched": 60,
+    "addedOptions": 710,
+    "totalOptions": 783
+  },
+  "accepted": [
+    {
+      "id": 2568,
+      "name": "Atta robusta",
+      "scientificName": "Atta robusta",
+      "displayName": "Atta robusta",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2568"
+    },
+    {
+      "id": 233,
+      "name": "三尖叉多刺蚁",
+      "scientificName": "Polyrhachis thrinax",
+      "displayName": "三尖叉多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/233"
+    },
+    {
+      "id": 1127,
+      "name": "三色弓背蚁",
+      "scientificName": "Camponotus tricoloratus",
+      "displayName": "三色弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1127"
+    },
+    {
+      "id": 489,
+      "name": "上海举腹蚁",
+      "scientificName": "Crematogaster zoceensis",
+      "displayName": "上海举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/489"
+    },
+    {
+      "id": 343,
+      "name": "上海大头蚁",
+      "scientificName": "pheidole zoceana",
+      "displayName": "上海大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/343"
+    },
+    {
+      "id": 1793,
+      "name": "不等弓背蚁",
+      "scientificName": "Camponotus inaequalis",
+      "displayName": "不等弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1793"
+    },
+    {
+      "id": 1518,
+      "name": "丛林弓背蚁",
+      "scientificName": "Camponotus dumetorum",
+      "displayName": "丛林弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1518"
+    },
+    {
+      "id": 178,
+      "name": "东方光胸臭蚁",
+      "scientificName": "Liometopum orientale",
+      "displayName": "东方光胸臭蚁",
+      "category": "光胸臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/178"
+    },
+    {
+      "id": 513,
+      "name": "东方双节行军蚁",
+      "scientificName": "Aenictus orientalis",
+      "displayName": "东方双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/513"
+    },
+    {
+      "id": 54,
+      "name": "东方收获蚁",
+      "scientificName": "Messor orientalis",
+      "displayName": "东方收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/54"
+    },
+    {
+      "id": 121,
+      "name": "东方行军蚁",
+      "scientificName": "Dorylus orientalis",
+      "displayName": "东方行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/121"
+    },
+    {
+      "id": 2362,
+      "name": "东洋毛蚁",
+      "scientificName": "Lasius nipponensis",
+      "displayName": "东洋毛蚁",
+      "category": "毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2362"
+    },
+    {
+      "id": 2361,
+      "name": "丝光灰褐蚁",
+      "scientificName": "Formica fuscocinerea",
+      "displayName": "丝光灰褐蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2361"
+    },
+    {
+      "id": 221,
+      "name": "丝光褐林蚁",
+      "scientificName": "Formica fusca",
+      "displayName": "丝光褐林蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/221"
+    },
+    {
+      "id": 219,
+      "name": "丝毛弓背蚁",
+      "scientificName": "Camponotus holosericeus",
+      "displayName": "丝毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/219"
+    },
+    {
+      "id": 606,
+      "name": "丝腹弓背蚁",
+      "scientificName": "Camponotus sericeiventris",
+      "displayName": "丝腹弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/606"
+    },
+    {
+      "id": 2588,
+      "name": "中亚凹头蚁",
+      "scientificName": "Formica mesasiatica",
+      "displayName": "中亚凹头蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2588"
+    },
+    {
+      "id": 11,
+      "name": "中亚弓背蚁",
+      "scientificName": "Camponotus turkestanus",
+      "displayName": "全黄土耳其弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/11"
+    },
+    {
+      "id": 157,
+      "name": "中华光胸臭蚁",
+      "scientificName": "Liometopum sinense",
+      "displayName": "中华光胸臭蚁",
+      "category": "光胸臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/157"
+    },
+    {
+      "id": 8,
+      "name": "中华大头蚁",
+      "scientificName": "Pheidole sinica",
+      "displayName": "中华大头蚁",
+      "category": "大头蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/8"
+    },
+    {
+      "id": 184,
+      "name": "中华小家蚁",
+      "scientificName": "Monomorium chinense",
+      "displayName": "中华小家蚁",
+      "category": "小家蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/184"
+    },
+    {
+      "id": 2007,
+      "name": "中华曲颊蚁",
+      "scientificName": "Gnamptogenys chinensis",
+      "displayName": "中华曲颊蚁",
+      "category": "曲颊猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2007"
+    },
+    {
+      "id": 146,
+      "name": "中华短猛蚁",
+      "scientificName": "Brachyponera chinensis",
+      "displayName": "中华短猛蚁",
+      "category": "短猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/146"
+    },
+    {
+      "id": 116,
+      "name": "中华红林蚁",
+      "scientificName": "Formica sinensis",
+      "displayName": "中华红林蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/116"
+    },
+    {
+      "id": 218,
+      "name": "中华细颚猛蚁",
+      "scientificName": "Leptogenys chinensis",
+      "displayName": "中华细颚猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/218"
+    },
+    {
+      "id": 179,
+      "name": "中华酸臭蚁",
+      "scientificName": "Tapinoma sinense",
+      "displayName": "中华酸臭蚁",
+      "category": "酸臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/179"
+    },
+    {
+      "id": 326,
+      "name": "中国影蚁",
+      "scientificName": "Syscia chinensis",
+      "displayName": "中国影蚁",
+      "category": "影蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/326"
+    },
+    {
+      "id": 2602,
+      "name": "中国毛蚁",
+      "scientificName": "Lasius chinensis",
+      "displayName": "中国毛蚁",
+      "category": "毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2602"
+    },
+    {
+      "id": 2606,
+      "name": "中红伪切叶蚁",
+      "scientificName": "Pseudomyrmex rufomedius",
+      "displayName": "中红伪切叶蚁",
+      "category": "伪切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2606"
+    },
+    {
+      "id": 986,
+      "name": "中红收获蚁",
+      "scientificName": "Messor medioruber",
+      "displayName": "中红收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/986"
+    },
+    {
+      "id": 82,
+      "name": "乌头弓背蚁",
+      "scientificName": "Camponotus atriceps",
+      "displayName": "乌头弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/82"
+    },
+    {
+      "id": 1831,
+      "name": "乌头行军蚁",
+      "scientificName": "Dorylus atriceps",
+      "displayName": "乌头行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1831"
+    },
+    {
+      "id": 258,
+      "name": "乌拉尔蚁",
+      "scientificName": "Formica uralensis",
+      "displayName": "乌拉尔蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/258"
+    },
+    {
+      "id": 468,
+      "name": "乌檀收获蚁",
+      "scientificName": "Messor ebeninus",
+      "displayName": "乌檀收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/468"
+    },
+    {
+      "id": 522,
+      "name": "乌黑蜜罐蚁",
+      "scientificName": "Myrmecocystus melanoticus",
+      "displayName": "乌黑蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/522"
+    },
+    {
+      "id": 1517,
+      "name": "九州弓背蚁",
+      "scientificName": "Camponotus kiusiuensis",
+      "displayName": "九州弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1517"
+    },
+    {
+      "id": 87,
+      "name": "乞拉朋海胆蚁",
+      "scientificName": "Echinopla cherapunjiensis",
+      "displayName": "乞拉朋海胆蚁",
+      "category": "海胆蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/87"
+    },
+    {
+      "id": 208,
+      "name": "争吵大齿猛蚁",
+      "scientificName": "Odontomachus rixosus",
+      "displayName": "争吵大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/208"
+    },
+    {
+      "id": 55,
+      "name": "二色盾胸切叶蚁",
+      "scientificName": "Meranoplus bicolor",
+      "displayName": "二色盾胸切叶蚁",
+      "category": "盾胸切叶蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/55"
+    },
+    {
+      "id": 36,
+      "name": "二色箭蚁",
+      "scientificName": "Cataglyphis bicolor",
+      "displayName": "二色箭蚁",
+      "category": "箭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/36"
+    },
+    {
+      "id": 2595,
+      "name": "二齿猛蚁",
+      "scientificName": "Ponera diodonta",
+      "displayName": "二齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2595"
+    },
+    {
+      "id": 2633,
+      "name": "五刺火蚁",
+      "scientificName": "Solenopsis quinquecuspis",
+      "displayName": "五刺火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2633"
+    },
+    {
+      "id": 2438,
+      "name": "五齿猛蚁",
+      "scientificName": "Ponera pentodontos",
+      "displayName": "五齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2438"
+    },
+    {
+      "id": 115,
+      "name": "亚光盗蚁",
+      "scientificName": "Harpagoxenus sublaevis",
+      "displayName": "亚光盗蚁",
+      "category": "盗蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/115"
+    },
+    {
+      "id": 592,
+      "name": "亚历山大收获蚁",
+      "scientificName": "Messor alexandri",
+      "displayName": "亚历山大收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/592"
+    },
+    {
+      "id": 360,
+      "name": "亚细结收获蚁",
+      "scientificName": "Messor subgracilinodis",
+      "displayName": "亚细结收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/360"
+    },
+    {
+      "id": 45,
+      "name": "亮平头蚁",
+      "scientificName": "Colobopsis vitreus",
+      "displayName": "亮平头蚁",
+      "category": "平头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/45"
+    },
+    {
+      "id": 244,
+      "name": "亮林蚁",
+      "scientificName": "Formica clara",
+      "displayName": "亮林蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/244"
+    },
+    {
+      "id": 2546,
+      "name": "亮毛凹头臭蚁",
+      "scientificName": "Dolichoderus pilinomas",
+      "displayName": "亮毛凹头臭蚁",
+      "category": "臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2546"
+    },
+    {
+      "id": 209,
+      "name": "亮毛蚁",
+      "scientificName": "Lasius fuliginosus",
+      "displayName": "亮毛蚁",
+      "category": "毛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/209"
+    },
+    {
+      "id": 2634,
+      "name": "亮红伪切叶蚁",
+      "scientificName": "Pseudomyrmex fervidus",
+      "displayName": "亮红伪切叶蚁",
+      "category": "伪切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2634"
+    },
+    {
+      "id": 64,
+      "name": "亮红大头蚁",
+      "scientificName": "Pheidole fervida",
+      "displayName": "亮红大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/64"
+    },
+    {
+      "id": 153,
+      "name": "亮红箭蚁",
+      "scientificName": "Cataglyphis rubra",
+      "displayName": "亮红箭蚁",
+      "category": "箭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/153"
+    },
+    {
+      "id": 2662,
+      "name": "亮胸举腹蚁",
+      "scientificName": "Crematogaster egidyi",
+      "displayName": "亮胸举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2662"
+    },
+    {
+      "id": 103,
+      "name": "亮腹黑褐蚁",
+      "scientificName": "Formica gagatoides",
+      "displayName": "亮腹黑褐蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/103"
+    },
+    {
+      "id": 1112,
+      "name": "亮褐行军蚁",
+      "scientificName": "Dorylus laevigatus",
+      "displayName": "亮褐行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1112"
+    },
+    {
+      "id": 173,
+      "name": "亮角蚁",
+      "scientificName": "Messor antennatus",
+      "displayName": "亮角蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/173"
+    },
+    {
+      "id": 2302,
+      "name": "亮足弓背蚁",
+      "scientificName": "Camponotus claripes",
+      "displayName": "亮足弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2302"
+    },
+    {
+      "id": 1414,
+      "name": "任性弓背蚁",
+      "scientificName": "Camponotus morosus",
+      "displayName": "任性弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1414"
+    },
+    {
+      "id": 118,
+      "name": "伊大头蚁",
+      "scientificName": "Pheidole yeensis",
+      "displayName": "伊大头蚁",
+      "category": "大头蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/118"
+    },
+    {
+      "id": 392,
+      "name": "伊宁弓背蚁",
+      "scientificName": "Camponotus yiningensis",
+      "displayName": "伊宁弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/392"
+    },
+    {
+      "id": 144,
+      "name": "伊比利亚收获蚁",
+      "scientificName": "Messor ibericus",
+      "displayName": "伊比利亚收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/144"
+    },
+    {
+      "id": 1311,
+      "name": "伊比利亚盘腹蚁",
+      "scientificName": "Aphaenogaster iberica",
+      "displayName": "伊比利亚盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1311"
+    },
+    {
+      "id": 2650,
+      "name": "伊氏弓背蚁",
+      "scientificName": "Camponotus eastwoodi",
+      "displayName": "伊氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2650"
+    },
+    {
+      "id": 347,
+      "name": "伊藤卷尾猛蚁",
+      "scientificName": "Proceratium itoi",
+      "displayName": "伊藤卷尾猛蚁",
+      "category": "卷尾猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/347"
+    },
+    {
+      "id": 2314,
+      "name": "伊东氏弓背蚁",
+      "scientificName": "Camponotus itoi",
+      "displayName": "伊东氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2314"
+    },
+    {
+      "id": 81,
+      "name": "伦格弓背蚁",
+      "scientificName": "Camponotus renggeri",
+      "displayName": "伦格弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/81"
+    },
+    {
+      "id": 457,
+      "name": "伦氏顶切叶蚁",
+      "scientificName": "Acromyrmex lundii",
+      "displayName": "伦氏顶切叶蚁",
+      "category": "顶切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/457"
+    },
+    {
+      "id": 719,
+      "name": "佛州弓背蚁",
+      "scientificName": "Camponotus floridanus",
+      "displayName": "佛州弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/719"
+    },
+    {
+      "id": 1795,
+      "name": "侧扁弓背蚁",
+      "scientificName": "Camponotus compressus",
+      "displayName": "侧扁弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1795"
+    },
+    {
+      "id": 2584,
+      "name": "侧扁弓背蚁（指名亚种）",
+      "scientificName": "Camponotus compressus compressus",
+      "displayName": "侧扁弓背蚁（指名亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2584"
+    },
+    {
+      "id": 790,
+      "name": "傲慢弓背蚁",
+      "scientificName": "Camponotus arrogans",
+      "displayName": "傲慢弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/790"
+    },
+    {
+      "id": 207,
+      "name": "光亮大齿猛蚁",
+      "scientificName": "Odontomachus fulgidus",
+      "displayName": "光亮大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/207"
+    },
+    {
+      "id": 622,
+      "name": "光亮弓背蚁",
+      "scientificName": "Camponotus clarior",
+      "displayName": "光亮弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/622"
+    },
+    {
+      "id": 482,
+      "name": "光亮恐猛蚁",
+      "scientificName": "Dinoponera lucida",
+      "displayName": "光亮恐猛蚁",
+      "category": "恐猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/482"
+    },
+    {
+      "id": 416,
+      "name": "光亮牛蚁",
+      "scientificName": "Myrmecia fulgida",
+      "displayName": "光亮牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/416"
+    },
+    {
+      "id": 255,
+      "name": "光亮黑蚁",
+      "scientificName": "Formica candida",
+      "displayName": "光亮黑蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/255"
+    },
+    {
+      "id": 777,
+      "name": "光亮黑蚁台湾亚种",
+      "scientificName": "Formica candida formosae",
+      "displayName": "光亮黑蚁台湾亚种",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/777"
+    },
+    {
+      "id": 387,
+      "name": "光弓背蚁",
+      "scientificName": "Camponotus politae",
+      "displayName": "光弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/387"
+    },
+    {
+      "id": 304,
+      "name": "光柄双节行军蚁",
+      "scientificName": "Aenictus laeviceps",
+      "displayName": "光柄双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/304"
+    },
+    {
+      "id": 2069,
+      "name": "光滑弓背蚁",
+      "scientificName": "Camponotus laevigatus",
+      "displayName": "光滑弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2069"
+    },
+    {
+      "id": 2611,
+      "name": "光滑盾胸切叶蚁",
+      "scientificName": "Meranoplus laeviventris",
+      "displayName": "光滑盾胸切叶蚁",
+      "category": "盾胸切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2611"
+    },
+    {
+      "id": 101,
+      "name": "光滑背蚁",
+      "scientificName": "Formica glabridorsis",
+      "displayName": "光滑背蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/101"
+    },
+    {
+      "id": 260,
+      "name": "光滑芭切叶蚁",
+      "scientificName": "Atta laevigata",
+      "displayName": "光滑芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/260"
+    },
+    {
+      "id": 667,
+      "name": "光胫多刺蚁",
+      "scientificName": "Polyrhachis tibialis",
+      "displayName": "光胫多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/667"
+    },
+    {
+      "id": 267,
+      "name": "光腹棘颚蚁",
+      "scientificName": "Acanthognathus laevigatus",
+      "displayName": "光腹棘颚蚁",
+      "category": "棘颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/267"
+    },
+    {
+      "id": 35,
+      "name": "光腿刺切叶蚁",
+      "scientificName": "Acanthomyrmex glabfemoralis",
+      "displayName": "光腿刺切叶蚁",
+      "category": "刺切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/35"
+    },
+    {
+      "id": 201,
+      "name": "光颚铺道蚁",
+      "scientificName": "Tetramorium insolens",
+      "displayName": "光颚铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/201"
+    },
+    {
+      "id": 532,
+      "name": "克平卷尾猛蚁",
+      "scientificName": "Proceratium kepingmai",
+      "displayName": "克平卷尾猛蚁",
+      "category": "卷尾猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/532"
+    },
+    {
+      "id": 2582,
+      "name": "克氏蜜罐蚁",
+      "scientificName": "Myrmecocystus creightoni",
+      "displayName": "克氏蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2582"
+    },
+    {
+      "id": 111,
+      "name": "入侵红火蚁",
+      "scientificName": "Solenopsis invicta",
+      "displayName": "入侵红火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/111"
+    },
+    {
+      "id": 234,
+      "name": "全异盲切叶蚁菲律宾亚种",
+      "scientificName": "Carebara diversa philippina",
+      "displayName": "全异盲切叶蚁菲律宾亚种",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/234"
+    },
+    {
+      "id": 56,
+      "name": "全异盲切叶蚁",
+      "scientificName": "Carebara diversa",
+      "displayName": "全异巨首蚁",
+      "category": "巨首蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/56"
+    },
+    {
+      "id": 249,
+      "name": "八刺顶切叶蚁",
+      "scientificName": "Acromyrmex octospinosus",
+      "displayName": "八刺顶切叶蚁",
+      "category": "顶切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/249"
+    },
+    {
+      "id": 666,
+      "name": "八节卵角蚁",
+      "scientificName": "Ooceraea octoantenna",
+      "displayName": "八节卵角蚁",
+      "category": "卵角蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/666"
+    },
+    {
+      "id": 460,
+      "name": "八重山尖尾蚁",
+      "scientificName": "Acropyga yaeyamensis",
+      "displayName": "八重山尖尾蚁",
+      "category": "尖尾蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/460"
+    },
+    {
+      "id": 2309,
+      "name": "六刺云行军蚁",
+      "scientificName": "Yunodorylus sexspinus",
+      "displayName": "六刺云行军蚁",
+      "category": "云蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2309"
+    },
+    {
+      "id": 262,
+      "name": "六刺芭切叶蚁",
+      "scientificName": "Atta sexdens",
+      "displayName": "六刺芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/262"
+    },
+    {
+      "id": 474,
+      "name": "六节瘤颚蚁",
+      "scientificName": "Strumigenys hexamera",
+      "displayName": "六节瘤颚蚁",
+      "category": "瘤颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/474"
+    },
+    {
+      "id": 2307,
+      "name": "具单眼大头蚁",
+      "scientificName": "Pheidole ocellata",
+      "displayName": "具单眼大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2307"
+    },
+    {
+      "id": 456,
+      "name": "冠角僵蚁",
+      "scientificName": "Ankylomyrma coronacantha",
+      "displayName": "冠角僵蚁",
+      "category": "僵蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/456"
+    },
+    {
+      "id": 2567,
+      "name": "冥府臭蚁",
+      "scientificName": "Technomyrmex hades",
+      "displayName": "冥府臭蚁",
+      "category": "狡臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2567"
+    },
+    {
+      "id": 293,
+      "name": "冥界离猛蚁",
+      "scientificName": "Apomyrma stygia",
+      "displayName": "冥界离猛蚁",
+      "category": "离猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/293"
+    },
+    {
+      "id": 1083,
+      "name": "凯撒弓背蚁",
+      "scientificName": "Camponotus caesar",
+      "displayName": "凯撒弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1083"
+    },
+    {
+      "id": 1493,
+      "name": "凯撒弓背蚁（帝王亚种）",
+      "scientificName": "Camponotus caesar imperator",
+      "displayName": "凯撒弓背蚁（帝王亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1493"
+    },
+    {
+      "id": 202,
+      "name": "凶暴铺道蚁",
+      "scientificName": "Tetramorium ferox",
+      "displayName": "凶暴铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/202"
+    },
+    {
+      "id": 2550,
+      "name": "凹唇举腹蚁",
+      "scientificName": "Crematogaster concavoclypeus",
+      "displayName": "凹唇举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2550"
+    },
+    {
+      "id": 312,
+      "name": "凹唇弓背蚁",
+      "scientificName": "Camponotus dorex",
+      "displayName": "凹唇弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/312"
+    },
+    {
+      "id": 620,
+      "name": "凹唇细长蚁",
+      "scientificName": "Tetraponera concava",
+      "displayName": "凹唇细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/620"
+    },
+    {
+      "id": 214,
+      "name": "凹大头蚁",
+      "scientificName": "Pheidole sulcaticeps",
+      "displayName": "凹大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/214"
+    },
+    {
+      "id": 596,
+      "name": "凹毛蚁",
+      "scientificName": "Lasius emarginatus",
+      "displayName": "凹毛蚁",
+      "category": "毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/596"
+    },
+    {
+      "id": 981,
+      "name": "切齿收获蚁",
+      "scientificName": "Messor incisus",
+      "displayName": "切齿收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/981"
+    },
+    {
+      "id": 759,
+      "name": "列氏扁头猛蚁",
+      "scientificName": "Ectomomyrmex lecuvenchocki",
+      "displayName": "扁头猛蚁",
+      "category": "猛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/759"
+    },
+    {
+      "id": 104,
+      "name": "刘氏瘤颚蚁",
+      "scientificName": "Strumigenys S. lewisi",
+      "displayName": "刘氏瘤颚蚁",
+      "category": "瘤颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/104"
+    },
+    {
+      "id": 2604,
+      "name": "刺结行军蚁",
+      "scientificName": "Dorylus spininodis",
+      "displayName": "刺结行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2604"
+    },
+    {
+      "id": 63,
+      "name": "刻纹棱胸切叶蚁",
+      "scientificName": "Pristomyrmex punctatus",
+      "displayName": "刻纹棱胸切叶蚁",
+      "category": "棱胸切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/63"
+    },
+    {
+      "id": 316,
+      "name": "剑颚新猛蚁",
+      "scientificName": "Neoponera rostrata",
+      "displayName": "剑颚新猛蚁",
+      "category": "新猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/316"
+    },
+    {
+      "id": 327,
+      "name": "剑齿梳猛蚁",
+      "scientificName": "Plectroctena mandibularis",
+      "displayName": "剑齿梳猛蚁",
+      "category": "梳猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/327"
+    },
+    {
+      "id": 428,
+      "name": "剑齿牛蚁",
+      "scientificName": "Myrmecia mandibularis",
+      "displayName": "剑齿牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/428"
+    },
+    {
+      "id": 2573,
+      "name": "剑齿行军蚁",
+      "scientificName": "Dorylus mandibularis",
+      "displayName": "剑齿行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2573"
+    },
+    {
+      "id": 579,
+      "name": "割草芭切叶蚁",
+      "scientificName": "Atta capiguara",
+      "displayName": "割草芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/579"
+    },
+    {
+      "id": 2609,
+      "name": "加州毛蚁",
+      "scientificName": "Lasius californicus",
+      "displayName": "加州毛蚁",
+      "category": "毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2609"
+    },
+    {
+      "id": 58,
+      "name": "加州须蚁",
+      "scientificName": "Pogonomyrmex californicus",
+      "displayName": "加州须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/58"
+    },
+    {
+      "id": 49,
+      "name": "勤劳收获蚁",
+      "scientificName": "Messor laboriosus",
+      "displayName": "勤劳收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/49"
+    },
+    {
+      "id": 2663,
+      "name": "勤勉弓背蚁",
+      "scientificName": "Camponotus sedulus",
+      "displayName": "勤勉弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2663"
+    },
+    {
+      "id": 543,
+      "name": "包公盘腹蚁",
+      "scientificName": "Aphaenogaster baogong",
+      "displayName": "包公盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/543"
+    },
+    {
+      "id": 490,
+      "name": "北京原细蚁",
+      "scientificName": "Protanilla beijingensis",
+      "displayName": "北京原细蚁",
+      "category": "原细蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/490"
+    },
+    {
+      "id": 2603,
+      "name": "北京细蚁",
+      "scientificName": "Leptanilla beijingensis",
+      "displayName": "北京细蚁",
+      "category": "细蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2603"
+    },
+    {
+      "id": 215,
+      "name": "半眼多刺蚁",
+      "scientificName": "Polyrhachis pubescens",
+      "displayName": "半眼多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/215"
+    },
+    {
+      "id": 1020,
+      "name": "半红收获蚁",
+      "scientificName": "Messor semirufus",
+      "displayName": "半红收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1020"
+    },
+    {
+      "id": 2358,
+      "name": "半褐弓背蚁",
+      "scientificName": "Camponotus semitestaceus",
+      "displayName": "半褐弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2358"
+    },
+    {
+      "id": 2296,
+      "name": "华丽原蚁",
+      "scientificName": "Proformica splendida",
+      "displayName": "华丽原蚁",
+      "category": "原蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2296"
+    },
+    {
+      "id": 2565,
+      "name": "单穴扁胸猛蚁",
+      "scientificName": "Ectomomyrmex unicolor",
+      "displayName": "单穴扁胸猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2565"
+    },
+    {
+      "id": 978,
+      "name": "单色收获蚁",
+      "scientificName": "Messor concolor",
+      "displayName": "单色收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/978"
+    },
+    {
+      "id": 987,
+      "name": "南方收获蚁",
+      "scientificName": "Messor meridionalis",
+      "displayName": "南方收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/987"
+    },
+    {
+      "id": 545,
+      "name": "南红弓背蚁",
+      "scientificName": "Camponotus CA02",
+      "displayName": "南红弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/545"
+    },
+    {
+      "id": 480,
+      "name": "南非粗颚猛蚁",
+      "scientificName": "Streblognathus aethiopicus",
+      "displayName": "南非粗颚猛蚁",
+      "category": "粗颚猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/480"
+    },
+    {
+      "id": 557,
+      "name": "卡林弓背蚁",
+      "scientificName": "Camponotus carin",
+      "displayName": "卡林弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/557"
+    },
+    {
+      "id": 308,
+      "name": "卡氏弓背蚁",
+      "scientificName": "Camponotus cameroni",
+      "displayName": "卡氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/308"
+    },
+    {
+      "id": 529,
+      "name": "卡氏无齿猛蚁",
+      "scientificName": "Discothyrea kamiteta",
+      "displayName": "卡氏无齿猛蚁",
+      "category": "无齿猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/529"
+    },
+    {
+      "id": 176,
+      "name": "卡拉齐背门蚁",
+      "scientificName": "Notostigma carazzii",
+      "displayName": "卡拉齐背门蚁",
+      "category": "背门蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/176"
+    },
+    {
+      "id": 582,
+      "name": "卡米拉迷猛蚁",
+      "scientificName": "Mystrium camillae",
+      "displayName": "卡米拉迷猛蚁",
+      "category": "迷猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/582"
+    },
+    {
+      "id": 286,
+      "name": "印大头蚁",
+      "scientificName": "Pheidole indica",
+      "displayName": "印大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/286"
+    },
+    {
+      "id": 1430,
+      "name": "厚毛弓背蚁",
+      "scientificName": "Camponotus monju",
+      "displayName": "厚毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1430"
+    },
+    {
+      "id": 2311,
+      "name": "厚甲游蚁",
+      "scientificName": "Eciton quadriglume",
+      "displayName": "厚甲游蚁",
+      "category": "游蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2311"
+    },
+    {
+      "id": 291,
+      "name": "厚背刺家蟻",
+      "scientificName": "Acanthomyrmex crassispinus",
+      "displayName": "厚背刺家蟻",
+      "category": "刺切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/291"
+    },
+    {
+      "id": 83,
+      "name": "厚金弓背蚁",
+      "scientificName": "Camponotus fulvopilosus",
+      "displayName": "厚金弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/83"
+    },
+    {
+      "id": 905,
+      "name": "原子盲切叶蚁",
+      "scientificName": "Carebara atoma",
+      "displayName": "原子盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/905"
+    },
+    {
+      "id": 2310,
+      "name": "叉颚原细蚁",
+      "scientificName": "Protanilla furcomandibula",
+      "displayName": "叉颚原细蚁",
+      "category": "原细蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2310"
+    },
+    {
+      "id": 1055,
+      "name": "双刺修猛蚁",
+      "scientificName": "Pseudoneoponera bispinosa",
+      "displayName": "双刺修猛蚁",
+      "category": "修猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1055"
+    },
+    {
+      "id": 470,
+      "name": "双突柄举腹蚁",
+      "scientificName": "Crematogaster dohrni",
+      "displayName": "双突柄举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/470"
+    },
+    {
+      "id": 277,
+      "name": "双色曲颊猛蚁",
+      "scientificName": "Stictoponera bicolor",
+      "displayName": "双色曲颊猛蚁",
+      "category": "猛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/277"
+    },
+    {
+      "id": 2316,
+      "name": "双色须蚁",
+      "scientificName": "Pogonomyrmex bicolor",
+      "displayName": "双色须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2316"
+    },
+    {
+      "id": 239,
+      "name": "双钩多刺蚁",
+      "scientificName": "Polyrhachis bihamata",
+      "displayName": "双钩多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/239"
+    },
+    {
+      "id": 61,
+      "name": "双隆骨铺道蚁",
+      "scientificName": "Tetramorium bicarinatum",
+      "displayName": "双隆骨铺道蚁",
+      "category": "铺道蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/61"
+    },
+    {
+      "id": 268,
+      "name": "小异牛蚁",
+      "scientificName": "Myrmecia varians",
+      "displayName": "小异牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/268"
+    },
+    {
+      "id": 607,
+      "name": "古尔德弓背蚁",
+      "scientificName": "Camponotus gouldi",
+      "displayName": "古尔德弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/607"
+    },
+    {
+      "id": 1630,
+      "name": "古巴芭切叶蚁",
+      "scientificName": "Atta cubana",
+      "displayName": "古巴芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1630"
+    },
+    {
+      "id": 465,
+      "name": "古田山双节行军蚁",
+      "scientificName": "Aenictus gutianshanensis",
+      "displayName": "古田山双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/465"
+    },
+    {
+      "id": 135,
+      "name": "句芒大齒猛蟻",
+      "scientificName": "Odontomachus goumang",
+      "displayName": "句芒大齒猛蟻",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/135"
+    },
+    {
+      "id": 373,
+      "name": "可爱丝切叶蚁",
+      "scientificName": "Sericomyrmex amabilis",
+      "displayName": "可爱丝切叶蚁",
+      "category": "丝切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/373"
+    },
+    {
+      "id": 336,
+      "name": "可爱大头蚁",
+      "scientificName": "Pheidole jucunda",
+      "displayName": "可爱大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/336"
+    },
+    {
+      "id": 551,
+      "name": "台湾举腹蚁",
+      "scientificName": "Crematogaster pia",
+      "displayName": "台湾举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/551"
+    },
+    {
+      "id": 168,
+      "name": "台湾双节行军蚁",
+      "scientificName": "Aenictus formosensis",
+      "displayName": "台湾双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/168"
+    },
+    {
+      "id": 1830,
+      "name": "台湾平头蚁",
+      "scientificName": "Colobopsis taivanae",
+      "displayName": "台湾平头蚁",
+      "category": "平头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1830"
+    },
+    {
+      "id": 1247,
+      "name": "台湾弓背蚁",
+      "scientificName": "Camponotus formosensis",
+      "displayName": "台湾弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1247"
+    },
+    {
+      "id": 379,
+      "name": "臺灣隱針蟻",
+      "scientificName": "Cryptopone taivanae",
+      "displayName": "臺灣隱針蟻",
+      "category": "隐猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/379"
+    },
+    {
+      "id": 242,
+      "name": "史氏大头蚁",
+      "scientificName": "Pheidole smythiesii",
+      "displayName": "史氏大头蚁",
+      "category": "大头蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/242"
+    },
+    {
+      "id": 41,
+      "name": "叶形多刺蚁",
+      "scientificName": "Polyrhachis lamellidens",
+      "displayName": "叶形多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/41"
+    },
+    {
+      "id": 530,
+      "name": "吉市红蚁",
+      "scientificName": "Myrmica jessensis",
+      "displayName": "吉市红蚁",
+      "category": "红蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/530"
+    },
+    {
+      "id": 492,
+      "name": "和谐切胸蚁",
+      "scientificName": "Temnothorax congruus",
+      "displayName": "和谐切胸蚁",
+      "category": "切胸蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/492"
+    },
+    {
+      "id": 808,
+      "name": "哀弓背蚁",
+      "scientificName": "Camponotus dolendus",
+      "displayName": "哀弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/808"
+    },
+    {
+      "id": 235,
+      "name": "哈氏多刺蚁",
+      "scientificName": "Polyrhachis halidayi",
+      "displayName": "哈氏多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/235"
+    },
+    {
+      "id": 29,
+      "name": "哈氏弓背蚁",
+      "scientificName": "Camponotus habereri",
+      "displayName": "哈氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/29"
+    },
+    {
+      "id": 2592,
+      "name": "哈氏漫蚁",
+      "scientificName": "Nomamyrmex hartigii",
+      "displayName": "哈氏漫蚁",
+      "category": "漫蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2592"
+    },
+    {
+      "id": 271,
+      "name": "哈氏牛蚁",
+      "scientificName": "Myrmecia haskinsorum",
+      "displayName": "哈氏牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/271"
+    },
+    {
+      "id": 511,
+      "name": "哥伦比亚芭切叶蚁",
+      "scientificName": "Atta colombica",
+      "displayName": "哥伦比亚芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/511"
+    },
+    {
+      "id": 1196,
+      "name": "善义后蚁",
+      "scientificName": "Metapone shanyii",
+      "displayName": "善义后蚁",
+      "category": "后蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1196"
+    },
+    {
+      "id": 980,
+      "name": "喜马拉雅收获蚁",
+      "scientificName": "Messor himalayanus",
+      "displayName": "喜马拉雅收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/980"
+    },
+    {
+      "id": 346,
+      "name": "圆盘顶切叶蚁",
+      "scientificName": "Acromyrmex disciger",
+      "displayName": "圆盘顶切叶蚁",
+      "category": "顶切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/346"
+    },
+    {
+      "id": 1194,
+      "name": "地栖盘腹蚁",
+      "scientificName": "Aphaenogaster subterranea",
+      "displayName": "地栖盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1194"
+    },
+    {
+      "id": 454,
+      "name": "埃及收获蚁",
+      "scientificName": "Messor aegyptiacus",
+      "displayName": "埃及收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/454"
+    },
+    {
+      "id": 356,
+      "name": "埃塞俄比亚细长蚁",
+      "scientificName": "Tetraponera aethiops",
+      "displayName": "埃塞俄比亚细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/356"
+    },
+    {
+      "id": 357,
+      "name": "埃塞俄比亚锯猛蚁",
+      "scientificName": "Prionopelta aethiopica",
+      "displayName": "埃塞俄比亚锯猛蚁",
+      "category": "锯猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/357"
+    },
+    {
+      "id": 2334,
+      "name": "埃氏扁胸切叶蚁",
+      "scientificName": "Vollenhovia emeryi",
+      "displayName": "埃氏扁胸切叶蚁",
+      "category": "扁胸切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2334"
+    },
+    {
+      "id": 74,
+      "name": "基氏细猛蚁",
+      "scientificName": "Leptogenys kitteli",
+      "displayName": "基氏细猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/74"
+    },
+    {
+      "id": 2360,
+      "name": "塔氏臭蚁",
+      "scientificName": "Dolichoderus taschenbergi",
+      "displayName": "塔氏臭蚁",
+      "category": "臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2360"
+    },
+    {
+      "id": 2306,
+      "name": "增城盲切叶蚁",
+      "scientificName": "Carebara zengchengensis",
+      "displayName": "增城盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2306"
+    },
+    {
+      "id": 259,
+      "name": "墨西哥芭切叶蚁",
+      "scientificName": "Atta mexicana",
+      "displayName": "墨西哥芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/259"
+    },
+    {
+      "id": 7,
+      "name": "墨西哥蜜罐蚁",
+      "scientificName": "Myrmecocystus mexicanus",
+      "displayName": "墨西哥蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/7"
+    },
+    {
+      "id": 1024,
+      "name": "多变收获蚁",
+      "scientificName": "Messor variabilis",
+      "displayName": "多变收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1024"
+    },
+    {
+      "id": 321,
+      "name": "分化龟蚁",
+      "scientificName": "Cephalotes varians",
+      "displayName": "分化龟蚁",
+      "category": "龟蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/321"
+    },
+    {
+      "id": 204,
+      "name": "多型铺道蚁",
+      "scientificName": "Tetramorium polymorphum",
+      "displayName": "多型铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/204"
+    },
+    {
+      "id": 105,
+      "name": "多栉蚁",
+      "scientificName": "Formica polyctena",
+      "displayName": "多栉蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/105"
+    },
+    {
+      "id": 1313,
+      "name": "丝弓背蚁",
+      "scientificName": "Camponotus punctatissimus",
+      "displayName": "丝弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1313"
+    },
+    {
+      "id": 270,
+      "name": "多毛牛蚁",
+      "scientificName": "Myrmecia pilosula",
+      "displayName": "多毛牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/270"
+    },
+    {
+      "id": 621,
+      "name": "多毛翼切叶蚁",
+      "scientificName": "Apterostigma pilosum",
+      "displayName": "多毛翼切叶蚁",
+      "category": "翼切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/621"
+    },
+    {
+      "id": 69,
+      "name": "大吉盘腹蚁",
+      "scientificName": "Aphaenogaster geei",
+      "displayName": "大吉盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/69"
+    },
+    {
+      "id": 484,
+      "name": "大头弓背蚁",
+      "scientificName": "Camponotus largiceps",
+      "displayName": "大头弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/484"
+    },
+    {
+      "id": 50,
+      "name": "大头收获蚁",
+      "scientificName": "Messor capitatus",
+      "displayName": "大头收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/50"
+    },
+    {
+      "id": 580,
+      "name": "大眼无结猛蚁",
+      "scientificName": "Adetomyrma clarivida",
+      "displayName": "大眼无结猛蚁",
+      "category": "无结猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/580"
+    },
+    {
+      "id": 584,
+      "name": "大眼盘腹蚁",
+      "scientificName": "Aphaenogaster megommata",
+      "displayName": "大眼盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/584"
+    },
+    {
+      "id": 558,
+      "name": "大眼脊蚁",
+      "scientificName": "Syllophopsis magnocula",
+      "displayName": "大眼脊蚁",
+      "category": "脊蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/558"
+    },
+    {
+      "id": 205,
+      "name": "大阪举腹蚁",
+      "scientificName": "Crematogaster osakensis",
+      "displayName": "大阪举腹蚁",
+      "category": "举腹蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/205"
+    },
+    {
+      "id": 539,
+      "name": "夫氏双凸切叶蚁",
+      "scientificName": "Dilobocondyla fouqueti",
+      "displayName": "夫氏双凸切叶蚁",
+      "category": "双凸切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/539"
+    },
+    {
+      "id": 1074,
+      "name": "奇大头蚁",
+      "scientificName": "Pheidole aphrasta",
+      "displayName": "奇大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1074"
+    },
+    {
+      "id": 1048,
+      "name": "奇异弓背蚁",
+      "scientificName": "Camponotus mirabilis",
+      "displayName": "奇异弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1048"
+    },
+    {
+      "id": 1081,
+      "name": "奥特朗弓背蚁",
+      "scientificName": "Camponotus autrani",
+      "displayName": "奥特朗弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1081"
+    },
+    {
+      "id": 976,
+      "name": "好望角收获蚁",
+      "scientificName": "Messor capensis",
+      "displayName": "好望角收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/976"
+    },
+    {
+      "id": 395,
+      "name": "媽祖粗跗家蟻",
+      "scientificName": "Rhopalomastix mazu",
+      "displayName": "媽祖粗跗家蟻",
+      "category": "棒角蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/395"
+    },
+    {
+      "id": 237,
+      "name": "始兴多刺蚁",
+      "scientificName": "Polyrhachis shixingensis",
+      "displayName": "始兴多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/237"
+    },
+    {
+      "id": 611,
+      "name": "威尔曼弓背蚁",
+      "scientificName": "Camponotus wellmani",
+      "displayName": "威尔曼弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/611"
+    },
+    {
+      "id": 1494,
+      "name": "威尔曼弓背蚁伽马亚种",
+      "scientificName": "Camponotus wellmani gamma",
+      "displayName": "威尔曼弓背蚁伽马亚种",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1494"
+    },
+    {
+      "id": 2651,
+      "name": "威尔曼弓背蚁红体亚种",
+      "scientificName": "Camponotus wellmani rufipartis",
+      "displayName": "威尔曼弓背蚁红体亚种",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2651"
+    },
+    {
+      "id": 2312,
+      "name": "威氏行军蚁",
+      "scientificName": "Dorylus wilverthi",
+      "displayName": "威氏行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2312"
+    },
+    {
+      "id": 419,
+      "name": "娇美牛蚁",
+      "scientificName": "Myrmecia gratiosa",
+      "displayName": "娇美牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/419"
+    },
+    {
+      "id": 455,
+      "name": "婀娜收获蚁",
+      "scientificName": "Messor aralocaspius",
+      "displayName": "婀娜收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/455"
+    },
+    {
+      "id": 1195,
+      "name": "孔子弓背蚁",
+      "scientificName": "Camponotus confucii",
+      "displayName": "孔子弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1195"
+    },
+    {
+      "id": 562,
+      "name": "孔子细颚猛蚁",
+      "scientificName": "Leptogenys confucii",
+      "displayName": "孔子细颚猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/562"
+    },
+    {
+      "id": 1796,
+      "name": "孤角窝蚁",
+      "scientificName": "Basiceros singularis",
+      "displayName": "孤角窝蚁",
+      "category": "角蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1796"
+    },
+    {
+      "id": 1365,
+      "name": "守卫捷蚁",
+      "scientificName": "Anoplolepis custodiens",
+      "displayName": "守卫捷蚁",
+      "category": "捷蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1365"
+    },
+    {
+      "id": 198,
+      "name": "安南扁头猛蚁",
+      "scientificName": "Ectomomyrmex annamitus",
+      "displayName": "安南扁头猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/198"
+    },
+    {
+      "id": 1119,
+      "name": "安宁弓背蚁",
+      "scientificName": "Camponotus anningensis",
+      "displayName": "安宁弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1119"
+    },
+    {
+      "id": 1562,
+      "name": "安氏真收获蚁",
+      "scientificName": "Veromessor andrei",
+      "displayName": "安氏真收获蚁",
+      "category": "真收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1562"
+    },
+    {
+      "id": 500,
+      "name": "安沙须蚁",
+      "scientificName": "Pogonomyrmex anzensis",
+      "displayName": "安沙须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/500"
+    },
+    {
+      "id": 1364,
+      "name": "家盘腹蚁",
+      "scientificName": "Aphaenogaster famelica",
+      "displayName": "家盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1364"
+    },
+    {
+      "id": 147,
+      "name": "宽结大头蚁",
+      "scientificName": "Pheidole nodus",
+      "displayName": "宽结大头蚁",
+      "category": "大头蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/147"
+    },
+    {
+      "id": 333,
+      "name": "宽节箭蚁",
+      "scientificName": "Cataglyphis nodus",
+      "displayName": "宽节箭蚁",
+      "category": "箭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/333"
+    },
+    {
+      "id": 317,
+      "name": "宾州弓背蚁",
+      "scientificName": "Camponotus pennsylvanicus",
+      "displayName": "宾州弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/317"
+    },
+    {
+      "id": 1122,
+      "name": "宾氏弓背蚁",
+      "scientificName": "Camponotus binghamii",
+      "displayName": "宾氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1122"
+    },
+    {
+      "id": 1,
+      "name": "宾氏曲颊猛蚁",
+      "scientificName": "Gnamptogenys binghamii",
+      "displayName": "宾氏曲颊猛蚁",
+      "category": "曲颊猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1"
+    },
+    {
+      "id": 583,
+      "name": "宾氏细颚猛蚁",
+      "scientificName": "Leptogenys binghamii",
+      "displayName": "宾氏细颚猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/583"
+    },
+    {
+      "id": 499,
+      "name": "寄生须蚁",
+      "scientificName": "Pogonomyrmex anergismus",
+      "displayName": "寄生须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/499"
+    },
+    {
+      "id": 230,
+      "name": "富川双节行军蚁",
+      "scientificName": "Aenictus fuchuanensis",
+      "displayName": "富川双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/230"
+    },
+    {
+      "id": 2299,
+      "name": "对跖大头蚁",
+      "scientificName": "Pheidole antipodum",
+      "displayName": "对跖大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2299"
+    },
+    {
+      "id": 494,
+      "name": "小刺盘腹蚁",
+      "scientificName": "Aphaenogaster pumilopuncta",
+      "displayName": "小刺盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/494"
+    },
+    {
+      "id": 2303,
+      "name": "小双节行军蚁",
+      "scientificName": "Aenictus minutulus",
+      "displayName": "小双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2303"
+    },
+    {
+      "id": 2099,
+      "name": "小体平头蚁",
+      "scientificName": "Colobopsis minus",
+      "displayName": "小体平头蚁",
+      "category": "平头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2099"
+    },
+    {
+      "id": 469,
+      "name": "小收获蚁",
+      "scientificName": "Messor minor",
+      "displayName": "小收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/469"
+    },
+    {
+      "id": 332,
+      "name": "小眼钩猛蚁",
+      "scientificName": "Anochetus subcoecus",
+      "displayName": "小眼钩猛蚁",
+      "category": "钩猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/332"
+    },
+    {
+      "id": 517,
+      "name": "小麻臭蚁",
+      "scientificName": "Linepithema humile",
+      "displayName": "小麻臭蚁",
+      "category": "麻臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/517"
+    },
+    {
+      "id": 2426,
+      "name": "小龟蚁",
+      "scientificName": "Cephalotes pusillus",
+      "displayName": "小龟蚁",
+      "category": "龟蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2426"
+    },
+    {
+      "id": 1278,
+      "name": "少毛弓背蚁",
+      "scientificName": "Camponoyus spanis",
+      "displayName": "少毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1278"
+    },
+    {
+      "id": 394,
+      "name": "尖细长蚁",
+      "scientificName": "Tetraponera apiculata",
+      "displayName": "尖细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/394"
+    },
+    {
+      "id": 463,
+      "name": "尤氏盲蚁",
+      "scientificName": "Aenictus eugenii",
+      "displayName": "尤氏盲蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/463"
+    },
+    {
+      "id": 301,
+      "name": "尤马蜜罐蚁",
+      "scientificName": "Myrmecocystus yuma",
+      "displayName": "尤马蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/301"
+    },
+    {
+      "id": 114,
+      "name": "尤里卡火星蚁",
+      "scientificName": "Martialis heureka",
+      "displayName": "尤里卡火星蚁",
+      "category": "火星蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/114"
+    },
+    {
+      "id": 9,
+      "name": "尼科巴弓背蚁",
+      "scientificName": "Camponotus nicobarensis",
+      "displayName": "尼科巴弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/9"
+    },
+    {
+      "id": 2654,
+      "name": "尼科巴弓背蚁山栖亚种",
+      "scientificName": "Camponotus nicobarensis monticola",
+      "displayName": "尼科巴弓背蚁山栖亚种",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2654"
+    },
+    {
+      "id": 136,
+      "name": "山大齿猛蚁",
+      "scientificName": "Odontomachus monticola",
+      "displayName": "山大齿猛蚁",
+      "category": "猛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/136"
+    },
+    {
+      "id": 2596,
+      "name": "山栖行军蚁",
+      "scientificName": "Dorylus montanus",
+      "displayName": "山栖行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2596"
+    },
+    {
+      "id": 2589,
+      "name": "岛屿芭切叶蚁",
+      "scientificName": "Atta insularis",
+      "displayName": "岛屿芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2589"
+    },
+    {
+      "id": 47,
+      "name": "工匠收获蚁",
+      "scientificName": "Messor structor",
+      "displayName": "工匠收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/47"
+    },
+    {
+      "id": 185,
+      "name": "巨人恐猛蚁",
+      "scientificName": "Dinoponera gigantea",
+      "displayName": "巨人恐猛蚁",
+      "category": "恐猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/185"
+    },
+    {
+      "id": 193,
+      "name": "巨人恐蚁",
+      "scientificName": "Dinomyrmex gigas",
+      "displayName": "巨人恐蚁",
+      "category": "恐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/193"
+    },
+    {
+      "id": 195,
+      "name": "巨人恐蚁（婆罗洲亚种）",
+      "scientificName": "Dinomyrmex gigas borneensis",
+      "displayName": "巨人恐蚁（婆罗洲亚种）",
+      "category": "恐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/195"
+    },
+    {
+      "id": 1079,
+      "name": "巨头弓背蚁",
+      "scientificName": "Camponotus capito",
+      "displayName": "巨头弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1079"
+    },
+    {
+      "id": 362,
+      "name": "巨工火蚁",
+      "scientificName": "Solenopsis megergates",
+      "displayName": "巨工火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/362"
+    },
+    {
+      "id": 520,
+      "name": "巨犰蚁",
+      "scientificName": "Tatuidris tatusia",
+      "displayName": "巨犰蚁",
+      "category": "犰蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/520"
+    },
+    {
+      "id": 315,
+      "name": "黄臀巨猛蚁",
+      "scientificName": "Megaponera analis",
+      "displayName": "黄臀巨猛蚁",
+      "category": "巨猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/315"
+    },
+    {
+      "id": 464,
+      "name": "巨眼细长蚁",
+      "scientificName": "Tetraponera ophthalmica",
+      "displayName": "巨眼细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/464"
+    },
+    {
+      "id": 519,
+      "name": "巨首大齿猛蚁",
+      "scientificName": "Odontomachus cephalotes",
+      "displayName": "巨首大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/519"
+    },
+    {
+      "id": 51,
+      "name": "巨首收获蚁",
+      "scientificName": "Messor cephalotes",
+      "displayName": "巨首收获蚁（肯尼亚收获蚁）",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/51"
+    },
+    {
+      "id": 273,
+      "name": "巨首牛蚁",
+      "scientificName": "Myrmecia cephalotes",
+      "displayName": "巨首牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/273"
+    },
+    {
+      "id": 166,
+      "name": "巨首芭切叶蚁",
+      "scientificName": "Atta cephalotes",
+      "displayName": "巨首芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/166"
+    },
+    {
+      "id": 12,
+      "name": "巴瑞弓背蚁",
+      "scientificName": "Camponotus parius",
+      "displayName": "巴瑞弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/12"
+    },
+    {
+      "id": 459,
+      "name": "布氏尖尾蚁",
+      "scientificName": "Acropyga butteli",
+      "displayName": "布氏尖尾蚁",
+      "category": "尖尾蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/459"
+    },
+    {
+      "id": 174,
+      "name": "布氏游蚁",
+      "scientificName": "Eciton burchellii",
+      "displayName": "布氏游蚁",
+      "category": "游蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/174"
+    },
+    {
+      "id": 2574,
+      "name": "布氏盲切叶蚁",
+      "scientificName": "Carebara bruni",
+      "displayName": "布氏盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2574"
+    },
+    {
+      "id": 378,
+      "name": "布氏祖切叶蚁",
+      "scientificName": "Amoimyrmex bruchi",
+      "displayName": "布氏祖切叶蚁",
+      "category": "祖切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/378"
+    },
+    {
+      "id": 1082,
+      "name": "布鲁图斯弓背蚁",
+      "scientificName": "Camponotus brutus",
+      "displayName": "布鲁图斯弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1082"
+    },
+    {
+      "id": 264,
+      "name": "希伯来收获蚁",
+      "scientificName": "Messor hebraeus",
+      "displayName": "希伯来收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/264"
+    },
+    {
+      "id": 2373,
+      "name": "希颀蚁",
+      "scientificName": "Zatania cisipa",
+      "displayName": "希颀蚁",
+      "category": "颀蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2373"
+    },
+    {
+      "id": 486,
+      "name": "席氏举腹蚁",
+      "scientificName": "Crematogaster schimmeri",
+      "displayName": "席氏举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/486"
+    },
+    {
+      "id": 27,
+      "name": "平和弓背蚁",
+      "scientificName": "Camponotus mitis",
+      "displayName": "平和弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/27"
+    },
+    {
+      "id": 488,
+      "name": "柱头举腹蚁",
+      "scientificName": "Crematogaster cylindriceps",
+      "displayName": "柱头举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/488"
+    },
+    {
+      "id": 2092,
+      "name": "平截弓背蚁",
+      "scientificName": "Camponotus nipponicus",
+      "displayName": "平截弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2092"
+    },
+    {
+      "id": 563,
+      "name": "平滑多刺蚁",
+      "scientificName": "Polyrhachis laevigata",
+      "displayName": "平滑多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/563"
+    },
+    {
+      "id": 39,
+      "name": "平眼蜜罐蚁",
+      "scientificName": "Myrmecocystus placodops",
+      "displayName": "平眼蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/39"
+    },
+    {
+      "id": 2305,
+      "name": "平背高黎贡蚁",
+      "scientificName": "Gaoligongidris planodorsa",
+      "displayName": "平背高黎贡蚁",
+      "category": "高黎贡山蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2305"
+    },
+    {
+      "id": 161,
+      "name": "广大头蚁",
+      "scientificName": "Pheidole megacephala",
+      "displayName": "广大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/161"
+    },
+    {
+      "id": 30,
+      "name": "广布弓背蚁",
+      "scientificName": "Camponotus herculeanus",
+      "displayName": "广布弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/30"
+    },
+    {
+      "id": 127,
+      "name": "广布弓背蚁萨哈林亚种",
+      "scientificName": "Camponotus herculeanus sachalinensis",
+      "displayName": "广布弓背蚁萨哈林亚种",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/127"
+    },
+    {
+      "id": 555,
+      "name": "广西猛蚁",
+      "scientificName": "Ponera guangxiensis",
+      "displayName": "广西猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/555"
+    },
+    {
+      "id": 2548,
+      "name": "广西铺道蚁",
+      "scientificName": "Tetramorium guangxiensis",
+      "displayName": "广西铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2548"
+    },
+    {
+      "id": 616,
+      "name": "庞培弓背蚁",
+      "scientificName": "Camponotus pompeius",
+      "displayName": "庞培弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/616"
+    },
+    {
+      "id": 341,
+      "name": "康斯坦大头蚁",
+      "scientificName": "Pheidole constanciae",
+      "displayName": "康斯坦大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/341"
+    },
+    {
+      "id": 487,
+      "name": "异化举腹蚁",
+      "scientificName": "Crematogaster aberrans",
+      "displayName": "异化举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/487"
+    },
+    {
+      "id": 566,
+      "name": "异大头蚁",
+      "scientificName": "Pheidole dispar",
+      "displayName": "异大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/566"
+    },
+    {
+      "id": 354,
+      "name": "异细长蚁",
+      "scientificName": "Tetraponera dispar",
+      "displayName": "异细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/354"
+    },
+    {
+      "id": 1111,
+      "name": "异色弓背蚁",
+      "scientificName": "Camponotus versicolor",
+      "displayName": "异色弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1111"
+    },
+    {
+      "id": 329,
+      "name": "异色罗纹须蚁",
+      "scientificName": "Pogonomyrmex rugosus bicolor",
+      "displayName": "异色罗纹须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/329"
+    },
+    {
+      "id": 590,
+      "name": "弗氏铺道蚁",
+      "scientificName": "Tetramorium flinex",
+      "displayName": "弗氏铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/590"
+    },
+    {
+      "id": 322,
+      "name": "弗里德弓背蚁",
+      "scientificName": "Camponotus friedae",
+      "displayName": "弗里德弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/322"
+    },
+    {
+      "id": 516,
+      "name": "弗雷氏蜂蚁",
+      "scientificName": "Sphecomyrma freyi",
+      "displayName": "弗雷氏蜂蚁",
+      "category": "微猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/516"
+    },
+    {
+      "id": 109,
+      "name": "弯角红蚁",
+      "scientificName": "Myrmica lobicornis",
+      "displayName": "弯角红蚁",
+      "category": "红蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/109"
+    },
+    {
+      "id": 472,
+      "name": "强壮收获蚁",
+      "scientificName": "Messor valentinae",
+      "displayName": "强壮收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/472"
+    },
+    {
+      "id": 614,
+      "name": "微亮弓背蚁",
+      "scientificName": "Camponotus subnitidus",
+      "displayName": "微亮弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/614"
+    },
+    {
+      "id": 2652,
+      "name": "微亮弓背蚁（指名亚种）",
+      "scientificName": "Camponotus subnitidus subnitidus",
+      "displayName": "微亮弓背蚁（指名亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2652"
+    },
+    {
+      "id": 533,
+      "name": "蓝双刺猛蚁",
+      "scientificName": "Diacamma caeruleum",
+      "displayName": "蓝双刺猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/533"
+    },
+    {
+      "id": 793,
+      "name": "微须弓背蚁",
+      "scientificName": "Camponotus subbarbatus",
+      "displayName": "微须弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/793"
+    },
+    {
+      "id": 2429,
+      "name": "微黄行军蚁",
+      "scientificName": "Dorylus helvolus",
+      "displayName": "微黄行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2429"
+    },
+    {
+      "id": 57,
+      "name": "得州芭切叶蚁",
+      "scientificName": "Atta texana",
+      "displayName": "得州芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/57"
+    },
+    {
+      "id": 1110,
+      "name": "怀特弓背蚁",
+      "scientificName": "Camponotus whitei",
+      "displayName": "怀特弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1110"
+    },
+    {
+      "id": 367,
+      "name": "急逃火蚁",
+      "scientificName": "Solenopsis fugax",
+      "displayName": "急逃火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/367"
+    },
+    {
+      "id": 1429,
+      "name": "悲痛弓背蚁",
+      "scientificName": "Camponotus luctuosus",
+      "displayName": "悲痛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1429"
+    },
+    {
+      "id": 605,
+      "name": "戈亚斯芭切叶蚁",
+      "scientificName": "Atta goiana",
+      "displayName": "戈亚斯芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/605"
+    },
+    {
+      "id": 988,
+      "name": "截收获蚁",
+      "scientificName": "Messor muticus",
+      "displayName": "截收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/988"
+    },
+    {
+      "id": 369,
+      "name": "截火蚁",
+      "scientificName": "Solenopsis interrupta",
+      "displayName": "截火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/369"
+    },
+    {
+      "id": 15,
+      "name": "截胸弓背蚁",
+      "scientificName": "Camponotus mutilarius",
+      "displayName": "截胸弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/15"
+    },
+    {
+      "id": 1759,
+      "name": "扁头弓背蚁",
+      "scientificName": "Camponotus depressiceps",
+      "displayName": "扁头弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1759"
+    },
+    {
+      "id": 72,
+      "name": "扁平虹臭蚁",
+      "scientificName": "Iridomyrmex anceps",
+      "displayName": "扁平虹臭蚁",
+      "category": "虹臭蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/72"
+    },
+    {
+      "id": 13,
+      "name": "拟光腹弓背蚁",
+      "scientificName": "Camponotus pseudoirritans",
+      "displayName": "拟光腹弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/13"
+    },
+    {
+      "id": 17,
+      "name": "拟哀弓背蚁",
+      "scientificName": "Camponotus pseudolendus",
+      "displayName": "拟哀弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/17"
+    },
+    {
+      "id": 2488,
+      "name": "拟大隐猛蚁",
+      "scientificName": "Cryptopone pseudogigas",
+      "displayName": "拟大隐猛蚁",
+      "category": "隐猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2488"
+    },
+    {
+      "id": 89,
+      "name": "拟广布弓背蚁",
+      "scientificName": "Camponotus consobrinus",
+      "displayName": "拟广布弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/89"
+    },
+    {
+      "id": 546,
+      "name": "拟态蜜罐蚁",
+      "scientificName": "Myrmecocystus mimicus",
+      "displayName": "拟态蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/546"
+    },
+    {
+      "id": 222,
+      "name": "拟黑中猛蚁",
+      "scientificName": "Mesoponera melanaria",
+      "displayName": "拟黑中猛蚁",
+      "category": "中猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/222"
+    },
+    {
+      "id": 509,
+      "name": "拟齿突双节行军蚁",
+      "scientificName": "Aenictus paradentatus",
+      "displayName": "拟齿突双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/509"
+    },
+    {
+      "id": 43,
+      "name": "掘穴蚁",
+      "scientificName": "Formica cunicularia",
+      "displayName": "掘穴蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/43"
+    },
+    {
+      "id": 491,
+      "name": "穴须蚁",
+      "scientificName": "Pogonomyrmex cunicularius",
+      "displayName": "穴须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/491"
+    },
+    {
+      "id": 984,
+      "name": "摩洛哥收获蚁",
+      "scientificName": "Messor marocanus",
+      "displayName": "摩洛哥收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/984"
+    },
+    {
+      "id": 189,
+      "name": "撒旦弓背蚁",
+      "scientificName": "Camponotus satan",
+      "displayName": "撒旦弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/189"
+    },
+    {
+      "id": 1109,
+      "name": "撒氏弓背蚁",
+      "scientificName": "Camponotus thadeus",
+      "displayName": "撒氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1109"
+    },
+    {
+      "id": 368,
+      "name": "敌火蚁",
+      "scientificName": "Solenopsis hostilis",
+      "displayName": "敌火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/368"
+    },
+    {
+      "id": 75,
+      "name": "敏捷扁头猛蚁",
+      "scientificName": "Ectomomyrmex astutus",
+      "displayName": "敏捷扁头猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/75"
+    },
+    {
+      "id": 294,
+      "name": "斗士悍蚁",
+      "scientificName": "Polyergus samura",
+      "displayName": "斗士悍蚁",
+      "category": "悍蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/294"
+    },
+    {
+      "id": 613,
+      "name": "新几内亚弓背蚁",
+      "scientificName": "Camponotus dorycus",
+      "displayName": "新几内亚弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/613"
+    },
+    {
+      "id": 2335,
+      "name": "新几内亚弓背蚁（矩头亚种）",
+      "scientificName": "Camponotus dorycus recticeps",
+      "displayName": "新几内亚弓背蚁（矩头亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2335"
+    },
+    {
+      "id": 226,
+      "name": "方头恐猛蚁",
+      "scientificName": "Dinoponera quadriceps",
+      "displayName": "方头恐猛蚁",
+      "category": "恐猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/226"
+    },
+    {
+      "id": 2068,
+      "name": "方结俄蚁",
+      "scientificName": "Rossomyrmex quandratinodum",
+      "displayName": "方结俄蚁",
+      "category": "俄蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2068"
+    },
+    {
+      "id": 2436,
+      "name": "方结凹猛蚁",
+      "scientificName": "Stictoponera quadrutinodules",
+      "displayName": "方结凹猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2436"
+    },
+    {
+      "id": 587,
+      "name": "无刺收获蚁",
+      "scientificName": "Messor inermis",
+      "displayName": "无刺收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/587"
+    },
+    {
+      "id": 231,
+      "name": "无畏弓背蚁",
+      "scientificName": "Camponotus intrepidus",
+      "displayName": "无畏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/231"
+    },
+    {
+      "id": 2653,
+      "name": "无畏弓背蚁（指名亚种）",
+      "scientificName": "Camponotus intrepidus intrepidus",
+      "displayName": "无畏弓背蚁（指名亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2653"
+    },
+    {
+      "id": 496,
+      "name": "无畏弓背蚁（好斗亚种）",
+      "scientificName": "Camponotus intrepidus bellicosus",
+      "displayName": "无畏弓背蚁（好斗亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/496"
+    },
+    {
+      "id": 2434,
+      "name": "无缘细长蚁",
+      "scientificName": "Tetraponera amargina",
+      "displayName": "无缘细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2434"
+    },
+    {
+      "id": 535,
+      "name": "日本姬猛蚁",
+      "scientificName": "Hypoponera nippona",
+      "displayName": "日本姬猛蚁",
+      "category": "姬猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/535"
+    },
+    {
+      "id": 167,
+      "name": "日本尖尾蚁",
+      "scientificName": "Acropyga nipponensis",
+      "displayName": "日本尖尾蚁",
+      "category": "尖尾蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/167"
+    },
+    {
+      "id": 14,
+      "name": "日本弓背蚁",
+      "scientificName": "Camponotus japonicus",
+      "displayName": "日本弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/14"
+    },
+    {
+      "id": 70,
+      "name": "日本盘腹蚁",
+      "scientificName": "Aphaenogaster japonica",
+      "displayName": "日本盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/70"
+    },
+    {
+      "id": 200,
+      "name": "日本铺道蚁",
+      "scientificName": "Tetramorium nipponense",
+      "displayName": "日本铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/200"
+    },
+    {
+      "id": 124,
+      "name": "日本黑褐蚁",
+      "scientificName": "Formica japonica",
+      "displayName": "日本黑褐蚁",
+      "category": "林蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/124"
+    },
+    {
+      "id": 1115,
+      "name": "显唇迷猛蚁",
+      "scientificName": "Mystrium eques",
+      "displayName": "显唇迷猛蚁",
+      "category": "迷猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1115"
+    },
+    {
+      "id": 430,
+      "name": "显贵牛蚁",
+      "scientificName": "Myrmecia nobilis",
+      "displayName": "显贵牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/430"
+    },
+    {
+      "id": 452,
+      "name": "显赫细长蚁",
+      "scientificName": "Tetraponera notabilis",
+      "displayName": "显赫细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/452"
+    },
+    {
+      "id": 2612,
+      "name": "暗胸内瓦蚁",
+      "scientificName": "Neivamyrmex opacithorax",
+      "displayName": "暗胸内瓦蚁",
+      "category": "内瓦蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2612"
+    },
+    {
+      "id": 16,
+      "name": "暗足弓背蚁",
+      "scientificName": "Camponotus obscuripes",
+      "displayName": "暗足弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/16"
+    },
+    {
+      "id": 599,
+      "name": "暗首芭切叶蚁",
+      "scientificName": "Atta opaciceps",
+      "displayName": "暗首芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/599"
+    },
+    {
+      "id": 2315,
+      "name": "木兰点猛蚁",
+      "scientificName": "Stigmatomma mulanae",
+      "displayName": "木兰点猛蚁",
+      "category": "点猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2315"
+    },
+    {
+      "id": 160,
+      "name": "木盲切叶蚁",
+      "scientificName": "Carebara lignata",
+      "displayName": "木盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/160"
+    },
+    {
+      "id": 577,
+      "name": "木野村切胸蚁",
+      "scientificName": "Temnothorax kinomurai",
+      "displayName": "木野村切胸蚁",
+      "category": "切胸蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/577"
+    },
+    {
+      "id": 140,
+      "name": "杂色弓背蚁",
+      "scientificName": "Camponotus variegatus",
+      "displayName": "杂色弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/140"
+    },
+    {
+      "id": 243,
+      "name": "变色顶切叶蚁",
+      "scientificName": "Acromyrmex versicolor",
+      "displayName": "变色顶切叶蚁",
+      "category": "顶切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/243"
+    },
+    {
+      "id": 162,
+      "name": "杜氏大头蚁",
+      "scientificName": "Pheidole dugasi",
+      "displayName": "杜氏大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/162"
+    },
+    {
+      "id": 575,
+      "name": "条纹收获蚁",
+      "scientificName": "Messor striatellus",
+      "displayName": "条纹收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/575"
+    },
+    {
+      "id": 510,
+      "name": "条纹祖切叶蚁",
+      "scientificName": "Amoimyrmex striatus",
+      "displayName": "条纹祖切叶蚁",
+      "category": "祖切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/510"
+    },
+    {
+      "id": 2006,
+      "name": "条纹细猛蚁",
+      "scientificName": "Leptogenys diminuta",
+      "displayName": "条纹细猛蚁",
+      "category": "猛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/2006"
+    },
+    {
+      "id": 541,
+      "name": "林氏原細蟻",
+      "scientificName": "Protanilla lini",
+      "displayName": "林氏原細蟻",
+      "category": "原细蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/541"
+    },
+    {
+      "id": 2372,
+      "name": "栗红平头蚁",
+      "scientificName": "Colobopsis badia",
+      "displayName": "栗红平头蚁",
+      "category": "平头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2372"
+    },
+    {
+      "id": 60,
+      "name": "栗红须蚁",
+      "scientificName": "Pogonomyrmex badius",
+      "displayName": "栗红须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/60"
+    },
+    {
+      "id": 309,
+      "name": "栗色弓背蚁",
+      "scientificName": "Camponotus castaneus",
+      "displayName": "栗色弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/309"
+    },
+    {
+      "id": 2432,
+      "name": "栗色盲切叶蚁",
+      "scientificName": "Carebara castanea",
+      "displayName": "栗色盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2432"
+    },
+    {
+      "id": 786,
+      "name": "格劳卡蚁",
+      "scientificName": "Formica glauca",
+      "displayName": "格劳卡蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/786"
+    },
+    {
+      "id": 307,
+      "name": "格拉夫钩猛蚁",
+      "scientificName": "Anochetus graeffei",
+      "displayName": "格拉夫钩猛蚁",
+      "category": "钩猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/307"
+    },
+    {
+      "id": 717,
+      "name": "格氏润蚁",
+      "scientificName": "Liomyrmex gestroi",
+      "displayName": "格氏润蚁",
+      "category": "润蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/717"
+    },
+    {
+      "id": 534,
+      "name": "野蛮收获蚁桑氏亚种",
+      "scientificName": "Messor barbarus santschii",
+      "displayName": "野蛮收获蚁桑氏亚种",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/534"
+    },
+    {
+      "id": 40,
+      "name": "梅氏多刺蚁",
+      "scientificName": "Polyrhachis illaudata",
+      "displayName": "梅氏多刺蚁",
+      "category": "多刺蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/40"
+    },
+    {
+      "id": 2613,
+      "name": "梅氏行军蚁",
+      "scientificName": "Dorylus mayri",
+      "displayName": "梅氏行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2613"
+    },
+    {
+      "id": 171,
+      "name": "梅花山大头蚁",
+      "scientificName": "Pheidole meihuashanensis",
+      "displayName": "梅花山大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/171"
+    },
+    {
+      "id": 371,
+      "name": "棉火蚁",
+      "scientificName": "Solenopsis xyloni",
+      "displayName": "棉火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/371"
+    },
+    {
+      "id": 175,
+      "name": "棒结近猛蚁",
+      "scientificName": "Paraponera clavata",
+      "displayName": "子弹蚁",
+      "category": "子弹蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/175"
+    },
+    {
+      "id": 65,
+      "name": "棕头举腹蚁",
+      "scientificName": "Crematogaster scutellaris",
+      "displayName": "棕头举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/65"
+    },
+    {
+      "id": 512,
+      "name": "棱原蚁",
+      "scientificName": "Proformica coriacea*",
+      "displayName": "棱原蚁",
+      "category": "原蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/512"
+    },
+    {
+      "id": 2433,
+      "name": "棱纹克雷蚁",
+      "scientificName": "Chrysapace costatus",
+      "displayName": "棱纹克雷蚁",
+      "category": "克雷蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2433"
+    },
+    {
+      "id": 2382,
+      "name": "榕细长蚁",
+      "scientificName": "Tetraponera microcarpa",
+      "displayName": "榕细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2382"
+    },
+    {
+      "id": 353,
+      "name": "槽结粗角蚁",
+      "scientificName": "Cerapachys sulcinodis",
+      "displayName": "槽结粗角蚁",
+      "category": "粗角蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/353"
+    },
+    {
+      "id": 73,
+      "name": "横纹齿猛蚁",
+      "scientificName": "Odontoponera transversa",
+      "displayName": "横纹齿猛蚁",
+      "category": "猛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/73"
+    },
+    {
+      "id": 213,
+      "name": "樱花拟立毛蚁",
+      "scientificName": "Paraparatrechina sakurae",
+      "displayName": "樱花拟立毛蚁",
+      "category": "拟立毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/213"
+    },
+    {
+      "id": 314,
+      "name": "橘红悍蚁",
+      "scientificName": "Polyergus rufescens",
+      "displayName": "橘红悍蚁",
+      "category": "悍蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/314"
+    },
+    {
+      "id": 20,
+      "name": "欺诈弓背蚁",
+      "scientificName": "Camponotus decipiens",
+      "displayName": "欺诈弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/20"
+    },
+    {
+      "id": 451,
+      "name": "武当山双节行军蚁",
+      "scientificName": "Aenictus wudangshanensis",
+      "displayName": "武当山双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/451"
+    },
+    {
+      "id": 263,
+      "name": "武装毒针蚁",
+      "scientificName": "Daceton armigerum",
+      "displayName": "武装毒针蚁",
+      "category": "毒针蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/263"
+    },
+    {
+      "id": 21,
+      "name": "毁木弓背蚁",
+      "scientificName": "Camponotus ligniperda",
+      "displayName": "毁木弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/21"
+    },
+    {
+      "id": 66,
+      "name": "比罗举腹蚁",
+      "scientificName": "Crematogaster biroi",
+      "displayName": "比罗举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/66"
+    },
+    {
+      "id": 206,
+      "name": "毕氏卵角蚁",
+      "scientificName": "Ooceraea biroi",
+      "displayName": "毕氏卵角蚁",
+      "category": "卵角蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/206"
+    },
+    {
+      "id": 84,
+      "name": "毕氏弓背蚁",
+      "scientificName": "Camponotus bishamon",
+      "displayName": "毕氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/84"
+    },
+    {
+      "id": 761,
+      "name": "毛林蚁",
+      "scientificName": "Formica lugubris",
+      "displayName": "毛林蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/761"
+    },
+    {
+      "id": 232,
+      "name": "毛柄草地蚁",
+      "scientificName": "Formica villiscapa",
+      "displayName": "毛柄草地蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/232"
+    },
+    {
+      "id": 2547,
+      "name": "毛柄钝猛蚁",
+      "scientificName": "Amblyopone pilosipetiola",
+      "displayName": "毛柄钝猛蚁",
+      "category": "钝猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2547"
+    },
+    {
+      "id": 949,
+      "name": "毛盾胸切叶蚁",
+      "scientificName": "Meranoplus hirsutus",
+      "displayName": "毛盾胸切叶蚁",
+      "category": "盾胸切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/949"
+    },
+    {
+      "id": 2400,
+      "name": "毛眼林蚁",
+      "scientificName": "Formica exsecta",
+      "displayName": "毛眼林蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2400"
+    },
+    {
+      "id": 2664,
+      "name": "毛腹弓背蚁",
+      "scientificName": "Camponotus piliventris",
+      "displayName": "毛腹弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2664"
+    },
+    {
+      "id": 26,
+      "name": "毛钳弓背蚁",
+      "scientificName": "Camponotus lasiselene",
+      "displayName": "毛钳弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/26"
+    },
+    {
+      "id": 453,
+      "name": "江华弓背蚁",
+      "scientificName": "Camponotus jianghuaensis",
+      "displayName": "江华弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/453"
+    },
+    {
+      "id": 597,
+      "name": "污黄拟毛蚁",
+      "scientificName": "污黄拟毛蚁的拉丁学名是 Pseudolasius cibdelus\n\n（注：在部分资料中，其学名也被拼写为 Pseudolasius cibdetus。）",
+      "displayName": "污黄拟毛蚁",
+      "category": "拟毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/597"
+    },
+    {
+      "id": 2590,
+      "name": "沃伦魏德芭切叶蚁(直译)",
+      "scientificName": "Atta vollenweideri",
+      "displayName": "沃伦魏德芭切叶蚁(直译)",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2590"
+    },
+    {
+      "id": 252,
+      "name": "沃斯曼弓背蚁",
+      "scientificName": "Camponotus wasmanni",
+      "displayName": "沃斯曼弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/252"
+    },
+    {
+      "id": 337,
+      "name": "沃森大头蚁",
+      "scientificName": "Pheidole watsoni",
+      "displayName": "沃森大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/337"
+    },
+    {
+      "id": 576,
+      "name": "沃氏收获蚁",
+      "scientificName": "Messor wasmanni",
+      "displayName": "沃氏收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/576"
+    },
+    {
+      "id": 2538,
+      "name": "沃达细蚁（伏地魔细蚁）",
+      "scientificName": "Leptanilla voldemort",
+      "displayName": "沃达细蚁（伏地魔细蚁）",
+      "category": "细蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2538"
+    },
+    {
+      "id": 2356,
+      "name": "沙克德双节行军蚁",
+      "scientificName": "Aenictus shuckardi",
+      "displayName": "沙克德双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2356"
+    },
+    {
+      "id": 1558,
+      "name": "沙地弓背蚁",
+      "scientificName": "Camponotus arenatus",
+      "displayName": "沙地弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1558"
+    },
+    {
+      "id": 52,
+      "name": "沙地收获蚁",
+      "scientificName": "Messor arenarius",
+      "displayName": "沙地收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/52"
+    },
+    {
+      "id": 2570,
+      "name": "沟齿弓背蚁",
+      "scientificName": "Camponotus atrox",
+      "displayName": "沟齿弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2570"
+    },
+    {
+      "id": 946,
+      "name": "没食子收获蚁",
+      "scientificName": "Messor galla",
+      "displayName": "没食子收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/946"
+    },
+    {
+      "id": 134,
+      "name": "河南双节行军蚁",
+      "scientificName": "Aenictus henanensis",
+      "displayName": "河南双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/134"
+    },
+    {
+      "id": 223,
+      "name": "法老小家蚁",
+      "scientificName": "Monomorium pharaonis",
+      "displayName": "法老小家蚁",
+      "category": "小家蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/223"
+    },
+    {
+      "id": 523,
+      "name": "泰国盲蚁",
+      "scientificName": "Aenictus thailandianus",
+      "displayName": "泰国盲蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/523"
+    },
+    {
+      "id": 1410,
+      "name": "泰坦行军蚁",
+      "scientificName": "Dorylus titan",
+      "displayName": "泰坦行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1410"
+    },
+    {
+      "id": 2572,
+      "name": "泰坦行军蚁维氏亚种",
+      "scientificName": "Dorylus titan vinalli",
+      "displayName": "泰坦行军蚁维氏亚种",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2572"
+    },
+    {
+      "id": 2665,
+      "name": "洛厄里弓背蚁",
+      "scientificName": "Camponotus loweryi",
+      "displayName": "洛厄里弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2665"
+    },
+    {
+      "id": 2507,
+      "name": "洞居盲细钩猛蚁",
+      "scientificName": "Anochetus troglodytes",
+      "displayName": "洞居盲细钩猛蚁",
+      "category": "钩猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2507"
+    },
+    {
+      "id": 117,
+      "name": "津岛铺道蚁",
+      "scientificName": "Tetramorium tsushimae",
+      "displayName": "津岛铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/117"
+    },
+    {
+      "id": 586,
+      "name": "浅毛弓背蚁",
+      "scientificName": "Camponotus albivillosus",
+      "displayName": "浅毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/586"
+    },
+    {
+      "id": 380,
+      "name": "海洋尖尾蚁",
+      "scientificName": "Acropyga oceanica",
+      "displayName": "海洋尖尾蚁",
+      "category": "尖尾蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/380"
+    },
+    {
+      "id": 37,
+      "name": "淡色箭蚁",
+      "scientificName": "Cataglyphis pallida",
+      "displayName": "淡色箭蚁",
+      "category": "箭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/37"
+    },
+    {
+      "id": 340,
+      "name": "淡黄大头蚁",
+      "scientificName": "Pheidole flaveria",
+      "displayName": "淡黄大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/340"
+    },
+    {
+      "id": 1994,
+      "name": "深黑弓背蚁",
+      "scientificName": "Camponotus aterrimus",
+      "displayName": "深黑弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1994"
+    },
+    {
+      "id": 538,
+      "name": "混乱弓背蚁",
+      "scientificName": "Camponotus confusus",
+      "displayName": "混乱弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/538"
+    },
+    {
+      "id": 537,
+      "name": "混杂弓背蚁",
+      "scientificName": "Camponotus misturus",
+      "displayName": "混杂弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/537"
+    },
+    {
+      "id": 571,
+      "name": "混杂钩猛蚁",
+      "scientificName": "Anochetus mixtus",
+      "displayName": "混杂钩猛蚁",
+      "category": "钩猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/571"
+    },
+    {
+      "id": 609,
+      "name": "游举腹蚁",
+      "scientificName": "Crematogaster vagula",
+      "displayName": "游举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/609"
+    },
+    {
+      "id": 598,
+      "name": "满斜结蚁",
+      "scientificName": "Plagiolepis manczshurica",
+      "displayName": "满斜结蚁",
+      "category": "斜结蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/598"
+    },
+    {
+      "id": 715,
+      "name": "满茸弓背蚁",
+      "scientificName": "Camponotus suffusus",
+      "displayName": "满茸弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/715"
+    },
+    {
+      "id": 363,
+      "name": "火山牛蚁",
+      "scientificName": "Myrmecia flammicollis",
+      "displayName": "火山牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/363"
+    },
+    {
+      "id": 733,
+      "name": "灰褐蚁",
+      "scientificName": "Formica cinerea",
+      "displayName": "灰褐蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/733"
+    },
+    {
+      "id": 225,
+      "name": "灰黑心结蚁",
+      "scientificName": "Cardiocondyla obscurior",
+      "displayName": "灰黑心结蚁",
+      "category": "心结蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/225"
+    },
+    {
+      "id": 458,
+      "name": "灵动尖尾蚁",
+      "scientificName": "Acropyga acutiventris",
+      "displayName": "灵动尖尾蚁",
+      "category": "尖尾蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/458"
+    },
+    {
+      "id": 1023,
+      "name": "热带收获蚁",
+      "scientificName": "Messor tropicorum",
+      "displayName": "热带收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1023"
+    },
+    {
+      "id": 203,
+      "name": "热带火蚁",
+      "scientificName": "Solenopsis geminata",
+      "displayName": "热带火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/203"
+    },
+    {
+      "id": 1515,
+      "name": "燃弓背蚁",
+      "scientificName": "Camponotus ustus",
+      "displayName": "燃弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1515"
+    },
+    {
+      "id": 2600,
+      "name": "煤黑举腹蚁",
+      "scientificName": "Crematogaster anthracina",
+      "displayName": "煤黑举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2600"
+    },
+    {
+      "id": 713,
+      "name": "熊猫曲颊猛蚁",
+      "scientificName": "Gnamptogenys panda",
+      "displayName": "熊猫曲颊猛蚁",
+      "category": "曲颊猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/713"
+    },
+    {
+      "id": 269,
+      "name": "燃烧牛蚁",
+      "scientificName": "Myrmecia urens",
+      "displayName": "燃烧牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/269"
+    },
+    {
+      "id": 527,
+      "name": "爆炸平头蚁",
+      "scientificName": "Colobopsis explodens",
+      "displayName": "爆炸平头蚁",
+      "category": "平头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/527"
+    },
+    {
+      "id": 375,
+      "name": "爪哇双节行军蚁",
+      "scientificName": "Aenictus javanus",
+      "displayName": "爪哇双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/375"
+    },
+    {
+      "id": 281,
+      "name": "爪哇扁头猛蚁",
+      "scientificName": "Ectomomyrmex javanus",
+      "displayName": "爪哇扁头猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/281"
+    },
+    {
+      "id": 556,
+      "name": "片突扁头猛蚁",
+      "scientificName": "Ectomomyrmex lobocarenus",
+      "displayName": "片突扁头猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/556"
+    },
+    {
+      "id": 2439,
+      "name": "片马猛蚁",
+      "scientificName": "Ponera pianmana",
+      "displayName": "片马猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2439"
+    },
+    {
+      "id": 975,
+      "name": "牛头收获蚁",
+      "scientificName": "Messor bucephalus",
+      "displayName": "牛头收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/975"
+    },
+    {
+      "id": 448,
+      "name": "牛眼细长蚁",
+      "scientificName": "Tetraponera buops",
+      "displayName": "牛眼细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/448"
+    },
+    {
+      "id": 958,
+      "name": "牧氏收获蚁",
+      "scientificName": "Messor bouvieri",
+      "displayName": "牧氏收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/958"
+    },
+    {
+      "id": 475,
+      "name": "狭唇细长蚁",
+      "scientificName": "Tetraponera attenuata",
+      "displayName": "狭唇细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/475"
+    },
+    {
+      "id": 33,
+      "name": "猎镰猛蚁",
+      "scientificName": "Harpegnathos venator",
+      "displayName": "猎镰猛蚁",
+      "category": "镰猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/33"
+    },
+    {
+      "id": 714,
+      "name": "獒弓背蚁",
+      "scientificName": "Camponotus molossus",
+      "displayName": "獒弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/714"
+    },
+    {
+      "id": 1521,
+      "name": "玄天盘腹蚁",
+      "scientificName": "Aphaenogaster xuantian",
+      "displayName": "玄天盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1521"
+    },
+    {
+      "id": 126,
+      "name": "玉米毛蚁",
+      "scientificName": "Lasius alienus",
+      "displayName": "玉米毛蚁",
+      "category": "毛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/126"
+    },
+    {
+      "id": 471,
+      "name": "王者收获蚁",
+      "scientificName": "Messor regalis",
+      "displayName": "王者收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/471"
+    },
+    {
+      "id": 246,
+      "name": "玛氏举腹蚁",
+      "scientificName": "Crematogaster matsumurai",
+      "displayName": "玛氏举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/246"
+    },
+    {
+      "id": 514,
+      "name": "球形芭切叶蚁",
+      "scientificName": "Atta bisphaerica",
+      "displayName": "球形芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/514"
+    },
+    {
+      "id": 366,
+      "name": "琥珀火蚁",
+      "scientificName": "Solenopsis electra",
+      "displayName": "琥珀火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/366"
+    },
+    {
+      "id": 181,
+      "name": "瑕疵弓背蚁",
+      "scientificName": "Camponotus vitiosus",
+      "displayName": "瑕疵弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/181"
+    },
+    {
+      "id": 280,
+      "name": "瑞亚大头蚁",
+      "scientificName": "Pheidole rhea",
+      "displayName": "瑞亚大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/280"
+    },
+    {
+      "id": 1120,
+      "name": "田野弓背蚁",
+      "scientificName": "Camponotus ager",
+      "displayName": "田野弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1120"
+    },
+    {
+      "id": 1344,
+      "name": "疑切胸蚁",
+      "scientificName": "Temnothorax ambiguus",
+      "displayName": "疑切胸蚁",
+      "category": "切胸蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1344"
+    },
+    {
+      "id": 531,
+      "name": "疾行箭蚁",
+      "scientificName": "Cataglyphis cursor",
+      "displayName": "疾行箭蚁",
+      "category": "箭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/531"
+    },
+    {
+      "id": 123,
+      "name": "瘤点圆颚蚁",
+      "scientificName": "Strongylognathus tylonus",
+      "displayName": "瘤点圆颚蚁",
+      "category": "圆颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/123"
+    },
+    {
+      "id": 1561,
+      "name": "白毛新收获蚁",
+      "scientificName": "Novomessor albisetosus",
+      "displayName": "白毛新收获蚁",
+      "category": "新收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1561"
+    },
+    {
+      "id": 747,
+      "name": "白毛盘腹蚁",
+      "scientificName": "Aphaenogaster senilis",
+      "displayName": "白毛盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/747"
+    },
+    {
+      "id": 1412,
+      "name": "白环弓背蚁",
+      "scientificName": "Camponotus albocinctus",
+      "displayName": "白环弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1412"
+    },
+    {
+      "id": 2332,
+      "name": "白足狡臭蚁",
+      "scientificName": "Technomyrmex albipes",
+      "displayName": "白足狡臭蚁",
+      "category": "狡臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2332"
+    },
+    {
+      "id": 297,
+      "name": "百陶弓背蚁",
+      "scientificName": "Camponotus bedoti",
+      "displayName": "百陶弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/297"
+    },
+    {
+      "id": 906,
+      "name": "的威弓背蚁",
+      "scientificName": "Camponotus devestivus",
+      "displayName": "的威弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/906"
+    },
+    {
+      "id": 292,
+      "name": "冠顶切叶蚁",
+      "scientificName": "Acromyrmex coronatus",
+      "displayName": "冠顶切叶蚁",
+      "category": "顶切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/292"
+    },
+    {
+      "id": 2355,
+      "name": "皮氏双节行军蚁",
+      "scientificName": "Aenictus piercei",
+      "displayName": "皮氏双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2355"
+    },
+    {
+      "id": 158,
+      "name": "皮氏大头蚁",
+      "scientificName": "Pheidole pieli",
+      "displayName": "皮氏大头蚁",
+      "category": "大头蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/158"
+    },
+    {
+      "id": 481,
+      "name": "皮氏粗颚猛蚁",
+      "scientificName": "Streblognathus peetersi",
+      "displayName": "皮氏粗颚猛蚁",
+      "category": "粗颚猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/481"
+    },
+    {
+      "id": 241,
+      "name": "盖氏大头蚁",
+      "scientificName": "Pheidole gatesi",
+      "displayName": "盖氏大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/241"
+    },
+    {
+      "id": 2607,
+      "name": "相似拟光蚁",
+      "scientificName": "Pseudolasius similus",
+      "displayName": "相似拟光蚁",
+      "category": "拟毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2607"
+    },
+    {
+      "id": 345,
+      "name": "相似铺道蚁",
+      "scientificName": "Tetramorium simillimum",
+      "displayName": "相似铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/345"
+    },
+    {
+      "id": 306,
+      "name": "盾龟蚁",
+      "scientificName": "Cephalotes clypeatus",
+      "displayName": "盾龟蚁",
+      "category": "龟蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/306"
+    },
+    {
+      "id": 285,
+      "name": "眼棘颚蚁",
+      "scientificName": "Acanthognathus ocellatus",
+      "displayName": "眼棘颚蚁",
+      "category": "棘颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/285"
+    },
+    {
+      "id": 989,
+      "name": "着色收获蚁",
+      "scientificName": "Messor picturatus",
+      "displayName": "着色收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/989"
+    },
+    {
+      "id": 2647,
+      "name": "知本火蚁",
+      "scientificName": "Solenopsis tipuna",
+      "displayName": "知本火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2647"
+    },
+    {
+      "id": 2329,
+      "name": "短刺棱胸切叶蚁",
+      "scientificName": "Pristomyrmex brevispinosus",
+      "displayName": "短刺棱胸切叶蚁",
+      "category": "棱胸切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2329"
+    },
+    {
+      "id": 2549,
+      "name": "短柄厚结蚁",
+      "scientificName": "Pachycondyla breviscapa",
+      "displayName": "短柄厚结蚁",
+      "category": "厚结猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2549"
+    },
+    {
+      "id": 2090,
+      "name": "短柄弓背蚁",
+      "scientificName": "Camponotus breviscapus",
+      "displayName": "短柄弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2090"
+    },
+    {
+      "id": 113,
+      "name": "短结牛蚁",
+      "scientificName": "Myrmecia brevinoda",
+      "displayName": "短结牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/113"
+    },
+    {
+      "id": 554,
+      "name": "短背短猛蚁",
+      "scientificName": "Brachyponera brevidorsa",
+      "displayName": "短背短猛蚁",
+      "category": "短猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/554"
+    },
+    {
+      "id": 107,
+      "name": "短角棘颚蚁",
+      "scientificName": "Acanthognathus brevicornis",
+      "displayName": "短角棘颚蚁",
+      "category": "棘颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/107"
+    },
+    {
+      "id": 1126,
+      "name": "短颈弓背蚁",
+      "scientificName": "Camponotus brevicollis",
+      "displayName": "短颈弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1126"
+    },
+    {
+      "id": 807,
+      "name": "矮大头蚁",
+      "scientificName": "Pheidole parva",
+      "displayName": "矮大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/807"
+    },
+    {
+      "id": 2363,
+      "name": "石狩红蚁",
+      "scientificName": "Formica yessensis",
+      "displayName": "石狩红蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2363"
+    },
+    {
+      "id": 1022,
+      "name": "砖红收获蚁",
+      "scientificName": "Messor testaceus",
+      "displayName": "砖红收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1022"
+    },
+    {
+      "id": 177,
+      "name": "破坏巨眼蚁",
+      "scientificName": "Gigantiops destructor",
+      "displayName": "破坏巨眼蚁",
+      "category": "巨眼蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/177"
+    },
+    {
+      "id": 1741,
+      "name": "神农猛蚁",
+      "scientificName": "Ponera shennong",
+      "displayName": "神农猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1741"
+    },
+    {
+      "id": 338,
+      "name": "神圣弓背蚁",
+      "scientificName": "Camponotus sanctus",
+      "displayName": "神圣弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/338"
+    },
+    {
+      "id": 2366,
+      "name": "科尔蜜罐蚁",
+      "scientificName": "Myrmecocystus colei",
+      "displayName": "科尔蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2366"
+    },
+    {
+      "id": 172,
+      "name": "科氏新收获蚁",
+      "scientificName": "Novomessor cockerelli",
+      "displayName": "科氏新收获蚁",
+      "category": "新收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/172"
+    },
+    {
+      "id": 2623,
+      "name": "科氏行军蚁",
+      "scientificName": "Dorylus kohli",
+      "displayName": "科氏行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2623"
+    },
+    {
+      "id": 574,
+      "name": "移动收获蚁",
+      "scientificName": "Messor excursionis",
+      "displayName": "移动收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/574"
+    },
+    {
+      "id": 138,
+      "name": "穴居大齿猛蚁",
+      "scientificName": "Odontomachus troglodytes",
+      "displayName": "穴居大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/138"
+    },
+    {
+      "id": 22,
+      "name": "突厥弓背蚁",
+      "scientificName": "Camponotus turkestanicus",
+      "displayName": "突厥弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/22"
+    },
+    {
+      "id": 462,
+      "name": "窄足双节行军蚁",
+      "scientificName": "Aenictus artipus",
+      "displayName": "窄足双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/462"
+    },
+    {
+      "id": 19,
+      "name": "窄颈弓背蚁",
+      "scientificName": "Camponotus angusticollis",
+      "displayName": "窄颈弓背蚁（窄径）",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/19"
+    },
+    {
+      "id": 945,
+      "name": "立毛收获蚁",
+      "scientificName": "Messor erectus",
+      "displayName": "立毛收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/945"
+    },
+    {
+      "id": 2593,
+      "name": "笼罩钳蚁",
+      "scientificName": "Labidus praedator",
+      "displayName": "笼罩钳蚁",
+      "category": "钳蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2593"
+    },
+    {
+      "id": 377,
+      "name": "米氏钝猛蚁",
+      "scientificName": "Amblyopone michaelseni",
+      "displayName": "米氏钝猛蚁",
+      "category": "钝猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/377"
+    },
+    {
+      "id": 493,
+      "name": "米芾红蚁",
+      "scientificName": "Myrmica mifui",
+      "displayName": "米芾红蚁",
+      "category": "红蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/493"
+    },
+    {
+      "id": 6,
+      "name": "粒沟切叶蚁",
+      "scientificName": "Cataulacus granulatus",
+      "displayName": "粒沟切叶蚁",
+      "category": "沟切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/6"
+    },
+    {
+      "id": 78,
+      "name": "粒纹大齿猛蚁",
+      "scientificName": "Odontomachus granatus",
+      "displayName": "粒纹大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/78"
+    },
+    {
+      "id": 1046,
+      "name": "粗糙钩猛蚁",
+      "scientificName": "Anochetus rugosus",
+      "displayName": "粗糙钩猛蚁",
+      "category": "钩猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1046"
+    },
+    {
+      "id": 507,
+      "name": "粗纹举腹蚁",
+      "scientificName": "Crematogaster artifex",
+      "displayName": "粗纹举腹蚁",
+      "category": "举腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/507"
+    },
+    {
+      "id": 330,
+      "name": "粗结厚结猛蚁",
+      "scientificName": "Pachycondyla crassinoda",
+      "displayName": "粗结厚结猛蚁",
+      "category": "厚结猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/330"
+    },
+    {
+      "id": 567,
+      "name": "粗节收获蚁",
+      "scientificName": "Messor perantennatus",
+      "displayName": "粗节收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/567"
+    },
+    {
+      "id": 589,
+      "name": "粗角双节行军蚁",
+      "scientificName": "Aenictus pachycerus",
+      "displayName": "粗角双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/589"
+    },
+    {
+      "id": 192,
+      "name": "索马里弓背蚁",
+      "scientificName": "Camponotus somalinus",
+      "displayName": "索马里弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/192"
+    },
+    {
+      "id": 71,
+      "name": "紫彩虹臭蚁",
+      "scientificName": "Iridomyrmex purpureus",
+      "displayName": "紫彩虹臭蚁",
+      "category": "虹臭蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/71"
+    },
+    {
+      "id": 196,
+      "name": "紫青双刺猛蚁",
+      "scientificName": "Diacamma viridipurpureum",
+      "displayName": "紫青双刺猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/196"
+    },
+    {
+      "id": 18,
+      "name": "红头弓背蚁",
+      "scientificName": "Camponotus singularis",
+      "displayName": "红头弓背蚁",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/18"
+    },
+    {
+      "id": 199,
+      "name": "红头弓背蚁（红斑亚种）",
+      "scientificName": "Camponotus singularis rufomaculatus",
+      "displayName": "红头弓背蚁（红斑亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/199"
+    },
+    {
+      "id": 102,
+      "name": "叶盛山蚁",
+      "scientificName": "Formica truncorum",
+      "displayName": "叶盛山蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/102"
+    },
+    {
+      "id": 615,
+      "name": "红弓背蚁",
+      "scientificName": "Camponotus rufus",
+      "displayName": "红弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/615"
+    },
+    {
+      "id": 265,
+      "name": "红狂蚁",
+      "scientificName": "Manica rubida",
+      "displayName": "红狂蚁",
+      "category": "狂蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/265"
+    },
+    {
+      "id": 266,
+      "name": "红矛猛蚁",
+      "scientificName": "Myopopone castanea",
+      "displayName": "红矛猛蚁",
+      "category": "矛猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/266"
+    },
+    {
+      "id": 2471,
+      "name": "红缘弓背蚁",
+      "scientificName": "Camponotus rufoglaucus",
+      "displayName": "红缘弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2471"
+    },
+    {
+      "id": 1118,
+      "name": "红股弓背蚁",
+      "scientificName": "Camponotus rufifemur",
+      "displayName": "红股弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1118"
+    },
+    {
+      "id": 122,
+      "name": "红胡须蚁",
+      "scientificName": "Pogonomyrmex barbatus",
+      "displayName": "红胡须蚁（巴巴特斯）",
+      "category": "须蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/122"
+    },
+    {
+      "id": 544,
+      "name": "红胸收获蚁",
+      "scientificName": "Messor minor hesperius",
+      "displayName": "红胸收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/544"
+    },
+    {
+      "id": 240,
+      "name": "红腹多刺蚁",
+      "scientificName": "Polyrhachis rubigastrica",
+      "displayName": "红腹多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/240"
+    },
+    {
+      "id": 993,
+      "name": "红褐收获蚁",
+      "scientificName": "Messor rufotestaceus",
+      "displayName": "红褐收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/993"
+    },
+    {
+      "id": 100,
+      "name": "红褐林蚁",
+      "scientificName": "Formica rufa",
+      "displayName": "红褐林蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/100"
+    },
+    {
+      "id": 32,
+      "name": "红足修猛蚁",
+      "scientificName": "Pseudoneoponera rufipes",
+      "displayName": "红足修猛蚁",
+      "category": "修猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/32"
+    },
+    {
+      "id": 80,
+      "name": "红足弓背蚁",
+      "scientificName": "Camponotus rufipes",
+      "displayName": "红足弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/80"
+    },
+    {
+      "id": 734,
+      "name": "红须蚁",
+      "scientificName": "Formica rufibarbis",
+      "displayName": "红须蚁",
+      "category": "林蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/734"
+    },
+    {
+      "id": 86,
+      "name": "红黑细长蚁",
+      "scientificName": "Tetraponera rufonigra",
+      "displayName": "红黑细长蚁",
+      "category": "细长蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/86"
+    },
+    {
+      "id": 228,
+      "name": "红黑虹臭蚁",
+      "scientificName": "Iridomyrmex rufoniger",
+      "displayName": "红黑虹臭蚁",
+      "category": "虹臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/228"
+    },
+    {
+      "id": 1086,
+      "name": "约翰克拉克弓背蚁",
+      "scientificName": "Camponotus johnclarki",
+      "displayName": "约翰克拉克弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1086"
+    },
+    {
+      "id": 982,
+      "name": "纯洁收获蚁",
+      "scientificName": "Messor incorruptus",
+      "displayName": "纯洁收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/982"
+    },
+    {
+      "id": 1021,
+      "name": "纹额收获蚁",
+      "scientificName": "Messor striatifrons",
+      "displayName": "纹额收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1021"
+    },
+    {
+      "id": 190,
+      "name": "纽约弓背蚁",
+      "scientificName": "Camponotus novaeboracensis",
+      "displayName": "纽约弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/190"
+    },
+    {
+      "id": 191,
+      "name": "细刺须蚁",
+      "scientificName": "Pogonomyrmex tenuispinus",
+      "displayName": "细刺须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/191"
+    },
+    {
+      "id": 2558,
+      "name": "细刻瘤胸切叶蚁",
+      "scientificName": "Meranoplus tenuiscultus",
+      "displayName": "细刻瘤胸切叶蚁",
+      "category": "盾胸切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2558"
+    },
+    {
+      "id": 2388,
+      "name": "破坏单家蚁",
+      "scientificName": "Monomorium destructor",
+      "displayName": "破坏单家蚁",
+      "category": "小家蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2388"
+    },
+    {
+      "id": 163,
+      "name": "长足捷蚁",
+      "scientificName": "Anoplolepis gracilipes",
+      "displayName": "长足捷蚁",
+      "category": "捷蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/163"
+    },
+    {
+      "id": 236,
+      "name": "结多刺蚁",
+      "scientificName": "Polyrhachis rastellata",
+      "displayName": "结多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/236"
+    },
+    {
+      "id": 501,
+      "name": "统领弓背蚁",
+      "scientificName": "Camponotus magister",
+      "displayName": "统领弓背蚁（统领蚁）",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/501"
+    },
+    {
+      "id": 2014,
+      "name": "绢毛弓背蚁",
+      "scientificName": "Camponotus sericeus",
+      "displayName": "绢毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2014"
+    },
+    {
+      "id": 397,
+      "name": "维多利亚虹臭蚁",
+      "scientificName": "Iridomyrmex victorianus",
+      "displayName": "维多利亚虹臭蚁",
+      "category": "虹臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/397"
+    },
+    {
+      "id": 1113,
+      "name": "维希努行军蚁",
+      "scientificName": "Dorylus vishnui",
+      "displayName": "维希努行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1113"
+    },
+    {
+      "id": 217,
+      "name": "缅甸细颚猛蚁",
+      "scientificName": "Leptogenys birmana",
+      "displayName": "缅甸细颚猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/217"
+    },
+    {
+      "id": 1411,
+      "name": "缺刺弓背蚁",
+      "scientificName": "Camponoyus vanispinus",
+      "displayName": "缺刺弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1411"
+    },
+    {
+      "id": 588,
+      "name": "罗格斯顶切叶蚁",
+      "scientificName": "Acromyrmex rugosus",
+      "displayName": "罗格斯顶切叶蚁",
+      "category": "顶切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/588"
+    },
+    {
+      "id": 508,
+      "name": "罗氏铺道蚁",
+      "scientificName": "Tetramorium wroughtonii",
+      "displayName": "罗氏铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/508"
+    },
+    {
+      "id": 328,
+      "name": "罗纹须蚁",
+      "scientificName": "Pogonomyrmex rugosus",
+      "displayName": "罗纹须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/328"
+    },
+    {
+      "id": 1108,
+      "name": "美丽弓背蚁",
+      "scientificName": "Camponotus pulcher",
+      "displayName": "美丽弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1108"
+    },
+    {
+      "id": 274,
+      "name": "美丽牛蚁",
+      "scientificName": "Myrmecia callima",
+      "displayName": "美丽牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/274"
+    },
+    {
+      "id": 600,
+      "name": "美国弓背蚁",
+      "scientificName": "Camponotus americanus",
+      "displayName": "美国弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/600"
+    },
+    {
+      "id": 2010,
+      "name": "美西盘腹蚁",
+      "scientificName": "Aphaenogaster occidentalis",
+      "displayName": "美西盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2010"
+    },
+    {
+      "id": 1514,
+      "name": "羞怯弓背蚁",
+      "scientificName": "Camponotus pudorosus",
+      "displayName": "羞怯弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1514"
+    },
+    {
+      "id": 381,
+      "name": "翁萼豆异形蚁",
+      "scientificName": "Atopomyrmex calpocalycola",
+      "displayName": "翁萼豆异形蚁",
+      "category": "异形蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/381"
+    },
+    {
+      "id": 152,
+      "name": "老挝盲切叶蚁",
+      "scientificName": "Carebara diversa laotina",
+      "displayName": "老挝盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/152"
+    },
+    {
+      "id": 77,
+      "name": "聚纹双刺猛蚁",
+      "scientificName": "Diacamma rugosum",
+      "displayName": "聚纹双刺猛蚁",
+      "category": "猛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/77"
+    },
+    {
+      "id": 302,
+      "name": "肯氏蜜罐蚁",
+      "scientificName": "Myrmecocystus kennedyi",
+      "displayName": "肯氏蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/302"
+    },
+    {
+      "id": 278,
+      "name": "胡克多刺蚁",
+      "scientificName": "Polyrhachis hookeri",
+      "displayName": "胡克多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/278"
+    },
+    {
+      "id": 1428,
+      "name": "脆弱弓背蚁",
+      "scientificName": "Camponotus fragilis",
+      "displayName": "脆弱弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1428"
+    },
+    {
+      "id": 149,
+      "name": "膨胀大头蚁",
+      "scientificName": "Pheidole tumida",
+      "displayName": "膨胀大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/149"
+    },
+    {
+      "id": 180,
+      "name": "膨胀弓背蚁",
+      "scientificName": "Camponotus inflatus",
+      "displayName": "膨胀弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/180"
+    },
+    {
+      "id": 787,
+      "name": "艾提弓背蚁",
+      "scientificName": "Camponotus aethiops",
+      "displayName": "艾提弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/787"
+    },
+    {
+      "id": 339,
+      "name": "艾氏漫蚁",
+      "scientificName": "Nomamyrmex esenbeckii",
+      "displayName": "艾氏漫蚁",
+      "category": "漫蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/339"
+    },
+    {
+      "id": 38,
+      "name": "艾箭蚁",
+      "scientificName": "Cataglyphis aenescens",
+      "displayName": "艾箭蚁",
+      "category": "箭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/38"
+    },
+    {
+      "id": 318,
+      "name": "花居小家蚁",
+      "scientificName": "Monomorium floricola",
+      "displayName": "花居小家蚁",
+      "category": "小家蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/318"
+    },
+    {
+      "id": 342,
+      "name": "苏州火蚁",
+      "scientificName": "solenopsis soochowensis",
+      "displayName": "苏州火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/342"
+    },
+    {
+      "id": 2537,
+      "name": "高大齿猛蚁",
+      "scientificName": "Odontomachus procerus",
+      "displayName": "高大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2537"
+    },
+    {
+      "id": 344,
+      "name": "茸毛铺道蚁",
+      "scientificName": "Tetramorium lanuginosum",
+      "displayName": "茸毛铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/344"
+    },
+    {
+      "id": 108,
+      "name": "草原原蚁",
+      "scientificName": "Proformica epinotalis",
+      "displayName": "草原原蚁",
+      "category": "原蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/108"
+    },
+    {
+      "id": 128,
+      "name": "草原蚁",
+      "scientificName": "Formica pratensis",
+      "displayName": "草原蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/128"
+    },
+    {
+      "id": 62,
+      "name": "草地铺道蚁",
+      "scientificName": "Tetramorium caespitum",
+      "displayName": "草地铺道蚁",
+      "category": "铺道蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/62"
+    },
+    {
+      "id": 120,
+      "name": "荒漠收获蚁",
+      "scientificName": "Messor desertus",
+      "displayName": "白刺收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/120"
+    },
+    {
+      "id": 298,
+      "name": "存储弓背蚁",
+      "scientificName": "Camponotus storeatus",
+      "displayName": "存储弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/298"
+    },
+    {
+      "id": 565,
+      "name": "莫氏大头蚁",
+      "scientificName": "Pheidole morrisii",
+      "displayName": "莫氏大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/565"
+    },
+    {
+      "id": 518,
+      "name": "莫氏异形蚁",
+      "scientificName": "Atopomyrmex mocquerysi",
+      "displayName": "莫氏异形蚁",
+      "category": "异形蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/518"
+    },
+    {
+      "id": 1193,
+      "name": "莫氏狡臭蚁",
+      "scientificName": "Technomyrmex modiglianii",
+      "displayName": "莫氏狡臭蚁",
+      "category": "狡臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1193"
+    },
+    {
+      "id": 44,
+      "name": "来氏平头蚁",
+      "scientificName": "Colobopsis leonardi",
+      "displayName": "来氏平头蚁",
+      "category": "平头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/44"
+    },
+    {
+      "id": 2324,
+      "name": "莱氏弓背蚁",
+      "scientificName": "Camponotus lespesii",
+      "displayName": "莱氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2324"
+    },
+    {
+      "id": 2354,
+      "name": "菲律宾双节行军蚁",
+      "scientificName": "Aenictus philippinensis",
+      "displayName": "菲律宾双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2354"
+    },
+    {
+      "id": 668,
+      "name": "萨尔塔芭切叶蚁",
+      "scientificName": "Atta saltensis",
+      "displayName": "萨尔塔芭切叶蚁",
+      "category": "芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/668"
+    },
+    {
+      "id": 983,
+      "name": "葡萄牙收获蚁",
+      "scientificName": "Messor lusitanicus",
+      "displayName": "葡萄牙收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/983"
+    },
+    {
+      "id": 2065,
+      "name": "蒙古原蚁",
+      "scientificName": "Proformica mongolica",
+      "displayName": "蒙古原蚁",
+      "category": "原蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/2065"
+    },
+    {
+      "id": 216,
+      "name": "蓝彩虹臭蚁",
+      "scientificName": "Iridomyrmex lividus",
+      "displayName": "蓝彩虹臭蚁",
+      "category": "虹臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/216"
+    },
+    {
+      "id": 712,
+      "name": "蓝链细颚猛蚁",
+      "scientificName": "Leptogenys cyanicatena",
+      "displayName": "蓝链细颚猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/712"
+    },
+    {
+      "id": 247,
+      "name": "蓬莱大齿猛蚁",
+      "scientificName": "Odontomachus formosae",
+      "displayName": "蓬莱大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/247"
+    },
+    {
+      "id": 250,
+      "name": "蚜居毛蚁",
+      "scientificName": "Lasius aphidicola",
+      "displayName": "蚜居毛蚁",
+      "category": "毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/250"
+    },
+    {
+      "id": 25,
+      "name": "血斑弓背蚁",
+      "scientificName": "Camponotus cruentatus",
+      "displayName": "血斑弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/25"
+    },
+    {
+      "id": 91,
+      "name": "血红林蚁",
+      "scientificName": "Formica sanguinea",
+      "displayName": "血红林蚁",
+      "category": "林蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/91"
+    },
+    {
+      "id": 229,
+      "name": "血色虹臭蚁",
+      "scientificName": "Iridomyrmex sanguineus",
+      "displayName": "血色虹臭蚁",
+      "category": "虹臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/229"
+    },
+    {
+      "id": 1312,
+      "name": "裸心结蚁",
+      "scientificName": "Cardiocondyla nuda",
+      "displayName": "裸心结蚁",
+      "category": "心结蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1312"
+    },
+    {
+      "id": 2098,
+      "name": "褐毛弓背蚁",
+      "scientificName": "Camponotus fuscivillosus",
+      "displayName": "褐毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2098"
+    },
+    {
+      "id": 1794,
+      "name": "褐红弓背蚁",
+      "scientificName": "Camponotus semirufus",
+      "displayName": "褐红弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1794"
+    },
+    {
+      "id": 2313,
+      "name": "褐红点猛蚁",
+      "scientificName": "Stigmatomma rubiginoum",
+      "displayName": "褐红点猛蚁",
+      "category": "点猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2313"
+    },
+    {
+      "id": 275,
+      "name": "褐臀牛蚁",
+      "scientificName": "Myrmecia fulviculis",
+      "displayName": "褐臀牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/275"
+    },
+    {
+      "id": 67,
+      "name": "褐色脊红蚁",
+      "scientificName": "Myrmicaria brunnea",
+      "displayName": "褐色脊红蚁",
+      "category": "脊红蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/67"
+    },
+    {
+      "id": 276,
+      "name": "褐足牛蚁",
+      "scientificName": "Myrmecia fulvipes",
+      "displayName": "褐足牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/276"
+    },
+    {
+      "id": 283,
+      "name": "西伯利亚臭蚁",
+      "scientificName": "Dolichoderus sibiricus",
+      "displayName": "西伯利亚臭蚁",
+      "category": "臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/283"
+    },
+    {
+      "id": 24,
+      "name": "西姆森弓背蚁",
+      "scientificName": "Camponotus siemsseni",
+      "displayName": "西姆森弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/24"
+    },
+    {
+      "id": 521,
+      "name": "西氏双节行军蚁",
+      "scientificName": "Aenictus silvestrii",
+      "displayName": "西氏双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/521"
+    },
+    {
+      "id": 137,
+      "name": "西氏大齿猛蚁",
+      "scientificName": "Odontomachus silvestrii",
+      "displayName": "西氏大齿猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/137"
+    },
+    {
+      "id": 2581,
+      "name": "西氏点猛蚁",
+      "scientificName": "Stigmatomma silvestrii",
+      "displayName": "西氏点猛蚁",
+      "category": "点猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2581"
+    },
+    {
+      "id": 581,
+      "name": "西氏祖切叶蚁",
+      "scientificName": "Amoimyrmex silvestrii",
+      "displayName": "西氏祖切叶蚁",
+      "category": "祖切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/581"
+    },
+    {
+      "id": 183,
+      "name": "西蒙原臭蚁",
+      "scientificName": "Aneuretus simoni",
+      "displayName": "西蒙原臭蚁",
+      "category": "原臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/183"
+    },
+    {
+      "id": 372,
+      "name": "角弓背蚁",
+      "scientificName": "Camponotus cornis",
+      "displayName": "角弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/372"
+    },
+    {
+      "id": 53,
+      "name": "角收获蚁",
+      "scientificName": "Messor angularis",
+      "displayName": "角收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/53"
+    },
+    {
+      "id": 1248,
+      "name": "诗琳通双节行军蚁",
+      "scientificName": "Aenictus shilintongae",
+      "displayName": "诗琳通双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1248"
+    },
+    {
+      "id": 2424,
+      "name": "谎言蜜罐蚁",
+      "scientificName": "Myrmecocystus",
+      "displayName": "谎言蜜罐蚁",
+      "category": "蜜罐蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2424"
+    },
+    {
+      "id": 110,
+      "name": "谨慎弓背蚁",
+      "scientificName": "Camponotus circumspectus",
+      "displayName": "谨慎弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/110"
+    },
+    {
+      "id": 212,
+      "name": "豪氏短角蚁",
+      "scientificName": "Gesomyrmex howardi",
+      "displayName": "豪氏短角蚁",
+      "category": "短角蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/212"
+    },
+    {
+      "id": 1192,
+      "name": "贝利点猛蚁",
+      "scientificName": "Stigmatomma bellii",
+      "displayName": "贝利点猛蚁",
+      "category": "点猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1192"
+    },
+    {
+      "id": 1359,
+      "name": "贝卡伪切叶蚁",
+      "scientificName": "Pseudomyrmex beccarii",
+      "displayName": "贝卡伪切叶蚁",
+      "category": "伪切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1359"
+    },
+    {
+      "id": 245,
+      "name": "贝卡盘腹蚁",
+      "scientificName": "Aphaenogaster beccarii",
+      "displayName": "贝卡盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/245"
+    },
+    {
+      "id": 540,
+      "name": "贝氏弓背蚁",
+      "scientificName": "Camponotus batesii",
+      "displayName": "贝氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/540"
+    },
+    {
+      "id": 2297,
+      "name": "贪婪游蚁",
+      "scientificName": "Eciton rapax",
+      "displayName": "贪婪游蚁",
+      "category": "游蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2297"
+    },
+    {
+      "id": 143,
+      "name": "贪食牛蚁",
+      "scientificName": "Myrmecia gulosa",
+      "displayName": "贪食牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/143"
+    },
+    {
+      "id": 1591,
+      "name": "费拉弓背蚁",
+      "scientificName": "Camponotus fellah",
+      "displayName": "费拉弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1591"
+    },
+    {
+      "id": 323,
+      "name": "费氏中盲猛蚁",
+      "scientificName": "Centromyrmex feae",
+      "displayName": "费氏中盲猛蚁",
+      "category": "中盲猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/323"
+    },
+    {
+      "id": 10,
+      "name": "费氏弓背蚁",
+      "scientificName": "Camponotus fedtschenkoi",
+      "displayName": "费氏弓背蚁（黑金弓背蚁）",
+      "category": "弓背蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/10"
+    },
+    {
+      "id": 155,
+      "name": "费氏收获蚁",
+      "scientificName": "Messor ferreri",
+      "displayName": "费氏收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/155"
+    },
+    {
+      "id": 1552,
+      "name": "费氏盘腹蚁",
+      "scientificName": "Aphaenogaster feae",
+      "displayName": "费氏盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1552"
+    },
+    {
+      "id": 2066,
+      "name": "贾氏原蚁",
+      "scientificName": "Proformica jacoti",
+      "displayName": "贾氏原蚁",
+      "category": "原蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2066"
+    },
+    {
+      "id": 186,
+      "name": "贾氏火蚁",
+      "scientificName": "Solenopsis jacoti",
+      "displayName": "贾氏火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/186"
+    },
+    {
+      "id": 1047,
+      "name": "赛奇双节行军蚁",
+      "scientificName": "Aenictus sagei",
+      "displayName": "赛奇双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1047"
+    },
+    {
+      "id": 251,
+      "name": "跳镰猛蚁",
+      "scientificName": "Harpegnathos saltator",
+      "displayName": "跳镰猛蚁",
+      "category": "镰猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/251"
+    },
+    {
+      "id": 947,
+      "name": "躁动收获蚁",
+      "scientificName": "Messor instabilis",
+      "displayName": "躁动收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/947"
+    },
+    {
+      "id": 2364,
+      "name": "辐毛弓背蚁",
+      "scientificName": "Camponotus radiatus",
+      "displayName": "辐毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2364"
+    },
+    {
+      "id": 612,
+      "name": "迅捷弓背蚁",
+      "scientificName": "Camponotus festinus",
+      "displayName": "迅捷弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/612"
+    },
+    {
+      "id": 2367,
+      "name": "迅捷弓背蚁（伊内兹亚种）",
+      "scientificName": "Camponotus festinus inezae",
+      "displayName": "迅捷弓背蚁（伊内兹亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2367"
+    },
+    {
+      "id": 477,
+      "name": "迅捷弓背蚁（勤奋亚种）",
+      "scientificName": "Camponotus festinus diligens",
+      "displayName": "迅捷弓背蚁（勤奋亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/477"
+    },
+    {
+      "id": 479,
+      "name": "迅捷弓背蚁（指名亚种）",
+      "scientificName": "Camponotus festinus festinus",
+      "displayName": "迅捷弓背蚁（指名亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/479"
+    },
+    {
+      "id": 2321,
+      "name": "迅捷箭蚁",
+      "scientificName": "Cataglyphis velox",
+      "displayName": "迅捷箭蚁",
+      "category": "箭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2321"
+    },
+    {
+      "id": 1279,
+      "name": "近缘切胸蚁",
+      "scientificName": "Temnothorax affinis",
+      "displayName": "近缘切胸蚁",
+      "category": "切胸蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1279"
+    },
+    {
+      "id": 150,
+      "name": "近缘盲切叶蚁",
+      "scientificName": "Carebara affinis",
+      "displayName": "近缘盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/150"
+    },
+    {
+      "id": 2357,
+      "name": "近须弓背蚁",
+      "scientificName": "Camponotus parabarbatus",
+      "displayName": "近须弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2357"
+    },
+    {
+      "id": 2326,
+      "name": "迟钝匿猛蚁",
+      "scientificName": "Buniapone amblyops",
+      "displayName": "迟钝匿猛蚁",
+      "category": "匿猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2326"
+    },
+    {
+      "id": 977,
+      "name": "迷惑收获蚁",
+      "scientificName": "Messor decipiens",
+      "displayName": "迷惑收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/977"
+    },
+    {
+      "id": 90,
+      "name": "迷走牛蚁",
+      "scientificName": "Myrmecia aberrans",
+      "displayName": "迷走牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/90"
+    },
+    {
+      "id": 2374,
+      "name": "逢股猛蚁",
+      "scientificName": "Xymmer phungi",
+      "displayName": "逢股猛蚁",
+      "category": "股猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2374"
+    },
+    {
+      "id": 125,
+      "name": "遮盖毛蚁",
+      "scientificName": "Lasius umbratus",
+      "displayName": "遮盖毛蚁",
+      "category": "毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/125"
+    },
+    {
+      "id": 1080,
+      "name": "邦哈斯弓背蚁",
+      "scientificName": "Camponotus banghaasi",
+      "displayName": "邦哈斯弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1080"
+    },
+    {
+      "id": 536,
+      "name": "邵氏姬針蟻",
+      "scientificName": "Hypoponera sauteri",
+      "displayName": "邵氏姬針蟻",
+      "category": "姬猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/536"
+    },
+    {
+      "id": 238,
+      "name": "邵氏尖尾蚁",
+      "scientificName": "Acropyga sauteri",
+      "displayName": "邵氏尖尾蚁",
+      "category": "尖尾蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/238"
+    },
+    {
+      "id": 806,
+      "name": "邵氏扁头猛蚁",
+      "scientificName": "Ectomomyrmex sauteri",
+      "displayName": "邵氏扁头猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/806"
+    },
+    {
+      "id": 2437,
+      "name": "邵氏无齿猛蚁",
+      "scientificName": "Discothyrea sauteri",
+      "displayName": "邵氏无齿猛蚁",
+      "category": "无齿猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2437"
+    },
+    {
+      "id": 2301,
+      "name": "邵氏寡家蟻",
+      "scientificName": "Carebara sauteri",
+      "displayName": "邵氏寡家蟻",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2301"
+    },
+    {
+      "id": 2359,
+      "name": "邵氏隐猛蚁",
+      "scientificName": "Cryptopone sauteri",
+      "displayName": "邵氏隐猛蚁",
+      "category": "隐猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2359"
+    },
+    {
+      "id": 2440,
+      "name": "邻臭蚁",
+      "scientificName": "Dolichoderus affinis",
+      "displayName": "邻臭蚁",
+      "category": "臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2440"
+    },
+    {
+      "id": 2428,
+      "name": "邻行军蚁",
+      "scientificName": "Dorylus affinis",
+      "displayName": "邻行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2428"
+    },
+    {
+      "id": 1025,
+      "name": "邻近收获蚁",
+      "scientificName": "Messor vicinus",
+      "displayName": "邻近收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1025"
+    },
+    {
+      "id": 585,
+      "name": "郑氏双节行军蚁",
+      "scientificName": "Aenictus zhengi",
+      "displayName": "郑氏双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/585"
+    },
+    {
+      "id": 76,
+      "name": "郑氏扁头猛蚁",
+      "scientificName": "Ectomomyrmex zhengi",
+      "displayName": "郑氏扁头猛蚁",
+      "category": "猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/76"
+    },
+    {
+      "id": 617,
+      "name": "酋长弓背蚁",
+      "scientificName": "Camponotus cacicus",
+      "displayName": "酋长弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/617"
+    },
+    {
+      "id": 23,
+      "name": "里氏弓背蚁",
+      "scientificName": "Camponotus reichardti",
+      "displayName": "里氏弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/23"
+    },
+    {
+      "id": 210,
+      "name": "里氏钩猛蚁",
+      "scientificName": "Anochetus risii",
+      "displayName": "里氏钩猛蚁",
+      "category": "钩猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/210"
+    },
+    {
+      "id": 791,
+      "name": "野蛮弓背蚁",
+      "scientificName": "Camponotus barbaricus",
+      "displayName": "野蛮弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/791"
+    },
+    {
+      "id": 48,
+      "name": "野蛮收获蚁",
+      "scientificName": "Messor barbarus",
+      "displayName": "野蛮收获蚁（原生收获蚁）",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/48"
+    },
+    {
+      "id": 2587,
+      "name": "野蛮收获蚁（五倍子亚种）",
+      "scientificName": "Messor barbarus gallaoides",
+      "displayName": "野蛮收获蚁（五倍子亚种）",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2587"
+    },
+    {
+      "id": 156,
+      "name": "金刻异节蚁",
+      "scientificName": "Allomerus auropunctatus",
+      "displayName": "金刻异节蚁",
+      "category": "异节蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/156"
+    },
+    {
+      "id": 370,
+      "name": "金属火蚁",
+      "scientificName": "Solenopsis metallica",
+      "displayName": "金属火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/370"
+    },
+    {
+      "id": 257,
+      "name": "金属皱猛蚁",
+      "scientificName": "Rhytidoponera metallica",
+      "displayName": "金属皱突蚁（金属蚁）",
+      "category": "猛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/257"
+    },
+    {
+      "id": 31,
+      "name": "金毛弓背蚁",
+      "scientificName": "Camponotus tonkinus",
+      "displayName": "金毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/31"
+    },
+    {
+      "id": 165,
+      "name": "金沙弓背蚁",
+      "scientificName": "Camponotus detritus",
+      "displayName": "金沙弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/165"
+    },
+    {
+      "id": 716,
+      "name": "金环弓背蚁",
+      "scientificName": "Camponotus aurocinctus",
+      "displayName": "金环弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/716"
+    },
+    {
+      "id": 602,
+      "name": "金腹弓背蚁",
+      "scientificName": "Camponotus auriventris",
+      "displayName": "金腹弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/602"
+    },
+    {
+      "id": 46,
+      "name": "针毛收获蚁",
+      "scientificName": "Messor aciculatus",
+      "displayName": "针毛收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/46"
+    },
+    {
+      "id": 2298,
+      "name": "钩齿游蚁",
+      "scientificName": "Eciton hamatum",
+      "displayName": "钩齿游蚁",
+      "category": "游蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2298"
+    },
+    {
+      "id": 789,
+      "name": "铜毛弓背蚁",
+      "scientificName": "Camponotus aeneopilosus",
+      "displayName": "铜毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/789"
+    },
+    {
+      "id": 227,
+      "name": "铜绿虹臭蚁",
+      "scientificName": "Iridomyrmex viridiaeneus",
+      "displayName": "铜绿虹臭蚁",
+      "category": "虹臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/227"
+    },
+    {
+      "id": 159,
+      "name": "银丝箭蚁",
+      "scientificName": "Cataglyphis bombycina",
+      "displayName": "银丝箭蚁（银丝蚁）",
+      "category": "箭蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/159"
+    },
+    {
+      "id": 2064,
+      "name": "锈色弓背蚁",
+      "scientificName": "Camponotus chromaiodes",
+      "displayName": "锈色弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2064"
+    },
+    {
+      "id": 34,
+      "name": "锡兰华丽蚁",
+      "scientificName": "Paratopula ceylonica",
+      "displayName": "锡兰华丽蚁",
+      "category": "华丽蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/34"
+    },
+    {
+      "id": 272,
+      "name": "锡兰双节行军蚁",
+      "scientificName": "Aenictus ceylonicus",
+      "displayName": "锡兰双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/272"
+    },
+    {
+      "id": 385,
+      "name": "长头弓背蚁",
+      "scientificName": "Camponotus longiceps",
+      "displayName": "长头弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/385"
+    },
+    {
+      "id": 542,
+      "name": "长头盘腹蚁",
+      "scientificName": "Aphaenogaster longiceps",
+      "displayName": "长头盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/542"
+    },
+    {
+      "id": 288,
+      "name": "长柄小盲猛蚁",
+      "scientificName": "Probolomyrmex longiscapus",
+      "displayName": "长柄小盲猛蚁",
+      "category": "小盲猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/288"
+    },
+    {
+      "id": 2056,
+      "name": "长毛弓背蚁",
+      "scientificName": "Camponotus nipponensis",
+      "displayName": "长毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2056"
+    },
+    {
+      "id": 361,
+      "name": "长瘤颚蚁",
+      "scientificName": "Strumigenys exilirhina",
+      "displayName": "长瘤颚蚁",
+      "category": "瘤颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/361"
+    },
+    {
+      "id": 466,
+      "name": "长结双节行军蚁",
+      "scientificName": "Aenictus longinodus",
+      "displayName": "长结双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/466"
+    },
+    {
+      "id": 495,
+      "name": "长结织叶蚁",
+      "scientificName": "Oecophylla longinoda",
+      "displayName": "长结织叶蚁",
+      "category": "织叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/495"
+    },
+    {
+      "id": 224,
+      "name": "长角立毛蚁",
+      "scientificName": "Paratrechina longicornis",
+      "displayName": "长角立毛蚁",
+      "category": "立毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/224"
+    },
+    {
+      "id": 331,
+      "name": "长足恐猛蚁",
+      "scientificName": "Dinoponera longipes",
+      "displayName": "长足恐猛蚁",
+      "category": "恐猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/331"
+    },
+    {
+      "id": 376,
+      "name": "长颚钝猛蚁",
+      "scientificName": "Amblyopone longidens",
+      "displayName": "长颚钝猛蚁",
+      "category": "钝猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/376"
+    },
+    {
+      "id": 505,
+      "name": "阿伦大头蚁",
+      "scientificName": "Pheidole allani",
+      "displayName": "阿伦大头蚁",
+      "category": "大头蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/505"
+    },
+    {
+      "id": 2320,
+      "name": "阿根廷拟芭切叶蚁",
+      "scientificName": "Pseudoatta argentina",
+      "displayName": "阿根廷拟芭切叶蚁",
+      "category": "拟芭切叶蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2320"
+    },
+    {
+      "id": 85,
+      "name": "阿玛多刺蚁",
+      "scientificName": "Polyrhachis armata",
+      "displayName": "阿玛多刺蚁",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/85"
+    },
+    {
+      "id": 1716,
+      "name": "阿玛多刺蚁 防御亚种",
+      "scientificName": "Polyrhachis armata defensa",
+      "displayName": "阿玛多刺蚁 防御亚种",
+      "category": "多刺蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1716"
+    },
+    {
+      "id": 151,
+      "name": "阿禄斜结蚁",
+      "scientificName": "Plagiolepis alluaudi",
+      "displayName": "阿禄斜结蚁",
+      "category": "斜结蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/151"
+    },
+    {
+      "id": 608,
+      "name": "阿育王弓背蚁",
+      "scientificName": "Camponotus ashokai",
+      "displayName": "阿育王弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/608"
+    },
+    {
+      "id": 2559,
+      "name": "陕西铺道蚁",
+      "scientificName": "Tetramorium shensiense",
+      "displayName": "陕西铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2559"
+    },
+    {
+      "id": 1553,
+      "name": "隆胸盘腹蚁",
+      "scientificName": "Aphaenogaster gibbosa",
+      "displayName": "隆胸盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1553"
+    },
+    {
+      "id": 497,
+      "name": "隈取瘤颚蚁",
+      "scientificName": "Strumigenys kumadori",
+      "displayName": "隈取瘤颚蚁",
+      "category": "瘤颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/497"
+    },
+    {
+      "id": 325,
+      "name": "雄王穴细蚁",
+      "scientificName": "Opamyrma hungvuong",
+      "displayName": "雄王穴细蚁",
+      "category": "穴细蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/325"
+    },
+    {
+      "id": 1526,
+      "name": "雕刻盘腹蚁",
+      "scientificName": "Aphaenogaster exasperata",
+      "displayName": "雕刻盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1526"
+    },
+    {
+      "id": 461,
+      "name": "雨师尖尾蚁",
+      "scientificName": "Acropyga yushi",
+      "displayName": "雨师尖尾蚁",
+      "category": "尖尾蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/461"
+    },
+    {
+      "id": 2013,
+      "name": "多毛弓背蚁",
+      "scientificName": "Camponotus niveosetosus",
+      "displayName": "多毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2013"
+    },
+    {
+      "id": 261,
+      "name": "霍氏双节行军蚁",
+      "scientificName": "Aenictus hodgsoni",
+      "displayName": "霍氏双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/261"
+    },
+    {
+      "id": 618,
+      "name": "非凡弓背蚁",
+      "scientificName": "Camponotus egregius",
+      "displayName": "非凡弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/618"
+    },
+    {
+      "id": 564,
+      "name": "非洲贼蚁",
+      "scientificName": "Carebara vidua",
+      "displayName": "非洲贼蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/564"
+    },
+    {
+      "id": 2304,
+      "name": "鞍弓背蚁",
+      "scientificName": "Camponotus ephippium",
+      "displayName": "鞍弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2304"
+    },
+    {
+      "id": 2533,
+      "name": "韦氏行军蚁（韦氏双节行军蚁）",
+      "scientificName": "Aenictus weissi",
+      "displayName": "韦氏行军蚁（韦氏双节行军蚁）",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2533"
+    },
+    {
+      "id": 792,
+      "name": "须弓背蚁",
+      "scientificName": "Camponotus barbatus",
+      "displayName": "须弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/792"
+    },
+    {
+      "id": 382,
+      "name": "人厌弓背蚁",
+      "scientificName": "Camponotus barbosus",
+      "displayName": "人厌弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/382"
+    },
+    {
+      "id": 994,
+      "name": "须收获蚁",
+      "scientificName": "Messor rugosus",
+      "displayName": "须收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/994"
+    },
+    {
+      "id": 355,
+      "name": "飘细长蚁",
+      "scientificName": "Tetraponera allaborans",
+      "displayName": "飘细长蚁",
+      "category": "细长蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/355"
+    },
+    {
+      "id": 129,
+      "name": "食客铺道蚁",
+      "scientificName": "Tetramorium inquilinum",
+      "displayName": "食客铺道蚁",
+      "category": "铺道蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/129"
+    },
+    {
+      "id": 2300,
+      "name": "饕餮牛蚁",
+      "scientificName": "Myrmecia esuriens",
+      "displayName": "饕餮牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2300"
+    },
+    {
+      "id": 299,
+      "name": "马拉维短猛蚁",
+      "scientificName": "Brachyponera sennaarensis",
+      "displayName": "马拉维短猛蚁",
+      "category": "短猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/299"
+    },
+    {
+      "id": 211,
+      "name": "马达拉钩猛蚁",
+      "scientificName": "Anochetus madaraszi",
+      "displayName": "马达拉钩猛蚁",
+      "category": "钩猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/211"
+    },
+    {
+      "id": 59,
+      "name": "马里科帕须蚁",
+      "scientificName": "Pogonomyrmex maricopa",
+      "displayName": "马里科帕须蚁",
+      "category": "须蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/59"
+    },
+    {
+      "id": 603,
+      "name": "驼色弓背蚁",
+      "scientificName": "Camponotus camelinus",
+      "displayName": "驼色弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/603"
+    },
+    {
+      "id": 573,
+      "name": "高作瘤颚蚁",
+      "scientificName": "Strumigenys takasago",
+      "displayName": "高作瘤颚蚁",
+      "category": "瘤颚蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/573"
+    },
+    {
+      "id": 2369,
+      "name": "高桥盘腹蚁",
+      "scientificName": "Aphaenogaster takahashii",
+      "displayName": "高桥盘腹蚁",
+      "category": "盘腹蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2369"
+    },
+    {
+      "id": 550,
+      "name": "高真结蚁",
+      "scientificName": "Euprenolepis procera",
+      "displayName": "高真结蚁",
+      "category": "真结蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/550"
+    },
+    {
+      "id": 305,
+      "name": "高结盲切叶蚁",
+      "scientificName": "Carebara altinodus",
+      "displayName": "高结盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/305"
+    },
+    {
+      "id": 985,
+      "name": "麦氏收获蚁",
+      "scientificName": "Messor mcarthuri",
+      "displayName": "麦氏收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/985"
+    },
+    {
+      "id": 383,
+      "name": "黄头弓背蚁",
+      "scientificName": "Camponotus gilviceps",
+      "displayName": "黄头弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/383"
+    },
+    {
+      "id": 2365,
+      "name": "黄尾牛蚁",
+      "scientificName": "Myrmecia apicalis",
+      "displayName": "黄尾牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2365"
+    },
+    {
+      "id": 601,
+      "name": "黄毛弓背蚁",
+      "scientificName": "Camponotus auratiacus",
+      "displayName": "黄毛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/601"
+    },
+    {
+      "id": 515,
+      "name": "黄毛蚁",
+      "scientificName": "Lasius flavus",
+      "displayName": "黄毛蚁",
+      "category": "毛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/515"
+    },
+    {
+      "id": 42,
+      "name": "黄猄蚁",
+      "scientificName": "Oecophylla smaragdina",
+      "displayName": "黄猄蚁",
+      "category": "织叶蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/42"
+    },
+    {
+      "id": 1740,
+      "name": "黄短猛蚁",
+      "scientificName": "Brachyponera lutea",
+      "displayName": "黄短猛蚁",
+      "category": "短猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1740"
+    },
+    {
+      "id": 28,
+      "name": "黄腹弓背蚁",
+      "scientificName": "Camponotus helvus",
+      "displayName": "黄腹弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/28"
+    },
+    {
+      "id": 2183,
+      "name": "黄色行军蚁",
+      "scientificName": "Dorylus fulvus",
+      "displayName": "黄色行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2183"
+    },
+    {
+      "id": 335,
+      "name": "黄足尼氏蚁",
+      "scientificName": "Nylanderia flavipes",
+      "displayName": "黄足尼氏蚁",
+      "category": "尼氏蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/335"
+    },
+    {
+      "id": 148,
+      "name": "黄足短猛蚁",
+      "scientificName": "Brachyponera luteipes",
+      "displayName": "黄足短猛蚁",
+      "category": "短猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/148"
+    },
+    {
+      "id": 444,
+      "name": "黄跗牛蚁",
+      "scientificName": "Myrmecia tarsata",
+      "displayName": "黄跗牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/444"
+    },
+    {
+      "id": 1557,
+      "name": "黑头弓背蚁",
+      "scientificName": "Camponotus nigriceps",
+      "displayName": "黑头弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1557"
+    },
+    {
+      "id": 88,
+      "name": "黑头牛蚁",
+      "scientificName": "Myrmecia nigriceps",
+      "displayName": "黑头牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/88"
+    },
+    {
+      "id": 254,
+      "name": "黑头酸臭蚁",
+      "scientificName": "Tapinoma melanocephalum",
+      "displayName": "黑头酸臭蚁",
+      "category": "酸臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/254"
+    },
+    {
+      "id": 139,
+      "name": "黑带牛蚁",
+      "scientificName": "Myrmecia nigrocincta",
+      "displayName": "黑带牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/139"
+    },
+    {
+      "id": 170,
+      "name": "黑柄牛蚁",
+      "scientificName": "Myrmecia nigriscapa",
+      "displayName": "黑柄牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/170"
+    },
+    {
+      "id": 142,
+      "name": "梨形牛蚁",
+      "scientificName": "Myrmecia pyriformis",
+      "displayName": "梨形牛蚁",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/142"
+    },
+    {
+      "id": 141,
+      "name": "黑毛蚁",
+      "scientificName": "Lasius niger",
+      "displayName": "黑毛蚁",
+      "category": "毛蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/141"
+    },
+    {
+      "id": 145,
+      "name": "黑沟盲切叶蚁",
+      "scientificName": "Carebara melasolena",
+      "displayName": "黑沟盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/145"
+    },
+    {
+      "id": 992,
+      "name": "黑海收获蚁",
+      "scientificName": "Messor ponticus",
+      "displayName": "黑海收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/992"
+    },
+    {
+      "id": 364,
+      "name": "黑火蚁",
+      "scientificName": "Solenopsis richteri",
+      "displayName": "黑火蚁",
+      "category": "火蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/364"
+    },
+    {
+      "id": 1125,
+      "name": "黑盾龟蚁",
+      "scientificName": "Cephalotes atratu",
+      "displayName": "黑盾龟蚁",
+      "category": "龟蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1125"
+    },
+    {
+      "id": 547,
+      "name": "黑细长蚁",
+      "scientificName": "Tetraponera nigra",
+      "displayName": "黑细长蚁",
+      "category": "细长蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/547"
+    },
+    {
+      "id": 68,
+      "name": "黑腹小家蚁",
+      "scientificName": "Monomorium intrudens",
+      "displayName": "黑腹小家蚁",
+      "category": "小家蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/68"
+    },
+    {
+      "id": 220,
+      "name": "黑色短猛蚁",
+      "scientificName": "Brachyponera nigrita",
+      "displayName": "黑色短猛蚁",
+      "category": "短猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/220"
+    },
+    {
+      "id": 300,
+      "name": "黑衣龟蚁",
+      "scientificName": "Cephalotes atratus",
+      "displayName": "黑衣龟蚁",
+      "category": "龟蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/300"
+    },
+    {
+      "id": 182,
+      "name": "黑褐举腹蚁",
+      "scientificName": "Crematogaster rogenhoferi",
+      "displayName": "黑褐举腹蚁",
+      "category": "举腹蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/182"
+    },
+    {
+      "id": 760,
+      "name": "勤劳小家蚁",
+      "scientificName": "Monomorium ergatogyna",
+      "displayName": "勤劳小家蚁",
+      "category": "小家蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/760"
+    },
+    {
+      "id": 1124,
+      "name": "黑角弓背蚁",
+      "scientificName": "Camponotus nigricans",
+      "displayName": "黑角弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1124"
+    },
+    {
+      "id": 1497,
+      "name": "鼠弓背蚁",
+      "scientificName": "Camponotus mus",
+      "displayName": "鼠弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1497"
+    },
+    {
+      "id": 313,
+      "name": "齿突双节行军蚁",
+      "scientificName": "Aenictus dentatus",
+      "displayName": "齿突双节行军蚁",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/313"
+    },
+    {
+      "id": 979,
+      "name": "齿节收获蚁",
+      "scientificName": "Messor denticornis",
+      "displayName": "齿节收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/979"
+    },
+    {
+      "id": 256,
+      "name": "齿跗枪盾猛蚁",
+      "scientificName": "Paltothyreus tarsatus",
+      "displayName": "齿跗枪盾猛蚁",
+      "category": "枪盾猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/256"
+    },
+    {
+      "id": 290,
+      "name": "龙王斜结蚁",
+      "scientificName": "Plagiolepis longwang",
+      "displayName": "龙王斜结蚁",
+      "category": "斜结蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/290"
+    },
+    {
+      "id": 2224,
+      "name": "龙盲切叶蚁",
+      "scientificName": "Carebara diversa draco",
+      "displayName": "龙盲切叶蚁",
+      "category": "巨首蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2224"
+    },
+    {
+      "id": 2091,
+      "name": "SP17牛蚁",
+      "scientificName": "Myrmecia sp.17",
+      "displayName": "SP17牛蚁（未定种）",
+      "category": "牛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2091",
+      "unidentified": true
+    },
+    {
+      "id": 2649,
+      "name": "丝腹弓背蚁（君王亚种）",
+      "scientificName": "Camponotus sericeiventris rex",
+      "displayName": "丝腹弓背蚁（君王亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2649",
+      "unidentified": false
+    },
+    {
+      "id": 2648,
+      "name": "丝腹弓背蚁指名亚种",
+      "scientificName": "Camponotus sericeiventris sericeiventris",
+      "displayName": "丝腹弓背蚁指名亚种",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2648",
+      "unidentified": false
+    },
+    {
+      "id": 2585,
+      "name": "凶猛弓背蚁",
+      "scientificName": "Camponotus rapax",
+      "displayName": "凶猛弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2585",
+      "unidentified": false
+    },
+    {
+      "id": 282,
+      "name": "双齿多刺蚁",
+      "scientificName": "Polyrhachis dives",
+      "displayName": "双齿多刺蚁",
+      "category": "多刺蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/282",
+      "unidentified": false
+    },
+    {
+      "id": 188,
+      "name": "四斑弓背蚁",
+      "scientificName": "Camponotus quadrinotatus",
+      "displayName": "四斑弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/188",
+      "unidentified": false
+    },
+    {
+      "id": 334,
+      "name": "多毛真猛蚁",
+      "scientificName": "Euponera pilosior",
+      "displayName": "多毛真猛蚁（Euponera pilosior）",
+      "category": "真猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/334",
+      "unidentified": false
+    },
+    {
+      "id": 319,
+      "name": "多毛真猛蚁",
+      "scientificName": "Fisheropone pilosior",
+      "displayName": "多毛真猛蚁（Fisheropone pilosior）",
+      "category": "费猛蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/319",
+      "unidentified": false
+    },
+    {
+      "id": 154,
+      "name": "大眼响蚁",
+      "scientificName": "Nothomyrmecia macrops",
+      "displayName": "大眼响蚁",
+      "category": "响蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/154",
+      "unidentified": false
+    },
+    {
+      "id": 295,
+      "name": "大眼响蚁",
+      "scientificName": "Nothomyrmecia macrops",
+      "displayName": "大眼响蚁",
+      "category": "响蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/295",
+      "unidentified": false,
+      "mergedInto": 154
+    },
+    {
+      "id": 164,
+      "name": "宾氏长齿蚁",
+      "scientificName": "Myrmoteras binghamii",
+      "displayName": "宾氏长齿蚁",
+      "category": "长齿蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/164",
+      "unidentified": false
+    },
+    {
+      "id": 2544,
+      "name": "宾氏长齿蚁",
+      "scientificName": "Myrmoteras binghamii",
+      "displayName": "宾氏长齿蚁",
+      "category": "长齿蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2544",
+      "unidentified": false,
+      "mergedInto": 164
+    },
+    {
+      "id": 498,
+      "name": "微颚齿收获蚁",
+      "scientificName": "Messor minusculus（Messor nondentatus）",
+      "displayName": "微颚齿收获蚁",
+      "category": "收获蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/498",
+      "unidentified": false
+    },
+    {
+      "id": 384,
+      "name": "易怒弓背蚁",
+      "scientificName": "Camponotus irritabilis",
+      "displayName": "易怒弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/384",
+      "unidentified": false
+    },
+    {
+      "id": 194,
+      "name": "无毛凹臭蚁",
+      "scientificName": "Ochetellus glaber",
+      "displayName": "无毛凹臭蚁",
+      "category": "凹臭蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/194",
+      "unidentified": false
+    },
+    {
+      "id": 1554,
+      "name": "无毛短蚁",
+      "scientificName": "Brachymyrmex depilis",
+      "displayName": "无毛短蚁",
+      "category": "短蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/1554",
+      "unidentified": false
+    },
+    {
+      "id": 570,
+      "name": "无颚齿收获蚁",
+      "scientificName": "Messor nondentatus",
+      "displayName": "无颚齿收获蚁",
+      "category": "收获蚁",
+      "existing": true,
+      "sourceUrl": "https://antden.net/antShow/570",
+      "unidentified": false
+    },
+    {
+      "id": 303,
+      "name": "毕氏双节行军蚁",
+      "scientificName": "Aenictus bihamatus",
+      "displayName": "毕氏双节行军蚁（Aenictus bihamatus）",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/303",
+      "unidentified": false
+    },
+    {
+      "id": 591,
+      "name": "毕氏双节行军蚁",
+      "scientificName": "Aenictus biroi",
+      "displayName": "毕氏双节行军蚁（Aenictus biroi）",
+      "category": "双节行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/591",
+      "unidentified": false
+    },
+    {
+      "id": 2666,
+      "name": "满茸弓背蚁（指名亚种）",
+      "scientificName": "Camponotus suffusus suffusus",
+      "displayName": "满茸弓背蚁（指名亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2666",
+      "unidentified": false
+    },
+    {
+      "id": 2667,
+      "name": "满茸弓背蚁（本迪戈亚种）",
+      "scientificName": "Camponotus suffusus bendigensis",
+      "displayName": "满茸弓背蚁（本迪戈亚种）",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2667",
+      "unidentified": false
+    },
+    {
+      "id": 2561,
+      "name": "非洲行军蚁",
+      "scientificName": "Dorylus gribodoi",
+      "displayName": "非洲行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/2561",
+      "unidentified": false
+    },
+    {
+      "id": 187,
+      "name": "黄斑弓背蚁",
+      "scientificName": "Camponotus albosparsus",
+      "displayName": "黄斑弓背蚁",
+      "category": "弓背蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/187",
+      "unidentified": false
+    },
+    {
+      "id": 526,
+      "name": "黑色行军蚁",
+      "scientificName": "Dorylus nigricans",
+      "displayName": "黑色行军蚁",
+      "category": "行军蚁",
+      "existing": false,
+      "sourceUrl": "https://antden.net/antShow/526",
+      "unidentified": false
+    }
+  ],
+  "excluded": [],
+  "mergedDuplicates": [
+    {
+      "sourceId": 295,
+      "canonicalId": 154,
+      "displayName": "大眼响蚁"
+    },
+    {
+      "sourceId": 2544,
+      "canonicalId": 164,
+      "displayName": "宾氏长齿蚁"
+    }
+  ],
+  "sharedAliases": {
+    "肩角弓背蚁": [
+      "丝腹弓背蚁指名亚种",
+      "丝腹弓背蚁（君王亚种）"
+    ],
+    "易怒弓背蚁": [
+      "凶猛弓背蚁",
+      "易怒弓背蚁"
+    ],
+    "拟黑多刺蚁": [
+      "双齿多刺蚁",
+      "拟黑多刺蚁"
+    ],
+    "黄斑弓背蚁": [
+      "四斑弓背蚁",
+      "黄斑弓背蚁"
+    ],
+    "多毛真猛蚁": [
+      "多毛真猛蚁（Euponera pilosior）",
+      "多毛真猛蚁（Fisheropone pilosior）"
+    ],
+    "无颚齿收获蚁": [
+      "微颚齿收获蚁",
+      "无颚齿收获蚁"
+    ],
+    "无毛凹臭蚁": [
+      "无毛凹臭蚁",
+      "无毛短蚁"
+    ],
+    "毕氏双节行军蚁": [
+      "毕氏双节行军蚁（Aenictus bihamatus）",
+      "毕氏双节行军蚁（Aenictus biroi）"
+    ],
+    "满绒弓背蚁": [
+      "满茸弓背蚁（指名亚种）",
+      "满茸弓背蚁（本迪戈亚种）"
+    ],
+    "黑色行军蚁": [
+      "非洲行军蚁",
+      "黑色行军蚁"
+    ]
+  },
+  "restoredSourceIds": [
+    2091,
+    2649,
+    2648,
+    2585,
+    282,
+    188,
+    334,
+    319,
+    154,
+    295,
+    164,
+    2544,
+    498,
+    384,
+    194,
+    1554,
+    570,
+    303,
+    591,
+    2666,
+    2667,
+    2561,
+    187,
+    526
+  ]
+}
