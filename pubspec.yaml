@@ -51,6 +51,7 @@ dependencies:
   flutter_local_notifications: ^21.0.0
   flutter_timezone: ^5.0.1
   timezone: ^0.11.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +76,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - docs/data/antden-species-import.json
 
   # To add assets to your application, add an assets section, like this:
   # assets:
