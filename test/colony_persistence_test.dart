@@ -32,6 +32,54 @@ void main() {
   });
 
   test(
+    'deleting a colony cascades only its records and backup references',
+    () async {
+      final now = DateTime(2026, 9, 30);
+      for (final id in ['deleted', 'retained']) {
+        await AppDatabase.instance.saveColony(
+          Colony(
+            id: id,
+            name: id,
+            coverPhotoPath: '$id-cover.jpg',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        for (var index = 0; index < 2; index++) {
+          await AppDatabase.instance.saveRecord(
+            CareRecord(
+              id: '$id-$index',
+              colonyId: id,
+              type: CareRecordType.observation,
+              occurredAt: now,
+              createdAt: now,
+              photos: ['$id-$index.jpg'],
+            ),
+          );
+        }
+      }
+      await AppDatabase.instance.deleteColony('deleted');
+      expect(await AppDatabase.instance.findColony('deleted'), isNull);
+      expect(await AppDatabase.instance.listRecords('deleted'), isEmpty);
+      expect(await AppDatabase.instance.findColony('retained'), isNotNull);
+      expect(await AppDatabase.instance.listRecords('retained'), hasLength(2));
+      final snapshot = await AppDatabase.instance.snapshot();
+      expect(AppDatabase.instance.photoPaths(snapshot), {
+        'retained-cover.jpg',
+        'retained-0.jpg',
+        'retained-1.jpg',
+      });
+      await AppDatabase.instance.replaceAll(snapshot);
+      expect(await AppDatabase.instance.findColony('deleted'), isNull);
+      expect(await AppDatabase.instance.listRecords('deleted'), isEmpty);
+      expect(await AppDatabase.instance.listRecords('retained'), hasLength(2));
+      await AppDatabase.instance.deleteColony('retained');
+      expect(await AppDatabase.instance.listColonies(), isEmpty);
+      expect(await AppDatabase.instance.listRecentRecords(), isEmpty);
+    },
+  );
+
+  test(
     'updating a colony retains its foreign-key-linked care records',
     () async {
       final now = DateTime(2026, 9, 29);

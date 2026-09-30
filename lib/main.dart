@@ -1555,6 +1555,7 @@ class ColonyDetailPage extends StatefulWidget {
 
 class _ColonyDetailPageState extends State<ColonyDetailPage> {
   late Future<_Detail> _detail;
+  bool _deleting = false;
   bool _editingAcquiredOn = false;
   bool _includeBrood = false;
   @override
@@ -1571,6 +1572,41 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
     await AppDatabase.instance.findColony(widget.colonyId),
     await AppDatabase.instance.listRecords(widget.colonyId),
   );
+
+  Future<void> _deleteColony(Colony colony) async {
+    if (_deleting) return;
+    setState(() => _deleting = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('删除蚁群？'),
+          content: Text('确定删除「${colony.name}」吗？该蚁群及全部养护记录将被删除，此操作无法撤销。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('确认删除'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      await AppDatabase.instance.deleteColony(colony.id);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
 
   Future<void> _editAcquiredOn(Colony colony) async {
     if (_editingAcquiredOn) return;
@@ -1610,26 +1646,38 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             IconButton(
               tooltip: '编辑蚁群',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () async {
-                final saved = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => ColonyFormPage(colony: colony),
-                  ),
-                );
-                if (saved == true && mounted) setState(_reload);
-              },
+              onPressed: _deleting
+                  ? null
+                  : () async {
+                      final saved = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => ColonyFormPage(colony: colony),
+                        ),
+                      );
+                      if (saved == true && mounted) setState(_reload);
+                    },
+            ),
+            IconButton(
+              tooltip: '删除蚁群',
+              icon: const Icon(Icons.delete_outline),
+              color: Theme.of(context).colorScheme.error,
+              onPressed: _deleting ? null : () => _deleteColony(colony),
             ),
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
           icon: const Icon(Icons.add),
           label: const Text('添加记录'),
-          onPressed: () async {
-            final saved = await Navigator.of(context).push<bool>(
-              MaterialPageRoute(builder: (_) => RecordFormPage(colony: colony)),
-            );
-            if (saved == true && mounted) setState(_reload);
-          },
+          onPressed: _deleting
+              ? null
+              : () async {
+                  final saved = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => RecordFormPage(colony: colony),
+                    ),
+                  );
+                  if (saved == true && mounted) setState(_reload);
+                },
         ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),

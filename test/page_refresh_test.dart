@@ -19,6 +19,7 @@ void main() {
   };
   final records = tables['feeder_records']!;
   late Directory directory;
+  bool failColonyDeletion = false;
 
   setUpAll(() async {
     directory = await Directory.systemTemp.createTemp('antkeep-feeder-test-');
@@ -60,6 +61,19 @@ void main() {
             case 'update':
               final sql = call.arguments['sql'] as String;
               final values = call.arguments['arguments'] as List<dynamic>;
+              if (sql == 'DELETE FROM colonies WHERE id = ?') {
+                if (failColonyDeletion) {
+                  throw PlatformException(code: 'delete_failed');
+                }
+                final count = tables['colonies']!.length;
+                tables['colonies']!.removeWhere(
+                  (row) => row['id'] == values.single,
+                );
+                tables['care_records']!.removeWhere(
+                  (row) => row['colony_id'] == values.single,
+                );
+                return count - tables['colonies']!.length;
+              }
               final table = RegExp(r'UPDATE (\w+)').firstMatch(sql)!.group(1)!;
               final columns = RegExp(
                 r'(\w+) = (\?|NULL)',
@@ -123,6 +137,7 @@ void main() {
   });
 
   setUp(() {
+    failColonyDeletion = false;
     for (final rows in tables.values) {
       rows.clear();
     }
@@ -150,6 +165,78 @@ void main() {
       await tester.enterText(input, '0');
     }
   }
+
+  testWidgets('colony deletion requires confirmation and refreshes the list', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 9, 30);
+    for (final id in ['待删除', '保留']) {
+      tables['colonies']!.add(
+        Colony(id: id, name: id, createdAt: now, updatedAt: now).toMap(),
+      );
+      tables['care_records']!.add(
+        CareRecord(
+          id: '$id-record',
+          colonyId: id,
+          type: CareRecordType.observation,
+          occurredAt: now,
+          createdAt: now,
+        ).toMap(),
+      );
+    }
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('待删除'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('删除蚁群'));
+    await tester.pumpAndSettle();
+    expect(find.text('删除蚁群？'), findsOneWidget);
+    expect(find.textContaining('「待删除」'), findsOneWidget);
+    expect(tables['colonies'], hasLength(2));
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ColonyDetailPage), findsOneWidget);
+    expect(tables['colonies'], hasLength(2));
+    expect(tables['care_records'], hasLength(2));
+
+    // Dismissing the dialog is also cancellation.
+    await tester.tap(find.byTooltip('删除蚁群'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(tables['colonies'], hasLength(2));
+
+    failColonyDeletion = true;
+    await tester.tap(find.byTooltip('删除蚁群'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ColonyDetailPage), findsOneWidget);
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(tables['colonies'], hasLength(2));
+    expect(tables['care_records'], hasLength(2));
+
+    failColonyDeletion = false;
+    await tester.tap(find.byTooltip('删除蚁群'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ColonyDetailPage), findsNothing);
+    expect(find.text('待删除'), findsNothing);
+    expect(find.text('保留'), findsOneWidget);
+    expect(tables['colonies']!.single['id'], '保留');
+    expect(tables['care_records']!.single['colony_id'], '保留');
+
+    await tester.tap(find.text('保留'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('删除蚁群'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+    expect(find.text('还没有蚁群'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('husbandry duration appears in the list and colony detail', (
     tester,
