@@ -19,7 +19,9 @@ class Colony {
     this.initialEggCount,
     this.initialCocoonCount,
     this.nestType,
+    this.targetTemperatureLower,
     this.targetTemperature,
+    this.targetHumidityLower,
     this.targetHumidity,
     this.coverPhotoPath,
     this.archived = false,
@@ -40,7 +42,9 @@ class Colony {
   final int? initialEggCount;
   final int? initialCocoonCount;
   final String? nestType;
+  final double? targetTemperatureLower;
   final double? targetTemperature;
+  final double? targetHumidityLower;
   final double? targetHumidity;
   final String? coverPhotoPath;
   final bool archived;
@@ -89,7 +93,10 @@ class Colony {
     initialEggCount: map['initial_egg_count'] as int?,
     initialCocoonCount: map['initial_cocoon_count'] as int?,
     nestType: map['nest_type'] as String?,
+    targetTemperatureLower: (map['target_temperature_lower'] as num?)
+        ?.toDouble(),
     targetTemperature: (map['target_temperature'] as num?)?.toDouble(),
+    targetHumidityLower: (map['target_humidity_lower'] as num?)?.toDouble(),
     targetHumidity: (map['target_humidity'] as num?)?.toDouble(),
     coverPhotoPath: map['cover_photo_path'] as String?,
     archived: (map['archived'] as int? ?? 0) == 1,
@@ -111,7 +118,9 @@ class Colony {
     'initial_egg_count': initialEggCount,
     'initial_cocoon_count': initialCocoonCount,
     'nest_type': nestType,
+    'target_temperature_lower': targetTemperatureLower,
     'target_temperature': targetTemperature,
+    'target_humidity_lower': targetHumidityLower,
     'target_humidity': targetHumidity,
     'cover_photo_path': coverPhotoPath,
     'archived': archived ? 1 : 0,

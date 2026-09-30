@@ -52,7 +52,7 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
       expect(
         tester
-            .widget<TextFormField>(find.widgetWithText(TextFormField, '蚁群昵称 *'))
+            .widget<TextFormField>(find.byKey(const ValueKey('colony-name')))
             .controller!
             .text,
         expected.keys.last,

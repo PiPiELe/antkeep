@@ -744,7 +744,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _workers = TextEditingController();
   final _eggs = TextEditingController();
   final _cocoons = TextEditingController();
+  final _targetTemperatureLower = TextEditingController();
   final _targetTemperature = TextEditingController();
+  final _targetHumidityLower = TextEditingController();
   final _targetHumidity = TextEditingController();
   String? _speciesFamily;
   String? _selectedSpecies;
@@ -767,7 +769,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     _workers.text = colony.initialWorkerCount?.toString() ?? '';
     _eggs.text = colony.initialEggCount?.toString() ?? '';
     _cocoons.text = colony.initialCocoonCount?.toString() ?? '';
+    _targetTemperatureLower.text =
+        colony.targetTemperatureLower?.toString() ?? '';
     _targetTemperature.text = colony.targetTemperature?.toString() ?? '';
+    _targetHumidityLower.text = colony.targetHumidityLower?.toString() ?? '';
     _targetHumidity.text = colony.targetHumidity?.toString() ?? '';
     _selectedSpecies = colony.species;
     for (final entry in _speciesOptions.entries) {
@@ -793,7 +798,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       _workers,
       _eggs,
       _cocoons,
+      _targetTemperatureLower,
       _targetTemperature,
+      _targetHumidityLower,
       _targetHumidity,
     ]) {
       controller.dispose();
@@ -805,6 +812,24 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     if (value == null || value.trim().isEmpty) return null;
     final count = int.tryParse(value.trim());
     return count == null || count < 0 ? '请输入非负整数，未知可留空' : null;
+  }
+
+  String? _validateRequiredCount(String? value) =>
+      value == null || value.trim().isEmpty ? '请填写数量' : _validateCount(value);
+
+  String? _validateAlertLimit(
+    String? value,
+    TextEditingController counterpart, {
+    required bool isLower,
+  }) {
+    if (value == null || value.trim().isEmpty) return null;
+    final number = double.tryParse(value.trim());
+    if (number == null) return '请输入有效数值';
+    final other = double.tryParse(counterpart.text.trim());
+    if (other == null) return null;
+    if (isLower && number > other) return '下限不能高于上限';
+    if (!isLower && number < other) return '上限不能低于下限';
+    return null;
   }
 
   Future<void> _save() async {
@@ -827,7 +852,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           initialEggCount: int.tryParse(_eggs.text),
           initialCocoonCount: int.tryParse(_cocoons.text),
           nestType: _selectedNest,
+          targetTemperatureLower: double.tryParse(_targetTemperatureLower.text),
           targetTemperature: double.tryParse(_targetTemperature.text),
+          targetHumidityLower: double.tryParse(_targetHumidityLower.text),
           targetHumidity: double.tryParse(_targetHumidity.text),
           coverPhotoPath: _cover == null
               ? widget.colony?.coverPhotoPath
@@ -949,6 +976,31 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     }
   }
 
+  Widget _section({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) => Card(
+    clipBehavior: Clip.antiAlias,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(widget.colony == null ? '新入手蚁群' : '编辑蚁群')),
@@ -957,72 +1009,115 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SearchableChoiceField(
-            label: '品种分类/细分种类',
-            hintText: '点击选择或搜索品种',
-            value: [?_speciesFamily, ?_selectedSpecies].join(' / '),
-            options: _speciesOptions.keys.toList(),
-            searchOptions: {
-              for (final entry in _speciesOptions.entries)
-                for (final species in entry.value) species: entry.key,
-            },
-            onSelected: _selectFamily,
-            onSearchSelected: _selectSpecies,
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _enterCustomSpecies,
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('未收录？手动填写品种'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _name,
-            decoration: const InputDecoration(
-              labelText: '蚁群昵称 *',
-              hintText: '例如：红土一号',
-            ),
-            validator: (value) =>
-                _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          _section(
+            icon: Icons.pest_control_outlined,
+            title: '品种',
             children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _queens,
-                  validator: _validateCount,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '蚁后数量'),
-                ),
+              _SearchableChoiceField(
+                label: '品种分类/细分种类',
+                hintText: '点击选择或搜索品种',
+                value: [?_speciesFamily, ?_selectedSpecies].join(' / '),
+                options: _speciesOptions.keys.toList(),
+                searchOptions: {
+                  for (final entry in _speciesOptions.entries)
+                    for (final species in entry.value) species: entry.key,
+                },
+                onSelected: _selectFamily,
+                onSearchSelected: _selectSpecies,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _workers,
-                  validator: _validateCount,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '初始工蚁数量',
-                    helperText: '初始工蚁为 0 表示从新后开始养；群规模随数量记录更新',
-                    helperMaxLines: 3,
-                  ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _enterCustomSpecies,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('未收录？手动填写品种'),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text('显示特化'),
-            value: _showSpecialized,
-            onChanged: (value) =>
-                setState(() => _showSpecialized = value ?? false),
+          _section(
+            icon: Icons.edit_outlined,
+            title: '蚁群昵称 *',
+            children: [
+              TextFormField(
+                key: const ValueKey('colony-name'),
+                controller: _name,
+                decoration: const InputDecoration(hintText: '例如：红土一号'),
+                validator: (value) =>
+                    _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+          _section(
+            icon: Icons.bar_chart_outlined,
+            title: '数量',
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _queens,
+                      validator: _validateRequiredCount,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '蚁后 *'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _workers,
+                      validator: _validateRequiredCount,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '工蚁 *'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _eggs,
+                      validator: _validateCount,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '卵',
+                        hintText: '可选',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _cocoons,
+                      validator: _validateCount,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '茧',
+                        hintText: '可选',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '工蚁填 0 表示从新后开始养',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: CheckboxListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('特化'),
+              value: _showSpecialized,
+              onChanged: (value) =>
+                  setState(() => _showSpecialized = value ?? false),
+            ),
+          ),
+          const SizedBox(height: 12),
           if (_showSpecialized) ...[
             TextFormField(
               controller: _specialized,
@@ -1034,119 +1129,164 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             ),
             const SizedBox(height: 12),
           ],
-          Row(
+          _section(
+            icon: Icons.home_outlined,
+            title: '巢体',
             children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _eggs,
-                  validator: _validateCount,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '卵数量（可选）'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _cocoons,
-                  validator: _validateCount,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '茧数量（可选）'),
-                ),
+              _SearchableChoiceField(
+                label: '巢体类型（可选）',
+                hintText: '点击搜索或选择巢体类型',
+                value: _selectedNest,
+                options: _nestTypeOptions,
+                onSelected: (nest) => setState(() => _selectedNest = nest),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _SearchableChoiceField(
-            label: '巢体类型',
-            hintText: '点击搜索或选择巢体类型',
-            value: _selectedNest,
-            options: _nestTypeOptions,
-            onSelected: (nest) => setState(() => _selectedNest = nest),
-          ),
-          const SizedBox(height: 12),
-          Text('环境预警上限（可选）', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Row(
+          _section(
+            icon: Icons.thermostat_outlined,
+            title: '环境预警（可选）',
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _targetTemperature,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _targetTemperatureLower,
+                      validator: (value) => _validateAlertLimit(
+                        value,
+                        _targetTemperature,
+                        isLower: true,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: '温度下限 °C'),
+                    ),
                   ),
-                  decoration: const InputDecoration(labelText: '温度上限 °C'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _targetHumidity,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _targetTemperature,
+                      validator: (value) => _validateAlertLimit(
+                        value,
+                        _targetTemperatureLower,
+                        isLower: false,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: '温度上限 °C'),
+                    ),
                   ),
-                  decoration: const InputDecoration(labelText: '湿度上限 %'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _source,
-            decoration: InputDecoration(
-              labelText: '来源',
-              hintText: '选择或填写来源',
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              helperText: '点击右侧箭头选择，也可手动填写',
-              helperMaxLines: 2,
-              suffixIcon: PopupMenuButton<String>(
-                tooltip: '选择来源',
-                icon: const Icon(Icons.arrow_drop_down),
-                onSelected: (source) => setState(() => _source.text = source),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: '野采', child: Text('野采')),
-                  PopupMenuItem(value: '网购', child: Text('网购')),
-                  PopupMenuItem(value: '蚁友赠送', child: Text('蚁友赠送')),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _targetHumidityLower,
+                      validator: (value) => _validateAlertLimit(
+                        value,
+                        _targetHumidity,
+                        isLower: true,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: '湿度下限 %'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _targetHumidity,
+                      validator: (value) => _validateAlertLimit(
+                        value,
+                        _targetHumidityLower,
+                        isLower: false,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: '湿度上限 %'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('超出范围时提醒', style: Theme.of(context).textTheme.bodySmall),
+            ],
           ),
           const SizedBox(height: 12),
-          _PurchasePriceField(controller: _purchasePrice),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.calendar_today_outlined),
-            label: Text(
-              _acquiredOn == null
-                  ? '选择入手日期（可选）'
-                  : '入手日期：${_date(_acquiredOn!)}',
-            ),
-            onPressed: () async {
-              final date = await showDatePicker(
-                context: context,
-                firstDate: DateTime(2000),
-                lastDate: DateTime.now(),
-                initialDate: _acquiredOn ?? DateTime.now(),
-              );
-              if (date != null) setState(() => _acquiredOn = date);
-            },
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.photo_outlined),
-            label: Text(
-              _cover != null
-                  ? '已选择封面照片'
-                  : widget.colony?.coverPhotoPath != null
-                  ? '更换封面照片'
-                  : '添加封面照片（可选）',
-            ),
-            onPressed: () async {
-              final image = await ImagePicker().pickImage(
-                source: ImageSource.gallery,
-                imageQuality: 86,
-              );
-              if (image != null) setState(() => _cover = image);
-            },
+          _section(
+            icon: Icons.receipt_long_outlined,
+            title: '来源与补充信息',
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _source,
+                      decoration: InputDecoration(
+                        labelText: '来源（可选）',
+                        suffixIcon: PopupMenuButton<String>(
+                          tooltip: '选择来源',
+                          icon: const Icon(Icons.arrow_drop_down),
+                          onSelected: (source) =>
+                              setState(() => _source.text = source),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: '野采', child: Text('野采')),
+                            PopupMenuItem(value: '网购', child: Text('网购')),
+                            PopupMenuItem(value: '蚁友赠送', child: Text('蚁友赠送')),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _PurchasePriceField(controller: _purchasePrice),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today_outlined),
+                label: Text(
+                  _acquiredOn == null
+                      ? '选择入手日期（可选）'
+                      : '入手日期：${_date(_acquiredOn!)}',
+                ),
+                onPressed: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                    initialDate: _acquiredOn ?? DateTime.now(),
+                  );
+                  if (date != null) setState(() => _acquiredOn = date);
+                },
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.photo_outlined),
+                label: Text(
+                  _cover != null
+                      ? '已选择封面照片'
+                      : widget.colony?.coverPhotoPath != null
+                      ? '更换封面照片'
+                      : '添加封面照片（可选）',
+                ),
+                onPressed: () async {
+                  final image = await ImagePicker().pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 86,
+                  );
+                  if (image != null) setState(() => _cover = image);
+                },
+              ),
+            ],
           ),
           const SizedBox(height: 28),
           FilledButton(
@@ -1315,16 +1455,18 @@ class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
                         separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (context, index) => ListTile(
                           title: Text(options[index].value),
-                          subtitle: options[index].category != null ||
+                          subtitle:
+                              options[index].category != null ||
                                   importedSpeciesDisambiguation.containsKey(
                                     options[index].value,
                                   )
-                              ? Text([
-                                  ?options[index].category,
-                                  ?importedSpeciesDisambiguation[
-                                    options[index].value
-                                  ],
-                                ].join(' · '))
+                              ? Text(
+                                  [
+                                    ?options[index].category,
+                                    ?importedSpeciesDisambiguation[options[index]
+                                        .value],
+                                  ].join(' · '),
+                                )
                               : null,
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => Navigator.pop(context, (
@@ -1580,81 +1722,105 @@ class _ColonySummary extends StatelessWidget {
   const _ColonySummary({required this.colony});
   final Colony colony;
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (colony.coverPhotoPath != null) ...[
-            _StoredImage(
-              relativePath: colony.coverPhotoPath!,
-              width: double.infinity,
-              height: 180,
-              borderRadius: 12,
-            ),
-            const SizedBox(height: 16),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  colony.species ?? '未填写品种',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+  Widget build(BuildContext context) {
+    String? alertRange(
+      String label,
+      double? lower,
+      double? upper,
+      String unit,
+    ) {
+      if (lower == null && upper == null) return null;
+      if (lower != null && upper != null) return '$label $lower–$upper$unit';
+      return lower != null ? '$label ≥ $lower$unit' : '$label ≤ $upper$unit';
+    }
+
+    final temperatureRange = alertRange(
+      '温度',
+      colony.targetTemperatureLower,
+      colony.targetTemperature,
+      '°C',
+    );
+    final humidityRange = alertRange(
+      '湿度',
+      colony.targetHumidityLower,
+      colony.targetHumidity,
+      '%',
+    );
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (colony.coverPhotoPath != null) ...[
+              _StoredImage(
+                relativePath: colony.coverPhotoPath!,
+                width: double.infinity,
+                height: 180,
+                borderRadius: 12,
               ),
-              if (colony.species?.trim().isNotEmpty == true) ...[
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  icon: const Icon(Icons.menu_book_outlined),
-                  label: const Text('百科'),
-                  onPressed: () {
-                    final species = colony.species!.trim();
-                    final query = _speciesAliases[species] ?? species;
-                    final profile = findSpeciesProfile(query);
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => profile == null
-                            ? SpeciesEncyclopediaPage(initialQuery: query)
-                            : SpeciesDetailPage(profile: profile),
-                      ),
-                    );
-                  },
+              const SizedBox(height: 16),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    colony.species ?? '未填写品种',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
+                if (colony.species?.trim().isNotEmpty == true) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    icon: const Icon(Icons.menu_book_outlined),
+                    label: const Text('百科'),
+                    onPressed: () {
+                      final species = colony.species!.trim();
+                      final query = _speciesAliases[species] ?? species;
+                      final profile = findSpeciesProfile(query);
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => profile == null
+                              ? SpeciesEncyclopediaPage(initialQuery: query)
+                              : SpeciesDetailPage(profile: profile),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (colony.queenCount != null)
-                Chip(label: Text('${colony.queenCount} 只蚁后')),
-              if (colony.showSpecialized && colony.specializedCount != null)
-                Chip(label: Text('${colony.specializedCount} 只特化')),
-              if (colony.initialWorkerCount != null)
-                Chip(label: Text('${colony.initialWorkerCount} 只工蚁')),
-              if (colony.initialEggCount != null)
-                Chip(label: Text('卵 ${colony.initialEggCount}')),
-              if (colony.initialCocoonCount != null)
-                Chip(label: Text('茧 ${colony.initialCocoonCount}')),
-              if (colony.nestType?.isNotEmpty == true)
-                Chip(label: Text(colony.nestType!)),
-              if (colony.targetTemperature != null)
-                Chip(label: Text('温度 ≤ ${colony.targetTemperature}°C')),
-              if (colony.targetHumidity != null)
-                Chip(label: Text('湿度 ≤ ${colony.targetHumidity}%')),
-              if (colony.acquiredOn != null)
-                Chip(label: Text('入手 ${_date(colony.acquiredOn!)}')),
-              if (colony.purchasePriceCents != null)
-                Chip(label: Text('购入价 ¥${colony.purchasePriceText}')),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (colony.queenCount != null)
+                  Chip(label: Text('${colony.queenCount} 只蚁后')),
+                if (colony.showSpecialized && colony.specializedCount != null)
+                  Chip(label: Text('${colony.specializedCount} 只特化')),
+                if (colony.initialWorkerCount != null)
+                  Chip(label: Text('${colony.initialWorkerCount} 只工蚁')),
+                if (colony.initialEggCount != null)
+                  Chip(label: Text('卵 ${colony.initialEggCount}')),
+                if (colony.initialCocoonCount != null)
+                  Chip(label: Text('茧 ${colony.initialCocoonCount}')),
+                if (colony.nestType?.isNotEmpty == true)
+                  Chip(label: Text(colony.nestType!)),
+                if (temperatureRange != null)
+                  Chip(label: Text(temperatureRange)),
+                if (humidityRange != null) Chip(label: Text(humidityRange)),
+                if (colony.acquiredOn != null)
+                  Chip(label: Text('入手 ${_date(colony.acquiredOn!)}')),
+                if (colony.purchasePriceCents != null)
+                  Chip(label: Text('购入价 ¥${colony.purchasePriceText}')),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class RecordFormPage extends StatefulWidget {
@@ -1903,14 +2069,22 @@ class _RecordCard extends StatelessWidget {
   final Colony? colony;
   @override
   Widget build(BuildContext context) {
-    final temperatureExceeded =
+    final temperatureAbove =
         record.temperature != null &&
         colony?.targetTemperature != null &&
         record.temperature! > colony!.targetTemperature!;
-    final humidityExceeded =
+    final temperatureBelow =
+        record.temperature != null &&
+        colony?.targetTemperatureLower != null &&
+        record.temperature! < colony!.targetTemperatureLower!;
+    final humidityAbove =
         record.humidity != null &&
         colony?.targetHumidity != null &&
         record.humidity! > colony!.targetHumidity!;
+    final humidityBelow =
+        record.humidity != null &&
+        colony?.targetHumidityLower != null &&
+        record.humidity! < colony!.targetHumidityLower!;
     final facts = <String>[
       if (record.temperature != null) '${record.temperature}°C',
       if (record.humidity != null) '${record.humidity}%',
@@ -1952,14 +2126,21 @@ class _RecordCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-            if (temperatureExceeded || humidityExceeded) ...[
+            if (temperatureAbove ||
+                temperatureBelow ||
+                humidityAbove ||
+                humidityBelow) ...[
               const SizedBox(height: 8),
               Text(
                 [
-                  if (temperatureExceeded)
+                  if (temperatureAbove)
                     '温度 ${record.temperature}°C 高于预设上限 ${colony!.targetTemperature}°C',
-                  if (humidityExceeded)
+                  if (temperatureBelow)
+                    '温度 ${record.temperature}°C 低于预设下限 ${colony!.targetTemperatureLower}°C',
+                  if (humidityAbove)
                     '湿度 ${record.humidity}% 高于预设上限 ${colony!.targetHumidity}%',
+                  if (humidityBelow)
+                    '湿度 ${record.humidity}% 低于预设下限 ${colony!.targetHumidityLower}%',
                 ].join('；'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.error,

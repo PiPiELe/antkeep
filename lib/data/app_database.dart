@@ -27,7 +27,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 13,
+      version: 14,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -45,7 +45,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0),
       specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0,
       initial_egg_count INTEGER, initial_cocoon_count INTEGER,
-      nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT,
+      nest_type TEXT, target_temperature_lower REAL, target_temperature REAL,
+      target_humidity_lower REAL, target_humidity REAL, cover_photo_path TEXT,
       archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     )''');
     await database.execute('''CREATE TABLE care_records (
@@ -149,6 +150,14 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
          purchased_at, expires_at, quantity, purchase_price_cents
         FROM inventory_items_old''');
       await database.execute('DROP TABLE inventory_items_old');
+    }
+    if (oldVersion < 14) {
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN target_temperature_lower REAL',
+      );
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN target_humidity_lower REAL',
+      );
     }
   }
 

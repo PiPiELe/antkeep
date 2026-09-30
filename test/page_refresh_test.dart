@@ -143,6 +143,14 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   }
 
+  Future<void> fillRequiredColonyCounts(WidgetTester tester) async {
+    for (final field in ['蚁后 *', '工蚁 *']) {
+      final input = find.widgetWithText(TextFormField, field);
+      await tester.ensureVisible(input);
+      await tester.enterText(input, '0');
+    }
+  }
+
   testWidgets('husbandry duration appears in the list and colony detail', (
     tester,
   ) async {
@@ -176,10 +184,8 @@ void main() {
     for (final name in ['测试蚁群一', '测试蚁群二']) {
       await tester.tap(find.widgetWithText(FloatingActionButton, '蚁群'));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextFormField, '蚁群昵称 *'),
-        name,
-      );
+      await tester.enterText(find.byKey(const ValueKey('colony-name')), name);
+      await fillRequiredColonyCounts(tester);
       await tapSave(tester, '保存蚁群');
       expect(find.byType(ColonyFormPage), findsNothing);
       expect(find.text(name), findsOneWidget);
@@ -201,10 +207,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FloatingActionButton, '蚁群'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '蚁群昵称 *'),
-      '购入价测试',
-    );
+    await tester.enterText(find.byKey(const ValueKey('colony-name')), '购入价测试');
+    await fillRequiredColonyCounts(tester);
     final price = find.widgetWithText(TextFormField, '购入价（可选）');
     await tester.scrollUntilVisible(
       price,
@@ -245,6 +249,38 @@ void main() {
         value.isEmpty ? findsNothing : findsOneWidget,
       );
     }
+  });
+
+  testWidgets('colony alert bounds validate and persist', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('colony-name')), '范围测试');
+    await fillRequiredColonyCounts(tester);
+    final temperatureLower = find.widgetWithText(TextFormField, '温度下限 °C');
+    final temperatureUpper = find.widgetWithText(TextFormField, '温度上限 °C');
+    await tester.scrollUntilVisible(
+      temperatureLower,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(temperatureLower, '30');
+    await tester.enterText(temperatureUpper, '20');
+    await tapSave(tester, '保存蚁群');
+    expect(tables['colonies'], isEmpty);
+    expect(find.text('下限不能高于上限'), findsOneWidget);
+
+    await tester.ensureVisible(temperatureLower);
+    await tester.enterText(temperatureLower, '20');
+    final humidityLower = find.widgetWithText(TextFormField, '湿度下限 %');
+    final humidityUpper = find.widgetWithText(TextFormField, '湿度上限 %');
+    await tester.enterText(humidityLower, '45');
+    await tester.enterText(humidityUpper, '65');
+    await tapSave(tester, '保存蚁群');
+    final saved = tables['colonies']!.single;
+    expect(saved['target_temperature_lower'], 20.0);
+    expect(saved['target_temperature'], 20.0);
+    expect(saved['target_humidity_lower'], 45.0);
+    expect(saved['target_humidity'], 65.0);
   });
 
   for (final feeder in FeederType.values) {
@@ -295,6 +331,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(name));
       await tester.pumpAndSettle();
+      await fillRequiredColonyCounts(tester);
       await tapSave(tester, '保存蚁群');
       final saved = (await AppDatabase.instance.listColonies()).single;
       expect(saved.species, name);
@@ -352,11 +389,12 @@ void main() {
       expect(find.text('$category / $species'), findsOneWidget);
       expect(
         tester
-            .widget<TextFormField>(find.widgetWithText(TextFormField, '蚁群昵称 *'))
+            .widget<TextFormField>(find.byKey(const ValueKey('colony-name')))
             .controller!
             .text,
         species,
       );
+      await fillRequiredColonyCounts(tester);
       await tapSave(tester, '保存蚁群');
       expect(
         (await AppDatabase.instance.listColonies()).single.species,
@@ -398,7 +436,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
     await tester.pumpAndSettle();
     final familyField = find.widgetWithText(TextFormField, '品种分类/细分种类');
-    final nameField = find.widgetWithText(TextFormField, '蚁群昵称 *');
+    final nameField = find.byKey(const ValueKey('colony-name'));
     expect(familyField, findsOneWidget);
     expect(find.widgetWithText(TextFormField, '细分品种'), findsNothing);
     expect(
@@ -493,10 +531,8 @@ void main() {
     );
     await tester.tap(find.text('确认'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '蚁群昵称 *'),
-      '双名称蚁群',
-    );
+    await tester.enterText(find.byKey(const ValueKey('colony-name')), '双名称蚁群');
+    await fillRequiredColonyCounts(tester);
     await tapSave(tester, '保存蚁群');
     final saved = (await AppDatabase.instance.listColonies()).single;
     expect(saved.species, 'Camponotus fedtschenkoi（黑金弓背蚁）');
@@ -836,11 +872,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('编辑蚁群'));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('显示特化'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
+      await tester.drag(find.byType(ListView).first, const Offset(0, -180));
+      await tester.pumpAndSettle();
     }
 
     await edit();
@@ -849,9 +882,12 @@ void main() {
       isFalse,
     );
     expect(find.widgetWithText(TextFormField, '特化数量'), findsNothing);
-    await tester.tap(find.text('显示特化'));
+    await tester.tap(find.byType(Checkbox));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, '特化数量'), '3');
+    final specialized = find.widgetWithText(TextFormField, '特化数量');
+    await tester.drag(find.byType(ListView).first, const Offset(0, -100));
+    await tester.pumpAndSettle();
+    await tester.enterText(specialized, '3');
     await tapSave(tester, '保存蚁群');
     expect(find.text('3 只特化'), findsOneWidget);
     await tester.pageBack();
@@ -872,7 +908,7 @@ void main() {
           .text,
       '3',
     );
-    await tester.tap(find.text('显示特化'));
+    await tester.tap(find.byType(Checkbox));
     await tester.pumpAndSettle();
     await tapSave(tester, '保存蚁群');
     expect(find.text('3 只特化'), findsNothing);
@@ -949,11 +985,8 @@ void main() {
     await tester.tap(find.byTooltip('编辑蚁群'));
     await tester.pumpAndSettle();
     expect(find.text('自定义品种'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextFormField, '蚁群昵称 *'), '编辑后');
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '初始工蚁数量'),
-      '1000',
-    );
+    await tester.enterText(find.byKey(const ValueKey('colony-name')), '编辑后');
+    await tester.enterText(find.widgetWithText(TextFormField, '工蚁 *'), '1000');
     await tapSave(tester, '保存蚁群');
     expect(find.text('编辑后'), findsOneWidget);
     expect(find.text('大群'), findsOneWidget);
@@ -973,10 +1006,7 @@ void main() {
     // Cancel a second edit without changing persisted data.
     await tester.tap(find.byTooltip('编辑蚁群'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '蚁群昵称 *'),
-      '取消编辑',
-    );
+    await tester.enterText(find.byKey(const ValueKey('colony-name')), '取消编辑');
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('编辑后'), findsOneWidget);
