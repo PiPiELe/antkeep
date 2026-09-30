@@ -273,6 +273,8 @@ void main() {
   for (final (category, scientificName, name) in [
     ('收获蚁', 'Messor ebeninus', '乌檀收获蚁'),
     ('牛蚁', 'Myrmecia pilosula', '多毛牛蚁'),
+    ('牛蚁', 'Myrmecia sp.17', 'SP17牛蚁（未定种）'),
+    ('真猛蚁', 'Euponera pilosior', '多毛真猛蚁（Euponera pilosior）'),
   ]) {
     testWidgets('imported $scientificName can be searched, saved and edited', (
       tester,
