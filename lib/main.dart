@@ -3667,6 +3667,21 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _showOnlineEditionNotice(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: const Text('测试中，期待后续开放o(^▽^)o'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: themeController,
@@ -3715,10 +3730,6 @@ class _SettingsPageState extends State<SettingsPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          OnlineSettings(
-            preferences: themeController,
-            controller: onlineController,
-          ),
           _section(context, '使用版本', [
             ListTile(
               leading: Icon(
@@ -3729,7 +3740,7 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('资料模式'),
               subtitle: Text(
                 themeController.edition == AppEdition.offline
-                    ? '使用 App 内置资料，断网也能查看。'
+                    ? '使用 App 内置资料，断网也能查看。在线版正在测试中。'
                     : '已选择在线版，在线资料更新暂不可用。',
               ),
             ),
@@ -3745,7 +3756,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       selected: themeController.edition == edition,
                       onSelected: _savingEdition
                           ? null
-                          : (_) => _setEdition(edition),
+                          : (selected) {
+                              if (!selected) return;
+                              if (edition == AppEdition.online) {
+                                _showOnlineEditionNotice(context);
+                              } else {
+                                _setEdition(edition);
+                              }
+                            },
                     ),
                 ],
               ),
@@ -3753,12 +3771,13 @@ class _SettingsPageState extends State<SettingsPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
-                '两种模式下，蚁群、记录和照片都只保存在本设备。',
+                '蚁群、记录和照片都只保存在本设备。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
+            OnlineSettings(controller: onlineController),
           ]),
           if (themeController.edition == AppEdition.online)
             _section(context, '个人中心', [
