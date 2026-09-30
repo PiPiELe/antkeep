@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/species_encyclopedia_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -761,6 +762,56 @@ void main() {
     expect(find.text('取消编辑'), findsNothing);
     expect(find.text('大群'), findsOneWidget);
   });
+
+  for (final species in ['黑金弓背蚁', '费氏弓背蚁（黑金弓背蚁）', '无恶齿收获蚁', null]) {
+    testWidgets('colony encyclopedia entry resolves $species', (tester) async {
+      final now = DateTime.now();
+      await AppDatabase.instance.saveColony(
+        Colony(
+          id: 'encyclopedia-colony',
+          name: '百科跳转测试',
+          species: species,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ColonyDetailPage(colonyId: 'encyclopedia-colony'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (species == null) {
+        expect(find.text('百科'), findsNothing);
+        return;
+      }
+      await tester.ensureVisible(find.text('百科'));
+      await tester.tap(find.text('百科'));
+      await tester.pumpAndSettle();
+      if (species != '无恶齿收获蚁') {
+        expect(find.byType(SpeciesDetailPage), findsOneWidget);
+        expect(
+          tester.widget<SpeciesDetailPage>(find.byType(SpeciesDetailPage))
+              .profile.name,
+          '费氏弓背蚁',
+        );
+      } else {
+        expect(find.byType(SpeciesEncyclopediaPage), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          '无颚齿收获蚁',
+        );
+        expect(find.text('暂无匹配的物种'), findsOneWidget);
+      }
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('百科跳转测试'), findsOneWidget);
+      expect(
+        (await AppDatabase.instance.findColony('encyclopedia-colony'))!.species,
+        species,
+      );
+    });
+  }
 
   testWidgets('new care records immediately refresh the colony detail', (
     tester,

@@ -10,6 +10,7 @@ import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'account_controller.dart';
 import 'personal_center_page.dart';
+import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
@@ -19,6 +20,7 @@ import 'data/local_notification_service.dart';
 import 'domain/models.dart';
 import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
+import 'domain/species_profile.dart';
 
 const _speciesOptions = <String, List<String>>{
   '收获蚁': [
@@ -1401,9 +1403,34 @@ class _ColonySummary extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          Text(
-            colony.species ?? '未填写品种',
-            style: Theme.of(context).textTheme.titleMedium,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  colony.species ?? '未填写品种',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              if (colony.species?.trim().isNotEmpty == true) ...[
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: const Text('百科'),
+                  onPressed: () {
+                    final species = colony.species!.trim();
+                    final query = _speciesAliases[species] ?? species;
+                    final profile = findSpeciesProfile(query);
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => profile == null
+                            ? SpeciesEncyclopediaPage(initialQuery: query)
+                            : SpeciesDetailPage(profile: profile),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -1781,8 +1808,25 @@ class DiscoverPage extends StatelessWidget {
     children: [
       Text('发现养蚁的更多乐趣', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 8),
-      Text('活动与实用工具将在这里陆续开放。', style: Theme.of(context).textTheme.bodyMedium),
+      Text('查阅物种资料，探索养蚁活动与实用工具。', style: Theme.of(context).textTheme.bodyMedium),
       const SizedBox(height: 24),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Icon(
+            Icons.menu_book_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('蚂蚁百科'),
+          subtitle: const Text('基础分类、体型数据与饲养信息 · 离线可查'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const SpeciesEncyclopediaPage(),
+            ),
+          ),
+        ),
+      ),
       for (final entry in const [
         (
           icon: Icons.emoji_events_outlined,
