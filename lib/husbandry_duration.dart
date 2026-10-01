@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'domain/models.dart';
 import 'date_display.dart';
+import 'widgets/justified_label.dart';
 
 class HusbandryDuration extends StatefulWidget {
   const HusbandryDuration({
@@ -11,12 +12,14 @@ class HusbandryDuration extends StatefulWidget {
     required this.colony,
     this.expanded = false,
     this.showAcquiredDate = false,
+    this.labelWidth,
     this.onTap,
   });
 
   final Colony colony;
   final bool expanded;
   final bool showAcquiredDate;
+  final double? labelWidth;
   final VoidCallback? onTap;
 
   @override
@@ -87,13 +90,13 @@ class _HusbandryDurationState extends State<HusbandryDuration>
           ],
         );
       }
-      final duration = FittedBox(
+      Widget duration = FittedBox(
         fit: BoxFit.scaleDown,
         alignment: Alignment.centerRight,
         child: Text.rich(
           TextSpan(
             children: [
-              const TextSpan(text: '已养殖 '),
+              if (widget.labelWidth == null) const TextSpan(text: '已养殖 '),
               TextSpan(
                 text: '$days',
                 style: TextStyle(
@@ -112,6 +115,22 @@ class _HusbandryDurationState extends State<HusbandryDuration>
           ),
         ),
       );
+      if (widget.labelWidth != null) {
+        duration = Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            JustifiedLabel(
+              text: '已养殖',
+              width: widget.labelWidth!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Expanded(child: duration),
+          ],
+        );
+      }
       if (!widget.showAcquiredDate || start == null) return duration;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,

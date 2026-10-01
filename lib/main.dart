@@ -37,6 +37,7 @@ import 'domain/beginner_care_notice.dart';
 import 'domain/species_profile.dart';
 import 'domain/imported_species_catalog.dart';
 import 'widgets/diary_record_actions.dart';
+import 'widgets/justified_label.dart';
 
 const _builtInSpeciesOptions = <String, List<String>>{
   '收获蚁': [
@@ -2208,6 +2209,15 @@ class _ColonyProfileSummary extends StatelessWidget {
   final List<CareRecord> records;
   final VoidCallback onDurationTap;
 
+  String get _sourceLabel => (colony.source ?? '').trim().replaceFirstMapped(
+    RegExp(r'^(野采|网购|蚁友赠送)(?:（(.*)）|\((.*)\)|\s+(.+))$', dotAll: true),
+    (match) {
+      final detail = (match.group(2) ?? match.group(3) ?? match.group(4)!)
+          .trim();
+      return detail.isEmpty ? match.group(1)! : '${match.group(1)}-$detail';
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
     final population = colony.currentPopulation(records);
@@ -2221,6 +2231,37 @@ class _ColonyProfileSummary extends StatelessWidget {
       if (population.cocoons != null) '${population.cocoons} 茧',
     ];
     final scheme = Theme.of(context).colorScheme;
+    final metadataStyle = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: scheme.onSurfaceVariant);
+    final metadataLabelWidth = MediaQuery.textScalerOf(context)
+        .scale((metadataStyle?.fontSize ?? 12) * 4 + 4);
+    Widget metadataRow(
+      String label,
+      String value, {
+      VoidCallback? onTap,
+      TextStyle? valueStyle,
+    }) {
+      final row = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          JustifiedLabel(
+            text: label,
+            width: metadataLabelWidth,
+            style: metadataStyle,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value, style: valueStyle ?? metadataStyle)),
+        ],
+      );
+      return onTap == null
+          ? row
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(8),
+              child: row,
+            );
+    }
+
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2270,33 +2311,35 @@ class _ColonyProfileSummary extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final duration = Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     InkWell(
                       onTap: onDurationTap,
                       borderRadius: BorderRadius.circular(8),
                       child: HusbandryDuration(
                         colony: colony,
-                        showAcquiredDate: true,
+                        labelWidth: metadataLabelWidth,
                       ),
                     ),
+                    if (colony.acquiredOn != null) ...[
+                      const SizedBox(height: 4),
+                      metadataRow(
+                        '入手日期',
+                        dottedDate(colony.acquiredOn!),
+                        onTap: onDurationTap,
+                      ),
+                    ],
                     if (colony.source?.trim().isNotEmpty == true) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        '来源：${colony.source}',
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      metadataRow(
+                        '来源',
+                        _sourceLabel,
+                        valueStyle: metadataStyle?.copyWith(letterSpacing: 0),
                       ),
                     ],
                     if (colony.purchasePriceCents != null) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        '购入价 ¥${colony.purchasePriceText}',
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
+                      metadataRow('购入价', '¥${colony.purchasePriceText}'),
                     ],
                   ],
                 );
