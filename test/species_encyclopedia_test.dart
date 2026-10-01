@@ -94,7 +94,7 @@ void main() {
   testWidgets('non-bundled species opens its online AntDen entry', (
     tester,
   ) async {
-    final directory = await AntDenSpeciesDirectory.load();
+    final directory = (await tester.runAsync(AntDenSpeciesDirectory.load))!;
     await tester.pumpWidget(
       MaterialApp(
         home: SpeciesEncyclopediaPage(
@@ -106,8 +106,8 @@ void main() {
 
     await tester.enterText(find.byType(TextField), '三尖叉多刺蚁');
     await tester.pumpAndSettle();
-    expect(find.text('联网查看完整资料和图片'), findsOneWidget);
-    await tester.tap(find.text('三尖叉多刺蚁'));
+    expect(find.textContaining('联网查看完整资料和图片'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ListTile, '三尖叉多刺蚁'));
     await tester.pumpAndSettle();
 
     expect(find.byType(OnlineSpeciesDetailPage), findsOneWidget);
