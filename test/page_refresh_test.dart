@@ -392,9 +392,9 @@ void main() {
     expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
     await tester.tap(find.text('到家计时'));
     await tester.pumpAndSettle();
-    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
+    expect(find.text('36 天', findRichText: true), findsOneWidget);
     expect(
-      find.text('入手日期：${arrival.year}.${arrival.month}.${arrival.day}'),
+      find.text('${arrival.year}.${arrival.month}.${arrival.day}'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
@@ -967,7 +967,9 @@ void main() {
           'updated_at': saved.updatedAt.toIso8601String(),
         });
         expect(
-          find.text('已养殖 5 天', findRichText: true).hitTestable(),
+          find
+              .text(fromList ? '已养殖 5 天' : '5 天', findRichText: true)
+              .hitTestable(),
           findsOneWidget,
         );
         expect(hint, findsNothing);
@@ -978,7 +980,7 @@ void main() {
         await tester.tap(find.text(colony.name));
         await tester.pumpAndSettle();
         expect(
-          find.text('已养殖 5 天', findRichText: true).hitTestable(),
+          find.text('5 天', findRichText: true).hitTestable(),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
@@ -1279,16 +1281,16 @@ void main() {
       of: find.text('试管巢'),
       matching: find.byType(Card),
     );
-    expect(find.text('来源：${colony.source}'), findsOneWidget);
+    expect(find.text('网购-蚁友商店，订单备注及完整来源说明'), findsOneWidget);
     expect(
       find.descendant(
         of: profileCard,
-        matching: find.text('来源：${colony.source}'),
+        matching: find.text('网购-蚁友商店，订单备注及完整来源说明'),
       ),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: infoCard, matching: find.text('来源：${colony.source}')),
+      find.descendant(of: infoCard, matching: find.text('网购-蚁友商店，订单备注及完整来源说明')),
       findsNothing,
     );
     expect(
@@ -1339,7 +1341,7 @@ void main() {
     expect(find.text('网购'), findsOneWidget);
     await tester.enterText(sourceField, '新店铺');
     await tapSave(tester, '保存蚁群');
-    expect(find.text('来源：网购（新店铺）'), findsOneWidget);
+    expect(find.text('网购-新店铺'), findsOneWidget);
     expect(find.text('编辑后'), findsOneWidget);
     expect(find.text('大群'), findsOneWidget);
     final saved = (await AppDatabase.instance.findColony(colony.id))!;
