@@ -4,9 +4,18 @@ import 'dart:convert';
 import 'package:antkeep/online/app_update.dart';
 import 'package:antkeep/online/app_update_controller.dart';
 import 'package:antkeep/online/online_api.dart';
+import 'package:antkeep/online/online_controller.dart';
+import 'package:antkeep/online/online_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+
+class _MemoryOnlineStore implements OnlineStore {
+  @override
+  Future<String?> readContent() async => null;
+  @override
+  Future<void> writeContent(String content) async {}
+}
 
 String policy({String latest = '1.1.0', String? minimum, int version = 1}) =>
     jsonEncode({
@@ -29,6 +38,7 @@ AppUpdateController controller({
   required Future<String> Function() currentVersion,
   bool supported = true,
   Future<bool> Function(Uri)? openUrl,
+  Future<void> Function()? onRequiredUpdate,
 }) => AppUpdateController(
   api: OnlineApi(
     baseUrl: 'https://api.example.test',
@@ -37,6 +47,7 @@ AppUpdateController controller({
   currentVersion: currentVersion,
   supportsUpdates: () => supported,
   openUrl: openUrl,
+  onRequiredUpdate: onRequiredUpdate,
 );
 
 void main() {
@@ -99,16 +110,23 @@ void main() {
   );
 
   test('offline minimum version remains a dismissible update', () async {
+    var blocked = 0;
     final updates = controller(
       respond: (_) async => response(policy(minimum: '1.1.0'), 200),
       currentVersion: () async => '1.0.0',
+      onRequiredUpdate: () async {
+        blocked++;
+      },
     );
     expect(await updates.setOnline(false), isFalse);
+    expect(blocked, 0);
     expect(updates.availability, AppUpdateAvailability.optional);
     expect(updates.takeOptionalPrompt(), isTrue);
     expect(await updates.setOnline(true), isTrue);
+    expect(blocked, 1);
     expect(updates.availability, AppUpdateAvailability.required);
     expect(await updates.setOnline(false), isFalse);
+    expect(blocked, 1);
     expect(updates.availability, AppUpdateAvailability.optional);
     updates.dispose();
   });
@@ -195,6 +213,68 @@ void main() {
       expect(await updates.setOnline(true), isFalse);
       expect(updates.availability, AppUpdateAvailability.none);
     }
+  });
+
+  test(
+    'manual mandatory policy disables online requests and clears sessions',
+    () async {
+      var requests = 0;
+      final online = OnlineController(
+        api: OnlineApi(
+          baseUrl: 'https://api.example.test',
+          clientFactory: () => MockClient((request) async {
+            requests++;
+            if (request.url.path == '/api/app/auth/login') {
+              return response(
+                '{"token":"session","user":{"id":"a","username":"a"}}',
+                200,
+              );
+            }
+            return response('{}', 404);
+          }),
+        ),
+        store: _MemoryOnlineStore(),
+      );
+      var minimum = '1.0.0';
+      final updates = controller(
+        respond: (_) async =>
+            response(policy(latest: '1.2.0', minimum: minimum), 200),
+        currentVersion: () async => '1.0.0',
+        onRequiredUpdate: () => online.setEnabled(false),
+      );
+      addTearDown(online.dispose);
+      addTearDown(updates.dispose);
+      await updates.setOnline(true);
+      await online.setEnabled(true);
+      await online.login('a', 'password');
+      expect(online.enabled, isTrue);
+      expect(online.hasSession, isTrue);
+
+      minimum = '1.1.0';
+      await updates.check(manual: true);
+      expect(updates.availability, AppUpdateAvailability.required);
+      expect(online.enabled, isFalse);
+      expect(online.hasSession, isFalse);
+      expect(online.user, isNull);
+      final blockedAt = requests;
+      await online.refreshContent();
+      await online.login('a', 'password');
+      await online.refreshCheckin(submit: true);
+      expect(requests, blockedAt);
+    },
+  );
+
+  test('startup mandatory checks invoke the same online blocker', () async {
+    var blocked = false;
+    final updates = controller(
+      respond: (_) async =>
+          response(policy(latest: '1.2.0', minimum: '1.1.0'), 200),
+      currentVersion: () async => '1.0.0',
+      onRequiredUpdate: () async => blocked = true,
+    );
+    addTearDown(updates.dispose);
+    expect(await updates.setOnline(true), isTrue);
+    expect(blocked, isTrue);
   });
 
   test(

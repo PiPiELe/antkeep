@@ -176,4 +176,84 @@ void main() {
       expect(records.first.workerCount, 22);
     },
   );
+
+  for (final path in GrowthPath.values) {
+    test('disabling restored legacy growth preserves ${path.name}', () async {
+      final id = 'legacy-${path.name}';
+      await db.saveColony(
+        Colony(
+          id: id,
+          name: id,
+          createdAt: start,
+          updatedAt: start,
+          initialEggCount: 10,
+          initialWorkerCount: 20,
+          initialCocoonCount: path == GrowthPath.eggToWorker ? 0 : 5,
+          growth: ColonyGrowth(
+            frequency: GrowthFrequency.daily,
+            path: path,
+            startedAt: start,
+            workers: 1,
+          ),
+        ),
+      );
+      await db.saveRecord(
+        CareRecord(
+          id: '$id-larvae',
+          colonyId: id,
+          type: CareRecordType.observation,
+          occurredAt: start,
+          createdAt: start,
+          larvaCount: 5,
+        ),
+      );
+      final legacy = await db.snapshot();
+      legacy['colonies'] = [
+        for (final row in legacy['colonies'] as List)
+          Map<String, Object?>.from(row as Map)
+            ..remove('development_path')
+            ..remove('initial_larva_count'),
+      ];
+      BackupData.validate(legacy);
+      await db.replaceAll(legacy);
+      expect((await db.findColony(id))!.developmentPath, path);
+
+      await db.configureColonyGrowth(id, null, now: start);
+      final disabled = (await db.findColony(id))!;
+      expect(disabled.growth, isNull);
+      expect(disabled.developmentPath, path);
+      expect(disabled.toMap()['development_path'], path.name);
+      await db.saveRecord(
+        CareRecord(
+          id: '$id-worker',
+          colonyId: id,
+          type: CareRecordType.observation,
+          occurredAt: start.add(const Duration(hours: 1)),
+          createdAt: start,
+          workerCount: 1,
+        ),
+        incremental: true,
+      );
+      final population = disabled.currentPopulation(await db.listRecords(id));
+      expect(population.workers, 21);
+      expect(population.larvae, path == GrowthPath.eggToWorker ? 4 : 5);
+      expect(population.cocoons, path == GrowthPath.eggToWorker ? 0 : 4);
+
+      final backup = await db.snapshot();
+      BackupData.validate(backup);
+      await db.replaceAll(backup);
+      expect((await db.findColony(id))!.developmentPath, path);
+      await db.configureColonyGrowth(
+        id,
+        ColonyGrowth(
+          frequency: GrowthFrequency.daily,
+          path: path,
+          startedAt: start.add(const Duration(days: 1)),
+          workers: 1,
+        ),
+        now: start.add(const Duration(days: 1)),
+      );
+      expect((await db.findColony(id))!.growth!.path, path);
+    });
+  }
 }

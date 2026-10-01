@@ -258,13 +258,19 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         whereArgs: [id],
       );
       if (rows.isEmpty) throw StateError('蚁群已不存在');
-      final current = Colony.fromMap(rows.single).growth;
+      final colony = Colony.fromMap(rows.single);
+      final current = colony.growth;
       final effective = growth != null && current?.startedAt == growth.startedAt
           ? current
           : growth;
       await txn.update(
         'colonies',
         {
+          // Keep legacy paths independent of the optional growth configuration.
+          'development_path':
+              rows.single['development_path'] ??
+              effective?.path.name ??
+              colony.developmentPath.name,
           'auto_growth_json': effective?.encode(),
           'updated_at': at.toIso8601String(),
         },

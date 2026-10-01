@@ -9,6 +9,7 @@ class AppUpdateController extends ChangeNotifier {
     required this.api,
     required this.currentVersion,
     required this.supportsUpdates,
+    this.onRequiredUpdate,
     Future<bool> Function(Uri)? openUrl,
   }) : _openUrl =
            openUrl ??
@@ -17,6 +18,7 @@ class AppUpdateController extends ChangeNotifier {
   final OnlineApi api;
   final Future<String> Function() currentVersion;
   final bool Function() supportsUpdates;
+  final Future<void> Function()? onRequiredUpdate;
   final Future<bool> Function(Uri) _openUrl;
   bool online = false, checking = false;
   String? error;
@@ -68,6 +70,9 @@ class AppUpdateController extends ChangeNotifier {
           : installed.compareTo(candidate.latestVersion) < 0
           ? AppUpdateAvailability.optional
           : AppUpdateAvailability.none;
+      if (availability == AppUpdateAvailability.required) {
+        await onRequiredUpdate?.call();
+      }
     } on ApiFailure catch (failure) {
       if (_current(generation) && failure.status == 404) {
         policy = null;
