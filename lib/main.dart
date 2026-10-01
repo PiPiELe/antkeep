@@ -16,6 +16,7 @@ import 'lottery_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'online/runtime.dart';
+import 'online/app_update.dart';
 import 'online/online_widgets.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
@@ -159,9 +160,8 @@ Future<void> main() async {
     await LocalMediaStore.instance.initialize();
     await AppDatabase.instance.open();
     await themeController.load();
-    void updateOnlineMode() => unawaited(
-      onlineController.setEnabled(themeController.edition == AppEdition.online),
-    );
+    void updateOnlineMode() =>
+        unawaited(setOnlineMode(themeController.edition == AppEdition.online));
     themeController.addListener(updateOnlineMode);
     updateOnlineMode();
     try {
@@ -183,25 +183,93 @@ Future<void> main() async {
 final themeController = AppPreferences(AppDatabase.instance);
 final accountController = AccountController(preferences: themeController);
 
-class AntKeepApp extends StatelessWidget {
+class AntKeepApp extends StatefulWidget {
   const AntKeepApp({super.key});
 
   @override
+  State<AntKeepApp> createState() => _AntKeepAppState();
+}
+
+class _AntKeepAppState extends State<AntKeepApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  int? _shownRequiredPolicy;
+
+  void _showUpdatePromptIfNeeded() {
+    final policy = appUpdateController.policy;
+    if (policy == null) {
+      return;
+    }
+    final required =
+        appUpdateController.availability == AppUpdateAvailability.required;
+    final optional =
+        appUpdateController.availability == AppUpdateAvailability.optional &&
+        appUpdateController.takeOptionalPrompt();
+    if ((!required && !optional) ||
+        (required && _shownRequiredPolicy == policy.version)) {
+      return;
+    }
+    if (required) {
+      _shownRequiredPolicy = policy.version;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final dialogContext = _navigatorKey.currentContext;
+      if (!mounted || dialogContext == null) return;
+      showDialog<void>(
+        context: dialogContext,
+        barrierDismissible: !required,
+        builder: (context) => AlertDialog(
+          title: Text(required ? '在线版需要更新' : '发现新版本 ${policy.latestVersion}'),
+          content: Text(
+            required
+                ? '请更新至 ${policy.minimumVersion} 后继续使用在线版。蚁群、记录、照片和备份仍可在离线版正常使用。\n\n${policy.releaseNotes}'
+                : policy.releaseNotes,
+          ),
+          actions: [
+            if (required)
+              TextButton(
+                onPressed: () async {
+                  await themeController.setEdition(AppEdition.offline);
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+                child: const Text('使用离线版'),
+              )
+            else
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('稍后更新'),
+              ),
+            FilledButton(
+              onPressed: () async {
+                await appUpdateController.openDownload();
+              },
+              child: const Text('立即更新'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: themeController,
-    builder: (context, _) => MaterialApp(
-      title: '蚁记',
-      locale: const Locale('zh', 'CN'),
-      supportedLocales: const [Locale('zh', 'CN')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      debugShowCheckedModeBanner: false,
-      theme: antKeepTheme(themeController.themeColor),
-      darkTheme: antKeepTheme(themeController.themeColor, dark: true),
-      themeMode: themeController.themeMode,
-      home: themeController.onboardingCompleted
-          ? const HomePage()
-          : OnboardingPage(preferences: themeController),
-    ),
+    animation: Listenable.merge([themeController, appUpdateController]),
+    builder: (context, _) {
+      _showUpdatePromptIfNeeded();
+      return MaterialApp(
+        navigatorKey: _navigatorKey,
+        title: '蚁记',
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const [Locale('zh', 'CN')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        debugShowCheckedModeBanner: false,
+        theme: antKeepTheme(themeController.themeColor),
+        darkTheme: antKeepTheme(themeController.themeColor, dark: true),
+        themeMode: themeController.themeMode,
+        home: themeController.onboardingCompleted
+            ? const HomePage()
+            : OnboardingPage(preferences: themeController),
+      );
+    },
   );
 }
 
@@ -3667,24 +3735,9 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _showOnlineEditionNotice(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: const Text('测试中，期待后续开放o(^▽^)o'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('知道了'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: themeController,
+    animation: Listenable.merge([themeController, appUpdateController]),
     builder: (context, _) => _buildSettings(context),
   );
 
@@ -3741,7 +3794,7 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: Text(
                 themeController.edition == AppEdition.offline
                     ? '使用 App 内置资料，断网也能查看。在线版正在测试中。'
-                    : '已选择在线版，在线资料更新暂不可用。',
+                    : '在线版可获取公共资料，并会匿名检查 Android 更新。',
               ),
             ),
             Padding(
@@ -3758,11 +3811,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ? null
                           : (selected) {
                               if (!selected) return;
-                              if (edition == AppEdition.online) {
-                                _showOnlineEditionNotice(context);
-                              } else {
-                                _setEdition(edition);
-                              }
+                              _setEdition(edition);
                             },
                     ),
                 ],
@@ -3777,9 +3826,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
-            OnlineSettings(controller: onlineController),
+            OnlineSettings(
+              controller: onlineController,
+              updates: appUpdateController,
+              useOffline: () => _setEdition(AppEdition.offline),
+            ),
           ]),
-          if (themeController.edition == AppEdition.online)
+          if (themeController.edition == AppEdition.online &&
+              appUpdateController.availability != AppUpdateAvailability.required)
             _section(context, '个人中心', [
               ListTile(
                 leading: const Icon(Icons.manage_accounts_outlined),

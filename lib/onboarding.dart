@@ -314,9 +314,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ? null
               : () => setState(() {
                   _edition = edition;
-                  unawaited(
-                    onlineController.setEnabled(edition == AppEdition.online),
-                  );
+                  unawaited(setOnlineMode(edition == AppEdition.online));
                   _error = null;
                 }),
           child: ConstrainedBox(

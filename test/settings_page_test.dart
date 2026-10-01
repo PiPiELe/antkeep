@@ -86,26 +86,24 @@ void main() {
       .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label))
       .selected;
 
-  testWidgets('online edition shows preview notice and remains offline', (
+  testWidgets('online edition can be selected and persists the choice', (
     tester,
   ) async {
     await tester.pumpWidget(app());
     expect(selected(tester, '离线版'), isTrue);
-    expect(find.text('在线模式'), findsNothing);
+    expect(find.text('应用已是最新版本'), findsNothing);
     expect(find.text('个人中心与签到'), findsNothing);
     await tester.tap(find.text('在线版'));
     await tester.pumpAndSettle();
-    expect(find.text('测试中，期待后续开放o(^▽^)o'), findsOneWidget);
-    expect(selected(tester, '离线版'), isTrue);
-    expect(selected(tester, '在线版'), isFalse);
-    await tester.tap(find.text('知道了'));
-    await tester.pumpAndSettle();
+    expect(selected(tester, '离线版'), isFalse);
+    expect(selected(tester, '在线版'), isTrue);
+    expect(find.text('个人中心与签到'), findsOneWidget);
     final restarted = AppPreferences(AppDatabase.instance);
     await restarted.load();
-    expect(restarted.edition, AppEdition.offline);
+    expect(restarted.edition, AppEdition.online);
   });
 
-  testWidgets('online edition preview does not write preferences', (
+  testWidgets('failed online edition change keeps the existing preference', (
     tester,
   ) async {
     await tester.pumpWidget(app());
@@ -113,10 +111,8 @@ void main() {
     await tester.tap(find.text('在线版'));
     await tester.pumpAndSettle();
     expect(selected(tester, '离线版'), isTrue);
-    expect(find.text('测试中，期待后续开放o(^▽^)o'), findsOneWidget);
-    await tester.tap(find.text('知道了'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('操作未完成'), findsNothing);
+    expect(selected(tester, '在线版'), isFalse);
+    expect(find.textContaining('操作未完成'), findsOneWidget);
   });
 
   for (final dark in [false, true]) {
