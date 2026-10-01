@@ -25,6 +25,15 @@ enum AppEdition {
   final String label;
 }
 
+enum ColonyTab {
+  colonies('我的蚁群', 'colonies_tab_name'),
+  memorial('英灵殿', 'memorial_tab_name');
+
+  const ColonyTab(this.defaultName, this.settingKey);
+  final String defaultName;
+  final String settingKey;
+}
+
 class AppPreferences extends ChangeNotifier {
   AppPreferences(this.store);
   final AppSettingsStore store;
@@ -37,9 +46,30 @@ class AppPreferences extends ChangeNotifier {
   AppEdition edition = AppEdition.offline;
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
+  final _colonyTabNames = <ColonyTab, String>{};
+
+  String colonyTabName(ColonyTab tab) =>
+      _colonyTabNames[tab] ?? tab.defaultName;
+
+  Future<void> setColonyTabName(ColonyTab tab, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.characters.length > 12) {
+      throw ArgumentError('菜单名称须为 1～12 个字符');
+    }
+    await store.writeSettings({tab.settingKey: trimmed});
+    _colonyTabNames[tab] = trimmed;
+    notifyListeners();
+  }
 
   Future<void> load() async {
     final values = await store.readSettings();
+    _colonyTabNames.clear();
+    for (final tab in ColonyTab.values) {
+      final name = values[tab.settingKey]?.trim();
+      if (name != null && name.isNotEmpty && name.characters.length <= 12) {
+        _colonyTabNames[tab] = name;
+      }
+    }
     onboardingCompleted = values['onboarding_completed'] == 'true';
     beginner = values['keeper_experience'] == 'beginner';
     simpleMode = values['simple_mode'] == 'true';

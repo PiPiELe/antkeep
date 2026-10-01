@@ -218,6 +218,73 @@ void main() {
     );
   });
 
+  testWidgets('colony tab names persist, validate, cancel and reset', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    for (final entry in {
+      ColonyTab.colonies: '蚂蚁之家',
+      ColonyTab.memorial: '星光纪念馆',
+    }.entries) {
+      await tester.longPress(find.text(entry.key.defaultName));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), '  ${entry.value}  ');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text(entry.value), findsOneWidget);
+    }
+    final restarted = AppPreferences(AppDatabase.instance);
+    await restarted.load();
+    expect(restarted.colonyTabName(ColonyTab.colonies), '蚂蚁之家');
+    expect(restarted.colonyTabName(ColonyTab.memorial), '星光纪念馆');
+    await tester.tap(find.text('星光纪念馆'));
+    await tester.pumpAndSettle();
+    expect(find.text('星光纪念馆 · 敬请期待'), findsOneWidget);
+    await tester.longPress(find.text('星光纪念馆'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '   ');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('请输入菜单名称'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('星光纪念馆'), findsOneWidget);
+    await tester.longPress(find.text('星光纪念馆'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('恢复默认'));
+    await tester.pumpAndSettle();
+    expect(find.text('英灵殿'), findsOneWidget);
+    expect(find.text('英灵殿 · 敬请期待'), findsOneWidget);
+    await restarted.load();
+    expect(restarted.colonyTabName(ColonyTab.memorial), '英灵殿');
+    expect(restarted.colonyTabName(ColonyTab.colonies), '蚂蚁之家');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'menu rename settings retain old name on failure and allow retry',
+    (tester) async {
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('英灵殿菜单名称'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), '纪念馆');
+      failWrites = true;
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.text('保存失败，请重试'), findsOneWidget);
+      expect(themeController.colonyTabName(ColonyTab.memorial), '英灵殿');
+      failWrites = false;
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('纪念馆'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('online edition can be selected and persists the choice', (
     tester,
   ) async {
@@ -230,6 +297,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected(tester, '离线版'), isFalse);
     expect(selected(tester, '在线版'), isTrue);
+    await tester.scrollUntilVisible(find.text('个人中心与签到'), 150);
     expect(find.text('个人中心与签到'), findsOneWidget);
     final restarted = AppPreferences(AppDatabase.instance);
     await restarted.load();
