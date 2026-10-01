@@ -165,7 +165,7 @@ void main() {
         find.widgetWithText(TextFormField, '数量（选填）'),
         '-2',
       );
-      await tester.tap(find.text('购买'));
+      await tester.tap(find.text('添加'));
       await tester.pumpAndSettle();
       expect(find.text('请输入非负整数'), findsWidgets);
       expect(
@@ -180,14 +180,14 @@ void main() {
         find.widgetWithText(TextFormField, '购入价（选填）'),
         '-1',
       );
-      await tester.tap(find.text('购买'));
+      await tester.tap(find.text('添加'));
       await tester.pumpAndSettle();
       expect(find.text('请输入非负金额，最多两位小数'), findsOneWidget);
       await tester.enterText(
         find.widgetWithText(TextFormField, '购入价（选填）'),
         '19.90',
       );
-      await tester.tap(find.text('购买'));
+      await tester.tap(find.text('添加'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('离心管 · 已购入'));
       await tester.tap(find.text('离心管 · 已购入'));
@@ -217,6 +217,7 @@ void main() {
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
       expect(find.text('19.90'), findsOneWidget);
+      expect(find.text('有损耗时填写剩余数量；填 0 表示已用完。'), findsOneWidget);
       await tester.enterText(find.widgetWithText(TextFormField, '数量（选填）'), '8');
       await tester.tap(find.text('保存'));
       await tester.pumpAndSettle();
@@ -243,15 +244,56 @@ void main() {
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
       expect(find.textContaining('数量：'), findsNothing);
+      expect(
+        rows.singleWhere((row) => row['name'] == '离心管 50ml')['quantity'],
+        8,
+      );
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('撤销购入'));
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '数量（选填）'),
+        '-1',
+      );
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.text('请输入非负整数'), findsOneWidget);
+      expect(
+        rows.singleWhere((row) => row['name'] == '离心管 50ml')['quantity'],
+        8,
+      );
+      await tester.enterText(find.widgetWithText(TextFormField, '数量（选填）'), '0');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      final depleted = rows.singleWhere((row) => row['name'] == '离心管 50ml');
+      expect(depleted['quantity'], 0);
+      expect(depleted['purchased'], 1);
+      expect(depleted['purchased_at'], purchasedAt);
+      expect(depleted['purchase_price_cents'], 1990);
+      await tester.tap(find.text('离心管 50ml'));
+      await tester.pumpAndSettle();
+      final beforeDelete = rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList();
+      await tester.tap(find.text('删除'));
+      await tester.pumpAndSettle();
+      expect(find.text('删除已购物品？'), findsOneWidget);
+      await tester.tap(find.text('取消').last);
+      await tester.pumpAndSettle();
+      expect(rows, beforeDelete);
+      await tester.tap(find.text('删除'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('确认删除'));
       await tester.pumpAndSettle();
       expect(find.text('还没有已购的物品。'), findsOneWidget);
       final row = rows.singleWhere((row) => row['name'] == '离心管 50ml');
+      expect(row['purchased'], 0);
       expect(row['quantity'], isNull);
       expect(row['purchase_price_cents'], isNull);
       expect(row['purchased_at'], isNull);
+      expect(
+        rows.where((row) => row['name'] != '离心管 50ml'),
+        beforeDelete.where((row) => row['name'] != '离心管 50ml'),
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -349,7 +391,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, '购买'))
+            .widget<FilledButton>(find.widgetWithText(FilledButton, '添加'))
             .onPressed,
         isNull,
       );
@@ -368,7 +410,7 @@ void main() {
         find.widgetWithText(TextFormField, '购入价（选填）').first,
         '1.234',
       );
-      await tester.tap(find.text('购买'));
+      await tester.tap(find.text('添加'));
       await tester.pumpAndSettle();
       expect(find.text('请输入非负金额，最多两位小数'), findsOneWidget);
       expect(rows, before);
@@ -384,7 +426,7 @@ void main() {
         find.widgetWithText(TextFormField, '数量（选填）').last,
         '4',
       );
-      await tester.tap(find.text('购买'));
+      await tester.tap(find.text('添加'));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.text('查看购物车'), findsNothing);

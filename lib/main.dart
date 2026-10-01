@@ -3011,7 +3011,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('聚合物品'),
-                  subtitle: const Text('一级名称下包含多个可单独购买的子物品'),
+                  subtitle: const Text('一级名称下包含多个可单独添加的子物品'),
                   value: isGroup,
                   onChanged: (value) => setDialogState(() {
                     isGroup = value;
@@ -3194,7 +3194,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   Expanded(child: Text('已选 ${_cart.length} 件物品')),
                   FilledButton(
                     onPressed: _purchasing ? null : _checkout,
-                    child: Text(_purchasing ? '正在购买…' : '查看购物车'),
+                    child: Text(_purchasing ? '正在添加…' : '查看购物车'),
                   ),
                 ],
               ),
@@ -3346,7 +3346,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   ? '已购入'
                   : _cart.contains(item.id)
                   ? '已加入购物车'
-                  : '点击购买',
+                  : '点击添加',
             ),
             if (expiry != null)
               Text(
@@ -3380,6 +3380,34 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
   late String _quantity;
   late String _price;
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除已购物品？'),
+        content: Text(
+          '将从已购列表移除「${widget.item.fullName}」，并清除数量、购入价和购入日期。推荐项会保留，可随时重新添加。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    Navigator.pop(context, (
+      purchased: false,
+      quantity: null,
+      purchasePriceCents: null,
+    ));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -3396,6 +3424,7 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
         child: _InventoryPurchaseFields(
           quantity: _quantity,
           price: _price,
+          purchased: widget.item.purchased,
           onQuantityChanged: (value) => _quantity = value,
           onPriceChanged: (value) => _price = value,
         ),
@@ -3403,14 +3432,7 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
     ),
     actions: [
       if (widget.item.purchased)
-        TextButton(
-          onPressed: () => Navigator.pop(context, (
-            purchased: false,
-            quantity: null,
-            purchasePriceCents: null,
-          )),
-          child: const Text('撤销购入'),
-        ),
+        TextButton(onPressed: _delete, child: const Text('删除')),
       TextButton(
         onPressed: () => Navigator.pop(context),
         child: const Text('取消'),
@@ -3424,7 +3446,7 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
             purchasePriceCents: parsePurchasePrice(_price),
           ));
         },
-        child: Text(widget.item.purchased ? '保存' : '购买'),
+        child: Text(widget.item.purchased ? '保存' : '添加'),
       ),
     ],
   );
@@ -3436,10 +3458,12 @@ class _InventoryPurchaseFields extends StatelessWidget {
     required this.price,
     required this.onQuantityChanged,
     required this.onPriceChanged,
+    this.purchased = false,
   });
 
   final String quantity;
   final String price;
+  final bool purchased;
   final ValueChanged<String> onQuantityChanged;
   final ValueChanged<String> onPriceChanged;
 
@@ -3451,7 +3475,11 @@ class _InventoryPurchaseFields extends StatelessWidget {
         initialValue: quantity,
         onChanged: onQuantityChanged,
         keyboardType: TextInputType.number,
-        decoration: const InputDecoration(labelText: '数量（选填）'),
+        decoration: InputDecoration(
+          labelText: '数量（选填）',
+          helperText: purchased ? '有损耗时填写剩余数量；填 0 表示已用完。' : null,
+          helperMaxLines: 2,
+        ),
         validator: (value) {
           final text = value?.trim() ?? '';
           if (text.isEmpty) return null;
@@ -3467,7 +3495,7 @@ class _InventoryPurchaseFields extends StatelessWidget {
         decoration: const InputDecoration(
           labelText: '购入价（选填）',
           prefixText: '¥ ',
-          helperText: '本次购买总价（元）',
+          helperText: '本次添加物品的总价（元）',
         ),
         validator: (value) =>
             (value?.trim().isEmpty ?? true) ||
@@ -3568,7 +3596,7 @@ class _InventoryCartDialogState extends State<_InventoryCartDialog> {
                     ),
                 });
               },
-        child: const Text('购买'),
+        child: const Text('添加'),
       ),
     ],
   );

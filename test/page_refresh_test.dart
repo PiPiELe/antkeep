@@ -1550,7 +1550,7 @@ void main() {
     await tester.tap(find.text('干巢'));
     await tester.pumpAndSettle();
     expect(find.text('5 元蚁巢 · 干巢'), findsOneWidget);
-    await tester.tap(find.text('购买'));
+    await tester.tap(find.text('添加'));
     await tester.pumpAndSettle();
     expect(
       tables['inventory_items']!
@@ -1573,11 +1573,11 @@ void main() {
     );
     await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
     await tester.pumpAndSettle();
-    expect(find.text('点击购买'), findsOneWidget);
+    expect(find.text('点击添加'), findsOneWidget);
     await tester.tap(find.text('测试物品'));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, '数量（选填）'), '5');
-    await tester.tap(find.text('购买'));
+    await tester.tap(find.text('添加'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('已购 (1)'), findsOneWidget);
