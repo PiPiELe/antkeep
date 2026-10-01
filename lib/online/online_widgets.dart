@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app_update.dart';
 import 'app_update_controller.dart';
@@ -109,6 +110,7 @@ class OnlineSettings extends StatelessWidget {
             ),
           ),
         ],
+        const _InstalledAppVersion(),
         ListTile(
           leading: const Icon(Icons.system_update_outlined),
           title: Text(
@@ -160,6 +162,36 @@ class OnlineSettings extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+class _InstalledAppVersion extends StatefulWidget {
+  const _InstalledAppVersion();
+
+  @override
+  State<_InstalledAppVersion> createState() => _InstalledAppVersionState();
+}
+
+class _InstalledAppVersionState extends State<_InstalledAppVersion> {
+  late final Future<PackageInfo> _info = PackageInfo.fromPlatform();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<PackageInfo>(
+    future: _info,
+    builder: (context, snapshot) {
+      final info = snapshot.data;
+      return ListTile(
+        leading: const Icon(Icons.info_outline),
+        title: const Text('当前 App 版本'),
+        subtitle: Text(
+          info != null
+              ? '${info.version}${info.buildNumber.isEmpty ? '' : ' (${info.buildNumber})'}'
+              : snapshot.hasError
+              ? '暂时无法读取版本'
+              : '读取中…',
+        ),
+      );
+    },
   );
 }
 

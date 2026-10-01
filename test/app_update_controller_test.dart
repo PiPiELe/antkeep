@@ -51,6 +51,18 @@ AppUpdateController controller({
 );
 
 void main() {
+  test('installed 1.0.3 detects the published 1.0.4 policy', () async {
+    final updates = controller(
+      respond: (_) async =>
+          response(policy(latest: '1.0.4', minimum: '1.0.0'), 200),
+      currentVersion: () async => '1.0.3',
+    );
+    await updates.setOnline(true);
+    expect(updates.availability, AppUpdateAvailability.optional);
+    expect(updates.policy!.latestVersion.toString(), '1.0.4');
+    updates.dispose();
+  });
+
   test(
     'update API preserves configured notes and uploaded APK details',
     () async {
