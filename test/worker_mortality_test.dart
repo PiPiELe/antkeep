@@ -244,6 +244,15 @@ void main() {
       await showCard();
       expect(
         find.descendant(of: card, matching: find.text('每日工蚁死亡数量')),
+        findsNothing,
+      );
+      expect(tester.getSize(card).height, lessThanOrEqualTo(56));
+      await tester.ensureVisible(find.byTooltip('展开死亡分析'));
+      await settle(tester);
+      await tester.tap(find.byTooltip('展开死亡分析'));
+      await settle(tester);
+      expect(
+        find.descendant(of: card, matching: find.text('每日工蚁死亡数量')),
         findsOneWidget,
       );
       expect(
@@ -255,6 +264,23 @@ void main() {
           of: card,
           matching: find.text('最近 7 日 · 3 只 · 已记录 1/7 天'),
         ),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.byTooltip('折叠死亡分析'));
+      await settle(tester);
+      await tester.tap(find.byTooltip('折叠死亡分析'));
+      await settle(tester);
+      expect(
+        find.descendant(of: card, matching: find.text('每日工蚁死亡数量')),
+        findsNothing,
+      );
+      expect(tester.getSize(card).height, lessThanOrEqualTo(56));
+      await tester.ensureVisible(find.byTooltip('展开死亡分析'));
+      await settle(tester);
+      await tester.tap(find.byTooltip('展开死亡分析'));
+      await settle(tester);
+      expect(
+        find.descendant(of: card, matching: find.text('每日工蚁死亡数量')),
         findsOneWidget,
       );
       final diary = find.byKey(const ValueKey('record'));

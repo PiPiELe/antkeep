@@ -1852,7 +1852,8 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   bool _deleting = false;
   bool _editingAcquiredOn = false;
   bool _includeBrood = false;
-  bool _populationExpanded = true;
+  bool _populationExpanded = false;
+  bool _mortalityExpanded = false;
   bool _showForecast = false;
   ForecastHorizon _forecastHorizon = ForecastHorizon.month;
   Timer? _growthTimer;
@@ -2093,6 +2094,10 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             const SizedBox(height: 16),
             WorkerMortalityAnalysisCard(
               key: const ValueKey('colony-mortality-analysis'),
+              expanded: _mortalityExpanded,
+              onExpandedChanged: (value) {
+                setState(() => _mortalityExpanded = value);
+              },
               points: dailyWorkerMortality(
                 colony.id,
                 detail.records,
@@ -2149,20 +2154,14 @@ class _ColonyProfileSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final population = colony.currentPopulation(records);
-    final brood = [
-      population.eggs,
-      population.larvae,
-      population.cocoons,
-    ].whereType<int>();
-    final broodCount = brood.isEmpty
-        ? null
-        : brood.fold<int>(0, (sum, count) => sum + count);
     final quantities = <String>[
       if (colony.queenCount != null) '${colony.queenCount} 蚁后',
       if (colony.showSpecialized && colony.specializedCount != null)
         '${colony.specializedCount} 特化',
       if (workers != null) '$workers 工蚁',
-      if (broodCount != null) '$broodCount 卵幼茧',
+      if (population.eggs != null) '${population.eggs} 卵',
+      if (population.larvae != null) '${population.larvae} 幼虫',
+      if (population.cocoons != null) '${population.cocoons} 茧',
     ];
     final scheme = Theme.of(context).colorScheme;
     final identity = Column(

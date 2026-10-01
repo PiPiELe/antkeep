@@ -262,6 +262,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       final toggle = find.byKey(const ValueKey('population-forecast-toggle'));
+      await tester.ensureVisible(find.byTooltip('展开种群数量'));
+      await tester.tap(find.byTooltip('展开种群数量'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(toggle);
       expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
       await tester.tap(toggle);
@@ -1054,6 +1057,14 @@ void main() {
         FontWeight.w700,
       );
       expect((quantity.children!.last as TextSpan).style, isNull);
+      await tester.tap(find.text('数量摘要'));
+      await tester.pumpAndSettle();
+      for (final text in ['1 蚁后', '8 工蚁', '0 卵', '3 幼虫', '2 茧']) {
+        expect(find.text(text), findsOneWidget);
+      }
+      expect(find.textContaining('卵幼茧'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       tester.view.physicalSize = const Size(320, 800);
       tester.view.devicePixelRatio = 1;
@@ -1274,17 +1285,9 @@ void main() {
       findsNothing,
     );
     expect(find.text('种群数量'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('colony-population-chart')),
-      findsOneWidget,
-    );
-    await Scrollable.ensureVisible(
-      tester.element(find.byTooltip('折叠种群数量')),
-      alignment: 0.3,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('折叠种群数量'));
-    await tester.pumpAndSettle();
+    expect(find.text('5 卵'), findsOneWidget);
+    expect(find.text('2 茧'), findsOneWidget);
+    expect(find.textContaining('幼虫'), findsNothing);
     expect(find.byKey(const ValueKey('colony-population-chart')), findsNothing);
     expect(find.byTooltip('展开种群数量'), findsOneWidget);
     await tester.ensureVisible(find.byTooltip('展开种群数量'));
@@ -1483,7 +1486,9 @@ void main() {
     saved = CareRecord.fromMap(tables['care_records']!.first);
     expect(saved.larvaCount, 4);
     expect(saved.eggCount, isNull);
-    expect(find.text('15 卵幼茧'), findsOneWidget);
+    expect(find.text('8 卵'), findsOneWidget);
+    expect(find.text('4 幼虫'), findsOneWidget);
+    expect(find.text('3 茧'), findsOneWidget);
   });
 
   testWidgets('new care records immediately refresh the colony detail', (
