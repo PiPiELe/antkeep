@@ -2047,12 +2047,14 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               records: detail.records,
               onDurationTap: () => _editAcquiredOn(colony),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             _ColonySummary(colony: colony),
             if (!themeController.simpleMode) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               Card(
                 child: ListTile(
+                  visualDensity: const VisualDensity(vertical: -4),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   leading: const Icon(Icons.trending_up),
                   title: const Text('群落自动扩充'),
                   subtitle: Text(
@@ -2072,7 +2074,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
             _PopulationTimeline(
               colony: colony,
               records: detail.records,
@@ -2091,7 +2093,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 setState(() => _populationExpanded = value);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
             WorkerMortalityAnalysisCard(
               key: const ValueKey('colony-mortality-analysis'),
               expanded: _mortalityExpanded,
@@ -2104,7 +2106,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 now: DateTime.now(),
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 12),
             Text('养蚁日记', style: Theme.of(context).textTheme.titleLarge),
             if (detail.records.isNotEmpty)
               Text('点击日记编辑，左滑删除', style: Theme.of(context).textTheme.bodySmall),
@@ -2212,13 +2214,36 @@ class _ColonyProfileSummary extends StatelessWidget {
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final duration = InkWell(
-                  onTap: onDurationTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: HusbandryDuration(
-                    colony: colony,
-                    showAcquiredDate: true,
-                  ),
+                final duration = Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    InkWell(
+                      onTap: onDurationTap,
+                      borderRadius: BorderRadius.circular(8),
+                      child: HusbandryDuration(
+                        colony: colony,
+                        showAcquiredDate: true,
+                      ),
+                    ),
+                    if (colony.source?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '来源：${colony.source}',
+                        textAlign: TextAlign.right,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                    if (colony.purchasePriceCents != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '购入价 ¥${colony.purchasePriceText}',
+                        textAlign: TextAlign.right,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ],
                 );
                 if (constraints.maxWidth < 320 ||
                     MediaQuery.textScalerOf(context).scale(12) > 18) {
@@ -2316,7 +2341,10 @@ class _PopulationTimeline extends StatelessWidget {
     final description = includeBrood ? '蚁后、特化、工蚁与卵幼茧' : '蚁后、特化与工蚁';
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: expanded ? 16 : 0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2514,7 +2542,7 @@ class _ColonySummary extends StatelessWidget {
     );
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2525,10 +2553,6 @@ class _ColonySummary extends StatelessWidget {
                 height: 180,
                 borderRadius: 12,
               ),
-              const SizedBox(height: 16),
-            ],
-            if (colony.source?.trim().isNotEmpty == true) ...[
-              Text('来源：${colony.source}'),
               const SizedBox(height: 8),
             ],
             Wrap(
@@ -2540,8 +2564,6 @@ class _ColonySummary extends StatelessWidget {
                 if (temperatureRange != null)
                   Chip(label: Text(temperatureRange)),
                 if (humidityRange != null) Chip(label: Text(humidityRange)),
-                if (colony.purchasePriceCents != null)
-                  Chip(label: Text('购入价 ¥${colony.purchasePriceText}')),
               ],
             ),
           ],
