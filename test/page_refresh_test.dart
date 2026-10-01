@@ -1332,7 +1332,12 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.enterText(sourceField, '网购（新店铺）');
+    expect(
+      tester.widget<TextFormField>(sourceField).controller!.text,
+      '蚁友商店，订单备注及完整来源说明',
+    );
+    expect(find.text('网购'), findsOneWidget);
+    await tester.enterText(sourceField, '新店铺');
     await tapSave(tester, '保存蚁群');
     expect(find.text('来源：网购（新店铺）'), findsOneWidget);
     expect(find.text('编辑后'), findsOneWidget);
@@ -1353,6 +1358,18 @@ void main() {
     // Cancel a second edit without changing persisted data.
     await tester.tap(find.byTooltip('编辑蚁群'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      sourceField,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(tester.widget<TextFormField>(sourceField).controller!.text, '新店铺');
+    expect(find.text('网购'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('colony-name')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(find.byKey(const ValueKey('colony-name')), '取消编辑');
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -1363,6 +1380,100 @@ void main() {
     expect(find.text('取消编辑'), findsNothing);
     expect(find.text('大群'), findsOneWidget);
   });
+
+  for (final example in [
+    (detail: '蚂蚁商户 A', type: '网购'),
+    (detail: '云丘山', type: '野采'),
+    (detail: '=哥', type: '蚁友赠送'),
+  ]) {
+    testWidgets('colony source keeps detail separate from ${example.type}', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.now();
+      final colony = Colony(
+        id: 'source-colony',
+        name: '来源测试',
+        queenCount: 1,
+        initialWorkerCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ColonyFormPage(colony: colony)),
+      );
+      final sourceField = find.widgetWithText(TextFormField, '来源（可选）');
+      await tester.scrollUntilVisible(
+        sourceField,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(sourceField, example.detail);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      for (final type in ['野采', '网购', example.type]) {
+        await tester.tap(find.byTooltip('选择来源'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(PopupMenuItem<String>, type));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextFormField>(sourceField).controller!.text,
+          example.detail,
+        );
+      }
+      final input = find.descendant(
+        of: sourceField,
+        matching: find.byType(EditableText),
+      );
+      final selector = find.byTooltip('选择来源');
+      expect(
+        tester.getSize(input).width,
+        greaterThan(tester.getSize(selector).width),
+      );
+      expect(tester.takeException(), isNull);
+      await tapSave(tester, '保存蚁群');
+      final saved = (await AppDatabase.instance.findColony(colony.id))!;
+      expect(saved.source, '${example.type}（${example.detail}）');
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(MaterialApp(home: ColonyFormPage(colony: saved)));
+      await tester.scrollUntilVisible(
+        sourceField,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        tester.widget<TextFormField>(sourceField).controller!.text,
+        example.detail,
+      );
+      expect(find.text(example.type), findsOneWidget);
+    });
+  }
+
+  for (final source in ['网购 蚂蚁商户', '野采', '自定义来源', null]) {
+    testWidgets('colony source preserves unchanged legacy value $source', (
+      tester,
+    ) async {
+      final now = DateTime.now();
+      final colony = Colony(
+        id: 'legacy-source',
+        name: '旧来源',
+        queenCount: 1,
+        initialWorkerCount: 0,
+        source: source,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ColonyFormPage(colony: colony)),
+      );
+      await tapSave(tester, '保存蚁群');
+      expect(
+        (await AppDatabase.instance.findColony(colony.id))!.source,
+        source,
+      );
+    });
+  }
 
   for (final species in ['黑金弓背蚁', '费氏弓背蚁（黑金弓背蚁）', '无恶齿收获蚁', null]) {
     testWidgets('colony encyclopedia entry resolves $species', (tester) async {

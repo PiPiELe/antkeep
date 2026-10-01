@@ -931,6 +931,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _source = TextEditingController();
+  String? _sourceType;
+  String? _originalSourceType;
+  String _originalSourceDetail = '';
   final _purchasePrice = TextEditingController();
   final _queens = TextEditingController();
   final _specialized = TextEditingController(text: '0');
@@ -959,6 +962,20 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     if (colony == null) return;
     _name.text = colony.name;
     _source.text = colony.source ?? '';
+    final sourceMatch = RegExp(
+      r'^(野采|网购|蚁友赠送)(?:（(.*)）|\((.*)\)|\s+(.+))?$',
+      dotAll: true,
+    ).firstMatch(_source.text.trim());
+    if (sourceMatch != null) {
+      _sourceType = sourceMatch.group(1);
+      _source.text =
+          sourceMatch.group(2) ??
+          sourceMatch.group(3) ??
+          sourceMatch.group(4) ??
+          '';
+    }
+    _originalSourceType = _sourceType;
+    _originalSourceDetail = _source.text;
     if (colony.coverPhotoPath != null) {
       _coverPreview = LocalMediaStore.instance
           .readImage(colony.coverPhotoPath!)
@@ -1049,7 +1066,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           name: _name.text.trim(),
           species: _selectedSpecies,
           acquiredOn: _acquiredOn,
-          source: _textOrNull(_source.text),
+          source: _sourceValue,
           purchasePriceCents: parsePurchasePrice(_purchasePrice.text),
           queenCount: int.tryParse(_queens.text),
           specializedCount: int.tryParse(_specialized.text.trim()),
@@ -1111,6 +1128,16 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     if (!RegExp(r'[A-Za-z]').hasMatch(parenthetical)) return parenthetical;
 
     return displayName.substring(0, match.start);
+  }
+
+  String? get _sourceValue {
+    if (_sourceType == _originalSourceType &&
+        _source.text == _originalSourceDetail) {
+      return widget.colony?.source;
+    }
+    final detail = _source.text.trim();
+    if (_sourceType == null) return _textOrNull(detail);
+    return detail.isEmpty ? _sourceType : '$_sourceType（$detail）';
   }
 
   Future<void> _selectFamily(String family) async {
@@ -1515,15 +1542,43 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 controller: _source,
                 decoration: InputDecoration(
                   labelText: '来源（可选）',
-                  suffixIcon: PopupMenuButton<String>(
-                    tooltip: '选择来源',
-                    icon: const Icon(Icons.arrow_drop_down),
-                    onSelected: (source) =>
-                        setState(() => _source.text = source),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: '野采', child: Text('野采')),
-                      PopupMenuItem(value: '网购', child: Text('网购')),
-                      PopupMenuItem(value: '蚁友赠送', child: Text('蚁友赠送')),
+                  hintText: '商户 / 地点 / 赠送人',
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        height: 24,
+                        child: VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: '选择来源',
+                        initialValue: _sourceType ?? '',
+                        onSelected: (source) =>
+                            setState(() => _sourceType = _textOrNull(source)),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: '野采', child: Text('野采')),
+                          PopupMenuItem(value: '网购', child: Text('网购')),
+                          PopupMenuItem(value: '蚁友赠送', child: Text('蚁友赠送')),
+                          PopupMenuItem(value: '', child: Text('不选择')),
+                        ],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(_sourceType ?? '选择'),
+                                const Icon(Icons.arrow_drop_down, size: 18),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
