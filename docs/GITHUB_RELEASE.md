@@ -12,6 +12,15 @@ https://github.com/PiPiELe/antkeep/releases/latest/download/AntKeep.apk
 https://github.com/PiPiELe/antkeep/releases/latest/download/AntKeep.apk.sha256
 ```
 
+## 版本约定
+
+版本仅使用 `major.minor.patch`，例如 `1.0.3`、`1.0.4`，`pubspec.yaml` 不再添加 `+x`。
+Android 自动按每段两位生成内部 `versionCode`：`major * 10000 + minor * 100 + patch`，
+例如 `1.0.3 → 010003 → 10003`、`1.1.0 → 010100 → 10100`；各段范围为 0–99，
+某段达到 99 后向前一段进位。新包必须提高版本号，不单独维护构建号。
+主线本地 APK 命名为 `AntKeep-1.0.3.apk`，本地标签为 `antkeep-1.0.3-main`。
+本地打包不自动推送标签或发布 GitHub Release。
+
 ## 首次配置
 
 在仓库 **Settings → Secrets and variables → Actions** 中添加以下 repository secrets。不要提交 keystore、`android/key.properties` 或任何密码。
@@ -33,8 +42,8 @@ base64 -i /absolute/path/to/antkeep-release.jks | tr -d '\n'
 
 ## 发布一个版本
 
-1. 将 `pubspec.yaml` 的 `version` 更新为要发布的版本号，例如 `1.0.0+2`，并合入 `main`。
-2. 在该提交创建并推送对应的不可变标签，例如 `v1.0.0`。
+1. 将 `pubspec.yaml` 的 `version` 更新为要发布的版本号，例如 `1.0.3`，并合入 `main`。
+2. 在该提交创建并推送对应的不可变标签，例如 `v1.0.3`。
 3. 标签推送会自动执行 **Release Android APK**；它构建已签名的 release APK、生成 SHA-256，然后创建或更新同标签的 GitHub Release。
 4. 在 Release 页面下载并安装 `AntKeep.apk` 做真机验证后，再对外公布上面的固定下载链接。
 
