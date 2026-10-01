@@ -137,12 +137,36 @@ void main() {
         '白菜巢',
         '堵水海绵',
         '蚂蚁吸尘器',
-        '棉花团',
+        '脱脂棉球',
         '恒温箱',
         'EPP 泡沫箱',
+        '尖头画笔（勾线笔）',
+        '图钉吸铁石',
+        '平头注射器',
+        '小剪刀',
+        'LED 小灯',
+        '平头画笔',
+        '营养果冻',
+        '蚂蚁喂水器',
+        '10mm 软管（蚂蚁平稳换巢）',
+        '滴管',
+        '手工玻璃纸',
+        '铝制喂食盘',
+        '个性喂食盘',
       ]),
     );
     expect(items.first.quantity, isNull);
+    expect(items.where((item) => item.name == '防逃液'), hasLength(1));
+    expect(items.where((item) => item.name == '棉花团'), isEmpty);
+    final jelly = items.singleWhere((item) => item.name == '营养果冻');
+    expect(jelly.expiryType, InventoryExpiryType.shelfLife);
+    expect(jelly.shelfLifeMonths, 3);
+    expect(
+      items
+          .where((item) => item.groupLabel == '喂食盘')
+          .map((item) => item.childLabel),
+      unorderedEquals(['铝制喂食盘', '个性喂食盘']),
+    );
   });
 
   testWidgets(
