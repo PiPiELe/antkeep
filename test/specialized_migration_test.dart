@@ -33,6 +33,8 @@ void main() {
         await applicationDatabasePath(),
         version: 9,
         onCreate: (db, _) async {
+          // Care-record migrations also run for these legacy database fixtures.
+          await db.execute('CREATE TABLE care_records (id TEXT PRIMARY KEY)');
           await db.execute('''CREATE TABLE colonies (
           id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT,
           source TEXT, queen_count INTEGER, initial_worker_count INTEGER,

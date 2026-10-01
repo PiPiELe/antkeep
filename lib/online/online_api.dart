@@ -37,6 +37,7 @@ class OnlineApi {
     String method = 'GET',
     Map<String, dynamic>? body,
     String? token,
+    void Function(String)? onDiagnostic,
   }) async {
     if (!enabled) throw const ApiFailure('当前为离线模式。');
     final base = Uri.tryParse(baseUrl);
@@ -56,6 +57,7 @@ class OnlineApi {
     _active.add(client);
     try {
       final request = http.Request(method, base.resolve(path));
+      onDiagnostic?.call('$method ${request.url}');
       request.headers['Accept'] = 'application/json';
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
       if (body != null) {
@@ -67,6 +69,9 @@ class OnlineApi {
       final response = await client
           .send(request)
           .timeout(const Duration(seconds: 15));
+      onDiagnostic?.call(
+        'HTTP ${response.statusCode}; Content-Type: ${response.headers['content-type'] ?? '-'}',
+      );
       final bytes = <int>[];
       await for (final chunk in response.stream.timeout(
         const Duration(seconds: 15),
@@ -74,6 +79,7 @@ class OnlineApi {
         bytes.addAll(chunk);
         if (bytes.length > 262144) throw const ApiFailure('服务器响应过大。');
       }
+      onDiagnostic?.call('响应长度: ${bytes.length} bytes');
       final text = utf8.decode(bytes);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         String message = '请求失败，请稍后重试。';
@@ -90,7 +96,11 @@ class OnlineApi {
       return text;
     } on ApiFailure {
       rethrow;
-    } catch (_) {
+    } catch (failure) {
+      final detail = '$failure';
+      onDiagnostic?.call(
+        '${failure.runtimeType}: ${detail.length > 1200 ? detail.substring(0, 1200) : detail}',
+      );
       throw const ApiFailure('无法连接服务，请检查网络后重试。');
     } finally {
       _active.remove(client);

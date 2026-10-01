@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app_update.dart';
@@ -142,6 +143,45 @@ class OnlineSettings extends StatelessWidget {
                   ),
                 ),
         ),
+        if (updates.diagnosticsEnabled)
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('更新诊断日志 · 测试包'),
+            subtitle: const Text('检查更新后打开，可截图或复制给开发者。'),
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('更新诊断日志'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      updates.diagnostics,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: updates.diagnostics),
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('诊断日志已复制')));
+                    },
+                    child: const Text('复制日志'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('关闭'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ListTile(
           leading: const Icon(Icons.help_outline),
           title: const Text('使用指南'),

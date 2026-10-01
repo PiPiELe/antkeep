@@ -10,6 +10,9 @@ class AppUpdateController extends ChangeNotifier {
     required this.currentVersion,
     required this.supportsUpdates,
     this.onRequiredUpdate,
+    this.diagnosticsEnabled = const bool.fromEnvironment(
+      'ANTKEEP_UPDATE_DIAGNOSTICS',
+    ),
     Future<bool> Function(Uri)? openUrl,
   }) : _openUrl =
            openUrl ??
@@ -22,6 +25,8 @@ class AppUpdateController extends ChangeNotifier {
   final Future<bool> Function(Uri) _openUrl;
   bool online = false, checking = false;
   String? error;
+  final bool diagnosticsEnabled;
+  String diagnostics = '尚未检查更新，请点击检查更新。';
   AppUpdatePolicy? policy;
   AppUpdateAvailability availability = AppUpdateAvailability.none;
   bool _optionalPromptShown = false;
@@ -53,14 +58,30 @@ class AppUpdateController extends ChangeNotifier {
       return;
     }
     final generation = _generation;
+    final timer = Stopwatch()..start();
+    final lines = <String>[];
+    void record(String message) {
+      if (!diagnosticsEnabled || !_current(generation)) return;
+      lines.add(message);
+      diagnostics = lines.join('\n');
+    }
+
+    record('时间: ${DateTime.now().toIso8601String()}');
+    record('平台: ${defaultTargetPlatform.name}; 模式: ${online ? '在线' : '离线'}');
+    record('服务: ${api.baseUrl}');
     checking = true;
     error = null;
     notifyListeners();
     try {
-      final raw = await api.request('/api/public/app-update/android');
+      final raw = await api.request(
+        '/api/public/app-update/android',
+        onDiagnostic: diagnosticsEnabled ? record : null,
+      );
+      record('正在解析更新策略');
       final candidate = AppUpdatePolicy.decode(raw);
       final installed = AppVersion.parse(await currentVersion());
       if (!_current(generation)) return;
+      record('当前: $installed; 最新: ${candidate.latestVersion}');
       policy = candidate;
       availability =
           online &&
@@ -74,6 +95,7 @@ class AppUpdateController extends ChangeNotifier {
         await onRequiredUpdate?.call();
       }
     } on ApiFailure catch (failure) {
+      record('失败: ${failure.message}; HTTP: ${failure.status ?? '-'}');
       if (_current(generation) && failure.status == 404) {
         policy = null;
         availability = AppUpdateAvailability.none;
@@ -81,14 +103,18 @@ class AppUpdateController extends ChangeNotifier {
         error = failure.message;
       }
     } on FormatException {
+      record('FormatException: 更新策略或本机版本格式无效');
       if (_current(generation) && manual) {
         error = '更新策略格式无效，已忽略。';
       }
-    } catch (_) {
+    } catch (failure) {
+      record('检查异常: ${failure.runtimeType}');
       if (_current(generation) && manual) {
         error = '无法检查更新，请稍后重试。';
       }
     } finally {
+      timer.stop();
+      record('总耗时: ${timer.elapsedMilliseconds} ms');
       if (_current(generation)) {
         checking = false;
         notifyListeners();

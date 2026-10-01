@@ -94,7 +94,7 @@ void main() {
   testWidgets('offline startup shows a dismissible update only once', (
     tester,
   ) async {
-    await appUpdateController.setOnline(false);
+    await tester.runAsync(() => appUpdateController.setOnline(false));
     appUpdateController.policy = AppUpdatePolicy(
       version: 1,
       latestVersion: const AppVersion(1, 1, 0),
@@ -104,7 +104,9 @@ void main() {
       apk: const AppUpdateApk(filename: '蚁记-1.1.0.apk', sizeBytes: 52428800),
     );
     appUpdateController.availability = AppUpdateAvailability.optional;
-    addTearDown(() => appUpdateController.setOnline(false));
+    addTearDown(
+      () => tester.runAsync(() => appUpdateController.setOnline(false)),
+    );
     await tester.pumpWidget(const AntKeepApp());
     await tester.pumpAndSettle();
     expect(find.text('发现新版本 1.1.0'), findsOneWidget);
@@ -141,7 +143,9 @@ void main() {
         releaseNotes: notes,
       );
       appUpdateController.availability = AppUpdateAvailability.required;
-      addTearDown(() => appUpdateController.setOnline(false));
+      addTearDown(
+        () => tester.runAsync(() => appUpdateController.setOnline(false)),
+      );
       await tester.pumpWidget(const AntKeepApp());
       await tester.pumpAndSettle();
       expect(find.text('在线版需要更新'), findsOneWidget);
