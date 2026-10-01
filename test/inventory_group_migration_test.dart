@@ -46,6 +46,8 @@ void main() {
         await applicationDatabasePath(),
         version: 12,
         onCreate: (db, _) async {
+          // Colony migrations also run when upgrading this inventory fixture.
+          await db.execute('CREATE TABLE colonies (id TEXT PRIMARY KEY)');
           await db.execute('''CREATE TABLE inventory_items (
         id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
         purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/models.dart';
+import '../domain/colony_growth.dart';
 import '../domain/spending_analysis.dart';
 import '../app_preferences.dart';
 import 'database_factory.dart';
@@ -28,7 +29,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 14,
+      version: 15,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -45,7 +46,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       source TEXT, queen_count INTEGER, initial_worker_count INTEGER,
       purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0),
       specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0,
-      initial_egg_count INTEGER, initial_cocoon_count INTEGER,
+      initial_egg_count INTEGER, initial_cocoon_count INTEGER, auto_growth_json TEXT,
       nest_type TEXT, target_temperature_lower REAL, target_temperature REAL,
       target_humidity_lower REAL, target_humidity REAL, cover_photo_path TEXT,
       archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -70,6 +71,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 15) {
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN auto_growth_json TEXT',
+      );
+    }
     if (oldVersion < 2) {
       await _createSettingsTable(database);
     }
@@ -197,15 +203,18 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   @override
-  Future<List<Colony>> listColonies() async => (await _db.query(
-    'colonies',
-    where: 'archived = 0',
-    orderBy:
-        'CASE WHEN initial_worker_count = 0 THEN 0 ELSE 1 END, updated_at DESC',
-  )).map(Colony.fromMap).toList();
+  Future<List<Colony>> listColonies() async {
+    await applyColonyGrowth();
+    return (await _db.query(
+      'colonies',
+      where: 'archived = 0',
+      orderBy: 'CASE WHEN initial_worker_count = 0 THEN 0 ELSE 1 END, updated_at DESC',
+    )).map(Colony.fromMap).toList();
+  }
 
   @override
   Future<Colony?> findColony(String id) async {
+    await applyColonyGrowth(colonyId: id);
     final rows = await _db.query('colonies', where: 'id = ?', whereArgs: [id]);
     return rows.isEmpty ? null : Colony.fromMap(rows.single);
   }
@@ -213,9 +222,10 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   @override
   Future<void> saveColony(Colony colony) =>
       _db.transaction((transaction) async {
+        await _applyGrowth(transaction, DateTime.now(), colony.id);
         final updated = await transaction.update(
           'colonies',
-          colony.toMap(),
+          colony.toMap()..remove('auto_growth_json'),
           where: 'id = ?',
           whereArgs: [colony.id],
         );
@@ -224,6 +234,108 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         }
       });
 
+  Future<void> configureColonyGrowth(
+    String id,
+    ColonyGrowth? growth, {
+    DateTime? now,
+  }) async {
+    final at = now ?? DateTime.now();
+    await _db.transaction((txn) async {
+      await _applyGrowth(txn, at, id);
+      final rows = await txn.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (rows.isEmpty) throw StateError('蚁群已不存在');
+      final current = Colony.fromMap(rows.single).growth;
+      final effective = growth != null && current?.startedAt == growth.startedAt
+          ? current
+          : growth;
+      await txn.update(
+        'colonies',
+        {
+          'auto_growth_json': effective?.encode(),
+          'updated_at': at.toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+  }
+
+  Future<void> applyColonyGrowth({DateTime? now, String? colonyId}) => _db
+      .transaction((txn) => _applyGrowth(txn, now ?? DateTime.now(), colonyId));
+
+  Future<void> _applyGrowth(
+    Transaction txn,
+    DateTime now,
+    String? colonyId,
+  ) async {
+    final rows = await txn.query(
+      'colonies',
+      where:
+          'archived = 0 AND auto_growth_json IS NOT NULL'
+          '${colonyId == null ? '' : ' AND id = ?'}',
+      whereArgs: colonyId == null ? null : [colonyId],
+    );
+    for (final row in rows) {
+      final colony = Colony.fromMap(row);
+      final growth = colony.growth;
+      if (growth == null || colony.archived) continue;
+      var cycle = growth.completedCycles;
+      if (growth.dueAt(cycle + 1).isAfter(now)) continue;
+      final records = (await txn.query(
+        'care_records',
+        where: 'colony_id = ?',
+        whereArgs: [colony.id],
+        orderBy: 'occurred_at ASC, created_at ASC, id ASC',
+      )).map(CareRecord.fromMap).toList();
+      var population = GrowthPopulation(
+        eggs: colony.initialEggCount,
+        cocoons: colony.initialCocoonCount,
+        workers: colony.initialWorkerCount,
+      );
+      var cursor = 0;
+      while (!growth.dueAt(cycle + 1).isAfter(now)) {
+        final due = growth.dueAt(++cycle);
+        while (cursor < records.length &&
+            !records[cursor].occurredAt.isAfter(due)) {
+          final record = records[cursor++];
+          population = GrowthPopulation(
+            eggs: record.eggCount ?? population.eggs,
+            cocoons: record.pupaCount ?? population.cocoons,
+            workers: record.workerCount ?? population.workers,
+          );
+        }
+        population = growth.advance(population);
+        await txn.insert(
+          'care_records',
+          CareRecord(
+            id: 'growth:${colony.id}:${growth.startedAt.toIso8601String()}:$cycle',
+            colonyId: colony.id,
+            type: CareRecordType.observation,
+            occurredAt: due,
+            createdAt: now,
+            note: '自动扩充（估算） · ${growth.frequency.label} · ${growth.path.label}',
+            eggCount: population.eggs,
+            pupaCount: population.cocoons,
+            workerCount: population.workers,
+          ).toMap(),
+        );
+      }
+      await txn.update(
+        'colonies',
+        {
+          'auto_growth_json': growth.completed(cycle).encode(),
+          'updated_at': now.toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [colony.id],
+      );
+    }
+  }
+
   @override
   Future<void> deleteColony(String id) async {
     // Foreign keys cascade the deletion to this colony's care records.
@@ -231,24 +343,30 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   @override
-  Future<List<CareRecord>> listRecords(String colonyId) async =>
-      (await _db.query(
-        'care_records',
-        where: 'colony_id = ?',
-        whereArgs: [colonyId],
-        orderBy: 'occurred_at DESC',
-      )).map(CareRecord.fromMap).toList();
+  Future<List<CareRecord>> listRecords(String colonyId) async {
+    await applyColonyGrowth(colonyId: colonyId);
+    return (await _db.query(
+      'care_records',
+      where: 'colony_id = ?',
+      whereArgs: [colonyId],
+      orderBy: 'occurred_at DESC',
+    )).map(CareRecord.fromMap).toList();
+  }
 
   @override
-  Future<List<CareRecord>> listRecentRecords() async => (await _db.query(
-    'care_records',
-    orderBy: 'occurred_at DESC',
-    limit: 50,
-  )).map(CareRecord.fromMap).toList();
+  Future<List<CareRecord>> listRecentRecords() async {
+    await applyColonyGrowth();
+    return (await _db.query(
+      'care_records',
+      orderBy: 'occurred_at DESC',
+      limit: 50,
+    )).map(CareRecord.fromMap).toList();
+  }
 
   @override
   Future<void> saveRecord(CareRecord record) =>
       _db.transaction((transaction) async {
+        await _applyGrowth(transaction, DateTime.now(), record.colonyId);
         await transaction.insert('care_records', record.toMap());
         await transaction.update(
           'colonies',
@@ -446,12 +564,14 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await batch.commit(noResult: true);
   }
 
-  Future<Map<String, dynamic>> snapshot() async => {
-    'colonies': await _db.query('colonies'),
-    'care_records': await _db.query('care_records'),
-    'feeder_records': await _db.query('feeder_records'),
-    'inventory_items': await _db.query('inventory_items'),
-  };
+  Future<Map<String, dynamic>> snapshot() => _db.transaction(
+    (txn) async => {
+      'colonies': await txn.query('colonies'),
+      'care_records': await txn.query('care_records'),
+      'feeder_records': await txn.query('feeder_records'),
+      'inventory_items': await txn.query('inventory_items'),
+    },
+  );
 
   Set<String> photoPaths(Map<String, dynamic> snapshot) {
     final paths = <String>{};
