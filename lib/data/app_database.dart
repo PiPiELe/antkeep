@@ -612,6 +612,15 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   Future<void> _seedInventory() async {
+    // Rename only the bundled item, preserving purchases and custom items.
+    await _db.update(
+      'inventory_items',
+      {'name': '脱脂棉球'},
+      where: 'id = ? AND name = ? AND group_name IS NULL',
+      whereArgs: ['default-17', '棉花团'],
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+    // Positions are persisted as IDs. Append new defaults; do not reorder.
     const items = [
       (name: '防逃液', expiryType: InventoryExpiryType.none, months: null),
       (name: '镊子', expiryType: InventoryExpiryType.none, months: null),
@@ -630,9 +639,24 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       (name: '白菜巢', expiryType: InventoryExpiryType.none, months: null),
       (name: '堵水海绵', expiryType: InventoryExpiryType.none, months: null),
       (name: '蚂蚁吸尘器', expiryType: InventoryExpiryType.none, months: null),
-      (name: '棉花团', expiryType: InventoryExpiryType.none, months: null),
+      (name: '脱脂棉球', expiryType: InventoryExpiryType.none, months: null),
       (name: '恒温箱', expiryType: InventoryExpiryType.none, months: null),
       (name: 'EPP 泡沫箱', expiryType: InventoryExpiryType.none, months: null),
+      (name: '尖头画笔（勾线笔）', expiryType: InventoryExpiryType.none, months: null),
+      (name: '图钉吸铁石', expiryType: InventoryExpiryType.none, months: null),
+      (name: '平头注射器', expiryType: InventoryExpiryType.none, months: null),
+      (name: '小剪刀', expiryType: InventoryExpiryType.none, months: null),
+      (name: 'LED 小灯', expiryType: InventoryExpiryType.none, months: null),
+      (name: '平头画笔', expiryType: InventoryExpiryType.none, months: null),
+      (name: '营养果冻', expiryType: InventoryExpiryType.shelfLife, months: 3),
+      (name: '蚂蚁喂水器', expiryType: InventoryExpiryType.none, months: null),
+      (
+        name: '10mm 软管（蚂蚁平稳换巢）',
+        expiryType: InventoryExpiryType.none,
+        months: null,
+      ),
+      (name: '滴管', expiryType: InventoryExpiryType.none, months: null),
+      (name: '手工玻璃纸', expiryType: InventoryExpiryType.none, months: null),
     ];
     final now = DateTime.now().toIso8601String();
     final batch = _db.batch();
@@ -644,6 +668,19 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'created_at': now,
         'expiry_type': items[index].expiryType.storageValue,
         'shelf_life_months': items[index].months,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    for (final item in const [
+      (id: 'default-feeding-tray-aluminum', name: '铝制喂食盘'),
+      (id: 'default-feeding-tray-personalized', name: '个性喂食盘'),
+    ]) {
+      batch.insert('inventory_items', {
+        'id': item.id,
+        'name': item.name,
+        'group_name': '喂食盘',
+        'purchased': 0,
+        'created_at': now,
+        'expiry_type': InventoryExpiryType.none.storageValue,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
