@@ -276,11 +276,14 @@ void main() {
       await tester.ensureVisible(find.text('幼虫'));
       await tester.tap(find.text('幼虫'));
       await tester.pumpAndSettle();
-      expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+      expect(tester.widget<SwitchListTile>(toggle).onChanged, isNotNull);
+      expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
       expect(
         find.byKey(const ValueKey('population-forecast-summary')),
-        findsNothing,
+        findsOneWidget,
       );
+      expect(find.textContaining('86 只（估算）'), findsOneWidget);
+      expect(find.text('幼虫 · 最近 100 只 · 1 个时间点'), findsOneWidget);
       await tester.tap(find.text('工蚁'));
       await tester.pumpAndSettle();
       await tester.tap(toggle);

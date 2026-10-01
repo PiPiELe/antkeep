@@ -15,6 +15,7 @@ final appUpdateController = AppUpdateController(
   api: OnlineApi(baseUrl: onlineBaseUrl),
   currentVersion: () async => (await PackageInfo.fromPlatform()).version,
   supportsUpdates: () => defaultTargetPlatform == TargetPlatform.android,
+  onRequiredUpdate: () => onlineController.setEnabled(false),
 );
 
 Future<void> setOnlineMode(bool value) async {

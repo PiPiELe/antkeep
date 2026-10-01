@@ -49,8 +49,6 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
       ? 'DLC 暂无自动扩充规则'
       : _colony!.growth == null
       ? '请先在群落自动扩充中设置增长规则'
-      : _metric == PopulationMetric.larvae
-      ? '自动扩充规则不包含幼虫，暂不预测此指标'
       : null;
 
   @override
