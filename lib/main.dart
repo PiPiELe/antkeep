@@ -697,14 +697,6 @@ class _ColonyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final broodCounts = [
-      population.eggs,
-      population.larvae,
-      population.cocoons,
-    ].whereType<int>();
-    final brood = broodCounts.isEmpty
-        ? null
-        : broodCounts.fold<int>(0, (sum, count) => sum + count);
     final theme = Theme.of(context);
     final numberStyle = TextStyle(
       color: theme.colorScheme.onSurface,
@@ -713,7 +705,7 @@ class _ColonyCard extends StatelessWidget {
     TextSpan quantity(int count, String label) => TextSpan(
       children: [
         TextSpan(text: '$count', style: numberStyle),
-        TextSpan(text: ' 只$label'),
+        TextSpan(text: ' $label'),
       ],
     );
     final details = <InlineSpan>[
@@ -721,7 +713,9 @@ class _ColonyCard extends StatelessWidget {
       if (colony.showSpecialized && colony.specializedCount != null)
         quantity(colony.specializedCount!, '特化'),
       if (workers != null) quantity(workers!, '工蚁'),
-      if (brood != null) quantity(brood, '卵幼茧'),
+      if (population.eggs != null) quantity(population.eggs!, '卵'),
+      if (population.larvae != null) quantity(population.larvae!, '幼虫'),
+      if (population.cocoons != null) quantity(population.cocoons!, '茧'),
     ];
     final description = [
       colony.species,
