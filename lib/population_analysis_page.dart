@@ -311,19 +311,18 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
 }
 
 class WorkerMortalityAnalysisCard extends StatelessWidget {
-  const WorkerMortalityAnalysisCard({super.key, required this.points});
+  const WorkerMortalityAnalysisCard({
+    super.key,
+    required this.points,
+    this.expanded = true,
+    this.onExpandedChanged,
+  });
   final List<PopulationPoint> points;
+  final bool expanded;
+  final ValueChanged<bool>? onExpandedChanged;
 
   @override
   Widget build(BuildContext context) {
-    if (points.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('暂无工蚁死亡数量记录\n请在日记中选择「死亡」，填写工蚁死亡数量。'),
-        ),
-      );
-    }
     final comparison = MortalityComparison(points, now: DateTime.now());
     String period(DateTime start, DateTime end) =>
         '${_date(start)} — ${_date(DateTime(end.year, end.month, end.day - 1))}';
@@ -331,73 +330,105 @@ class WorkerMortalityAnalysisCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: expanded ? 16 : 0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              comparison.label,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: comparison.comparable && comparison.delta > 0
-                    ? colors.error
-                    : null,
+            if (onExpandedChanged != null)
+              Row(
+                children: [
+                  const Icon(Icons.monitor_heart_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '死亡分析',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: expanded ? '折叠死亡分析' : '展开死亡分析',
+                    onPressed: () => onExpandedChanged!(!expanded),
+                    icon: Icon(
+                      expanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '最近 7 日 · ${comparison.recentTotal} 只 · 已记录 ${comparison.recentDays}/7 天',
-            ),
-            Text(
-              period(comparison.recentStart, comparison.end),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '前 7 日 · ${comparison.previousTotal} 只 · 已记录 ${comparison.previousDays}/7 天',
-            ),
-            Text(
-              period(comparison.previousStart, comparison.recentStart),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (comparison.comparable) ...[
-              const SizedBox(height: 8),
+            if (expanded && points.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('暂无工蚁死亡数量记录\n请在日记中选择「死亡」，填写工蚁死亡数量。'),
+              ),
+            if (expanded && points.isNotEmpty) ...[
               Text(
-                '较前 7 日 ${comparison.delta > 0 ? "+" : ""}${comparison.delta} 只'
-                '${percent == null ? "（前期为 0，不计算百分比）" : "（${percent > 0 ? "+" : ""}${percent.toStringAsFixed(1)}%）"}',
-              ),
-            ],
-            const SizedBox(height: 12),
-            const Text(
-              '比较截至昨日的两个完整 7 日周期，不含今天。仅比较已录入死亡数，记录频率不同可能影响结果；未记录日期不视为零死亡。',
-            ),
-            const SizedBox(height: 20),
-            Text('每日工蚁死亡数量', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Semantics(
-              label: '每日工蚁死亡数量折线图，详细数据见每日明细。',
-              child: SizedBox(
-                height: 220,
-                width: double.infinity,
-                child: CustomPaint(
-                  painter: _PopulationChartPainter(points, colors),
+                comparison.label,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: comparison.comparable && comparison.delta > 0
+                      ? colors.error
+                      : null,
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text('${_date(points.first.time)} — ${_date(points.last.time)}'),
-            const Text('按实际发生日期汇总，同日多条相加；空白不计入，0 保留。连线仅连接记录日，今日数据可能尚未完整。'),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text('每日明细'),
-              children: [
-                for (final point in points.reversed)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(_date(point.time)),
-                    trailing: Text('${point.count} 只'),
-                  ),
+              const SizedBox(height: 12),
+              Text(
+                '最近 7 日 · ${comparison.recentTotal} 只 · 已记录 ${comparison.recentDays}/7 天',
+              ),
+              Text(
+                period(comparison.recentStart, comparison.end),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '前 7 日 · ${comparison.previousTotal} 只 · 已记录 ${comparison.previousDays}/7 天',
+              ),
+              Text(
+                period(comparison.previousStart, comparison.recentStart),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (comparison.comparable) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '较前 7 日 ${comparison.delta > 0 ? "+" : ""}${comparison.delta} 只'
+                  '${percent == null ? "（前期为 0，不计算百分比）" : "（${percent > 0 ? "+" : ""}${percent.toStringAsFixed(1)}%）"}',
+                ),
               ],
-            ),
+              const SizedBox(height: 12),
+              const Text(
+                '比较截至昨日的两个完整 7 日周期，不含今天。仅比较已录入死亡数，记录频率不同可能影响结果；未记录日期不视为零死亡。',
+              ),
+              const SizedBox(height: 20),
+              Text('每日工蚁死亡数量', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              Semantics(
+                label: '每日工蚁死亡数量折线图，详细数据见每日明细。',
+                child: SizedBox(
+                  height: 220,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    painter: _PopulationChartPainter(points, colors),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text('${_date(points.first.time)} — ${_date(points.last.time)}'),
+              const Text('按实际发生日期汇总，同日多条相加；空白不计入，0 保留。连线仅连接记录日，今日数据可能尚未完整。'),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('每日明细'),
+                children: [
+                  for (final point in points.reversed)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(_date(point.time)),
+                      trailing: Text('${point.count} 只'),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
