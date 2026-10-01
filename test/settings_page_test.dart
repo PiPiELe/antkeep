@@ -39,6 +39,9 @@ void main() {
                 {'user_version': 13},
               ];
             }
+            if (!(call.arguments['sql'] as String).contains('app_settings')) {
+              return [];
+            }
             return [
               for (final entry in settings.entries)
                 {'setting_key': entry.key, 'setting_value': entry.value},
@@ -85,6 +88,62 @@ void main() {
   bool selected(WidgetTester tester, String label) => tester
       .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label))
       .selected;
+
+  testWidgets('simple mode persists and restores all navigation entries', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    expect(themeController.simpleMode, isFalse);
+    expect(find.byType(NavigationDestination), findsNWidgets(5));
+    expect(find.text('分析'), findsOneWidget);
+    await tester.tap(find.widgetWithText(NavigationDestination, '设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('简化模式'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationDestination), findsNWidgets(2));
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      1,
+    );
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(find.text('分析'), findsNothing);
+    final restarted = AppPreferences(AppDatabase.instance);
+    await restarted.load();
+    expect(restarted.simpleMode, isTrue);
+    await tester.tap(find.widgetWithText(NavigationDestination, '蚁群'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ColoniesPage), findsOneWidget);
+    expect(find.text('还没有蚁群'), findsOneWidget);
+    await tester.tap(find.widgetWithText(NavigationDestination, '设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('简化模式'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationDestination), findsNWidgets(5));
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      4,
+    );
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(find.text('分析'), findsOneWidget);
+    await restarted.load();
+    expect(restarted.simpleMode, isFalse);
+  });
+
+  testWidgets('failed simple mode change preserves full mode', (tester) async {
+    await tester.pumpWidget(app());
+    failWrites = true;
+    await tester.tap(find.text('简化模式'));
+    await tester.pumpAndSettle();
+    expect(themeController.simpleMode, isFalse);
+    expect(find.textContaining('操作未完成'), findsOneWidget);
+    expect(
+      tester
+          .widget<SwitchListTile>(find.widgetWithText(SwitchListTile, '简化模式'))
+          .value,
+      isFalse,
+    );
+  });
 
   testWidgets('online edition can be selected and persists the choice', (
     tester,

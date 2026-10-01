@@ -31,6 +31,7 @@ class AppPreferences extends ChangeNotifier {
 
   bool onboardingCompleted = false;
   bool beginner = false;
+  bool simpleMode = false;
   bool careRemindersEnabled = false;
   int careReminderMinuteOfDay = 20 * 60;
   AppEdition edition = AppEdition.offline;
@@ -41,6 +42,7 @@ class AppPreferences extends ChangeNotifier {
     final values = await store.readSettings();
     onboardingCompleted = values['onboarding_completed'] == 'true';
     beginner = values['keeper_experience'] == 'beginner';
+    simpleMode = values['simple_mode'] == 'true';
     careRemindersEnabled = values['care_reminders_enabled'] == 'true';
     careReminderMinuteOfDay =
         int.tryParse(values['care_reminder_minute_of_day'] ?? '') ?? 20 * 60;
@@ -107,6 +109,12 @@ class AppPreferences extends ChangeNotifier {
       'keeper_experience': enabled ? 'beginner' : 'experienced',
     });
     beginner = enabled;
+    notifyListeners();
+  }
+
+  Future<void> setSimpleMode(bool enabled) async {
+    await store.writeSettings({'simple_mode': enabled.toString()});
+    simpleMode = enabled;
     notifyListeners();
   }
 

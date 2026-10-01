@@ -139,10 +139,15 @@ void main() {
   });
 
   setUp(() {
+    themeController.simpleMode = false;
     failColonyDeletion = false;
     for (final rows in tables.values) {
       rows.clear();
     }
+  });
+
+  tearDown(() {
+    themeController.simpleMode = false;
   });
 
   Future<void> tapSave(WidgetTester tester, String label) async {
@@ -390,6 +395,63 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'simple mode keeps colony and diary creation and restores detail',
+    (tester) async {
+      themeController.simpleMode = true;
+      await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FloatingActionButton, '蚁群'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('colony-name')), '简化测试');
+      await fillRequiredColonyCounts(tester);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('保存蚁群'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('保存蚁群'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ColonyGrowthPage), findsNothing);
+      expect(find.byType(ColonyFormPage), findsNothing);
+      expect(find.text('简化测试'), findsOneWidget);
+      await tester.tap(find.text('简化测试'));
+      await tester.pumpAndSettle();
+      expect(find.text('群落自动扩充'), findsNothing);
+      expect(find.text('种群数量'), findsOneWidget);
+      expect(find.text('百科'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('养蚁日记'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('养蚁日记'), findsOneWidget);
+      await tester.tap(find.text('添加记录'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, '备注'), '简化模式的记录');
+      await tapSave(tester, '保存记录');
+      await tester.scrollUntilVisible(
+        find.text('简化模式的记录'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('简化模式的记录'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      themeController.simpleMode = false;
+      await tester.tap(find.text('简化测试'));
+      await tester.pumpAndSettle();
+      expect(find.text('群落自动扩充'), findsOneWidget);
+      expect(find.text('种群数量'), findsOneWidget);
+      expect(tables['colonies'], hasLength(1));
+      expect(tables['care_records'], hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('new colonies appear on returning home without reopening', (
     tester,

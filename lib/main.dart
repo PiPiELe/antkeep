@@ -350,6 +350,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _buildPage(BuildContext context) {
     const titles = ['我的蚁群', '物品', 'DLC 养殖', '发现', '设置'];
+    final visiblePages = themeController.simpleMode ? [0, 4] : [0, 1, 2, 3, 4];
+    final pageIndex = visiblePages.contains(_index) ? _index : 0;
     final pages = [
       const ColoniesPage(),
       const InventoryPage(),
@@ -359,20 +361,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(titles[_index]),
+        title: Text(titles[pageIndex]),
         actions: [
-          TextButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PopulationAnalysisPage()),
+          if (!themeController.simpleMode)
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const PopulationAnalysisPage(),
+                ),
+              ),
+              icon: const Icon(Icons.show_chart),
+              label: const Text('分析'),
             ),
-            icon: const Icon(Icons.show_chart),
-            label: const Text('分析'),
-          ),
         ],
       ),
       body: Column(
         children: [
-          if (_index == 0 && themeController.beginner)
+          if (pageIndex == 0 && themeController.beginner)
             Material(
               color: Theme.of(context).colorScheme.secondaryContainer,
               child: ListTile(
@@ -399,12 +404,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 },
               ),
             ),
-          Expanded(child: pages[_index]),
+          Expanded(child: pages[pageIndex]),
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() {
+        selectedIndex: visiblePages.indexOf(pageIndex),
+        onDestinationSelected: (index) => setState(() {
+          final value = visiblePages[index];
           if (value == 0 && _index != 0) {
             _beginnerCareNotice = randomBeginnerCareNotice(
               previous: _beginnerCareNotice,
@@ -413,28 +419,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           }
           _index = value;
         }),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.hive_outlined),
             selectedIcon: Icon(Icons.hive),
             label: '蚁群',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
-            label: '物品',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.pets_outlined),
-            selectedIcon: Icon(Icons.pets),
-            label: 'DLC',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: '发现',
-          ),
-          NavigationDestination(
+          if (!themeController.simpleMode) ...[
+            const NavigationDestination(
+              icon: Icon(Icons.inventory_2_outlined),
+              selectedIcon: Icon(Icons.inventory_2),
+              label: '物品',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.pets_outlined),
+              selectedIcon: Icon(Icons.pets),
+              label: 'DLC',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore),
+              label: '发现',
+            ),
+          ],
+          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: '设置',
@@ -998,7 +1006,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           updatedAt: now,
         ),
       );
-      if (widget.colony == null && mounted) {
+      if (widget.colony == null && !themeController.simpleMode && mounted) {
         final colony = await AppDatabase.instance.findColony(colonyId);
         if (colony != null && mounted) {
           await Navigator.of(context).push<bool>(
@@ -1815,27 +1823,29 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             ),
             const SizedBox(height: 12),
             _ColonySummary(colony: colony),
-            const SizedBox(height: 12),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.trending_up),
-                title: const Text('群落自动扩充'),
-                subtitle: Text(
-                  colony.growth == null
-                      ? '未开启 · 设置卵、茧、工增长规则'
-                      : '${colony.growth!.frequency.label} · ${colony.growth!.path.label} · 自动估算',
+            if (!themeController.simpleMode) ...[
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.trending_up),
+                  title: const Text('群落自动扩充'),
+                  subtitle: Text(
+                    colony.growth == null
+                        ? '未开启 · 设置卵、茧、工增长规则'
+                        : '${colony.growth!.frequency.label} · ${colony.growth!.path.label} · 自动估算',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => ColonyGrowthPage(colony: colony),
+                      ),
+                    );
+                    if (mounted) setState(_reload);
+                  },
                 ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => ColonyGrowthPage(colony: colony),
-                    ),
-                  );
-                  if (mounted) setState(_reload);
-                },
               ),
-            ),
+            ],
             const SizedBox(height: 16),
             _PopulationTimeline(
               colony: colony,
@@ -1935,7 +1945,8 @@ class _ColonyProfileSummary extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
-            if (colony.species?.trim().isNotEmpty == true)
+            if (!themeController.simpleMode &&
+                colony.species?.trim().isNotEmpty == true)
               TextButton.icon(
                 icon: const Icon(Icons.menu_book_outlined),
                 label: const Text('百科'),
@@ -3834,6 +3845,19 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _savingEdition = false;
+  bool _savingSimpleMode = false;
+
+  Future<void> _setSimpleMode(bool enabled) async {
+    if (_savingSimpleMode) return;
+    setState(() => _savingSimpleMode = true);
+    try {
+      await themeController.setSimpleMode(enabled);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _savingSimpleMode = false);
+    }
+  }
 
   Future<void> _setEdition(AppEdition edition) async {
     if (_savingEdition || themeController.edition == edition) return;
@@ -3895,6 +3919,15 @@ class _SettingsPageState extends State<SettingsPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
+          _section(context, '展示模式', [
+            SwitchListTile(
+              secondary: const Icon(Icons.view_agenda_outlined),
+              title: const Text('简化模式'),
+              subtitle: const Text('只展示蚁群、日常记录和设置；关闭后恢复全部功能入口，已有数据保留'),
+              value: themeController.simpleMode,
+              onChanged: _savingSimpleMode ? null : _setSimpleMode,
+            ),
+          ]),
           _section(context, '使用版本', [
             ListTile(
               leading: Icon(
@@ -3944,8 +3977,10 @@ class _SettingsPageState extends State<SettingsPage> {
               useOffline: () => _setEdition(AppEdition.offline),
             ),
           ]),
-          if (themeController.edition == AppEdition.online &&
-              appUpdateController.availability != AppUpdateAvailability.required)
+          if (!themeController.simpleMode &&
+              themeController.edition == AppEdition.online &&
+              appUpdateController.availability !=
+                  AppUpdateAvailability.required)
             _section(context, '个人中心', [
               ListTile(
                 leading: const Icon(Icons.manage_accounts_outlined),
