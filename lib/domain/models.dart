@@ -201,6 +201,7 @@ class CareRecord {
     this.larvaCount,
     this.pupaCount,
     this.workerCount,
+    this.workerMortalityCount,
     this.photos = const [],
   });
 
@@ -215,6 +216,7 @@ class CareRecord {
   final int? larvaCount;
   final int? pupaCount;
   final int? workerCount;
+  final int? workerMortalityCount;
   final List<String> photos;
   final DateTime createdAt;
 
@@ -230,6 +232,7 @@ class CareRecord {
     larvaCount: map['larva_count'] as int?,
     pupaCount: map['pupa_count'] as int?,
     workerCount: map['worker_count'] as int?,
+    workerMortalityCount: map['worker_mortality_count'] as int?,
     photos: _stringList(map['photos_json']),
     createdAt: DateTime.parse(map['created_at']! as String),
   );
@@ -246,6 +249,7 @@ class CareRecord {
     'larva_count': larvaCount,
     'pupa_count': pupaCount,
     'worker_count': workerCount,
+    'worker_mortality_count': workerMortalityCount,
     'photos_json': jsonEncode(photos),
     'created_at': createdAt.toIso8601String(),
   };

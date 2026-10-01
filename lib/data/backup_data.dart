@@ -75,6 +75,11 @@ class BackupData {
               value < 0) {
             throw FormatException('字段 ${field.key} 不能为负数。');
           }
+          if (field.key == 'worker_mortality_count' &&
+              value is int &&
+              (value < 0 || value > 1000000)) {
+            throw const FormatException('工蚁死亡数量请输入 0～1000000 的整数。');
+          }
           if (const {
                 'archived',
                 'show_specialized',

@@ -32,7 +32,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 16,
+      version: 17,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -59,6 +59,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, record_type TEXT NOT NULL,
       occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL,
       egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER,
+      worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000),
       photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL,
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
     )''');
@@ -75,6 +76,12 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 17) {
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN worker_mortality_count INTEGER '
+        'CHECK (worker_mortality_count BETWEEN 0 AND 1000000)',
+      );
+    }
     if (oldVersion < 16) {
       await database.execute(
         'ALTER TABLE colonies ADD COLUMN initial_larva_count INTEGER',

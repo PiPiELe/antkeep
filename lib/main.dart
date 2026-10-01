@@ -28,6 +28,7 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/mortality_analysis.dart';
 import 'domain/colony_growth.dart';
 import 'domain/population_analysis.dart';
 import 'domain/purchase_price.dart';
@@ -1986,6 +1987,15 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 setState(() => _populationExpanded = value);
               },
             ),
+            const SizedBox(height: 16),
+            WorkerMortalityAnalysisCard(
+              key: const ValueKey('colony-mortality-analysis'),
+              points: dailyWorkerMortality(
+                colony.id,
+                detail.records,
+                now: DateTime.now(),
+              ),
+            ),
             const SizedBox(height: 22),
             Text('养蚁日记', style: Theme.of(context).textTheme.titleLarge),
             if (detail.records.isNotEmpty)
@@ -2451,6 +2461,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   final _larvae = TextEditingController();
   final _pupae = TextEditingController();
   final _workers = TextEditingController();
+  final _workerMortality = TextEditingController();
   final _photos = <XFile>[];
   var _type = CareRecordType.observation;
   var _occurredAt = DateTime.now();
@@ -2470,6 +2481,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
     _larvae.text = record.larvaCount?.toString() ?? '';
     _pupae.text = record.pupaCount?.toString() ?? '';
     _workers.text = record.workerCount?.toString() ?? '';
+    _workerMortality.text = record.workerMortalityCount?.toString() ?? '';
     // Stored counts are snapshots, even if originally entered as increments.
     _incremental = false;
   }
@@ -2484,6 +2496,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
       _larvae,
       _pupae,
       _workers,
+      _workerMortality,
     ]) {
       c.dispose();
     }
@@ -2492,7 +2505,13 @@ class _RecordFormPageState extends State<RecordFormPage> {
 
   Future<void> _save() async {
     if (_saving) return;
-    for (final controller in [_eggs, _larvae, _pupae, _workers]) {
+    for (final controller in [
+      _eggs,
+      _larvae,
+      _pupae,
+      _workers,
+      if (_type == CareRecordType.mortality) _workerMortality,
+    ]) {
       final text = controller.text.trim();
       final n = int.tryParse(text);
       if (text.isNotEmpty && (n == null || n < 0 || n > 1000000)) {
@@ -2522,6 +2541,9 @@ class _RecordFormPageState extends State<RecordFormPage> {
             ? null
             : int.tryParse(_pupae.text),
         workerCount: int.tryParse(_workers.text),
+        workerMortalityCount: _type == CareRecordType.mortality
+            ? int.tryParse(_workerMortality.text.trim())
+            : null,
         photos: photos,
         createdAt: widget.record?.createdAt ?? DateTime.now(),
       );
@@ -2589,6 +2611,17 @@ class _RecordFormPageState extends State<RecordFormPage> {
               )
               .toList(),
         ),
+        if (_type == CareRecordType.mortality) ...[
+          const SizedBox(height: 16),
+          TextField(
+            controller: _workerMortality,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: '工蚁死亡数量',
+              helperText: '本次死亡数量，不清楚可留空',
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: _pickTime,
@@ -2805,6 +2838,8 @@ class _RecordCard extends StatelessWidget {
       if (record.larvaCount != null) '幼虫 ${record.larvaCount}',
       if (record.pupaCount != null) '蛹 ${record.pupaCount}',
       if (record.workerCount != null) '工蚁 ${record.workerCount}',
+      if (record.workerMortalityCount != null)
+        '工蚁死亡 ${record.workerMortalityCount}',
     ];
     return Card(
       child: Padding(

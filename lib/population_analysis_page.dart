@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'data/app_database.dart';
 import 'date_display.dart';
 import 'domain/models.dart';
+import 'domain/mortality_analysis.dart';
 import 'domain/population_analysis.dart';
 import 'domain/spending_analysis.dart';
 import 'spending_analysis_view.dart';
@@ -41,7 +42,8 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   FeederType? _feeder;
   PopulationMetric _metric = PopulationMetric.workers;
   String? _selectedId;
-  bool _showSpending = false;
+  int _tabIndex = 0;
+  bool get _showMortality => _tabIndex == 2;
   bool _showForecast = false;
   ForecastHorizon _forecastHorizon = ForecastHorizon.month;
 
@@ -66,6 +68,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
     final colony = _colony;
     final feeder = _feeder;
     final metric = _metric;
+    final mortality = _showMortality;
     final predict = _showForecast && _forecastUnavailableReason == null;
     final horizon = _forecastHorizon;
     if (colony != null) {
@@ -74,6 +77,12 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
             colony.id,
           );
       final now = DateTime.now();
+      if (mortality) {
+        return (
+          history: dailyWorkerMortality(colony.id, records, now: now),
+          forecast: <PopulationPoint>[],
+        );
+      }
       return (
         history: colonyPopulation(
           colony,
@@ -128,19 +137,26 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 2,
+    length: 3,
     child: Scaffold(
       appBar: AppBar(
         title: const Text('分析'),
         bottom: TabBar(
-          onTap: (index) => setState(() => _showSpending = index == 1),
+          onTap: (index) => setState(() {
+            _tabIndex = index;
+            if (index != 1 &&
+                (_colony != null || (!_showMortality && _feeder != null))) {
+              _reloadPoints();
+            }
+          }),
           tabs: const [
             Tab(text: '数量分析'),
             Tab(text: '消费占比'),
+            Tab(text: '死亡分析'),
           ],
         ),
       ),
-      body: _showSpending
+      body: _tabIndex == 1
           ? SpendingAnalysisView(loadSummary: widget.loadSpending)
           : FutureBuilder<List<Colony>>(
               future: _colonies,
@@ -164,11 +180,17 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     DropdownButtonFormField<String>(
-                      key: const ValueKey('analysis-subject'),
-                      initialValue: _selectedId,
+                      key: ValueKey(
+                        _showMortality
+                            ? 'mortality-subject'
+                            : 'analysis-subject',
+                      ),
+                      initialValue: _showMortality && _colony == null
+                          ? null
+                          : _selectedId,
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: '选择蚁群或 DLC 养殖',
+                      decoration: InputDecoration(
+                        labelText: _showMortality ? '选择蚁群' : '选择蚁群或 DLC 养殖',
                       ),
                       items: [
                         for (final colony in colonies)
@@ -179,54 +201,60 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        for (final feeder in FeederType.values)
-                          DropdownMenuItem(
-                            value: 'feeder:${feeder.name}',
-                            child: Text('DLC · ${feeder.label}'),
-                          ),
+                        if (!_showMortality)
+                          for (final feeder in FeederType.values)
+                            DropdownMenuItem(
+                              value: 'feeder:${feeder.name}',
+                              child: Text('DLC · ${feeder.label}'),
+                            ),
                       ],
                       onChanged: (id) {
                         if (id != null) _select(id, colonies);
                       },
                     ),
                     const SizedBox(height: 16),
-                    if (_selectedId == null)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 48),
+                    if (_selectedId == null ||
+                        (_showMortality && _colony == null))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 48),
                         child: Text(
-                          '选择一窝蚁群或一种 DLC 养殖，查看数量变化。',
+                          _showMortality
+                              ? '选择一窝蚁群，查看工蚁死亡量变化。'
+                              : '选择一窝蚁群或一种 DLC 养殖，查看数量变化。',
                           textAlign: TextAlign.center,
                         ),
                       )
                     else ...[
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          for (final metric in metrics)
-                            ChoiceChip(
-                              label: Text(metric.label),
-                              selected: _metric == metric,
-                              onSelected: (_) => setState(() {
-                                _metric = metric;
-                                _reloadPoints();
-                              }),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      PopulationForecastControls(
-                        enabled: _showForecast,
-                        horizon: _forecastHorizon,
-                        unavailableReason: _forecastUnavailableReason,
-                        onEnabledChanged: (value) => setState(() {
-                          _showForecast = value;
-                          _reloadPoints();
-                        }),
-                        onHorizonChanged: (value) => setState(() {
-                          _forecastHorizon = value;
-                          _reloadPoints();
-                        }),
-                      ),
+                      if (!_showMortality) ...[
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            for (final metric in metrics)
+                              ChoiceChip(
+                                label: Text(metric.label),
+                                selected: _metric == metric,
+                                onSelected: (_) => setState(() {
+                                  _metric = metric;
+                                  _reloadPoints();
+                                }),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        PopulationForecastControls(
+                          enabled: _showForecast,
+                          horizon: _forecastHorizon,
+                          unavailableReason: _forecastUnavailableReason,
+                          onEnabledChanged: (value) => setState(() {
+                            _showForecast = value;
+                            _reloadPoints();
+                          }),
+                          onHorizonChanged: (value) => setState(() {
+                            _forecastHorizon = value;
+                            _reloadPoints();
+                          }),
+                        ),
+                      ],
                       FutureBuilder<_PopulationSeries>(
                         future: _points,
                         builder: (context, snapshot) {
@@ -239,7 +267,16 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                           if (snapshot.hasError) {
                             return TextButton(
                               onPressed: () => setState(_reloadPoints),
-                              child: const Text('数量读取失败，点击重试'),
+                              child: Text(
+                                _showMortality
+                                    ? '死亡数量读取失败，点击重试'
+                                    : '数量读取失败，点击重试',
+                              ),
+                            );
+                          }
+                          if (_showMortality) {
+                            return WorkerMortalityAnalysisCard(
+                              points: snapshot.data!.history,
                             );
                           }
                           return _PopulationResult(
@@ -249,19 +286,21 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                           );
                         },
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '按全部有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
-                        '${_colony != null ? "初始数量以入手日期（未填写时用建档时间）计入。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
-                        '同一时刻的同一指标使用最后录入的有效值。连线仅连接记录点，不代表期间每天的数量。',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '趋势规则：至少 3 个时间点；数量相同为平稳，只增不减为稳定上升，'
-                        '只减不增为稳定下降，有升有降为数量波动。估计数量也会参与分析，结果仅描述已有记录。',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      if (!_showMortality) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          '按全部有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
+                          '${_colony != null ? "初始数量以入手日期（未填写时用建档时间）计入。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
+                          '同一时刻的同一指标使用最后录入的有效值。连线仅连接记录点，不代表期间每天的数量。',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '趋势规则：至少 3 个时间点；数量相同为平稳，只增不减为稳定上升，'
+                          '只减不增为稳定下降，有升有降为数量波动。估计数量也会参与分析，结果仅描述已有记录。',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ],
                   ],
                 );
@@ -269,6 +308,101 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
             ),
     ),
   );
+}
+
+class WorkerMortalityAnalysisCard extends StatelessWidget {
+  const WorkerMortalityAnalysisCard({super.key, required this.points});
+  final List<PopulationPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    if (points.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('暂无工蚁死亡数量记录\n请在日记中选择「死亡」，填写工蚁死亡数量。'),
+        ),
+      );
+    }
+    final comparison = MortalityComparison(points, now: DateTime.now());
+    String period(DateTime start, DateTime end) =>
+        '${_date(start)} — ${_date(DateTime(end.year, end.month, end.day - 1))}';
+    final percent = comparison.percent;
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              comparison.label,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: comparison.comparable && comparison.delta > 0
+                    ? colors.error
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '最近 7 日 · ${comparison.recentTotal} 只 · 已记录 ${comparison.recentDays}/7 天',
+            ),
+            Text(
+              period(comparison.recentStart, comparison.end),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '前 7 日 · ${comparison.previousTotal} 只 · 已记录 ${comparison.previousDays}/7 天',
+            ),
+            Text(
+              period(comparison.previousStart, comparison.recentStart),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (comparison.comparable) ...[
+              const SizedBox(height: 8),
+              Text(
+                '较前 7 日 ${comparison.delta > 0 ? "+" : ""}${comparison.delta} 只'
+                '${percent == null ? "（前期为 0，不计算百分比）" : "（${percent > 0 ? "+" : ""}${percent.toStringAsFixed(1)}%）"}',
+              ),
+            ],
+            const SizedBox(height: 12),
+            const Text(
+              '比较截至昨日的两个完整 7 日周期，不含今天。仅比较已录入死亡数，记录频率不同可能影响结果；未记录日期不视为零死亡。',
+            ),
+            const SizedBox(height: 20),
+            Text('每日工蚁死亡数量', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Semantics(
+              label: '每日工蚁死亡数量折线图，详细数据见每日明细。',
+              child: SizedBox(
+                height: 220,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _PopulationChartPainter(points, colors),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('${_date(points.first.time)} — ${_date(points.last.time)}'),
+            const Text('按实际发生日期汇总，同日多条相加；空白不计入，0 保留。连线仅连接记录日，今日数据可能尚未完整。'),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('每日明细'),
+              children: [
+                for (final point in points.reversed)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(_date(point.time)),
+                    trailing: Text('${point.count} 只'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PopulationResult extends StatelessWidget {
