@@ -18,6 +18,8 @@ abstract class AntKeepRepository {
   Future<List<CareRecord>> listRecords(String colonyId);
   Future<List<CareRecord>> listRecentRecords();
   Future<void> saveRecord(CareRecord record, {bool incremental = false});
+  Future<void> updateRecord(CareRecord record);
+  Future<void> deleteRecord(CareRecord record);
 }
 
 class AppDatabase implements AntKeepRepository, AppSettingsStore {
@@ -406,6 +408,44 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
           );
         }
         await transaction.insert('care_records', resolved.toMap());
+        await transaction.update(
+          'colonies',
+          {'updated_at': DateTime.now().toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [record.colonyId],
+        );
+      });
+
+  @override
+  Future<void> updateRecord(CareRecord record) =>
+      _db.transaction((transaction) async {
+        final values = record.toMap()
+          ..remove('id')
+          ..remove('colony_id')
+          ..remove('created_at');
+        final count = await transaction.update(
+          'care_records',
+          values,
+          where: 'id = ? AND colony_id = ?',
+          whereArgs: [record.id, record.colonyId],
+        );
+        if (count != 1) throw StateError('日记已不存在，请返回刷新');
+        await transaction.update(
+          'colonies',
+          {'updated_at': DateTime.now().toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [record.colonyId],
+        );
+      });
+
+  @override
+  Future<void> deleteRecord(CareRecord record) =>
+      _db.transaction((transaction) async {
+        await transaction.delete(
+          'care_records',
+          where: 'id = ? AND colony_id = ?',
+          whereArgs: [record.id, record.colonyId],
+        );
         await transaction.update(
           'colonies',
           {'updated_at': DateTime.now().toIso8601String()},

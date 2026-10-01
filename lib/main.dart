@@ -34,6 +34,7 @@ import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
 import 'domain/species_profile.dart';
 import 'domain/imported_species_catalog.dart';
+import 'widgets/diary_record_actions.dart';
 
 const _builtInSpeciesOptions = <String, List<String>>{
   '收获蚁': [
@@ -1801,6 +1802,48 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
     }
   }
 
+  Future<void> _editRecord(Colony colony, CareRecord record) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RecordFormPage(colony: colony, record: record),
+      ),
+    );
+    if (saved == true && mounted) setState(_reload);
+  }
+
+  Future<void> _deleteRecord(CareRecord record) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除日记？'),
+        content: Text(
+          '确定删除 ${_dateTime(record.occurredAt)} 的${record.type.label}记录吗？此操作无法撤销。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await AppDatabase.instance.deleteRecord(record);
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<_Detail>(
     future: _detail,
@@ -1914,6 +1957,8 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             ),
             const SizedBox(height: 22),
             Text('养蚁日记', style: Theme.of(context).textTheme.titleLarge),
+            if (detail.records.isNotEmpty)
+              Text('点击日记编辑，左滑删除', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 8),
             if (detail.records.isEmpty)
               const Padding(
@@ -1925,7 +1970,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ),
               ),
             ...detail.records.map(
-              (record) => _RecordCard(record: record, colony: colony),
+              (record) => DiaryRecordActions(
+                key: ValueKey(record.id),
+                onEdit: () => _editRecord(colony, record),
+                onDelete: () => _deleteRecord(record),
+                child: _RecordCard(record: record, colony: colony),
+              ),
             ),
           ],
         ),
@@ -2355,8 +2405,9 @@ class _ColonySummary extends StatelessWidget {
 }
 
 class RecordFormPage extends StatefulWidget {
-  const RecordFormPage({super.key, required this.colony});
+  const RecordFormPage({super.key, required this.colony, this.record});
   final Colony colony;
+  final CareRecord? record;
   @override
   State<RecordFormPage> createState() => _RecordFormPageState();
 }
@@ -2375,6 +2426,24 @@ class _RecordFormPageState extends State<RecordFormPage> {
   var _saving = false;
   var _incremental = true;
   @override
+  void initState() {
+    super.initState();
+    final record = widget.record;
+    if (record == null) return;
+    _type = record.type;
+    _occurredAt = record.occurredAt;
+    _note.text = record.note ?? '';
+    _temperature.text = record.temperature?.toString() ?? '';
+    _humidity.text = record.humidity?.toString() ?? '';
+    _eggs.text = record.eggCount?.toString() ?? '';
+    _larvae.text = record.larvaCount?.toString() ?? '';
+    _pupae.text = record.pupaCount?.toString() ?? '';
+    _workers.text = record.workerCount?.toString() ?? '';
+    // Stored counts are snapshots, even if originally entered as increments.
+    _incremental = false;
+  }
+
+  @override
   void dispose() {
     for (final c in [
       _note,
@@ -2391,6 +2460,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     for (final controller in [_eggs, _larvae, _pupae, _workers]) {
       final text = controller.text.trim();
       final n = int.tryParse(text);
@@ -2401,32 +2471,37 @@ class _RecordFormPageState extends State<RecordFormPage> {
     }
     setState(() => _saving = true);
     try {
-      final photos = <String>[];
+      final photos = <String>[...?widget.record?.photos];
       for (final photo in _photos) {
         photos.add(await LocalMediaStore.instance.copyImage(photo));
       }
-      await AppDatabase.instance.saveRecord(
-        CareRecord(
-          id: const Uuid().v4(),
-          colonyId: widget.colony.id,
-          type: _type,
-          occurredAt: _occurredAt,
-          note: _textOrNull(_note.text),
-          temperature: double.tryParse(_temperature.text),
-          humidity: double.tryParse(_humidity.text),
-          eggCount: int.tryParse(_eggs.text),
-          larvaCount: int.tryParse(_larvae.text),
-          pupaCount:
-              _incremental &&
-                  widget.colony.developmentPath == GrowthPath.eggToWorker
-              ? null
-              : int.tryParse(_pupae.text),
-          workerCount: int.tryParse(_workers.text),
-          photos: photos,
-          createdAt: DateTime.now(),
-        ),
-        incremental: _incremental,
+      final record = CareRecord(
+        id: widget.record?.id ?? const Uuid().v4(),
+        colonyId: widget.colony.id,
+        type: _type,
+        occurredAt: _occurredAt,
+        note: _textOrNull(_note.text),
+        temperature: double.tryParse(_temperature.text),
+        humidity: double.tryParse(_humidity.text),
+        eggCount: int.tryParse(_eggs.text),
+        larvaCount: int.tryParse(_larvae.text),
+        pupaCount:
+            _incremental &&
+                widget.colony.developmentPath == GrowthPath.eggToWorker
+            ? null
+            : int.tryParse(_pupae.text),
+        workerCount: int.tryParse(_workers.text),
+        photos: photos,
+        createdAt: widget.record?.createdAt ?? DateTime.now(),
       );
+      if (widget.record == null) {
+        await AppDatabase.instance.saveRecord(
+          record,
+          incremental: _incremental,
+        );
+      } else {
+        await AppDatabase.instance.updateRecord(record);
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) _showError(context, error);
@@ -2462,7 +2537,9 @@ class _RecordFormPageState extends State<RecordFormPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('记录 ${widget.colony.name}')),
+    appBar: AppBar(
+      title: Text(widget.record == null ? '记录 ${widget.colony.name}' : '编辑日记'),
+    ),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -2522,19 +2599,25 @@ class _RecordFormPageState extends State<RecordFormPage> {
             ),
           ],
         ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('增量'),
-          value: _incremental,
-          onChanged: _saving
-              ? null
-              : (value) => setState(() => _incremental = value),
-          subtitle: Text(
-            _incremental
-                ? '填写增加值，自动扣减上一阶段；${widget.colony.developmentPath.label}。未知数量请先关闭增量填写总数。'
-                : '填写当前总数，留空不修改',
+        if (widget.record != null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('编辑时填写该次记录的数量总数，留空表示该项未知。'),
+          )
+        else
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('增量'),
+            value: _incremental,
+            onChanged: _saving
+                ? null
+                : (value) => setState(() => _incremental = value),
+            subtitle: Text(
+              _incremental
+                  ? '填写增加值，自动扣减上一阶段；${widget.colony.developmentPath.label}。未知数量请先关闭增量填写总数。'
+                  : '填写当前总数，留空不修改',
+            ),
           ),
-        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -2592,15 +2675,40 @@ class _RecordFormPageState extends State<RecordFormPage> {
           ],
         ),
         const SizedBox(height: 16),
+        if (widget.record?.photos.isNotEmpty == true) ...[
+          const Text('已有照片'),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.record!.photos.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) => _StoredImage(
+                relativePath: widget.record!.photos[index],
+                width: 80,
+                height: 80,
+                borderRadius: 8,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         OutlinedButton.icon(
           icon: const Icon(Icons.add_photo_alternate_outlined),
           label: Text(
             _photos.isEmpty ? '添加照片（可选）' : '已选择 ${_photos.length} 张照片',
           ),
-          onPressed: () async {
-            final images = await ImagePicker().pickMultiImage(imageQuality: 86);
-            if (images.isNotEmpty) setState(() => _photos.addAll(images));
-          },
+          onPressed: _saving
+              ? null
+              : () async {
+                  final images = await ImagePicker().pickMultiImage(
+                    imageQuality: 86,
+                  );
+                  if (images.isNotEmpty && mounted) {
+                    setState(() => _photos.addAll(images));
+                  }
+                },
         ),
         if (_photos.isNotEmpty) ...[
           const SizedBox(height: 12),
