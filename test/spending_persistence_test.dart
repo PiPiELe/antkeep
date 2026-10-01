@@ -33,7 +33,9 @@ void main() {
       );
       await directory.delete(recursive: true);
     });
-    expect((await repository.loadSpendingSummary()).totalCents, 0);
+    final empty = await repository.loadSpendingSummary();
+    expect(empty.totalCents, 0);
+    expect(empty.topEntries, isEmpty);
     final date = DateTime(2026, 9, 1);
     for (final entry in {
       'active': 10001,
@@ -90,11 +92,54 @@ void main() {
     expect(summary.inventoryCents, 5000);
     expect(summary.feedersCents, 25 * FeederType.values.length);
     expect(summary.totalCents, 15030 + 25 * FeederType.values.length);
+    expect(summary.topEntries.map((entry) => entry.cents), [
+      10001,
+      5000,
+      29,
+      25,
+      25,
+    ]);
+    expect(summary.topEntries.map((entry) => entry.name), [
+      'active',
+      'paid',
+      'archived',
+      '樱桃蟑螂 · 观察',
+      '蛐蛐 · 观察',
+    ]);
+    expect(summary.topEntries.map((entry) => entry.category), [
+      '蚁群',
+      '已购物品',
+      '蚁群',
+      'DLC 养殖',
+      'DLC 养殖',
+    ]);
+    expect(summary.topEntries.last.occurredAt, date);
+    await db.update(
+      'feeder_records',
+      {'purchase_price_cents': 20001},
+      where: 'id = ?',
+      whereArgs: [FeederType.dubia.name],
+    );
+    summary = await repository.loadSpendingSummary();
+    expect(summary.topEntries.first.name, '杜比亚 · 观察');
+    expect(summary.topEntries.first.cents, 20001);
     final paid = (await repository.listInventory()).singleWhere(
       (item) => item.id == 'paid',
     );
     await repository.setInventoryPurchased(paid, false);
     summary = await repository.loadSpendingSummary();
     expect(summary.inventoryCents, 0);
+    expect(
+      summary.topEntries.map((entry) => entry.name),
+      isNot(contains('paid')),
+    );
+
+    await db.update('feeder_records', {'purchase_price_cents': null});
+    summary = await repository.loadSpendingSummary();
+    expect(summary.topEntries.map((entry) => entry.name), [
+      'active',
+      'archived',
+    ]);
+    expect(summary.topEntries.map((entry) => entry.cents), [10001, 29]);
   });
 }

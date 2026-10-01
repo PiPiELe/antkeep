@@ -478,24 +478,56 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         }
       });
 
-  Future<SpendingSummary> loadSpendingSummary() =>
-      _db.transaction((transaction) async {
-        Future<int> sum(String table, {String? where}) async {
-          final rows = await transaction.query(
-            table,
-            columns: ['COALESCE(SUM(purchase_price_cents), 0) AS total'],
-            where: where,
-          );
-          return rows.single['total'] as int;
-        }
+  Future<SpendingSummary> loadSpendingSummary() => _db.transaction((
+    transaction,
+  ) async {
+    Future<int> sum(String table, {String? where}) async {
+      final rows = await transaction.query(
+        table,
+        columns: ['COALESCE(SUM(purchase_price_cents), 0) AS total'],
+        where: where,
+      );
+      return rows.single['total'] as int;
+    }
 
-        return SpendingSummary(
-          // Archived colonies still represent money already spent.
-          coloniesCents: await sum('colonies'),
-          inventoryCents: await sum('inventory_items', where: 'purchased = 1'),
-          feedersCents: await sum('feeder_records'),
+    final topRows = await transaction.rawQuery('''
+          SELECT id, name, '蚁群' AS category, purchase_price_cents AS cents,
+                 NULL AS record_type, NULL AS occurred_at
+          FROM colonies WHERE purchase_price_cents > 0
+          UNION ALL
+          SELECT id,
+                 CASE WHEN group_name IS NULL OR group_name = '' THEN name
+                      ELSE group_name || ' · ' || name END,
+                 '已购物品', purchase_price_cents, NULL, NULL
+          FROM inventory_items WHERE purchased = 1 AND purchase_price_cents > 0
+          UNION ALL
+          SELECT id, feeder_type, 'DLC 养殖', purchase_price_cents,
+                 record_type, occurred_at
+          FROM feeder_records WHERE purchase_price_cents > 0
+          ORDER BY cents DESC, category ASC, id ASC
+          LIMIT 5
+        ''');
+    return SpendingSummary(
+      // Archived colonies still represent money already spent.
+      coloniesCents: await sum('colonies'),
+      inventoryCents: await sum('inventory_items', where: 'purchased = 1'),
+      feedersCents: await sum('feeder_records'),
+      topEntries: topRows.map((row) {
+        final isFeeder = row['record_type'] != null;
+        return SpendingEntry(
+          name: isFeeder
+              ? '${FeederType.fromStorage(row['name'] as String).label} · '
+                    '${FeederRecordType.fromStorage(row['record_type'] as String).label}'
+              : row['name'] as String,
+          category: row['category'] as String,
+          cents: row['cents'] as int,
+          occurredAt: isFeeder
+              ? DateTime.parse(row['occurred_at'] as String)
+              : null,
         );
-      });
+      }).toList(),
+    );
+  });
 
   Future<List<InventoryItem>> listInventory() async => (await _db.query(
     'inventory_items',

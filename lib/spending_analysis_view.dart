@@ -136,11 +136,90 @@ class _SpendingAnalysisViewState extends State<SpendingAnalysisView> {
               '每笔录入金额计入一次，不再乘数量。百分比四舍五入至 1 位小数。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '消费前 5 笔',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '按单笔购入金额从高到低排列',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    if (summary.topEntries.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 16),
+                        child: Text('暂无消费明细，填写大于 0 的购入价后即可查看。'),
+                      ),
+                    for (var i = 0; i < summary.topEntries.length; i++) ...[
+                      if (i > 0) const Divider(height: 1),
+                      _SpendingEntryRow(
+                        rank: i + 1,
+                        entry: summary.topEntries[i],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
     },
   );
+}
+
+class _SpendingEntryRow extends StatelessWidget {
+  const _SpendingEntryRow({required this.rank, required this.entry});
+
+  final int rank;
+  final SpendingEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = entry.occurredAt;
+    final subtitle = date == null
+        ? entry.category
+        : '${entry.category} · ${date.year}-'
+              '${date.month.toString().padLeft(2, '0')}-'
+              '${date.day.toString().padLeft(2, '0')}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text(
+              '$rank',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(entry.name),
+                const SizedBox(height: 4),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 4),
+                Text(
+                  '¥${formatPurchasePrice(entry.cents)}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SpendingPiePainter extends CustomPainter {
