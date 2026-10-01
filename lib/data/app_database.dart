@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../domain/models.dart';
 import '../domain/colony_growth.dart';
+import '../domain/record_increment.dart';
 import '../domain/spending_analysis.dart';
 import '../app_preferences.dart';
 import 'database_factory.dart';
@@ -16,7 +17,7 @@ abstract class AntKeepRepository {
   Future<void> deleteColony(String id);
   Future<List<CareRecord>> listRecords(String colonyId);
   Future<List<CareRecord>> listRecentRecords();
-  Future<void> saveRecord(CareRecord record);
+  Future<void> saveRecord(CareRecord record, {bool incremental = false});
 }
 
 class AppDatabase implements AntKeepRepository, AppSettingsStore {
@@ -29,7 +30,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 15,
+      version: 16,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -47,6 +48,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0),
       specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0,
       initial_egg_count INTEGER, initial_cocoon_count INTEGER, auto_growth_json TEXT,
+      initial_larva_count INTEGER, development_path TEXT,
       nest_type TEXT, target_temperature_lower REAL, target_temperature REAL,
       target_humidity_lower REAL, target_humidity REAL, cover_photo_path TEXT,
       archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -71,6 +73,14 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 16) {
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN initial_larva_count INTEGER',
+      );
+      await database.execute(
+        'ALTER TABLE colonies ADD COLUMN development_path TEXT',
+      );
+    }
     if (oldVersion < 15) {
       await database.execute(
         'ALTER TABLE colonies ADD COLUMN auto_growth_json TEXT',
@@ -293,6 +303,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       )).map(CareRecord.fromMap).toList();
       var population = GrowthPopulation(
         eggs: colony.initialEggCount,
+        larvae: colony.initialLarvaCount,
         cocoons: colony.initialCocoonCount,
         workers: colony.initialWorkerCount,
       );
@@ -304,6 +315,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
           final record = records[cursor++];
           population = GrowthPopulation(
             eggs: record.eggCount ?? population.eggs,
+            larvae: record.larvaCount ?? population.larvae,
             cocoons: record.pupaCount ?? population.cocoons,
             workers: record.workerCount ?? population.workers,
           );
@@ -319,6 +331,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
             createdAt: now,
             note: '自动扩充（估算） · ${growth.frequency.label} · ${growth.path.label}',
             eggCount: population.eggs,
+            larvaCount: population.larvae,
             pupaCount: population.cocoons,
             workerCount: population.workers,
           ).toMap(),
@@ -364,10 +377,29 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   @override
-  Future<void> saveRecord(CareRecord record) =>
+  Future<void> saveRecord(CareRecord record, {bool incremental = false}) =>
       _db.transaction((transaction) async {
         await _applyGrowth(transaction, DateTime.now(), record.colonyId);
-        await transaction.insert('care_records', record.toMap());
+        var resolved = record;
+        if (incremental) {
+          final rows = await transaction.query(
+            'colonies',
+            where: 'id = ?',
+            whereArgs: [record.colonyId],
+          );
+          if (rows.isEmpty) throw StateError('蚁群已不存在');
+          final history = await transaction.query(
+            'care_records',
+            where: 'colony_id = ?',
+            whereArgs: [record.colonyId],
+          );
+          resolved = resolveRecordIncrement(
+            Colony.fromMap(rows.single),
+            history.map(CareRecord.fromMap),
+            record,
+          );
+        }
+        await transaction.insert('care_records', resolved.toMap());
         await transaction.update(
           'colonies',
           {'updated_at': DateTime.now().toIso8601String()},

@@ -63,6 +63,8 @@ void main() {
 
     await AppDatabase.instance.open();
     final colony = (await AppDatabase.instance.findColony('legacy'))!;
+    expect(colony.initialLarvaCount, isNull);
+    expect(colony.developmentPath.label, '卵 → 幼 → 茧 → 工');
     expect(colony.targetTemperatureLower, isNull);
     expect(colony.targetHumidityLower, isNull);
     expect(colony.targetTemperature, 30.0);

@@ -56,6 +56,7 @@ List<PopulationPoint> colonyPopulationForecast(
       !const [
         PopulationMetric.workers,
         PopulationMetric.eggs,
+        PopulationMetric.larvae,
         PopulationMetric.pupae,
         PopulationMetric.total,
       ].contains(metric)) {
@@ -75,7 +76,7 @@ List<PopulationPoint> colonyPopulationForecast(
   var eggs = valid(colony.initialEggCount);
   var cocoons = valid(colony.initialCocoonCount);
   var workers = valid(colony.initialWorkerCount);
-  int? larvae;
+  var larvae = valid(colony.initialLarvaCount);
   for (final record in known) {
     eggs = valid(record.eggCount) ?? eggs;
     cocoons = valid(record.pupaCount) ?? cocoons;
@@ -84,6 +85,7 @@ List<PopulationPoint> colonyPopulationForecast(
   }
   var population = GrowthPopulation(
     eggs: eggs,
+    larvae: larvae,
     cocoons: cocoons,
     workers: workers,
   );
@@ -92,6 +94,7 @@ List<PopulationPoint> colonyPopulationForecast(
       return switch (metric) {
         PopulationMetric.workers => population.workers,
         PopulationMetric.eggs => population.eggs,
+        PopulationMetric.larvae => population.larvae,
         PopulationMetric.pupae => population.cocoons,
         _ => null,
       };
@@ -100,7 +103,11 @@ List<PopulationPoint> colonyPopulationForecast(
       valid(colony.queenCount),
       if (colony.showSpecialized) valid(colony.specializedCount),
       population.workers,
-      if (includeBrood) ...[population.eggs, larvae, population.cocoons],
+      if (includeBrood) ...[
+        population.eggs,
+        population.larvae,
+        population.cocoons,
+      ],
     ].whereType<int>().toList();
     return values.isEmpty
         ? null

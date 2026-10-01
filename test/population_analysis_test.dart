@@ -230,7 +230,8 @@ void main() {
         createdAt: now,
         updatedAt: now,
         initialWorkerCount: 10,
-        initialEggCount: 100,
+        initialEggCount: 0,
+        initialLarvaCount: 100,
         growth: ColonyGrowth(
           frequency: GrowthFrequency.daily,
           path: GrowthPath.eggToWorker,

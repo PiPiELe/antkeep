@@ -9,7 +9,7 @@ void main() {
   Colony colony({
     GrowthFrequency frequency = GrowthFrequency.daily,
     GrowthPath path = GrowthPath.eggToWorker,
-    int? eggs,
+    int? larvae,
     int? cocoons,
     int? workers = 1,
     int? initialWorkers = 20,
@@ -19,14 +19,16 @@ void main() {
     createdAt: now,
     updatedAt: now,
     queenCount: 1,
-    initialEggCount: 10,
+    initialEggCount: 0,
+    initialLarvaCount: 10,
     initialCocoonCount: 5,
     initialWorkerCount: initialWorkers,
     growth: ColonyGrowth(
       frequency: frequency,
       path: path,
       startedAt: now,
-      eggs: eggs,
+      eggs: 0,
+      larvae: larvae,
       cocoons: cocoons,
       workers: workers,
     ),
@@ -40,7 +42,7 @@ void main() {
     );
     expect(ForecastHorizon.week.endFrom(now), DateTime(2028, 2, 7, 12));
     expect(ForecastHorizon.fortnight.endFrom(now), DateTime(2028, 2, 14, 12));
-    final points = colonyPopulationForecast(colony(eggs: 2), [], now: now);
+    final points = colonyPopulationForecast(colony(larvae: 2), [], now: now);
     expect(points.first.time, now);
     expect(points.last.time, DateTime(2028, 2, 29, 12));
     expect(points.last.count, 49);
@@ -50,19 +52,19 @@ void main() {
   test('forecast shares conversion limits and net growth semantics', () {
     final conversion = colonyPopulationForecast(colony(), [], now: now);
     expect(conversion.last.count, 30);
-    final eggs = colonyPopulationForecast(
+    final larvae = colonyPopulationForecast(
       colony(),
       [],
       now: now,
-      metric: PopulationMetric.eggs,
+      metric: PopulationMetric.larvae,
     );
-    expect(eggs.last.count, 0);
+    expect(larvae.last.count, 0);
     final independent = colonyPopulationForecast(
-      colony(eggs: 2),
+      colony(larvae: 2),
       [],
       now: now,
       horizon: ForecastHorizon.week,
-      metric: PopulationMetric.eggs,
+      metric: PopulationMetric.larvae,
     );
     expect(independent.last.count, 24);
     final cocoons = colonyPopulationForecast(
@@ -82,7 +84,7 @@ void main() {
 
   test('weekly and monthly rules only change on their scheduled cycles', () {
     final weekly = colonyPopulationForecast(
-      colony(frequency: GrowthFrequency.weekly, eggs: 0),
+      colony(frequency: GrowthFrequency.weekly, larvae: 0),
       [],
       now: now,
       horizon: ForecastHorizon.fortnight,
@@ -105,13 +107,13 @@ void main() {
   });
 
   test('latest partial observations anchor forecast without mutating data or using future/other colonies', () {
-    final c = colony(eggs: 2);
+    final c = colony(larvae: 2);
     CareRecord observation(
       String id,
       DateTime time, {
       String colonyId = 'a',
       int? workers,
-      int? eggs,
+      int? larvae,
     }) => CareRecord(
       id: id,
       colonyId: colonyId,
@@ -119,11 +121,11 @@ void main() {
       occurredAt: time,
       createdAt: time,
       workerCount: workers,
-      eggCount: eggs,
+      larvaCount: larvae,
     );
     final records = [
       observation('old', now.subtract(const Duration(hours: 2)), workers: 30),
-      observation('new', now.subtract(const Duration(hours: 1)), eggs: 50),
+      observation('new', now.subtract(const Duration(hours: 1)), larvae: 50),
       observation('other', now, colonyId: 'b', workers: 999),
       observation('future', now.add(const Duration(days: 2)), workers: 999),
     ];
@@ -143,7 +145,7 @@ void main() {
         records,
         now: now,
         horizon: ForecastHorizon.week,
-        metric: PopulationMetric.eggs,
+        metric: PopulationMetric.larvae,
       ).last.count,
       64,
     );
@@ -180,8 +182,8 @@ void main() {
         [],
         now: now,
         metric: PopulationMetric.larvae,
-      ),
-      isEmpty,
+      ).last.count,
+      0,
     );
     expect(
       colonyPopulationForecast(
@@ -196,7 +198,7 @@ void main() {
   test(
     'saved progress is not replayed and overdue cycles are not applied twice',
     () {
-      final c = colony(eggs: 0);
+      final c = colony(larvae: 0);
       final later = now.add(const Duration(days: 5, hours: 1));
       final completed = Colony.fromMap({
         ...c.toMap(),

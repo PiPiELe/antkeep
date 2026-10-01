@@ -18,7 +18,9 @@ class Colony {
     this.showSpecialized = false,
     this.initialWorkerCount,
     this.initialEggCount,
+    this.initialLarvaCount,
     this.initialCocoonCount,
+    this._developmentPath,
     this.nestType,
     this.targetTemperatureLower,
     this.targetTemperature,
@@ -26,7 +28,7 @@ class Colony {
     this.targetHumidity,
     this.coverPhotoPath,
     this.archived = false,
-    this.growth,
+    this._growth,
   });
 
   final String id;
@@ -42,7 +44,11 @@ class Colony {
   final bool showSpecialized;
   final int? initialWorkerCount;
   final int? initialEggCount;
+  final int? initialLarvaCount;
   final int? initialCocoonCount;
+  final GrowthPath? _developmentPath;
+  GrowthPath get developmentPath =>
+      _developmentPath ?? _growth?.path ?? GrowthPath.eggToCocoonToWorker;
   final String? nestType;
   final double? targetTemperatureLower;
   final double? targetTemperature;
@@ -50,7 +56,8 @@ class Colony {
   final double? targetHumidity;
   final String? coverPhotoPath;
   final bool archived;
-  final ColonyGrowth? growth;
+  final ColonyGrowth? _growth;
+  ColonyGrowth? get growth => _growth?.withPath(developmentPath);
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -78,14 +85,21 @@ class Colony {
         return time != 0 ? time : a.createdAt.compareTo(b.createdAt);
       });
     var eggs = initialEggCount;
+    var larvae = initialLarvaCount;
     var cocoons = initialCocoonCount;
     var workers = initialWorkerCount;
     for (final record in sorted) {
       eggs = record.eggCount ?? eggs;
+      larvae = record.larvaCount ?? larvae;
       cocoons = record.pupaCount ?? cocoons;
       workers = record.workerCount ?? workers;
     }
-    return GrowthPopulation(eggs: eggs, cocoons: cocoons, workers: workers);
+    return GrowthPopulation(
+      eggs: eggs,
+      larvae: larvae,
+      cocoons: cocoons,
+      workers: workers,
+    );
   }
 
   int? currentWorkerCount(Iterable<CareRecord> records) {
@@ -111,7 +125,9 @@ class Colony {
     showSpecialized: (map['show_specialized'] as int? ?? 0) == 1,
     initialWorkerCount: map['initial_worker_count'] as int?,
     initialEggCount: map['initial_egg_count'] as int?,
+    initialLarvaCount: map['initial_larva_count'] as int?,
     initialCocoonCount: map['initial_cocoon_count'] as int?,
+    developmentPath: GrowthPath.fromStorage(map['development_path']),
     nestType: map['nest_type'] as String?,
     targetTemperatureLower: (map['target_temperature_lower'] as num?)
         ?.toDouble(),
@@ -137,7 +153,9 @@ class Colony {
     'show_specialized': showSpecialized ? 1 : 0,
     'initial_worker_count': initialWorkerCount,
     'initial_egg_count': initialEggCount,
+    'initial_larva_count': initialLarvaCount,
     'initial_cocoon_count': initialCocoonCount,
+    'development_path': _developmentPath?.name,
     'nest_type': nestType,
     'target_temperature_lower': targetTemperatureLower,
     'target_temperature': targetTemperature,

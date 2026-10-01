@@ -184,6 +184,8 @@ void main() {
       createdAt: now,
       updatedAt: now,
       initialEggCount: 10,
+      initialLarvaCount: 10,
+      developmentPath: GrowthPath.eggToCocoonToWorker,
       initialCocoonCount: 5,
       initialWorkerCount: 20,
     );
@@ -197,10 +199,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('每月').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<GrowthPath>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('卵 → 茧 → 工').last);
-    await tester.pumpAndSettle();
+    expect(find.byType(DropdownButtonFormField<GrowthPath>), findsNothing);
+    expect(find.textContaining('卵 → 幼 → 茧 → 工'), findsOneWidget);
     for (final item in [('卵净增长', '2'), ('茧净增长', '3'), ('工净增长', '1')]) {
       final field = find.widgetWithText(TextFormField, item.$1);
       await tester.ensureVisible(field);
@@ -246,7 +246,8 @@ void main() {
           updatedAt: now,
           queenCount: 1,
           initialWorkerCount: 20,
-          initialEggCount: 100,
+          initialEggCount: 0,
+          initialLarvaCount: 100,
           initialCocoonCount: 5,
           growth: ColonyGrowth(
             frequency: GrowthFrequency.daily,
@@ -1149,7 +1150,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('编辑蚁群'));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView).first, const Offset(0, -180));
+      await tester.drag(find.byType(ListView).first, const Offset(0, -340));
       await tester.pumpAndSettle();
     }
 
@@ -1360,6 +1361,95 @@ void main() {
       );
     });
   }
+
+  testWidgets('new and edited colonies control the shared development path', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
+    final selector = find.byType(DropdownButtonFormField<GrowthPath>);
+    await tester.ensureVisible(selector);
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('卵 → 幼 → 工').last);
+    await tester.pumpAndSettle();
+    final name = find.byKey(const ValueKey('colony-name'));
+    await tester.scrollUntilVisible(
+      name,
+      -150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(name, '模式测试');
+    for (final entry in [('蚁后 *', '1'), ('工蚁 *', '2'), ('幼虫', '3')]) {
+      final field = find.widgetWithText(TextFormField, entry.$1);
+      await tester.ensureVisible(field);
+      await tester.enterText(field, entry.$2);
+    }
+    await tapSave(tester, '保存蚁群');
+    var colony = Colony.fromMap(tables['colonies']!.single);
+    expect(colony.developmentPath, GrowthPath.eggToWorker);
+    expect(colony.initialLarvaCount, 3);
+    await tester.pumpWidget(
+      MaterialApp(
+        key: const ValueKey('edit-mode'),
+        home: ColonyFormPage(colony: colony),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(selector);
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('卵 → 幼 → 茧 → 工').last);
+    await tester.pumpAndSettle();
+    await tapSave(tester, '保存蚁群');
+    colony = Colony.fromMap(tables['colonies']!.single);
+    expect(colony.developmentPath, GrowthPath.eggToCocoonToWorker);
+    expect(colony.initialLarvaCount, 3);
+  });
+
+  testWidgets('record increments default on and can be switched to totals', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final colony = Colony(
+      id: 'increment-ui',
+      name: '增量测试',
+      createdAt: now,
+      updatedAt: now,
+      initialEggCount: 10,
+      initialLarvaCount: 5,
+      initialCocoonCount: 3,
+      initialWorkerCount: 20,
+    );
+    tables['colonies']!.add(colony.toMap());
+    await tester.pumpWidget(
+      const MaterialApp(home: ColonyDetailPage(colonyId: 'increment-ui')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('添加记录'));
+    await tester.pumpAndSettle();
+    final toggle = find.widgetWithText(SwitchListTile, '增量');
+    await tester.ensureVisible(toggle);
+    expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+    final field = find.widgetWithText(TextField, '幼虫数');
+    await tester.ensureVisible(field);
+    await tester.enterText(field, '2');
+    await tapSave(tester, '保存记录');
+    var saved = CareRecord.fromMap(tables['care_records']!.single);
+    expect([saved.eggCount, saved.larvaCount], [8, 7]);
+    await tester.ensureVisible(find.text('添加记录'));
+    await tester.tap(find.text('添加记录'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(field);
+    await tester.enterText(field, '4');
+    await tapSave(tester, '保存记录');
+    saved = CareRecord.fromMap(tables['care_records']!.first);
+    expect(saved.larvaCount, 4);
+    expect(saved.eggCount, isNull);
+    expect(find.text('15 卵幼茧'), findsOneWidget);
+  });
 
   testWidgets('new care records immediately refresh the colony detail', (
     tester,

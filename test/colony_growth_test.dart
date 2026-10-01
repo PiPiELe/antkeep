@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   ColonyGrowth rule({
     int? eggs,
+    int? larvae,
     int? cocoons,
     int? workers = 1,
     GrowthPath path = GrowthPath.eggToWorker,
@@ -12,19 +13,25 @@ void main() {
     path: path,
     startedAt: DateTime(2026, 1, 1),
     eggs: eggs,
+    larvae: larvae,
     cocoons: cocoons,
     workers: workers,
   );
-  const initial = GrowthPopulation(eggs: 10, cocoons: 5, workers: 20);
+  const initial = GrowthPopulation(
+    eggs: 10,
+    larvae: 10,
+    cocoons: 5,
+    workers: 20,
+  );
 
-  test('worker growth consumes eggs unless egg net growth is explicit', () {
+  test('worker growth consumes larvae unless larva net growth is explicit', () {
     final converted = rule().advance(initial);
-    expect(converted.eggs, 9);
+    expect(converted.larvae, 9);
     expect(converted.workers, 21);
-    final independent = rule(eggs: 2).advance(initial);
-    expect(independent.eggs, 12);
+    final independent = rule(eggs: 0, larvae: 2).advance(initial);
+    expect(independent.larvae, 12);
     expect(independent.workers, 21);
-    expect(rule(eggs: 0).advance(initial).eggs, 10);
+    expect(rule(larvae: 0).advance(initial).larvae, 10);
   });
 
   test('cocoon path consumes the immediate upstream unspecified stage', () {
@@ -36,7 +43,7 @@ void main() {
       path: GrowthPath.eggToCocoonToWorker,
       cocoons: 2,
     ).advance(initial);
-    expect(cocoons.eggs, 8);
+    expect(cocoons.larvae, 8);
     expect(cocoons.cocoons, 7);
     expect(cocoons.workers, 21);
     final all = rule(
@@ -51,12 +58,21 @@ void main() {
 
   test('depleted or unknown sources cannot produce invented workers', () {
     final limited = rule(workers: 30).advance(initial);
-    expect(limited.eggs, 0);
+    expect(limited.larvae, 0);
     expect(limited.workers, 30);
     final unknown = rule().advance(const GrowthPopulation(workers: 2));
     expect(unknown.eggs, isNull);
     expect(unknown.workers, 2);
     expect(rule(eggs: 2).advance(const GrowthPopulation()).eggs, isNull);
+  });
+
+  test('larval growth consumes eggs unless egg growth is explicit', () {
+    final converted = rule(larvae: 2, workers: 0).advance(initial);
+    expect(converted.eggs, 8);
+    expect(converted.larvae, 12);
+    final independent = rule(eggs: 3, larvae: 2, workers: 0).advance(initial);
+    expect(independent.eggs, 13);
+    expect(independent.larvae, 12);
   });
 
   test('calendar periods retain time and the original month-end anchor', () {

@@ -15,12 +15,13 @@ class ColonyGrowthPage extends StatefulWidget {
 class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
   final _form = GlobalKey<FormState>();
   final _eggs = TextEditingController();
+  final _larvae = TextEditingController();
   final _cocoons = TextEditingController();
   final _workers = TextEditingController();
   var _enabled = false;
   var _saving = false;
   var _frequency = GrowthFrequency.daily;
-  var _path = GrowthPath.eggToWorker;
+  GrowthPath get _path => widget.colony.developmentPath;
 
   @override
   void initState() {
@@ -29,7 +30,7 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
     _enabled = growth != null;
     if (growth != null) {
       _frequency = growth.frequency;
-      _path = growth.path;
+      _larvae.text = growth.larvae?.toString() ?? '';
       _eggs.text = growth.eggs?.toString() ?? '';
       _cocoons.text = growth.cocoons?.toString() ?? '';
       _workers.text = growth.workers?.toString() ?? '';
@@ -39,6 +40,7 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
   @override
   void dispose() {
     _eggs.dispose();
+    _larvae.dispose();
     _cocoons.dispose();
     _workers.dispose();
     super.dispose();
@@ -50,11 +52,13 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
     final eggs = _count(_eggs);
+    final larvae = _count(_larvae);
     final cocoons = _path == GrowthPath.eggToCocoonToWorker
         ? _count(_cocoons)
         : null;
     final workers = _count(_workers);
-    if (_enabled && (eggs ?? 0) + (cocoons ?? 0) + (workers ?? 0) == 0) {
+    if (_enabled &&
+        (eggs ?? 0) + (larvae ?? 0) + (cocoons ?? 0) + (workers ?? 0) == 0) {
       _error('请至少填写一项大于 0 的增长数量');
       return;
     }
@@ -66,10 +70,11 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
       final population = colony.currentPopulation(records);
       if (_enabled &&
           (population.eggs == null ||
+              population.larvae == null ||
               population.workers == null ||
               (_path == GrowthPath.eggToCocoonToWorker &&
                   population.cocoons == null))) {
-        _error('请先在蚁群档案或养护记录中填写卵、工的当前数量；经过茧的路径还需填写茧数量，暂无请填 0。');
+        _error('请先在蚁群档案或养护记录中填写卵、幼虫、工的当前数量；经过茧的路径还需填写茧数量，暂无请填 0。');
         return;
       }
       final old = colony.growth;
@@ -79,6 +84,7 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
           old.frequency == _frequency &&
           old.path == _path &&
           old.eggs == eggs &&
+          old.larvae == larvae &&
           old.cocoons == cocoons &&
           old.workers == workers;
       final growth = !_enabled
@@ -90,6 +96,7 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
               path: _path,
               startedAt: DateTime.now(),
               eggs: eggs,
+              larvae: larvae,
               cocoons: cocoons,
               workers: workers,
             );
@@ -142,7 +149,7 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('开启自动扩充'),
-            subtitle: const Text('按设定周期估算卵、茧、工数量'),
+            subtitle: const Text('按设定周期估算卵、幼虫、茧、工数量'),
             value: _enabled,
             onChanged: _saving
                 ? null
@@ -160,24 +167,17 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
               onChanged: (value) => setState(() => _frequency = value!),
             ),
             const SizedBox(height: 20),
-            DropdownButtonFormField<GrowthPath>(
-              initialValue: _path,
-              decoration: const InputDecoration(labelText: '发育路径（单选）'),
-              items: [
-                for (final value in GrowthPath.values)
-                  DropdownMenuItem(value: value, child: Text(value.label)),
-              ],
-              onChanged: (value) => setState(() => _path = value!),
-            ),
+            Text('发育模式：${_path.label}（在蚁群信息中修改）'),
             const SizedBox(height: 20),
             _quantity('卵', _eggs),
+            _quantity('幼虫', _larvae),
             if (_path == GrowthPath.eggToCocoonToWorker)
               _quantity('茧', _cocoons),
             _quantity('工', _workers),
             const Text(
               '填写的是每周期净增长。\n'
-              '例：卵 → 工，只填工 1，则卵 −1、工 +1；同时填卵 2，则卵 +2、工 +1。\n'
-              '卵 → 茧 → 工：只填工时扣茧，只填茧时扣卵；明确填写的阶段按净增长处理。\n'
+              '填幼虫时扣卵；填茧时扣幼虫；填工时根据蚁群发育模式扣茧或幼虫。\n'
+              '明确填写的阶段按净增长处理，留空阶段按路径扣减。\n'
               '来源不足时只转化已有数量，不会扣成负数。',
             ),
             const SizedBox(height: 16),

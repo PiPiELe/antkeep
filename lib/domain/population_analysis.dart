@@ -42,6 +42,7 @@ List<PopulationPoint> colonyPopulation(
   final initial = switch (metric) {
     PopulationMetric.workers => colony.initialWorkerCount,
     PopulationMetric.eggs => colony.initialEggCount,
+    PopulationMetric.larvae => colony.initialLarvaCount,
     PopulationMetric.pupae => colony.initialCocoonCount,
     _ => null,
   };
@@ -89,7 +90,7 @@ List<PopulationPoint> colonyPopulationTotal(
       : null;
   var workers = valid(colony.initialWorkerCount);
   var eggs = valid(colony.initialEggCount);
-  int? larvae;
+  var larvae = valid(colony.initialLarvaCount);
   var pupae = valid(colony.initialCocoonCount);
   final values = <int, PopulationPoint>{};
 

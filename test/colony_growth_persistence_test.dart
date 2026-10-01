@@ -39,6 +39,7 @@ void main() {
       createdAt: start,
       updatedAt: start,
       initialEggCount: 10,
+      initialLarvaCount: 10,
       initialCocoonCount: 5,
       initialWorkerCount: 20,
       archived: archived,
@@ -69,7 +70,7 @@ void main() {
       ]);
       var records = await db.listRecords(colony.id);
       expect(records, hasLength(3));
-      expect(records.first.eggCount, 7);
+      expect(records.first.larvaCount, 7);
       expect(records.first.workerCount, 23);
       expect(records.first.note, contains('估算'));
       expect(await db.listRecords('archived'), isEmpty);
@@ -99,7 +100,7 @@ void main() {
           type: CareRecordType.observation,
           occurredAt: DateTime(2040, 2, 1, 13),
           createdAt: start,
-          eggCount: 50,
+          larvaCount: 50,
           workerCount: 100,
         ),
       );
@@ -109,10 +110,37 @@ void main() {
       );
       final records = await db.listRecords('observed');
       expect(records.first.workerCount, 101);
-      expect(records.first.eggCount, 49);
+      expect(records.first.larvaCount, 49);
       expect(records.first.pupaCount, 5);
     },
   );
+
+  test('editing the colony path controls the next automatic cycle and preserves progress', () async {
+    await seed('shared-path');
+    await db.applyColonyGrowth(
+      now: DateTime(2040, 2, 1, 12),
+      colonyId: 'shared-path',
+    );
+    final before = (await db.findColony('shared-path'))!;
+    await db.saveColony(
+      Colony.fromMap({
+        ...before.toMap(),
+        'development_path': GrowthPath.eggToCocoonToWorker.name,
+      }),
+    );
+    final edited = (await db.findColony('shared-path'))!;
+    expect(edited.growth!.completedCycles, 1);
+    expect(edited.growth!.path, GrowthPath.eggToCocoonToWorker);
+    await db.applyColonyGrowth(
+      now: DateTime(2040, 2, 2, 12),
+      colonyId: 'shared-path',
+    );
+    final records = await db.listRecords('shared-path');
+    expect(records, hasLength(2));
+    expect(records.first.larvaCount, 9);
+    expect(records.first.pupaCount, 4);
+    expect(records.first.workerCount, 22);
+  });
 
   test(
     'disable settles old periods; re-enable does not catch up disabled time',
@@ -144,7 +172,7 @@ void main() {
       );
       final records = await db.listRecords('toggle');
       expect(records, hasLength(2));
-      expect(records.first.eggCount, 11);
+      expect(records.first.eggCount, 12);
       expect(records.first.workerCount, 22);
     },
   );

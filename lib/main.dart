@@ -27,6 +27,7 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/colony_growth.dart';
 import 'domain/population_analysis.dart';
 import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
@@ -496,7 +497,7 @@ class ColoniesPage extends StatefulWidget {
 
 typedef _ColonyListEntry = ({
   Colony colony,
-  CareRecord? latestPopulation,
+  GrowthPopulation population,
   int? workers,
 });
 
@@ -538,18 +539,11 @@ class _ColoniesPageState extends State<ColoniesPage> {
     return Future.wait(
       colonies.map((colony) async {
         final records = await AppDatabase.instance.listRecords(colony.id);
-        final latestPopulation = records.cast<CareRecord?>().firstWhere(
-          (record) =>
-              record!.eggCount != null ||
-              record.larvaCount != null ||
-              record.pupaCount != null ||
-              record.workerCount != null,
-          orElse: () => null,
-        );
+        final population = colony.currentPopulation(records);
         return (
           colony: colony,
-          latestPopulation: latestPopulation,
-          workers: colony.currentWorkerCount(records),
+          population: population,
+          workers: population.workers,
         );
       }),
     );
@@ -604,7 +598,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
             separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (context, index) => _ColonyCard(
               colony: colonies[index].colony,
-              latestPopulation: colonies[index].latestPopulation,
+              population: colonies[index].population,
               workers: colonies[index].workers,
               onDurationTap: () => _editAcquiredOn(colonies[index].colony),
               onTap: () async {
@@ -627,13 +621,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
 class _ColonyCard extends StatelessWidget {
   const _ColonyCard({
     required this.colony,
-    required this.latestPopulation,
+    required this.population,
     required this.workers,
     required this.onTap,
     required this.onDurationTap,
   });
   final Colony colony;
-  final CareRecord? latestPopulation;
+  final GrowthPopulation population;
   final int? workers;
   final VoidCallback onTap;
   final VoidCallback onDurationTap;
@@ -641,9 +635,9 @@ class _ColonyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final broodCounts = [
-      latestPopulation?.eggCount ?? colony.initialEggCount,
-      latestPopulation?.larvaCount,
-      latestPopulation?.pupaCount ?? colony.initialCocoonCount,
+      population.eggs,
+      population.larvae,
+      population.cocoons,
     ].whereType<int>();
     final brood = broodCounts.isEmpty
         ? null
@@ -885,6 +879,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _workers = TextEditingController();
   final _eggs = TextEditingController();
   final _cocoons = TextEditingController();
+  final _larvae = TextEditingController();
+  var _developmentPath = GrowthPath.eggToCocoonToWorker;
   final _targetTemperatureLower = TextEditingController();
   final _targetTemperature = TextEditingController();
   final _targetHumidityLower = TextEditingController();
@@ -909,6 +905,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     _showSpecialized = colony.showSpecialized;
     _workers.text = colony.initialWorkerCount?.toString() ?? '';
     _eggs.text = colony.initialEggCount?.toString() ?? '';
+    _developmentPath = colony.developmentPath;
+    _larvae.text = colony.initialLarvaCount?.toString() ?? '';
     _cocoons.text = colony.initialCocoonCount?.toString() ?? '';
     _targetTemperatureLower.text =
         colony.targetTemperatureLower?.toString() ?? '';
@@ -939,6 +937,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
       _workers,
       _eggs,
       _cocoons,
+      _larvae,
       _targetTemperatureLower,
       _targetTemperature,
       _targetHumidityLower,
@@ -992,6 +991,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           showSpecialized: _showSpecialized,
           initialWorkerCount: int.tryParse(_workers.text),
           initialEggCount: int.tryParse(_eggs.text),
+          initialLarvaCount: int.tryParse(_larvae.text),
+          developmentPath: _developmentPath,
           initialCocoonCount: int.tryParse(_cocoons.text),
           nestType: _selectedNest,
           targetTemperatureLower: double.tryParse(_targetTemperatureLower.text),
@@ -1215,6 +1216,17 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             icon: Icons.bar_chart_outlined,
             title: '数量',
             children: [
+              DropdownButtonFormField<GrowthPath>(
+                isExpanded: true,
+                initialValue: _developmentPath,
+                decoration: const InputDecoration(labelText: '发育模式'),
+                items: [
+                  for (final path in GrowthPath.values)
+                    DropdownMenuItem(value: path, child: Text(path.label)),
+                ],
+                onChanged: (path) => setState(() => _developmentPath = path!),
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -1263,6 +1275,16 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _larvae,
+                validator: _validateCount,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '幼虫',
+                  hintText: '可选，暂无请填 0',
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -1907,18 +1929,11 @@ class _ColonyProfileSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final latest = records.cast<CareRecord?>().firstWhere(
-      (record) =>
-          record!.eggCount != null ||
-          record.larvaCount != null ||
-          record.pupaCount != null ||
-          record.workerCount != null,
-      orElse: () => null,
-    );
+    final population = colony.currentPopulation(records);
     final brood = [
-      latest?.eggCount ?? colony.initialEggCount,
-      latest?.larvaCount,
-      latest?.pupaCount ?? colony.initialCocoonCount,
+      population.eggs,
+      population.larvae,
+      population.cocoons,
     ].whereType<int>();
     final broodCount = brood.isEmpty
         ? null
@@ -2333,6 +2348,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   var _type = CareRecordType.observation;
   var _occurredAt = DateTime.now();
   var _saving = false;
+  var _incremental = true;
   @override
   void dispose() {
     for (final c in [
@@ -2350,6 +2366,14 @@ class _RecordFormPageState extends State<RecordFormPage> {
   }
 
   Future<void> _save() async {
+    for (final controller in [_eggs, _larvae, _pupae, _workers]) {
+      final text = controller.text.trim();
+      final n = int.tryParse(text);
+      if (text.isNotEmpty && (n == null || n < 0 || n > 1000000)) {
+        _showError(context, '数量请输入 0～1000000 的整数');
+        return;
+      }
+    }
     setState(() => _saving = true);
     try {
       final photos = <String>[];
@@ -2367,11 +2391,16 @@ class _RecordFormPageState extends State<RecordFormPage> {
           humidity: double.tryParse(_humidity.text),
           eggCount: int.tryParse(_eggs.text),
           larvaCount: int.tryParse(_larvae.text),
-          pupaCount: int.tryParse(_pupae.text),
+          pupaCount:
+              _incremental &&
+                  widget.colony.developmentPath == GrowthPath.eggToWorker
+              ? null
+              : int.tryParse(_pupae.text),
           workerCount: int.tryParse(_workers.text),
           photos: photos,
           createdAt: DateTime.now(),
         ),
+        incremental: _incremental,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -2468,6 +2497,19 @@ class _RecordFormPageState extends State<RecordFormPage> {
             ),
           ],
         ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('增量'),
+          value: _incremental,
+          onChanged: _saving
+              ? null
+              : (value) => setState(() => _incremental = value),
+          subtitle: Text(
+            _incremental
+                ? '填写增加值，自动扣减上一阶段；${widget.colony.developmentPath.label}。未知数量请先关闭增量填写总数。'
+                : '填写当前总数，留空不修改',
+          ),
+        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -2475,7 +2517,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
               child: TextField(
                 controller: _eggs,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '卵数'),
+                decoration: InputDecoration(
+                  labelText: '卵数',
+                  helperText: _incremental ? '增加数量' : '当前总数',
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -2483,7 +2528,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
               child: TextField(
                 controller: _larvae,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '幼虫数'),
+                decoration: InputDecoration(
+                  labelText: '幼虫数',
+                  helperText: _incremental ? '增加数量' : '当前总数',
+                ),
               ),
             ),
           ],
@@ -2494,8 +2542,15 @@ class _RecordFormPageState extends State<RecordFormPage> {
             Expanded(
               child: TextField(
                 controller: _pupae,
+                enabled:
+                    !_incremental ||
+                    widget.colony.developmentPath ==
+                        GrowthPath.eggToCocoonToWorker,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '蛹数'),
+                decoration: InputDecoration(
+                  labelText: '蛹数',
+                  helperText: _incremental ? '增加数量' : '当前总数',
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -2503,7 +2558,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
               child: TextField(
                 controller: _workers,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '工蚁数量（可估计）'),
+                decoration: InputDecoration(
+                  labelText: '工蚁数量（可估计）',
+                  helperText: _incremental ? '增加数量' : '当前总数',
+                ),
               ),
             ),
           ],
@@ -2710,9 +2768,9 @@ class DiscoverPage extends StatelessWidget {
           title: const Text('数字抽奖'),
           subtitle: const Text('转盘随机抽取，或直接显示范围内数字'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const LotteryPage()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const LotteryPage())),
         ),
       ),
       for (final entry in const [
