@@ -1412,7 +1412,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '温度下限 °C'),
+                      decoration: const InputDecoration(
+                        labelText: '温度下限 °C',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1427,7 +1434,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '温度上限 °C'),
+                      decoration: const InputDecoration(
+                        labelText: '温度上限 °C',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1446,7 +1460,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '湿度下限 %'),
+                      decoration: const InputDecoration(
+                        labelText: '湿度下限 %',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1461,7 +1482,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '湿度上限 %'),
+                      decoration: const InputDecoration(
+                        labelText: '湿度上限 %',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                 ],
