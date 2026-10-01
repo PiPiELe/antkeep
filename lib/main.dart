@@ -329,8 +329,10 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   var _index = 0;
+  late final TabController _colonyTabs;
   late BeginnerCareNotice _beginnerCareNotice;
   late List<BeginnerCareNotice> _careNotices;
 
@@ -349,6 +351,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _colonyTabs = TabController(length: 2, vsync: this);
     _careNotices = onlineController.content.beginnerCareNotices;
     _beginnerCareNotice = randomBeginnerCareNotice(notices: _careNotices);
     onlineController.addListener(_updateCareNotices);
@@ -357,6 +360,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _colonyTabs.dispose();
     onlineController.removeListener(_updateCareNotices);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -380,7 +384,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final visiblePages = themeController.simpleMode ? [0, 4] : [0, 1, 2, 3, 4];
     final pageIndex = visiblePages.contains(_index) ? _index : 0;
     final pages = [
-      const ColoniesPage(),
+      IndexedStack(
+        index: _colonyTabs.index,
+        children: [
+          const ColoniesPage(),
+          _EmptyState(
+            icon: Icons.local_florist_outlined,
+            title:
+                '${themeController.colonyTabName(ColonyTab.memorial)} · 敬请期待',
+            message: '为逝去的小生命留一份纪念。\n这里将用于记录死亡的蚂蚁，具体功能规划中。',
+          ),
+        ],
+      ),
       const InventoryPage(),
       const DlcPage(),
       const DiscoverPage(),
@@ -388,7 +403,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(titles[pageIndex]),
+        title: pageIndex == 0
+            ? TabBar(
+                controller: _colonyTabs,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                dividerColor: Colors.transparent,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                labelStyle: Theme.of(context).textTheme.titleMedium,
+                onTap: (_) => setState(() {}),
+                tabs: [
+                  for (final tab in ColonyTab.values)
+                    Tab(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onLongPress: () => _renameColonyTab(context, tab),
+                        child: Text(themeController.colonyTabName(tab)),
+                      ),
+                    ),
+                ],
+              )
+            : Text(titles[pageIndex]),
         actions: [
           if (!themeController.simpleMode)
             TextButton.icon(
@@ -404,7 +439,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
-          if (pageIndex == 0 && themeController.beginner)
+          if (pageIndex == 0 &&
+              _colonyTabs.index == 0 &&
+              themeController.beginner)
             Material(
               color: Theme.of(context).colorScheme.secondaryContainer,
               child: ListTile(
@@ -4050,6 +4087,93 @@ class _FeederRecordCard extends StatelessWidget {
   }
 }
 
+Future<void> _renameColonyTab(BuildContext context, ColonyTab tab) async {
+  final formKey = GlobalKey<FormState>();
+  var name = themeController.colonyTabName(tab);
+  var saving = false;
+  String? error;
+  await showDialog<void>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, updateDialog) {
+        Future<void> save(String value) async {
+          if (saving) return;
+          updateDialog(() {
+            saving = true;
+            error = null;
+          });
+          try {
+            await themeController.setColonyTabName(tab, value);
+            if (context.mounted) Navigator.of(context).pop();
+          } catch (_) {
+            if (context.mounted) {
+              updateDialog(() {
+                saving = false;
+                error = '保存失败，请重试';
+              });
+            }
+          }
+        }
+
+        return PopScope(
+          canPop: !saving,
+          child: AlertDialog(
+            title: const Text('修改菜单名称'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      initialValue: name,
+                      autofocus: true,
+                      enabled: !saving,
+                      maxLength: 12,
+                      decoration: const InputDecoration(labelText: '菜单名称'),
+                      onChanged: (value) => name = value,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? '请输入菜单名称'
+                          : null,
+                    ),
+                    if (error != null)
+                      Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => save(tab.defaultName),
+                child: const Text('恢复默认'),
+              ),
+              TextButton(
+                onPressed: saving ? null : () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: saving
+                    ? null
+                    : () {
+                        if (formKey.currentState!.validate()) save(name);
+                      },
+                child: Text(saving ? '保存中…' : '保存'),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
   @override
@@ -4140,6 +4264,14 @@ class _SettingsPageState extends State<SettingsPage> {
               value: themeController.simpleMode,
               onChanged: _savingSimpleMode ? null : _setSimpleMode,
             ),
+            for (final tab in ColonyTab.values)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text('${tab.defaultName}菜单名称'),
+                subtitle: Text(themeController.colonyTabName(tab)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _renameColonyTab(context, tab),
+              ),
           ]),
           _section(context, '使用版本', [
             ListTile(
