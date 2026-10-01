@@ -1226,7 +1226,11 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       decoration: const InputDecoration(labelText: '工蚁 *'),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
                   Expanded(
                     child: TextFormField(
                       controller: _eggs,
