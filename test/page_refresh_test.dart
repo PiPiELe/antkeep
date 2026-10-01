@@ -985,7 +985,7 @@ void main() {
   }
 
   testWidgets(
-    'colony summaries combine brood with record and archive fallback',
+    'colony summaries separate brood with record and archive fallback',
     (tester) async {
       final date = DateTime(2026, 9, 1);
       await AppDatabase.instance.saveColony(
@@ -1002,10 +1002,12 @@ void main() {
       );
       await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
       await tester.pumpAndSettle();
-      for (final text in ['1 只蚁后', '0 只工蚁', '7 只卵幼茧']) {
+      for (final text in ['1 蚁后', '0 工蚁', '5 卵', '2 茧']) {
         expect(find.text(text), findsOneWidget);
       }
       expect(find.text('新后群'), findsOneWidget);
+      expect(find.textContaining('幼虫'), findsNothing);
+      expect(find.textContaining('卵幼茧'), findsNothing);
 
       // A newer feeding entry has no counts; use the latest quantity entry.
       await AppDatabase.instance.saveRecord(
@@ -1042,16 +1044,35 @@ void main() {
       tester.state<RefreshIndicatorState>(find.byType(RefreshIndicator)).show();
       await tester.pumpAndSettle();
       // Explicit zero overrides the archive; missing pupae fall back to 2.
-      for (final text in ['1 只蚁后', '8 只工蚁', '5 只卵幼茧']) {
+      for (final text in ['1 蚁后', '8 工蚁', '0 卵', '3 幼虫', '2 茧']) {
         expect(find.text(text), findsOneWidget);
       }
       final quantity =
-          tester.widget<Text>(find.text('1 只蚁后')).textSpan! as TextSpan;
+          tester.widget<Text>(find.text('1 蚁后')).textSpan! as TextSpan;
       expect(
         (quantity.children!.first as TextSpan).style!.fontWeight,
         FontWeight.w700,
       );
       expect((quantity.children!.last as TextSpan).style, isNull);
+      expect(tester.takeException(), isNull);
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(1.3)),
+            child: child!,
+          ),
+          home: const ColoniesPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final text in ['1 蚁后', '8 工蚁', '0 卵', '3 幼虫', '2 茧']) {
+        expect(find.text(text).hitTestable(), findsOneWidget);
+      }
       expect(tester.takeException(), isNull);
     },
   );
@@ -1094,7 +1115,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('新后群'), findsOneWidget);
         expect(find.text(entry.value), findsOneWidget);
-        expect(find.text('${entry.key} 只工蚁'), findsOneWidget);
+        expect(find.text('${entry.key} 工蚁'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tap(find.text('从新后养起'));
         await tester.pumpAndSettle();
@@ -1140,10 +1161,10 @@ void main() {
     );
     await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
     await tester.pumpAndSettle();
-    for (final text in ['1 只蚁后', '10 只工蚁', '7 只卵幼茧']) {
+    for (final text in ['1 蚁后', '10 工蚁', '5 卵', '2 茧']) {
       expect(find.text(text), findsOneWidget);
     }
-    expect(find.text('3 只特化'), findsNothing);
+    expect(find.text('3 特化'), findsNothing);
 
     Future<void> edit() async {
       await tester.tap(find.text('特化展示'));
@@ -1168,7 +1189,7 @@ void main() {
     expect(find.text('3 特化'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    for (final text in ['1 只蚁后', '3 只特化', '10 只工蚁', '7 只卵幼茧']) {
+    for (final text in ['1 蚁后', '3 特化', '10 工蚁', '5 卵', '2 茧']) {
       expect(find.text(text), findsOneWidget);
     }
 
@@ -1184,13 +1205,13 @@ void main() {
     await tester.tap(find.byType(Checkbox));
     await tester.pumpAndSettle();
     await tapSave(tester, '保存蚁群');
-    expect(find.text('3 只特化'), findsNothing);
+    expect(find.text('3 特化'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    for (final text in ['1 只蚁后', '10 只工蚁', '7 只卵幼茧']) {
+    for (final text in ['1 蚁后', '10 工蚁', '5 卵', '2 茧']) {
       expect(find.text(text), findsOneWidget);
     }
-    expect(find.text('3 只特化'), findsNothing);
+    expect(find.text('3 特化'), findsNothing);
     final saved = (await AppDatabase.instance.findColony(
       'specialized-colony',
     ))!;
