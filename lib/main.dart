@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
 import 'colony_growth_page.dart';
+import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'account_controller.dart';
@@ -4602,6 +4603,17 @@ class _SettingsPageState extends State<SettingsPage> {
                         if (context.mounted) _showError(context, error);
                       }
                     },
+            ),
+          ]),
+          _section(context, '交流与反馈', [
+            ListTile(
+              leading: const Icon(Icons.qr_code_2_outlined),
+              title: const Text('交流群二维码'),
+              subtitle: const Text('微信、抖音交流群'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CommunityGroupsPage()),
+              ),
             ),
           ]),
           _section(context, '数据与备份', [
