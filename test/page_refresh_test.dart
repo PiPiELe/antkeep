@@ -1270,6 +1270,17 @@ void main() {
     );
     expect(find.text('来源：${colony.source}'), findsOneWidget);
     expect(
+      find.descendant(
+        of: profileCard,
+        matching: find.text('来源：${colony.source}'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: infoCard, matching: find.text('来源：${colony.source}')),
+      findsNothing,
+    );
+    expect(
       find.descendant(of: infoCard, matching: find.text('入手 2026年9月1日')),
       findsNothing,
     );
@@ -1287,6 +1298,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('colony-population-chart')), findsNothing);
     expect(find.byTooltip('展开种群数量'), findsOneWidget);
+    final collapsedPopulation = find.ancestor(
+      of: find.text('种群数量'),
+      matching: find.byType(Card),
+    );
+    expect(tester.getSize(collapsedPopulation).height, lessThanOrEqualTo(56));
     await tester.ensureVisible(find.byTooltip('展开种群数量'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('展开种群数量'));
