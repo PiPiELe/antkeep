@@ -1230,7 +1230,7 @@ void main() {
       queenCount: 1,
       initialWorkerCount: 0,
       nestType: '试管巢',
-      source: '蚁友赠送',
+      source: '网购（蚁友商店，订单备注及完整来源说明）',
       acquiredOn: createdAt,
       initialEggCount: 5,
       initialCocoonCount: 2,
@@ -1268,6 +1268,7 @@ void main() {
       of: find.text('试管巢'),
       matching: find.byType(Card),
     );
+    expect(find.text('来源：${colony.source}'), findsOneWidget);
     expect(
       find.descendant(of: infoCard, matching: find.text('入手 2026年9月1日')),
       findsNothing,
@@ -1277,12 +1278,17 @@ void main() {
       find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,
     );
-    await tester.ensureVisible(find.byTooltip('折叠种群数量'));
+    await Scrollable.ensureVisible(
+      tester.element(find.byTooltip('折叠种群数量')),
+      alignment: 0.3,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('折叠种群数量'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('colony-population-chart')), findsNothing);
     expect(find.byTooltip('展开种群数量'), findsOneWidget);
     await tester.ensureVisible(find.byTooltip('展开种群数量'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('展开种群数量'));
     await tester.pumpAndSettle();
     expect(
@@ -1301,13 +1307,21 @@ void main() {
     expect(find.text('自定义品种'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey('colony-name')), '编辑后');
     await tester.enterText(find.widgetWithText(TextFormField, '工蚁 *'), '1000');
+    final sourceField = find.widgetWithText(TextFormField, '来源（可选）');
+    await tester.scrollUntilVisible(
+      sourceField,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(sourceField, '网购（新店铺）');
     await tapSave(tester, '保存蚁群');
+    expect(find.text('来源：网购（新店铺）'), findsOneWidget);
     expect(find.text('编辑后'), findsOneWidget);
     expect(find.text('大群'), findsOneWidget);
     final saved = (await AppDatabase.instance.findColony(colony.id))!;
     expect(saved.createdAt, createdAt);
     expect(saved.species, colony.species);
-    expect(saved.source, colony.source);
+    expect(saved.source, '网购（新店铺）');
     expect(saved.acquiredOn, colony.acquiredOn);
     expect(saved.initialEggCount, 5);
     expect(saved.initialCocoonCount, 2);
