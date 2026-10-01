@@ -948,6 +948,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   String? _selectedNest;
   DateTime? _acquiredOn;
   XFile? _cover;
+  Future<Uint8List?>? _coverPreview;
   var _saving = false;
 
   @override
@@ -957,6 +958,11 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     if (colony == null) return;
     _name.text = colony.name;
     _source.text = colony.source ?? '';
+    if (colony.coverPhotoPath != null) {
+      _coverPreview = LocalMediaStore.instance
+          .readImage(colony.coverPhotoPath!)
+          .then<Uint8List?>((bytes) => bytes, onError: (Object _) => null);
+    }
     _purchasePrice.text = colony.purchasePriceText ?? '';
     _queens.text = colony.queenCount?.toString() ?? '';
     _specialized.text = colony.specializedCount?.toString() ?? '0';
@@ -1413,7 +1419,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '温度下限 °C'),
+                      decoration: const InputDecoration(
+                        labelText: '温度下限 °C',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1428,7 +1441,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '温度上限 °C'),
+                      decoration: const InputDecoration(
+                        labelText: '温度上限 °C',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1447,7 +1467,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '湿度下限 %'),
+                      decoration: const InputDecoration(
+                        labelText: '湿度下限 %',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1462,7 +1489,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: '湿度上限 %'),
+                      decoration: const InputDecoration(
+                        labelText: '湿度上限 %',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1476,33 +1510,25 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             icon: Icons.receipt_long_outlined,
             title: '来源与补充信息',
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _source,
-                      decoration: InputDecoration(
-                        labelText: '来源（可选）',
-                        suffixIcon: PopupMenuButton<String>(
-                          tooltip: '选择来源',
-                          icon: const Icon(Icons.arrow_drop_down),
-                          onSelected: (source) =>
-                              setState(() => _source.text = source),
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: '野采', child: Text('野采')),
-                            PopupMenuItem(value: '网购', child: Text('网购')),
-                            PopupMenuItem(value: '蚁友赠送', child: Text('蚁友赠送')),
-                          ],
-                        ),
-                      ),
-                    ),
+              TextFormField(
+                controller: _source,
+                decoration: InputDecoration(
+                  labelText: '来源（可选）',
+                  suffixIcon: PopupMenuButton<String>(
+                    tooltip: '选择来源',
+                    icon: const Icon(Icons.arrow_drop_down),
+                    onSelected: (source) =>
+                        setState(() => _source.text = source),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: '野采', child: Text('野采')),
+                      PopupMenuItem(value: '网购', child: Text('网购')),
+                      PopupMenuItem(value: '蚁友赠送', child: Text('蚁友赠送')),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _PurchasePriceField(controller: _purchasePrice),
-                  ),
-                ],
+                ),
               ),
+              const SizedBox(height: 12),
+              _PurchasePriceField(controller: _purchasePrice),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.calendar_today_outlined),
@@ -1531,14 +1557,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       ? '更换封面照片'
                       : '添加封面照片（可选）',
                 ),
-                onPressed: () async {
-                  final image = await ImagePicker().pickImage(
-                    source: ImageSource.gallery,
-                    imageQuality: 86,
-                  );
-                  if (image != null) setState(() => _cover = image);
-                },
+                onPressed: _saving ? null : _pickCover,
               ),
+              if (_coverPreview != null) ...[
+                const SizedBox(height: 12),
+                _CoverPhotoPreview(image: _coverPreview!),
+              ],
             ],
           ),
           const SizedBox(height: 28),
@@ -1549,6 +1573,84 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
         ],
       ),
     ),
+  );
+
+  Future<void> _pickCover() async {
+    try {
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 86,
+      );
+      if (image == null || !mounted) return;
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _cover = image;
+        _coverPreview = Future.value(bytes);
+      });
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    }
+  }
+}
+
+class _CoverPhotoPreview extends StatelessWidget {
+  const _CoverPhotoPreview({required this.image});
+  final Future<Uint8List?> image;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List?>(
+    future: image,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const SizedBox(
+          height: 180,
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      const error = SizedBox(
+        height: 180,
+        child: Center(child: Text('封面无法预览，请重新选择照片')),
+      );
+      final bytes = snapshot.data;
+      if (snapshot.hasError || bytes == null) return error;
+      return Column(
+        children: [
+          InkWell(
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (context) => Dialog.fullscreen(
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('封面预览'),
+                    leading: const CloseButton(),
+                  ),
+                  body: Center(
+                    child: InteractiveViewer(
+                      child: Image.memory(
+                        bytes,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => error,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            child: Image.memory(
+              bytes,
+              semanticLabel: '封面照片预览',
+              width: double.infinity,
+              height: 180,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => error,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text('点击照片放大预览', style: Theme.of(context).textTheme.bodySmall),
+        ],
+      );
+    },
   );
 }
 
@@ -2424,6 +2526,10 @@ class _ColonySummary extends StatelessWidget {
                 borderRadius: 12,
               ),
               const SizedBox(height: 16),
+            ],
+            if (colony.source?.trim().isNotEmpty == true) ...[
+              Text('来源：${colony.source}'),
+              const SizedBox(height: 8),
             ],
             Wrap(
               spacing: 8,
