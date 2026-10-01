@@ -21,6 +21,19 @@ Android 自动按每段两位生成内部 `versionCode`：`major * 10000 + minor
 主线本地 APK 命名为 `AntKeep-1.0.3.apk`，本地标签为 `antkeep-1.0.3-main`。
 本地打包不自动推送标签或发布 GitHub Release。
 
+## 正式环境更新接口
+
+主线正式 APK 必须配置 `ANTKEEP_API_BASE_URL=https://pipiele.xyz`：
+
+```bash
+flutter build apk --release --dart-define=ANTKEEP_API_BASE_URL=https://pipiele.xyz
+```
+
+App 通过 `https://pipiele.xyz/api/public/app-update/android` 匿名检查更新，在线版与离线版均适用。
+后台必须发布更新策略后才会返回可用更新；未发布时返回 `APP_UPDATE_NOT_PUBLISHED`。
+此参数也用于公开资料接口，不启用账号与签到功能。不要将 APK 下载站 `pipicbb.xyz` 当作 API 地址。
+构建验收应确认 APK 内包含正式域名；未带此参数的构建不能作为主线正式包交付。
+
 ## 首次配置
 
 在仓库 **Settings → Secrets and variables → Actions** 中添加以下 repository secrets。不要提交 keystore、`android/key.properties` 或任何密码。
