@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'purchase_price.dart';
+import 'colony_growth.dart';
 
 class Colony {
   const Colony({
@@ -25,6 +26,7 @@ class Colony {
     this.targetHumidity,
     this.coverPhotoPath,
     this.archived = false,
+    this.growth,
   });
 
   final String id;
@@ -48,6 +50,7 @@ class Colony {
   final double? targetHumidity;
   final String? coverPhotoPath;
   final bool archived;
+  final ColonyGrowth? growth;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -66,6 +69,23 @@ class Colony {
       today.day,
     ).difference(DateTime.utc(start.year, start.month, start.day)).inDays;
     return days < 0 ? 0 : days;
+  }
+
+  GrowthPopulation currentPopulation(Iterable<CareRecord> records) {
+    final sorted = records.where((r) => r.colonyId == id).toList()
+      ..sort((a, b) {
+        final time = a.occurredAt.compareTo(b.occurredAt);
+        return time != 0 ? time : a.createdAt.compareTo(b.createdAt);
+      });
+    var eggs = initialEggCount;
+    var cocoons = initialCocoonCount;
+    var workers = initialWorkerCount;
+    for (final record in sorted) {
+      eggs = record.eggCount ?? eggs;
+      cocoons = record.pupaCount ?? cocoons;
+      workers = record.workerCount ?? workers;
+    }
+    return GrowthPopulation(eggs: eggs, cocoons: cocoons, workers: workers);
   }
 
   int? currentWorkerCount(Iterable<CareRecord> records) {
@@ -100,6 +120,7 @@ class Colony {
     targetHumidity: (map['target_humidity'] as num?)?.toDouble(),
     coverPhotoPath: map['cover_photo_path'] as String?,
     archived: (map['archived'] as int? ?? 0) == 1,
+    growth: ColonyGrowth.decode(map['auto_growth_json']),
     createdAt: DateTime.parse(map['created_at']! as String),
     updatedAt: DateTime.parse(map['updated_at']! as String),
   );
@@ -124,6 +145,7 @@ class Colony {
     'target_humidity': targetHumidity,
     'cover_photo_path': coverPhotoPath,
     'archived': archived ? 1 : 0,
+    'auto_growth_json': growth?.encode(),
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };

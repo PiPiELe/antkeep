@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/colony_growth_page.dart';
+import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/species_encyclopedia_page.dart';
 import 'package:flutter/material.dart';
@@ -154,9 +156,133 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(label));
     await tester.pumpAndSettle();
+    if (label == '保存蚁群' &&
+        find.byType(ColonyGrowthPage).evaluate().isNotEmpty) {
+      expect(
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        isFalse,
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
     expect(tester.takeException(), isNull);
     expect(find.byType(SnackBar), findsNothing);
   }
+
+  testWidgets('growth settings validate counts and persist period and path', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final colony = Colony(
+      id: 'growth-ui',
+      name: '扩充测试',
+      createdAt: now,
+      updatedAt: now,
+      initialEggCount: 10,
+      initialCocoonCount: 5,
+      initialWorkerCount: 20,
+    );
+    tables['colonies']!.add(colony.toMap());
+    await tester.pumpWidget(
+      MaterialApp(home: ColonyGrowthPage(colony: colony)),
+    );
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<GrowthFrequency>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('每月').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<GrowthPath>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('卵 → 茧 → 工').last);
+    await tester.pumpAndSettle();
+    for (final item in [('卵净增长', '2'), ('茧净增长', '3'), ('工净增长', '1')]) {
+      final field = find.widgetWithText(TextFormField, item.$1);
+      await tester.ensureVisible(field);
+      await tester.enterText(field, item.$2);
+    }
+    await tapSave(tester, '保存设置');
+    final growth = Colony.fromMap(tables['colonies']!.single).growth!;
+    expect(growth.frequency, GrowthFrequency.monthly);
+    expect(growth.path, GrowthPath.eggToCocoonToWorker);
+    expect(growth.eggs, 2);
+    expect(growth.cocoons, 3);
+    expect(growth.workers, 1);
+    expect(growth.completedCycles, 0);
+    await tester.pumpWidget(
+      MaterialApp(
+        key: const ValueKey('reopened-growth-app'),
+        home: ColonyGrowthPage(
+          key: const ValueKey('reopen'),
+          colony: Colony.fromMap(tables['colonies']!.single),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+      isTrue,
+    );
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    await tapSave(tester, '保存设置');
+    expect(Colony.fromMap(tables['colonies']!.single).growth, isNull);
+  });
+
+  testWidgets(
+    'detail chart forecasts without adding records and keeps brood filtering',
+    (tester) async {
+      final now = DateTime.now();
+      tables['colonies']!.add(
+        Colony(
+          id: 'detail-forecast',
+          name: '详情预测',
+          createdAt: now,
+          updatedAt: now,
+          queenCount: 1,
+          initialWorkerCount: 20,
+          initialEggCount: 100,
+          initialCocoonCount: 5,
+          growth: ColonyGrowth(
+            frequency: GrowthFrequency.daily,
+            path: GrowthPath.eggToWorker,
+            startedAt: now,
+            workers: 1,
+          ),
+        ).toMap(),
+      );
+      await tester.pumpWidget(
+        const MaterialApp(home: ColonyDetailPage(colonyId: 'detail-forecast')),
+      );
+      await tester.pumpAndSettle();
+      final toggle = find.byKey(const ValueKey('population-forecast-toggle'));
+      await tester.ensureVisible(toggle);
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('7 天'));
+      await tester.tap(find.text('7 天'));
+      await tester.pumpAndSettle();
+      final summary = find.byKey(const ValueKey('population-forecast-summary'));
+      await tester.ensureVisible(summary);
+      expect(find.textContaining('28 只（估算）'), findsOneWidget);
+      await Scrollable.ensureVisible(
+        tester.element(find.text('带卵幼')),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('带卵幼'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('126 只（估算）'), findsOneWidget);
+      expect(tables['care_records'], isEmpty);
+      await tester.ensureVisible(toggle);
+      await tester.pumpAndSettle();
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(summary, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   Future<void> fillRequiredColonyCounts(WidgetTester tester) async {
     for (final field in ['蚁后 *', '工蚁 *']) {
@@ -1067,16 +1193,19 @@ void main() {
       find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,
     );
+    await tester.ensureVisible(find.byTooltip('折叠种群数量'));
     await tester.tap(find.byTooltip('折叠种群数量'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('colony-population-chart')), findsNothing);
     expect(find.byTooltip('展开种群数量'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('展开种群数量'));
     await tester.tap(find.byTooltip('展开种群数量'));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,
     );
+    await tester.ensureVisible(find.text('带卵幼'));
     await tester.tap(find.text('带卵幼'));
     await tester.pumpAndSettle();
     expect(

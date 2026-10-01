@@ -1,4 +1,5 @@
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/population_analysis.dart';
 import 'package:antkeep/population_analysis_page.dart';
 import 'package:flutter/material.dart';
@@ -215,6 +216,78 @@ void main() {
       await tester.tap(find.text('成体'));
       await tester.pumpAndSettle();
       expect(find.text('成体 · 最近 3 只 · 1 个时间点'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'forecast defaults off, changes horizon and never changes history statistics',
+    (tester) async {
+      final now = DateTime.now();
+      final growing = Colony(
+        id: 'forecast',
+        name: '预测群',
+        createdAt: now,
+        updatedAt: now,
+        initialWorkerCount: 10,
+        initialEggCount: 100,
+        growth: ColonyGrowth(
+          frequency: GrowthFrequency.daily,
+          path: GrowthPath.eggToWorker,
+          startedAt: now,
+          workers: 1,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PopulationAnalysisPage(
+            loadColonies: () async => [growing],
+            loadRecords: (_) async => [],
+            loadFeederRecords: (_) async => [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('analysis-subject')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('蚁群 · 预测群').last);
+      await tester.pumpAndSettle();
+      final toggle = find.byKey(const ValueKey('population-forecast-toggle'));
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(
+        find.byKey(const ValueKey('population-forecast-summary')),
+        findsNothing,
+      );
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('7 天'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('population-forecast-summary')),
+      );
+      expect(find.textContaining('17 只（估算）'), findsOneWidget);
+      expect(find.text('工蚁 · 最近 10 只 · 1 个时间点'), findsOneWidget);
+      expect(find.text('数据不足'), findsOneWidget);
+      await tester.ensureVisible(find.text('14 天'));
+      await tester.tap(find.text('14 天'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('24 只（估算）'), findsOneWidget);
+      await tester.ensureVisible(find.text('幼虫'));
+      await tester.tap(find.text('幼虫'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+      expect(
+        find.byKey(const ValueKey('population-forecast-summary')),
+        findsNothing,
+      );
+      await tester.tap(find.text('工蚁'));
+      await tester.pumpAndSettle();
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('population-forecast-summary')),
+        findsNothing,
+      );
       expect(tester.takeException(), isNull);
     },
   );

@@ -8,6 +8,13 @@ import 'domain/models.dart';
 import 'domain/population_analysis.dart';
 import 'domain/spending_analysis.dart';
 import 'spending_analysis_view.dart';
+import 'domain/population_forecast.dart';
+import 'population_forecast_controls.dart';
+
+typedef _PopulationSeries = ({
+  List<PopulationPoint> history,
+  List<PopulationPoint> forecast,
+});
 
 class PopulationAnalysisPage extends StatefulWidget {
   const PopulationAnalysisPage({
@@ -29,12 +36,22 @@ class PopulationAnalysisPage extends StatefulWidget {
 
 class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   late Future<List<Colony>> _colonies;
-  Future<List<PopulationPoint>>? _points;
+  Future<_PopulationSeries>? _points;
   Colony? _colony;
   FeederType? _feeder;
   PopulationMetric _metric = PopulationMetric.workers;
   String? _selectedId;
   bool _showSpending = false;
+  bool _showForecast = false;
+  ForecastHorizon _forecastHorizon = ForecastHorizon.month;
+
+  String? get _forecastUnavailableReason => _colony == null
+      ? 'DLC 暂无自动扩充规则'
+      : _colony!.growth == null
+      ? '请先在群落自动扩充中设置增长规则'
+      : _metric == PopulationMetric.larvae
+      ? '自动扩充规则不包含幼虫，暂不预测此指标'
+      : null;
 
   @override
   void initState() {
@@ -47,21 +64,44 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
     _colonies.ignore();
   }
 
-  Future<List<PopulationPoint>> _loadPoints() async {
+  Future<_PopulationSeries> _loadPoints() async {
     final colony = _colony;
     final feeder = _feeder;
     final metric = _metric;
+    final predict = _showForecast && _forecastUnavailableReason == null;
+    final horizon = _forecastHorizon;
     if (colony != null) {
       final records =
           await (widget.loadRecords ?? AppDatabase.instance.listRecords)(
             colony.id,
           );
-      return colonyPopulation(colony, records, metric);
+      final now = DateTime.now();
+      return (
+        history: colonyPopulation(
+          colony,
+          predict
+              ? records.where((r) => !r.occurredAt.isAfter(now)).toList()
+              : records,
+          metric,
+        ),
+        forecast: predict
+            ? colonyPopulationForecast(
+                colony,
+                records,
+                now: now,
+                horizon: horizon,
+                metric: metric,
+              )
+            : <PopulationPoint>[],
+      );
     }
     final records =
         await (widget.loadFeederRecords ??
             AppDatabase.instance.listFeederRecords)(feeder!);
-    return feederPopulation(feeder, records, metric);
+    return (
+      history: feederPopulation(feeder, records, metric),
+      forecast: <PopulationPoint>[],
+    );
   }
 
   void _reloadPoints() {
@@ -74,6 +114,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   void _select(String id, List<Colony> colonies) {
     setState(() {
       _selectedId = id;
+      _showForecast = false;
       _colony = id.startsWith('colony:')
           ? colonies.firstWhere((c) => 'colony:${c.id}' == id)
           : null;
@@ -175,7 +216,20 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      FutureBuilder<List<PopulationPoint>>(
+                      PopulationForecastControls(
+                        enabled: _showForecast,
+                        horizon: _forecastHorizon,
+                        unavailableReason: _forecastUnavailableReason,
+                        onEnabledChanged: (value) => setState(() {
+                          _showForecast = value;
+                          _reloadPoints();
+                        }),
+                        onHorizonChanged: (value) => setState(() {
+                          _forecastHorizon = value;
+                          _reloadPoints();
+                        }),
+                      ),
+                      FutureBuilder<_PopulationSeries>(
                         future: _points,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState !=
@@ -191,7 +245,8 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                             );
                           }
                           return _PopulationResult(
-                            points: snapshot.data!,
+                            points: snapshot.data!.history,
+                            forecast: snapshot.data!.forecast,
                             metric: _metric,
                           );
                         },
@@ -219,7 +274,12 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
 }
 
 class _PopulationResult extends StatelessWidget {
-  const _PopulationResult({required this.points, required this.metric});
+  const _PopulationResult({
+    required this.points,
+    required this.forecast,
+    required this.metric,
+  });
+  final List<PopulationPoint> forecast;
   final List<PopulationPoint> points;
   final PopulationMetric metric;
 
@@ -259,12 +319,33 @@ class _PopulationResult extends StatelessWidget {
                   painter: _PopulationChartPainter(
                     points,
                     Theme.of(context).colorScheme,
+                    forecast: forecast,
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            Text('${_date(points.first.time)} — ${_date(points.last.time)}'),
+            Text(
+              '${_date(points.first.time)} — ${_date(forecast.isEmpty ? points.last.time : forecast.last.time)}',
+            ),
+            if (forecast.isNotEmpty) ...[
+              Text(
+                '预测至 ${_date(forecast.last.time)} · ${forecast.last.count} 只（估算）',
+                key: const ValueKey('population-forecast-summary'),
+              ),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('预测数量（估算）'),
+                children: [
+                  for (final point in forecast.skip(1))
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${_date(point.time)} ${_time(point.time)}'),
+                      trailing: Text('${point.count} 只'),
+                    ),
+                ],
+              ),
+            ],
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
               title: const Text('数量记录'),
@@ -295,7 +376,13 @@ String _time(DateTime time) {
 }
 
 class _PopulationChartPainter extends CustomPainter {
-  _PopulationChartPainter(this.points, this.colors);
+  _PopulationChartPainter(
+    List<PopulationPoint> history,
+    this.colors, {
+    List<PopulationPoint> forecast = const [],
+  }) : points = [...history, ...forecast],
+       historyCount = history.length;
+  final int historyCount;
   final List<PopulationPoint> points;
   final ColorScheme colors;
 
@@ -336,20 +423,7 @@ class _PopulationChartPainter extends CustomPainter {
           plot.bottom - plot.height * point.count / maximum,
         ),
     ];
-    final path = Path()..moveTo(locations.first.dx, locations.first.dy);
-    for (final point in locations.skip(1)) {
-      path.lineTo(point.dx, point.dy);
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = colors.primary
-        ..strokeWidth = 2.5
-        ..style = PaintingStyle.stroke,
-    );
-    for (final point in locations) {
-      canvas.drawCircle(point, 3.5, Paint()..color = colors.primary);
-    }
+    drawPopulationSeries(canvas, locations, historyCount, colors);
     final start = label(
       chineseDate(points.first.time.toLocal(), includeYear: false),
     );

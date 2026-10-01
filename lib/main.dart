@@ -9,11 +9,14 @@ import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
 import 'privacy_policy.dart';
+import 'colony_growth_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'lottery_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
+import 'population_forecast_controls.dart';
+import 'domain/population_forecast.dart';
 import 'online/runtime.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
@@ -458,10 +461,29 @@ class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
   bool _editingAcquiredOn = false;
 
+  Timer? _growthTimer;
+  AppLifecycleListener? _growthLifecycle;
+
+  void _refreshGrowth() {
+    if (mounted) setState(_reload);
+  }
+
+  @override
+  void dispose() {
+    _growthTimer?.cancel();
+    _growthLifecycle?.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
     _reload();
+    _growthTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refreshGrowth(),
+    );
+    _growthLifecycle = AppLifecycleListener(onResume: _refreshGrowth);
   }
 
   void _reload() {
@@ -913,9 +935,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     setState(() => _saving = true);
     try {
       final now = DateTime.now();
+      final colonyId = widget.colony?.id ?? const Uuid().v4();
       await AppDatabase.instance.saveColony(
         Colony(
-          id: widget.colony?.id ?? const Uuid().v4(),
+          id: colonyId,
           name: _name.text.trim(),
           species: _selectedSpecies,
           acquiredOn: _acquiredOn,
@@ -940,6 +963,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           updatedAt: now,
         ),
       );
+      if (widget.colony == null && mounted) {
+        final colony = await AppDatabase.instance.findColony(colonyId);
+        if (colony != null && mounted) {
+          await Navigator.of(context).push<bool>(
+            MaterialPageRoute(builder: (_) => ColonyGrowthPage(colony: colony)),
+          );
+        }
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) _showError(context, error);
@@ -1596,10 +1627,31 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   bool _editingAcquiredOn = false;
   bool _includeBrood = false;
   bool _populationExpanded = true;
+  bool _showForecast = false;
+  ForecastHorizon _forecastHorizon = ForecastHorizon.month;
+  Timer? _growthTimer;
+  AppLifecycleListener? _growthLifecycle;
+
+  void _refreshGrowth() {
+    if (mounted) setState(_reload);
+  }
+
+  @override
+  void dispose() {
+    _growthTimer?.cancel();
+    _growthLifecycle?.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
     _reload();
+    _growthTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refreshGrowth(),
+    );
+    _growthLifecycle = AppLifecycleListener(onResume: _refreshGrowth);
   }
 
   void _reload() {
@@ -1728,12 +1780,39 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             ),
             const SizedBox(height: 12),
             _ColonySummary(colony: colony),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.trending_up),
+                title: const Text('群落自动扩充'),
+                subtitle: Text(
+                  colony.growth == null
+                      ? '未开启 · 设置卵、茧、工增长规则'
+                      : '${colony.growth!.frequency.label} · ${colony.growth!.path.label} · 自动估算',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => ColonyGrowthPage(colony: colony),
+                    ),
+                  );
+                  if (mounted) setState(_reload);
+                },
+              ),
+            ),
             const SizedBox(height: 16),
             _PopulationTimeline(
               colony: colony,
               records: detail.records,
               includeBrood: _includeBrood,
               expanded: _populationExpanded,
+              showForecast: _showForecast,
+              forecastHorizon: _forecastHorizon,
+              onForecastChanged: (value) =>
+                  setState(() => _showForecast = value),
+              onForecastHorizonChanged: (value) =>
+                  setState(() => _forecastHorizon = value),
               onIncludeBroodChanged: (value) {
                 setState(() => _includeBrood = value);
               },
@@ -1919,21 +1998,42 @@ class _PopulationTimeline extends StatelessWidget {
     required this.expanded,
     required this.onIncludeBroodChanged,
     required this.onExpandedChanged,
+    required this.showForecast,
+    required this.forecastHorizon,
+    required this.onForecastChanged,
+    required this.onForecastHorizonChanged,
   });
   final Colony colony;
   final List<CareRecord> records;
   final bool includeBrood;
   final bool expanded;
+  final bool showForecast;
+  final ForecastHorizon forecastHorizon;
+  final ValueChanged<bool> onForecastChanged;
+  final ValueChanged<ForecastHorizon> onForecastHorizonChanged;
   final ValueChanged<bool> onIncludeBroodChanged;
   final ValueChanged<bool> onExpandedChanged;
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
     final points = colonyPopulationTotal(
       colony,
-      records,
+      showForecast && colony.growth != null
+          ? records.where((r) => !r.occurredAt.isAfter(now)).toList()
+          : records,
       includeBrood: includeBrood,
     );
+    final forecast = showForecast
+        ? colonyPopulationForecast(
+            colony,
+            records,
+            now: now,
+            horizon: forecastHorizon,
+            metric: PopulationMetric.total,
+            includeBrood: includeBrood,
+          )
+        : <PopulationPoint>[];
     final description = includeBrood ? '蚁后、特化、工蚁与卵幼茧' : '蚁后、特化与工蚁';
     return Card(
       child: Padding(
@@ -1980,6 +2080,15 @@ class _PopulationTimeline extends StatelessWidget {
                   ),
                 ],
               ),
+              PopulationForecastControls(
+                enabled: showForecast,
+                horizon: forecastHorizon,
+                unavailableReason: colony.growth == null
+                    ? '请先在群落自动扩充中设置增长规则'
+                    : null,
+                onEnabledChanged: onForecastChanged,
+                onHorizonChanged: onForecastHorizonChanged,
+              ),
               const SizedBox(height: 14),
               if (points.isEmpty)
                 const Padding(
@@ -1999,15 +2108,21 @@ class _PopulationTimeline extends StatelessWidget {
                       painter: _ColonyPopulationChartPainter(
                         points,
                         Theme.of(context).colorScheme,
+                        forecast: forecast,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${_date(points.first.time)} — ${_date(points.last.time)}',
+                  '${_date(points.first.time)} — ${_date(forecast.isEmpty ? points.last.time : forecast.last.time)}',
                 ),
               ],
+              if (forecast.isNotEmpty)
+                Text(
+                  '预测至 ${_date(forecast.last.time)} · ${forecast.last.count} 只（估算）',
+                  key: const ValueKey('population-forecast-summary'),
+                ),
               const SizedBox(height: 8),
               Text(
                 '未填写的数量不会按 0 计算；两次记录之间沿用最近一次已填写的数量。',
@@ -2022,7 +2137,13 @@ class _PopulationTimeline extends StatelessWidget {
 }
 
 class _ColonyPopulationChartPainter extends CustomPainter {
-  _ColonyPopulationChartPainter(this.points, this.colors);
+  _ColonyPopulationChartPainter(
+    List<PopulationPoint> history,
+    this.colors, {
+    List<PopulationPoint> forecast = const [],
+  }) : points = [...history, ...forecast],
+       historyCount = history.length;
+  final int historyCount;
   final List<PopulationPoint> points;
   final ColorScheme colors;
 
@@ -2066,20 +2187,7 @@ class _ColonyPopulationChartPainter extends CustomPainter {
           plot.bottom - plot.height * point.count / maximum,
         ),
     ];
-    final path = Path()..moveTo(locations.first.dx, locations.first.dy);
-    for (final location in locations.skip(1)) {
-      path.lineTo(location.dx, location.dy);
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = colors.primary
-        ..strokeWidth = 2.5
-        ..style = PaintingStyle.stroke,
-    );
-    for (final location in locations) {
-      canvas.drawCircle(location, 3.5, Paint()..color = colors.primary);
-    }
+    drawPopulationSeries(canvas, locations, historyCount, colors);
     final start = label(
       chineseDate(points.first.time.toLocal(), includeYear: false),
     );
