@@ -86,22 +86,25 @@ void main() {
       .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label))
       .selected;
 
-  testWidgets('online edition can be selected and persists the choice', (
-    tester,
-  ) async {
-    await tester.pumpWidget(app());
-    expect(selected(tester, '离线版'), isTrue);
-    expect(find.text('应用已是最新版本'), findsNothing);
-    expect(find.text('个人中心与签到'), findsNothing);
-    await tester.tap(find.text('在线版'));
-    await tester.pumpAndSettle();
-    expect(selected(tester, '离线版'), isFalse);
-    expect(selected(tester, '在线版'), isTrue);
-    expect(find.text('个人中心与签到'), findsOneWidget);
-    final restarted = AppPreferences(AppDatabase.instance);
-    await restarted.load();
-    expect(restarted.edition, AppEdition.online);
-  });
+  testWidgets(
+    'online materials can be selected without update or account entrypoints',
+    (tester) async {
+      await tester.pumpWidget(app());
+      expect(selected(tester, '离线版'), isTrue);
+      expect(find.text('应用已是最新版本'), findsNothing);
+      expect(find.text('个人中心与签到'), findsNothing);
+      await tester.tap(find.text('在线版'));
+      await tester.pumpAndSettle();
+      expect(selected(tester, '离线版'), isFalse);
+      expect(selected(tester, '在线版'), isTrue);
+      expect(find.text('个人中心与签到'), findsNothing);
+      expect(find.text('检查更新'), findsNothing);
+      expect(find.text('去更新'), findsNothing);
+      final restarted = AppPreferences(AppDatabase.instance);
+      await restarted.load();
+      expect(restarted.edition, AppEdition.online);
+    },
+  );
 
   testWidgets('failed online edition change keeps the existing preference', (
     tester,

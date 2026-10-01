@@ -8,16 +8,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'privacy_policy.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
-import 'account_controller.dart';
-import 'personal_center_page.dart';
 import 'lottery_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'online/runtime.dart';
-import 'online/app_update.dart';
-import 'online/online_widgets.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
 import 'data/backup_service.dart';
@@ -181,7 +178,34 @@ Future<void> main() async {
 }
 
 final themeController = AppPreferences(AppDatabase.instance);
-final accountController = AccountController(preferences: themeController);
+
+Future<bool> confirmLocalPhotoUse(
+  BuildContext context, {
+  required bool multiple,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('使用照片'),
+      content: Text(
+        multiple
+            ? '选择的照片仅用于本机的养护记录和备份，不会上传到服务器。是否继续选择？'
+            : '选择的照片仅用于本机蚁群封面和备份，不会上传到服务器。是否继续选择？',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('继续选择'),
+        ),
+      ],
+    ),
+  );
+  return confirmed == true;
+}
 
 class AntKeepApp extends StatefulWidget {
   const AntKeepApp({super.key});
@@ -191,72 +215,11 @@ class AntKeepApp extends StatefulWidget {
 }
 
 class _AntKeepAppState extends State<AntKeepApp> {
-  final _navigatorKey = GlobalKey<NavigatorState>();
-  int? _shownRequiredPolicy;
-
-  void _showUpdatePromptIfNeeded() {
-    final policy = appUpdateController.policy;
-    if (policy == null) {
-      return;
-    }
-    final required =
-        appUpdateController.availability == AppUpdateAvailability.required;
-    final optional =
-        appUpdateController.availability == AppUpdateAvailability.optional &&
-        appUpdateController.takeOptionalPrompt();
-    if ((!required && !optional) ||
-        (required && _shownRequiredPolicy == policy.version)) {
-      return;
-    }
-    if (required) {
-      _shownRequiredPolicy = policy.version;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final dialogContext = _navigatorKey.currentContext;
-      if (!mounted || dialogContext == null) return;
-      showDialog<void>(
-        context: dialogContext,
-        barrierDismissible: !required,
-        builder: (context) => AlertDialog(
-          title: Text(required ? '在线版需要更新' : '发现新版本 ${policy.latestVersion}'),
-          content: Text(
-            required
-                ? '请更新至 ${policy.minimumVersion} 后继续使用在线版。蚁群、记录、照片和备份仍可在离线版正常使用。\n\n${policy.releaseNotes}'
-                : policy.releaseNotes,
-          ),
-          actions: [
-            if (required)
-              TextButton(
-                onPressed: () async {
-                  await themeController.setEdition(AppEdition.offline);
-                  if (context.mounted) Navigator.of(context).pop();
-                },
-                child: const Text('使用离线版'),
-              )
-            else
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('稍后更新'),
-              ),
-            FilledButton(
-              onPressed: () async {
-                await appUpdateController.openDownload();
-              },
-              child: const Text('立即更新'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([themeController, appUpdateController]),
+    animation: themeController,
     builder: (context, _) {
-      _showUpdatePromptIfNeeded();
       return MaterialApp(
-        navigatorKey: _navigatorKey,
         title: '蚁记',
         locale: const Locale('zh', 'CN'),
         supportedLocales: const [Locale('zh', 'CN')],
@@ -265,9 +228,12 @@ class _AntKeepAppState extends State<AntKeepApp> {
         theme: antKeepTheme(themeController.themeColor),
         darkTheme: antKeepTheme(themeController.themeColor, dark: true),
         themeMode: themeController.themeMode,
-        home: themeController.onboardingCompleted
-            ? const HomePage()
-            : OnboardingPage(preferences: themeController),
+        home: PrivacyPolicyGate(
+          preferences: themeController,
+          child: themeController.onboardingCompleted
+              ? const HomePage()
+              : OnboardingPage(preferences: themeController),
+        ),
       );
     },
   );
@@ -334,9 +300,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(onlineController.refreshCheckin());
-    }
+    // The Xiaomi build has no account or check-in entrypoint. Public content
+    // refreshes only when the user explicitly switches to online materials.
   }
 
   @override
@@ -1409,6 +1374,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       : '添加封面照片（可选）',
                 ),
                 onPressed: () async {
+                  if (!await confirmLocalPhotoUse(context, multiple: false) ||
+                      !context.mounted) {
+                    return;
+                  }
                   final image = await ImagePicker().pickImage(
                     source: ImageSource.gallery,
                     imageQuality: 86,
@@ -2392,6 +2361,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
             _photos.isEmpty ? '添加照片（可选）' : '已选择 ${_photos.length} 张照片',
           ),
           onPressed: () async {
+            if (!await confirmLocalPhotoUse(context, multiple: true) ||
+                !context.mounted) {
+              return;
+            }
             final images = await ImagePicker().pickMultiImage(imageQuality: 86);
             if (images.isNotEmpty) setState(() => _photos.addAll(images));
           },
@@ -2587,9 +2560,9 @@ class DiscoverPage extends StatelessWidget {
           title: const Text('数字抽奖'),
           subtitle: const Text('转盘随机抽取，或直接显示范围内数字'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const LotteryPage()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const LotteryPage())),
         ),
       ),
       for (final entry in const [
@@ -3737,7 +3710,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([themeController, appUpdateController]),
+    animation: themeController,
     builder: (context, _) => _buildSettings(context),
   );
 
@@ -3794,7 +3767,7 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: Text(
                 themeController.edition == AppEdition.offline
                     ? '使用 App 内置资料，断网也能查看。在线版正在测试中。'
-                    : '在线版可获取公共资料，并会匿名检查 Android 更新。',
+                    : '在线版可获取后台发布的公开资料；不提供账号功能。',
               ),
             ),
             Padding(
@@ -3826,28 +3799,29 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
-            OnlineSettings(
-              controller: onlineController,
-              updates: appUpdateController,
-              useOffline: () => _setEdition(AppEdition.offline),
-            ),
           ]),
-          if (themeController.edition == AppEdition.online &&
-              appUpdateController.availability != AppUpdateAvailability.required)
-            _section(context, '个人中心', [
-              ListTile(
-                leading: const Icon(Icons.manage_accounts_outlined),
-                title: const Text('个人中心与签到'),
-                subtitle: const Text('登录账号，查看每日签到记录'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        PersonalCenterPage(controller: accountController),
-                  ),
+          _section(context, '隐私与权限', [
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: const Text('隐私政策'),
+              subtitle: Text(
+                themeController.privacyPolicyVersion == null
+                    ? '首次使用前需阅读并同意。'
+                    : '当前已同意版本 ${themeController.privacyPolicyVersion}。',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PrivacyPolicyDetailsPage(),
                 ),
               ),
-            ]),
+            ),
+            const ListTile(
+              leading: Icon(Icons.photo_library_outlined),
+              title: Text('照片权限'),
+              subtitle: Text('仅在你选择照片时读取，用于保存本机蚁群记录。'),
+            ),
+          ]),
           _section(context, '外观与偏好', [
             const ListTile(
               leading: Icon(Icons.palette_outlined),

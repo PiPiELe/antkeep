@@ -30,6 +30,7 @@ class AppPreferences extends ChangeNotifier {
   final AppSettingsStore store;
 
   bool onboardingCompleted = false;
+  int? privacyPolicyVersion;
   bool beginner = false;
   bool careRemindersEnabled = false;
   int careReminderMinuteOfDay = 20 * 60;
@@ -40,6 +41,7 @@ class AppPreferences extends ChangeNotifier {
   Future<void> load() async {
     final values = await store.readSettings();
     onboardingCompleted = values['onboarding_completed'] == 'true';
+    privacyPolicyVersion = int.tryParse(values['privacy_policy_version'] ?? '');
     beginner = values['keeper_experience'] == 'beginner';
     careRemindersEnabled = values['care_reminders_enabled'] == 'true';
     careReminderMinuteOfDay =
@@ -87,6 +89,18 @@ class AppPreferences extends ChangeNotifier {
   Future<void> setEdition(AppEdition edition) async {
     await store.writeSettings({'app_edition': edition.name});
     this.edition = edition;
+    notifyListeners();
+  }
+
+  bool get hasAcceptedPrivacyPolicy => privacyPolicyVersion != null;
+
+  bool hasAcceptedPrivacyPolicyVersion(int version) =>
+      privacyPolicyVersion == version;
+
+  Future<void> acceptPrivacyPolicy(int version) async {
+    if (version < 1) throw ArgumentError.value(version, 'version');
+    await store.writeSettings({'privacy_policy_version': version.toString()});
+    privacyPolicyVersion = version;
     notifyListeners();
   }
 

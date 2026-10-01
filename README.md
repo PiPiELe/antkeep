@@ -10,6 +10,17 @@
 
 Android APK 通过 GitHub Release 分发；发布配置、签名 Secrets 和固定下载链接见 [docs/GITHUB_RELEASE.md](docs/GITHUB_RELEASE.md)。
 
+## 小米版发布前置条件
+
+`release-xiaomi` 不提供运行后的更新提示或账号入口。首次启动会从内容后台读取并展示已发布的隐私政策，
+同意的协议版本只保存在本机。构建前必须在内容后台的「协议管理」保存并发布协议，然后使用 HTTPS 地址构建：
+
+```sh
+flutter build apk --release --dart-define=ANTKEEP_API_BASE_URL=https://your-domain.example
+```
+
+未配置地址、协议尚未发布或首次启动时无法读取协议，用户不能进入应用；已同意同一版本的用户在临时离线时可继续使用本地功能。
+
 备份导入与导出使用相同限制：最多 499 张照片，ZIP 最大 128 MB，单个附件最大
 24 MB，清单最大 1 MB，解压后总量最大 192 MB。超限时导出会报错，不生成无法恢复的备份。
 恢复会先校验记录字段、日期和关联关系；无效备份不会覆盖现有数据或上次回退副本。
