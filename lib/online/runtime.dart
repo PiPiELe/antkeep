@@ -19,8 +19,8 @@ final appUpdateController = AppUpdateController(
 
 Future<void> setOnlineMode(bool value) async {
   if (!value) {
-    await appUpdateController.setOnline(false);
     await onlineController.setEnabled(false);
+    await appUpdateController.setOnline(false);
     return;
   }
   final required = await appUpdateController.setOnline(true);

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/online/app_update.dart';
+import 'package:antkeep/online/runtime.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -89,6 +91,33 @@ void main() {
       .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label))
       .selected;
 
+  testWidgets('offline startup shows a dismissible update only once', (
+    tester,
+  ) async {
+    await appUpdateController.setOnline(false);
+    appUpdateController.policy = AppUpdatePolicy(
+      version: 1,
+      latestVersion: const AppVersion(1, 1, 0),
+      minimumVersion: const AppVersion(1, 1, 0),
+      downloadUrl: Uri.parse('https://downloads.example.test/antkeep'),
+      releaseNotes: '修复已知问题。',
+    );
+    appUpdateController.availability = AppUpdateAvailability.optional;
+    addTearDown(() => appUpdateController.setOnline(false));
+    await tester.pumpWidget(const AntKeepApp());
+    await tester.pumpAndSettle();
+    expect(find.text('发现新版本 1.1.0'), findsOneWidget);
+    expect(find.text('立即更新'), findsOneWidget);
+    expect(find.text('在线版需要更新'), findsNothing);
+    await tester.tap(find.text('稍后更新'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    await themeController.setThemeColor(ThemeColor.forest);
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(themeController.edition, AppEdition.offline);
+  });
+
   testWidgets('simple mode persists and restores all navigation entries', (
     tester,
   ) async {
@@ -150,6 +179,7 @@ void main() {
   ) async {
     await tester.pumpWidget(app());
     expect(selected(tester, '离线版'), isTrue);
+    expect(find.text('检查更新'), findsOneWidget);
     expect(find.text('应用已是最新版本'), findsNothing);
     expect(find.text('个人中心与签到'), findsNothing);
     await tester.tap(find.text('在线版'));

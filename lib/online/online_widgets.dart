@@ -109,39 +109,37 @@ class OnlineSettings extends StatelessWidget {
             ),
           ),
         ],
-        if (updates.online)
-          ListTile(
-            leading: const Icon(Icons.system_update_outlined),
-            title: Text(
-              updates.availability == AppUpdateAvailability.none
-                  ? '应用已是最新版本'
-                  : '发现新版本 ${updates.policy?.latestVersion}',
-            ),
-            subtitle: Text(
-              updates.error ??
-                  (updates.availability == AppUpdateAvailability.required
-                      ? '需更新后才能使用在线版；本地数据仍可离线使用。'
-                      : updates.policy?.releaseNotes ??
-                            '仅检查 Android 更新，不会上传本地养殖数据。'),
-            ),
-            trailing: updates.checking
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : TextButton(
-                    onPressed:
-                        updates.availability == AppUpdateAvailability.none
-                        ? () => updates.check(manual: true)
-                        : updates.openDownload,
-                    child: Text(
-                      updates.availability == AppUpdateAvailability.none
-                          ? '检查更新'
-                          : '去更新',
-                    ),
-                  ),
+        ListTile(
+          leading: const Icon(Icons.system_update_outlined),
+          title: Text(
+            updates.availability == AppUpdateAvailability.none
+                ? (updates.policy == null ? '应用更新' : '应用已是最新版本')
+                : '发现新版本 ${updates.policy?.latestVersion}',
           ),
+          subtitle: Text(
+            updates.error ??
+                (updates.availability == AppUpdateAvailability.required
+                    ? '需更新后才能使用在线版；本地数据仍可离线使用。'
+                    : updates.policy?.releaseNotes ??
+                          '仅检查 Android 更新，不会上传本地养殖数据。'),
+          ),
+          trailing: updates.checking
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : TextButton(
+                  onPressed: updates.availability == AppUpdateAvailability.none
+                      ? () => updates.check(manual: true)
+                      : updates.openDownload,
+                  child: Text(
+                    updates.availability == AppUpdateAvailability.none
+                        ? '检查更新'
+                        : '去更新',
+                  ),
+                ),
+        ),
         ListTile(
           leading: const Icon(Icons.help_outline),
           title: const Text('使用指南'),

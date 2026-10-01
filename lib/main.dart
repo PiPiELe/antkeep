@@ -164,8 +164,14 @@ Future<void> main() async {
     await LocalMediaStore.instance.initialize();
     await AppDatabase.instance.open();
     await themeController.load();
-    void updateOnlineMode() =>
-        unawaited(setOnlineMode(themeController.edition == AppEdition.online));
+    AppEdition? appliedEdition;
+    void updateOnlineMode() {
+      final edition = themeController.edition;
+      if (appliedEdition == edition) return;
+      appliedEdition = edition;
+      unawaited(setOnlineMode(edition == AppEdition.online));
+    }
+
     themeController.addListener(updateOnlineMode);
     updateOnlineMode();
     try {
@@ -3996,7 +4002,7 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('资料模式'),
               subtitle: Text(
                 themeController.edition == AppEdition.offline
-                    ? '使用 App 内置资料，断网也能查看。在线版正在测试中。'
+                    ? '使用内置资料，断网可用；启动时会联网检查 Android 更新。'
                     : '在线版可获取公共资料，并会匿名检查 Android 更新。',
               ),
             ),

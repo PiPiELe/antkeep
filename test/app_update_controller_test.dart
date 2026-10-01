@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:antkeep/online/app_update.dart';
@@ -53,28 +54,101 @@ void main() {
     },
   );
 
-  test('offline and unsupported platforms make no update request', () async {
+  test('offline checks anonymously and supports manual rechecking', () async {
     var calls = 0;
     final offline = controller(
-      respond: (_) async {
+      respond: (request) async {
         calls++;
+        expect(request.method, 'GET');
+        expect(request.url.path, '/api/public/app-update/android');
+        expect(request.url.hasQuery, isFalse);
+        expect(request.headers.containsKey('authorization'), isFalse);
+        expect(request.body, isEmpty);
         return response(policy(), 200);
       },
       currentVersion: () async => '1.0.0',
     );
-    await offline.setOnline(false);
-    expect(calls, 0);
-    final unsupported = controller(
-      respond: (_) async {
-        calls++;
-        return response(policy(), 200);
-      },
-      currentVersion: () async => '1.0.0',
-      supported: false,
-    );
-    await unsupported.setOnline(true);
-    expect(calls, 0);
+    expect(await offline.setOnline(false), isFalse);
+    expect(calls, 1);
+    expect(offline.online, isFalse);
+    expect(offline.availability, AppUpdateAvailability.optional);
+    expect(offline.takeOptionalPrompt(), isTrue);
+    await offline.check(manual: true);
+    expect(calls, 2);
+    expect(offline.takeOptionalPrompt(), isFalse);
+    offline.dispose();
   });
+
+  test(
+    'unsupported platforms make no update request in either edition',
+    () async {
+      var calls = 0;
+      final unsupported = controller(
+        respond: (_) async {
+          calls++;
+          return response(policy(), 200);
+        },
+        currentVersion: () async => '1.0.0',
+        supported: false,
+      );
+      await unsupported.setOnline(true);
+      await unsupported.setOnline(false);
+      expect(calls, 0);
+      unsupported.dispose();
+    },
+  );
+
+  test('offline minimum version remains a dismissible update', () async {
+    final updates = controller(
+      respond: (_) async => response(policy(minimum: '1.1.0'), 200),
+      currentVersion: () async => '1.0.0',
+    );
+    expect(await updates.setOnline(false), isFalse);
+    expect(updates.availability, AppUpdateAvailability.optional);
+    expect(updates.takeOptionalPrompt(), isTrue);
+    expect(await updates.setOnline(true), isTrue);
+    expect(updates.availability, AppUpdateAvailability.required);
+    expect(await updates.setOnline(false), isFalse);
+    expect(updates.availability, AppUpdateAvailability.optional);
+    updates.dispose();
+  });
+
+  test('late online response cannot override an offline check', () async {
+    final pending = Completer<http.Response>();
+    var calls = 0;
+    final updates = controller(
+      respond: (_) async => ++calls == 1
+          ? pending.future
+          : response(policy(latest: '1.0.0'), 200),
+      currentVersion: () async => '1.0.0',
+    );
+    final onlineCheck = updates.setOnline(true);
+    await updates.setOnline(false);
+    pending.complete(response(policy(minimum: '1.1.0'), 200));
+    await onlineCheck;
+    expect(updates.online, isFalse);
+    expect(updates.availability, AppUpdateAvailability.none);
+    expect(updates.policy!.latestVersion.toString(), '1.0.0');
+    expect(updates.checking, isFalse);
+    updates.dispose();
+  });
+
+  test(
+    'offline startup failure is silent and manual failure is visible',
+    () async {
+      final updates = controller(
+        respond: (_) async => throw Exception('network unavailable'),
+        currentVersion: () async => '1.0.0',
+      );
+      expect(await updates.setOnline(false), isFalse);
+      expect(updates.error, isNull);
+      expect(updates.checking, isFalse);
+      expect(updates.availability, AppUpdateAvailability.none);
+      await updates.check(manual: true);
+      expect(updates.error, isNotNull);
+      updates.dispose();
+    },
+  );
 
   test(
     'newer policy is optional once and does not block online mode',

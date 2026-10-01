@@ -29,25 +29,21 @@ class AppUpdateController extends ChangeNotifier {
     final generation = ++_generation;
     online = value;
     api.cancel();
-    api.setEnabled(value);
+    // Update checks are anonymous and available in both editions.
+    api.setEnabled(true);
     checking = false;
     error = null;
     policy = null;
     availability = AppUpdateAvailability.none;
-    if (!value) {
-      checking = false;
-      notifyListeners();
-      return false;
-    }
     await check();
     return _current(generation) &&
         availability == AppUpdateAvailability.required;
   }
 
-  bool _current(int generation) => online && generation == _generation;
+  bool _current(int generation) => generation == _generation;
 
   Future<void> check({bool manual = false}) async {
-    if (!online || checking) return;
+    if (checking) return;
     if (!supportsUpdates()) {
       availability = AppUpdateAvailability.none;
       error = manual ? '当前平台暂不支持应用更新检查。' : null;
@@ -65,7 +61,8 @@ class AppUpdateController extends ChangeNotifier {
       if (!_current(generation)) return;
       policy = candidate;
       availability =
-          candidate.minimumVersion != null &&
+          online &&
+              candidate.minimumVersion != null &&
               installed.compareTo(candidate.minimumVersion!) < 0
           ? AppUpdateAvailability.required
           : installed.compareTo(candidate.latestVersion) < 0

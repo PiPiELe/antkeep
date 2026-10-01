@@ -116,7 +116,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                       _editionCard(
                                         context,
                                         AppEdition.offline,
-                                        '使用 App 内封装好的资料；蚁群、记录和照片始终只保存在本机。',
+                                        '使用内置资料，启动时会联网检查 Android 更新；蚁群、记录和照片始终只保存在本机。',
                                         Icons.phonelink_lock_outlined,
                                       ),
                                       const SizedBox(height: 12),
