@@ -46,6 +46,8 @@ void main() {
         await applicationDatabasePath(),
         version: 12,
         onCreate: (db, _) async {
+          // Care-record migrations also run for these legacy database fixtures.
+          await db.execute('CREATE TABLE care_records (id TEXT PRIMARY KEY)');
           // Colony migrations also run when upgrading this inventory fixture.
           await db.execute('CREATE TABLE colonies (id TEXT PRIMARY KEY)');
           await db.execute('''CREATE TABLE inventory_items (
