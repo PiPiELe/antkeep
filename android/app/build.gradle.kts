@@ -38,7 +38,11 @@ android {
         // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
         // flag during build.
         versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        // versionCode = major * 1000000 + minor * 10000 + patch * 100 + test.
+        // Pub uses three-part versions; Android displays a fourth part for tests.
+        val testRevision = flutter.versionCode % 100
+        versionName = if (testRevision == 0) flutter.versionName
+            else "${flutter.versionName}.$testRevision"
     }
 
     signingConfigs {

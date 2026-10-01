@@ -1,18 +1,20 @@
 import 'dart:convert';
 
 class AppVersion implements Comparable<AppVersion> {
-  const AppVersion(this.major, this.minor, this.patch);
-  final int major, minor, patch;
+  const AppVersion(this.major, this.minor, this.patch, [this.testRevision = 0]);
+  final int major, minor, patch, testRevision;
 
   factory AppVersion.parse(String value) {
-    final match = RegExp(r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')
-        .firstMatch(value);
-    if (match == null) throw const FormatException('版本号必须为三段数字');
+    final match = RegExp(
+      r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$',
+    ).firstMatch(value);
+    if (match == null) throw const FormatException('版本号必须为三段或四段数字');
     try {
       return AppVersion(
         int.parse(match.group(1)!),
         int.parse(match.group(2)!),
         int.parse(match.group(3)!),
+        int.parse(match.group(4) ?? '0'),
       );
     } on FormatException {
       throw const FormatException('版本号超出支持范围');
@@ -25,6 +27,7 @@ class AppVersion implements Comparable<AppVersion> {
       (major, other.major),
       (minor, other.minor),
       (patch, other.patch),
+      (testRevision, other.testRevision),
     ]) {
       final result = pair.$1.compareTo(pair.$2);
       if (result != 0) return result;
@@ -33,7 +36,8 @@ class AppVersion implements Comparable<AppVersion> {
   }
 
   @override
-  String toString() => '$major.$minor.$patch';
+  String toString() =>
+      '$major.$minor.$patch${testRevision == 0 ? '' : '.$testRevision'}';
 }
 
 class AppUpdateApk {

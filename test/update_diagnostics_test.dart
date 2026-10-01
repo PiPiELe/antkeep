@@ -1,3 +1,4 @@
+import 'package:antkeep/online/app_update.dart';
 import 'package:antkeep/online/app_update_controller.dart';
 import 'package:antkeep/online/online_api.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +6,46 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test('test version comparison follows numeric fourth part', () {
+    final testVersion = AppVersion.parse('1.0.7.1');
+    expect(testVersion.toString(), '1.0.7.1');
+    expect(testVersion.compareTo(AppVersion.parse('1.0.7')), greaterThan(0));
+    expect(testVersion.compareTo(AppVersion.parse('1.0.7.2')), lessThan(0));
+    expect(testVersion.compareTo(AppVersion.parse('1.0.8')), lessThan(0));
+    expect(
+      AppVersion.parse('1.0.7.10').compareTo(AppVersion.parse('1.0.7.2')),
+      greaterThan(0),
+    );
+    expect(AppVersion.parse('1.0.7.0').compareTo(AppVersion.parse('1.0.7')), 0);
+    expect(() => AppVersion.parse('1.0.7.01'), throwsFormatException);
+    expect(() => AppVersion.parse('1.0.7.1.2'), throwsFormatException);
+  });
+
+  test(
+    'four-part installed version can check a production update policy',
+    () async {
+      final updates = AppUpdateController(
+        api: OnlineApi(
+          baseUrl: 'https://updates.example.test',
+          clientFactory: () => MockClient(
+            (_) async => http.Response(
+              '{"version":1,"enabled":true,"latestVersion":"1.0.8","minimumVersion":null,"downloadUrl":"https://example.test/download","releaseNotes":"update"}',
+              200,
+            ),
+          ),
+        ),
+        currentVersion: () async => '1.0.7.1',
+        supportsUpdates: () => true,
+        diagnosticsEnabled: true,
+      );
+      addTearDown(updates.dispose);
+      await updates.setOnline(true);
+      expect(updates.availability, AppUpdateAvailability.optional);
+      expect(updates.error, isNull);
+      expect(updates.diagnostics, contains('当前: 1.0.7.1; 最新: 1.0.8'));
+    },
+  );
+
   AppUpdateController create(
     Future<http.Response> Function(http.Request) respond, {
     bool enabled = true,
@@ -13,7 +54,7 @@ void main() {
       baseUrl: 'https://updates.example.test',
       clientFactory: () => MockClient(respond),
     ),
-    currentVersion: () async => '1.0.6',
+    currentVersion: () async => '1.0.7.1',
     supportsUpdates: () => true,
     diagnosticsEnabled: enabled,
   );
