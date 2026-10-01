@@ -100,7 +100,8 @@ void main() {
       latestVersion: const AppVersion(1, 1, 0),
       minimumVersion: const AppVersion(1, 1, 0),
       downloadUrl: Uri.parse('https://downloads.example.test/antkeep'),
-      releaseNotes: '修复已知问题。',
+      releaseNotes: '新增离线更新提示。\n修复记录展示问题。',
+      apk: const AppUpdateApk(filename: '蚁记-1.1.0.apk', sizeBytes: 52428800),
     );
     appUpdateController.availability = AppUpdateAvailability.optional;
     addTearDown(() => appUpdateController.setOnline(false));
@@ -108,6 +109,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('发现新版本 1.1.0'), findsOneWidget);
     expect(find.text('立即更新'), findsOneWidget);
+    expect(find.text('更新说明'), findsOneWidget);
+    expect(find.text('新增离线更新提示。\n修复记录展示问题。'), findsOneWidget);
+    expect(find.text('蚁记-1.1.0.apk'), findsOneWidget);
+    expect(find.text('文件大小：50.0 MB'), findsOneWidget);
     expect(find.text('在线版需要更新'), findsNothing);
     await tester.tap(find.text('稍后更新'));
     await tester.pumpAndSettle();
@@ -117,6 +122,45 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
     expect(themeController.edition, AppEdition.offline);
   });
+
+  testWidgets(
+    'long required-update notes scroll on a small screen without APK metadata',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final notes = List.generate(60, (i) => '${i + 1}. 后台配置的更新说明。').join('\n');
+      appUpdateController.policy = AppUpdatePolicy(
+        version: 2,
+        latestVersion: const AppVersion(1, 2, 0),
+        minimumVersion: const AppVersion(1, 1, 0),
+        downloadUrl: Uri.parse('https://downloads.example.test/antkeep'),
+        releaseNotes: notes,
+      );
+      appUpdateController.availability = AppUpdateAvailability.required;
+      addTearDown(() => appUpdateController.setOnline(false));
+      await tester.pumpWidget(const AntKeepApp());
+      await tester.pumpAndSettle();
+      expect(find.text('在线版需要更新'), findsOneWidget);
+      expect(find.text(notes), findsOneWidget);
+      expect(find.text('安装包'), findsNothing);
+      final scrollable = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(Scrollable),
+      );
+      expect(scrollable, findsOneWidget);
+      expect(
+        tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
+        greaterThan(0),
+      );
+      expect(find.text('立即更新').hitTestable(), findsOneWidget);
+      expect(find.text('使用离线版').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('simple mode persists and restores all navigation entries', (
     tester,

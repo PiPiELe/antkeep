@@ -21,6 +21,7 @@ import 'domain/population_forecast.dart';
 import 'online/runtime.dart';
 import 'online/app_update.dart';
 import 'online/online_widgets.dart';
+import 'online/update_release_notes.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
 import 'data/backup_service.dart';
@@ -228,11 +229,29 @@ class _AntKeepAppState extends State<AntKeepApp> {
         context: dialogContext,
         barrierDismissible: !required,
         builder: (context) => AlertDialog(
+          scrollable: true,
           title: Text(required ? '在线版需要更新' : '发现新版本 ${policy.latestVersion}'),
-          content: Text(
-            required
-                ? '请更新至 ${policy.minimumVersion} 后继续使用在线版。蚁群、记录、照片和备份仍可在离线版正常使用。\n\n${policy.releaseNotes}'
-                : policy.releaseNotes,
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (required) ...[
+                Text(
+                  '请更新至 ${policy.minimumVersion} 后继续使用在线版。蚁群、记录、照片和备份仍可在离线版正常使用。',
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (policy.apk case final apk?) ...[
+                Text('安装包', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(apk.filename),
+                Text('文件大小：${apk.formattedSize}'),
+                const SizedBox(height: 16),
+              ],
+              Text('更新说明', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              UpdateReleaseNotes(notes: policy.releaseNotes),
+            ],
           ),
           actions: [
             if (required)

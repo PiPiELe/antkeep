@@ -36,6 +36,37 @@ class AppVersion implements Comparable<AppVersion> {
   String toString() => '$major.$minor.$patch';
 }
 
+class AppUpdateApk {
+  const AppUpdateApk({required this.filename, required this.sizeBytes});
+
+  final String filename;
+  final int sizeBytes;
+
+  // Older publications may only have a download URL. Invalid optional metadata
+  // must not prevent the user from seeing an otherwise valid update.
+  static AppUpdateApk? decode(Object? value) {
+    if (value is! Map<String, dynamic>) return null;
+    final filename = value['filename'];
+    final sizeBytes = value['sizeBytes'];
+    if (filename is! String ||
+        filename.trim().isEmpty ||
+        filename.length > 255 ||
+        sizeBytes is! int ||
+        sizeBytes <= 0) {
+      return null;
+    }
+    return AppUpdateApk(filename: filename, sizeBytes: sizeBytes);
+  }
+
+  String get formattedSize {
+    if (sizeBytes < 1024) return '$sizeBytes B';
+    if (sizeBytes < 1024 * 1024) {
+      return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
 class AppUpdatePolicy {
   const AppUpdatePolicy({
     required this.version,
@@ -43,12 +74,14 @@ class AppUpdatePolicy {
     required this.minimumVersion,
     required this.downloadUrl,
     required this.releaseNotes,
+    this.apk,
   });
   final int version;
   final AppVersion latestVersion;
   final AppVersion? minimumVersion;
   final Uri downloadUrl;
   final String releaseNotes;
+  final AppUpdateApk? apk;
 
   factory AppUpdatePolicy.decode(String source) {
     if (utf8.encode(source).length > 16384) {
@@ -85,6 +118,7 @@ class AppUpdatePolicy {
       minimumVersion: minimum,
       downloadUrl: uri,
       releaseNotes: notes,
+      apk: AppUpdateApk.decode(data['apk']),
     );
   }
 }

@@ -41,6 +41,53 @@ AppUpdateController controller({
 
 void main() {
   test(
+    'update API preserves configured notes and uploaded APK details',
+    () async {
+      const notes = '新增离线更新提示。\n修复记录展示问题。';
+      final payload = jsonDecode(policy()) as Map<String, dynamic>;
+      payload['releaseNotes'] = notes;
+      payload['apk'] = {
+        'filename': '蚁记-1.1.0.apk',
+        'sizeBytes': 52428800,
+        'sha256': 'a' * 64,
+      };
+      final updates = controller(
+        respond: (_) async => response(jsonEncode(payload), 200),
+        currentVersion: () async => '1.0.0',
+      );
+      await updates.setOnline(false);
+      expect(updates.policy!.releaseNotes, notes);
+      expect(updates.policy!.apk!.filename, '蚁记-1.1.0.apk');
+      expect(updates.policy!.apk!.sizeBytes, 52428800);
+      expect(updates.policy!.apk!.formattedSize, '50.0 MB');
+      expect(updates.availability, AppUpdateAvailability.optional);
+      updates.dispose();
+    },
+  );
+
+  test(
+    'legacy or malformed optional APK metadata does not discard updates',
+    () {
+      expect(AppUpdatePolicy.decode(policy()).apk, isNull);
+      for (final apk in [
+        null,
+        'invalid',
+        <String, dynamic>{},
+        {'filename': '', 'sizeBytes': 100},
+        {'filename': 'AntKeep.apk', 'sizeBytes': -1},
+        {'filename': 'AntKeep.apk', 'sizeBytes': '100'},
+      ]) {
+        final payload = jsonDecode(policy()) as Map<String, dynamic>;
+        payload['apk'] = apk;
+        final decoded = AppUpdatePolicy.decode(jsonEncode(payload));
+        expect(decoded.apk, isNull);
+        expect(decoded.releaseNotes, '修复已知问题。');
+        expect(decoded.latestVersion.toString(), '1.1.0');
+      }
+    },
+  );
+
+  test(
     'three-part versions compare numerically and reject non-release labels',
     () {
       expect(
