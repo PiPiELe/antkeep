@@ -33,11 +33,12 @@ android {
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         multiDexEnabled = true
-        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
-        versionCode = flutter.versionCode
+        // 1.0.3 -> 01 00 03 -> 10003; no separate +build suffix is maintained.
+        val versionParts = flutter.versionName.split('.').map { it.toInt() }
+        require(versionParts.size == 3 && versionParts.all { it in 0..99 }) {
+            "Version must be major.minor.patch with each component between 0 and 99"
+        }
+        versionCode = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
         versionName = flutter.versionName
     }
 
