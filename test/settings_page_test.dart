@@ -35,6 +35,8 @@ void main() {
             return {'transactionId': 1};
           case 'batch':
             return null;
+          case 'update':
+            return 0;
           case 'query':
             if (call.arguments['sql'] == 'PRAGMA user_version') {
               return [

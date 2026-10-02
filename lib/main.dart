@@ -20,6 +20,7 @@ import 'population_analysis_page.dart';
 import 'population_forecast_controls.dart';
 import 'domain/population_forecast.dart';
 import 'online/runtime.dart';
+import 'online/inventory_push_page.dart';
 import 'online/app_update.dart';
 import 'online/online_widgets.dart';
 import 'online/update_release_notes.dart';
@@ -4754,6 +4755,20 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ]),
           _section(context, '数据与备份', [
+            ListTile(
+              leading: const Icon(Icons.cloud_upload_outlined),
+              title: const Text('数据推送'),
+              subtitle: const Text('选择物品栏数据推送到 B 端，每天一次'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => InventoryPushPage(
+                    controller: onlineController,
+                    loadItems: AppDatabase.instance.listInventory,
+                  ),
+                ),
+              ),
+            ),
             ListTile(
               leading: const Icon(Icons.upload_file_outlined),
               title: const Text('导出备份'),
