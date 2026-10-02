@@ -63,12 +63,19 @@ android {
     }
 }
 
-if (!hasReleaseSigning) {
-    tasks.configureEach {
-        if (name.contains("Release")) {
-            doFirst {
+tasks.configureEach {
+    if (name.contains("Release")) {
+        doFirst {
+            if (!hasReleaseSigning) {
                 throw GradleException(
                     "Missing Android release signing configuration: android/key.properties",
+                )
+            }
+            if (project.findProperty("dart-obfuscation")?.toString() != "true" ||
+                project.findProperty("split-debug-info")?.toString().isNullOrBlank()
+            ) {
+                throw GradleException(
+                    "Release builds require --obfuscate --split-debug-info=<private-symbols-directory>",
                 )
             }
         }

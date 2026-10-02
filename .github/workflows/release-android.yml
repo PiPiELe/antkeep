@@ -67,7 +67,12 @@ jobs:
           } > android/key.properties
 
       - name: Build the release APK
-        run: flutter build apk --release
+        run: >-
+          flutter build apk --release --obfuscate
+          --split-debug-info=build/release-symbols
+
+      - name: Check APK contents
+        run: python3 tool/check_release_apk.py build/app/outputs/flutter-apk/app-release.apk
 
       - name: Prepare release assets
         shell: bash

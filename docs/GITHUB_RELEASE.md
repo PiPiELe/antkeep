@@ -41,3 +41,27 @@ base64 -i /absolute/path/to/antkeep-release.jks | tr -d '\n'
 如果需要重试已存在的标签，在 Actions 页面手动运行 **Release Android APK**，并填写该标签名。工作流只接受已经存在的标签，避免把任意工作分支误发布为正式包。
 
 GitHub Release 的直接下载只提供文件分发；Android 安装时仍应核对签名与 SHA-256，且真机安装验证、商店发布是独立步骤。
+
+## 混淆与发布检查
+
+Android release 构建必须同时开启 Dart 混淆与调试信息分离；漏传参数时 Gradle 会拒绝构建，debug 构建不受影响。本地构建示例（符号目录放在仓库外，按版本和源码提交隔离）：
+
+```bash
+flutter build apk --release --obfuscate \
+  --split-debug-info=/absolute/private/path/version-commit/android-symbols
+python3 tool/check_release_apk.py build/app/outputs/flutter-apk/app-release.apk
+```
+
+需要在线服务的渠道继续添加该渠道原有的 `--dart-define`；它只适合传服务地址等公开配置，不能用来隐藏私钥、管理员密码或服务端密钥。iOS release 同样应添加 `--obfuscate --split-debug-info=...`，本项目暂未加入 iOS CI 强制检查。
+
+检查器会拒绝误打包的 Dart 源文件、常见签名/环境/符号文件、常见格式的密钥，以及仍带 `package:antkeep/` 路径的 Dart 二进制。它不是完整的密钥检测或安全审计。物种 JSON、图片、接口地址仍可提取；混淆提高逆向分析成本，不能保证源码保密。用户的 ZIP 备份格式和导入导出操作保持不变。
+
+本地生成的符号文件应与对应源码 SHA、版本、APK SHA256 一起保存到私有长期存储；不提交 Git、不附加到公开 Release，也不放进 APK。排查崩溃时选择对应版本和设备 ABI：
+
+```bash
+flutter symbolize -i crash.txt -d /absolute/private/path/version-commit/android-symbols/app.android-arm64.symbols
+```
+
+CI 当前仅在临时 runner 的 `build/release-symbols` 生成符号，**尚未配置持久保存，任务结束后无法依赖它恢复崩溃栈**。正式采用 CI 混淆发布前，应先确定符号保存方式。拟采用独立高强度密码加密后存入 Actions artifact，仅保存密文，包含源码 SHA 与 APK SHA256；该上传方案待明确授权，不上传明文符号。
+
+公开源码仓库本身可直接提供源码，APK 混淆不改变仓库可见性；如需闭源，应单独核实并处理仓库访问权限。
