@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../domain/models.dart';
 import 'content.dart';
 import 'online_api.dart';
 import 'online_store.dart';
@@ -196,6 +197,53 @@ class OnlineController extends ChangeNotifier {
       await _summary(generation, submit: submit);
     } catch (e) {
       if (_current(generation)) await _failure(e);
+    } finally {
+      if (_current(generation)) {
+        busy = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> inventoryPushStatus() =>
+      _inventoryRequest('/api/app/inventory-pushes/status');
+
+  Future<Map<String, dynamic>> pushInventory(List<InventoryItem> items) {
+    if (items.isEmpty || items.length > 200) {
+      throw const ApiFailure('请选择 1–200 条物品数据。');
+    }
+    return _inventoryRequest(
+      '/api/app/inventory-pushes',
+      body: {'items': items.map((item) => item.toMap()).toList()},
+    );
+  }
+
+  Future<Map<String, dynamic>> _inventoryRequest(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    if (!enabled || user == null || _token == null) {
+      throw const ApiFailure('请切换在线版并登录后推送。');
+    }
+    if (busy) throw const ApiFailure('正在处理请求，请稍后再试。');
+    final generation = _generation;
+    busy = true;
+    error = null;
+    notifyListeners();
+    try {
+      final raw = await api.request(
+        path,
+        method: body == null ? 'GET' : 'POST',
+        token: _token,
+        body: body,
+      );
+      if (!_current(generation)) {
+        throw const ApiFailure('在线状态已改变，请重新登录后查询推送结果。');
+      }
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (e) {
+      if (_current(generation)) await _failure(e);
+      rethrow;
     } finally {
       if (_current(generation)) {
         busy = false;
