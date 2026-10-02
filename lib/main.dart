@@ -4892,33 +4892,48 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: const Icon(Icons.download_outlined),
           title: const Text('恢复备份'),
           trailing: const Icon(Icons.chevron_right),
-          subtitle: const Text('恢复会替换本机现有蚁群与记录'),
+          subtitle: const Text('可选择增量恢复或覆盖恢复'),
           onTap: () async {
-            final approved = await showDialog<bool>(
+            final mode = await showDialog<BackupRestoreMode>(
               context: context,
               builder: (context) => AlertDialog(
-                title: const Text('恢复并替换本地数据？'),
-                content: const Text('当前蚁群和记录会被选中的备份替换。请先导出当前数据。'),
+                title: const Text('选择恢复方式'),
+                scrollable: true,
+                content: const Text(
+                  '增量恢复：保留本机数据，只补入缺失的蚁群、记录和物品。'
+                  '相同 ID 的数据，以及同分组同名物品，保留本机内容。\n\n'
+                  '覆盖恢复：用备份替换本机现有蚁群、记录和物品。\n\n'
+                  '两种方式都会在恢复前保存回退副本，可撤销上一次恢复。',
+                ),
                 actions: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context, false),
+                    onPressed: () => Navigator.pop(context),
                     child: const Text('取消'),
                   ),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pop(context, BackupRestoreMode.overwrite),
+                    child: const Text('覆盖恢复'),
+                  ),
                   FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('选择备份'),
+                    onPressed: () =>
+                        Navigator.pop(context, BackupRestoreMode.incremental),
+                    child: const Text('增量恢复'),
                   ),
                 ],
               ),
             );
-            if (approved != true || !context.mounted) return;
+            if (mode == null || !context.mounted) return;
             try {
               final restored = await BackupService(
                 AppDatabase.instance,
                 LocalMediaStore.instance,
-              ).restoreBackup();
+              ).restoreBackup(mode: mode);
               if (restored && context.mounted) {
-                _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
+                _showInfo(
+                  context,
+                  '${mode == BackupRestoreMode.incremental ? '增量' : '覆盖'}恢复完成；可在设置中撤销上一次恢复。',
+                );
               }
             } catch (error) {
               if (context.mounted) _showError(context, error);
@@ -4929,7 +4944,7 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: const Icon(Icons.undo_outlined),
           title: const Text('撤销上一次恢复'),
           trailing: const Icon(Icons.chevron_right),
-          subtitle: const Text('恢复覆盖前自动保留的本地回退副本'),
+          subtitle: const Text('恢复操作前自动保留的本地回退副本'),
           onTap: () async {
             final service = BackupService(
               AppDatabase.instance,

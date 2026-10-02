@@ -40,7 +40,7 @@ void main() {
           case 'query':
             if (call.arguments['sql'] == 'PRAGMA user_version') {
               return [
-                {'user_version': 13},
+                {'user_version': 17},
               ];
             }
             if (!(call.arguments['sql'] as String).contains('app_settings')) {
@@ -117,7 +117,7 @@ void main() {
       expect(find.text('导出备份'), findsOneWidget);
       await tester.tap(find.text('恢复备份'));
       await tester.pumpAndSettle();
-      expect(find.text('恢复并替换本地数据？'), findsOneWidget);
+      expect(find.text('选择恢复方式'), findsOneWidget);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('数据推送'));
@@ -391,6 +391,34 @@ void main() {
     expect(selected(tester, '在线版'), isFalse);
     expect(find.textContaining('操作未完成'), findsOneWidget);
   });
+
+  testWidgets(
+    'restore offers both modes and cancellation leaves settings unchanged',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(app());
+      await openCategory(tester, '数据管理');
+      await tester.scrollUntilVisible(find.text('恢复备份'), 180);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('恢复备份'));
+      await tester.pumpAndSettle();
+      expect(find.text('选择恢复方式'), findsOneWidget);
+      expect(find.text('增量恢复'), findsOneWidget);
+      expect(find.text('覆盖恢复'), findsOneWidget);
+      expect(find.textContaining('相同 ID'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.textContaining('恢复完成；'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final dark in [false, true]) {
     testWidgets(
