@@ -364,6 +364,7 @@ void main() {
         await database.restoreMemorialColony('colony');
         await database.deleteMemorial('queen');
         await database.deleteMemorial('worker');
+        await database.deleteMemorial('brood');
         if (archiveAgain) {
           await database.saveMemorial(
             Memorial(
@@ -386,6 +387,7 @@ void main() {
           unorderedEquals([
             'queen',
             'worker',
+            'brood',
             if (archiveAgain) 'local-ending',
           ]),
         );
@@ -420,7 +422,10 @@ void main() {
       await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
       expect((await database.findColony('c'))!.archived, isTrue);
       expect((await database.findColony('c'))!.growth, isNull);
-      expect(await database.listMemorials(), hasLength(3));
+      expect(
+        (await database.listMemorials()).map((m) => m.kind),
+        unorderedEquals(MemorialKind.values),
+      );
       final photo = (await database.listRecords('c')).single.photos.single;
       expect(await media.readImage(photo), [1, 2, 3]);
       final after = await database.snapshot();
