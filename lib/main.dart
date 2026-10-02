@@ -395,7 +395,11 @@ class _HomePageState extends State<HomePage>
             icon: Icons.local_florist_outlined,
             title:
                 '${themeController.colonyTabName(ColonyTab.memorial)} · 敬请期待',
-            message: '为逝去的小生命留一份纪念。\n这里将用于记录死亡的蚂蚁，具体功能规划中。',
+            message:
+                '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
+                '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
+                '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
+                '它们无声地来过，却曾竭尽全力地活着。',
           ),
         ],
       ),
