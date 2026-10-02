@@ -6,13 +6,26 @@ import 'app_update_controller.dart';
 import 'content.dart';
 import 'online_controller.dart';
 
+enum OnlineSettingsSection { all, account, updates, help }
+
 class OnlineSettings extends StatelessWidget {
   const OnlineSettings({
     super.key,
     required this.controller,
     required this.updates,
     required this.useOffline,
+    this.section = OnlineSettingsSection.all,
   });
+  final OnlineSettingsSection section;
+  bool get _account =>
+      section == OnlineSettingsSection.all ||
+      section == OnlineSettingsSection.account;
+  bool get _updates =>
+      section == OnlineSettingsSection.all ||
+      section == OnlineSettingsSection.updates;
+  bool get _help =>
+      section == OnlineSettingsSection.all ||
+      section == OnlineSettingsSection.help;
   final OnlineController controller;
   final AppUpdateController updates;
   final Future<void> Function() useOffline;
@@ -21,13 +34,14 @@ class OnlineSettings extends StatelessWidget {
     animation: Listenable.merge([controller, updates]),
     builder: (context, _) => Column(
       children: [
-        if (updates.availability == AppUpdateAvailability.required)
+        if ((_account || _updates) &&
+            updates.availability == AppUpdateAvailability.required)
           _RequiredUpdateCard(updates: updates, useOffline: useOffline),
-        if (controller.enabled) ...[
+        if (_account && controller.enabled) ...[
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),
             title: Text(controller.user?.username ?? '游客 · 未登录'),
-            subtitle: const Text('账号只关联签到，不关联本机养殖数据。'),
+            subtitle: const Text('账号用于签到和主动推送所选物品，其他本机数据不上传。'),
             trailing: controller.user == null
                 ? TextButton(
                     onPressed: controller.busy
@@ -110,56 +124,61 @@ class OnlineSettings extends StatelessWidget {
             ),
           ),
         ],
-        const _InstalledAppVersion(),
-        ListTile(
-          leading: const Icon(Icons.system_update_outlined),
-          title: Text(
-            updates.availability == AppUpdateAvailability.none
-                ? (updates.policy == null ? '应用更新' : '应用已是最新版本')
-                : '发现新版本 ${updates.policy?.latestVersion}',
-          ),
-          subtitle: Text(
-            updates.error ??
-                (updates.availability == AppUpdateAvailability.required
-                    ? '需更新后才能使用在线版；本地数据仍可离线使用。'
-                    : updates.policy?.releaseNotes ??
-                          '仅检查 Android 更新，不会上传本地养殖数据。'),
-          ),
-          trailing: updates.checking
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : TextButton(
-                  onPressed: updates.availability == AppUpdateAvailability.none
-                      ? () => updates.check(manual: true)
-                      : updates.openDownload,
-                  child: Text(
-                    updates.availability == AppUpdateAvailability.none
-                        ? '检查更新'
-                        : '去更新',
+        if (_updates) ...[
+          const _InstalledAppVersion(),
+          ListTile(
+            leading: const Icon(Icons.system_update_outlined),
+            title: Text(
+              updates.availability == AppUpdateAvailability.none
+                  ? (updates.policy == null ? '应用更新' : '应用已是最新版本')
+                  : '发现新版本 ${updates.policy?.latestVersion}',
+            ),
+            subtitle: Text(
+              updates.error ??
+                  (updates.availability == AppUpdateAvailability.required
+                      ? '需更新后才能使用在线版；本地数据仍可离线使用。'
+                      : updates.policy?.releaseNotes ??
+                            '仅检查 Android 更新，不会上传本地养殖数据。'),
+            ),
+            trailing: updates.checking
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : TextButton(
+                    onPressed:
+                        updates.availability == AppUpdateAvailability.none
+                        ? () => updates.check(manual: true)
+                        : updates.openDownload,
+                    child: Text(
+                      updates.availability == AppUpdateAvailability.none
+                          ? '检查更新'
+                          : '去更新',
+                    ),
                   ),
-                ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.help_outline),
-          title: const Text('使用指南'),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: const Text('使用指南')),
-                body: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: AnimatedBuilder(
-                    animation: controller,
-                    builder: (_, _) => HelpContent(content: controller.content),
+          ),
+        ],
+        if (_help)
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('使用指南'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('使用指南')),
+                  body: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: AnimatedBuilder(
+                      animation: controller,
+                      builder: (_, _) =>
+                          HelpContent(content: controller.content),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
       ],
     ),
   );
@@ -300,7 +319,7 @@ class _LoginPageState extends State<LoginPage> {
             key: _form,
             child: Column(
               children: [
-                const Text('登录仅用于签到，蚁群、记录和照片不会上传。'),
+                const Text('登录后可签到，也可主动推送所选物品；蚁群、记录和照片不会上传。'),
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _username,
