@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>将您生成的蚁群分享图片保存到相册。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>选择养殖照片或保存您生成的分享图片。</string>
 	<key>NSAppTransportSecurity</key>
 	<dict><key>NSAllowsArbitraryLoads</key><false/></dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
