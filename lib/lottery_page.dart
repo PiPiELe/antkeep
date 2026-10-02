@@ -32,7 +32,12 @@ double wheelTurnsForSelectedIndex({
   required double currentTurns,
   required int selectedIndex,
   required int itemCount,
-}) => currentTurns.ceilToDouble() + 3 - (selectedIndex + 0.5) / itemCount;
+  double rotationTurns = 3,
+}) {
+  final selectedCenter = (selectedIndex + 0.5) / itemCount;
+  return (currentTurns + rotationTurns + selectedCenter).roundToDouble() -
+      selectedCenter;
+}
 
 class LotteryPage extends StatefulWidget {
   const LotteryPage({super.key});
@@ -45,12 +50,22 @@ class _LotteryPageState extends State<LotteryPage>
     with SingleTickerProviderStateMixin {
   static const _durationOptions = [4, 6, 8, 10];
   static const _durationKey = 'lottery_wheel_seconds';
+  static const _speedKey = 'lottery_wheel_speed';
+  static const _directDurationKey = 'lottery_direct_seconds';
+  static const _directSpeedKey = 'lottery_direct_speed';
+  static const _rollingIntervals = {1: 200, 2: 100, 3: 40};
+  static const _speedOptions = {1: '慢速', 2: '中速', 3: '快速'};
+  // Match the previous 3 turns / 6 seconds and original 5 turns / 2.2 seconds.
+  static const _turnsPerSecond = {1: 0.25, 2: 0.5, 3: 5 / 2.2};
   late final AnimationController _spinController;
   Animation<double> _rotation = const AlwaysStoppedAnimation(0);
   SharedPreferences? _preferences;
   var _spinSeconds = 6;
-  var _durationReady = false;
-  var _savingDuration = false;
+  var _spinSpeed = 2;
+  var _directSeconds = 6;
+  var _directSpeed = 2;
+  var _settingsReady = false;
+  var _savingSettings = false;
   final _startController = TextEditingController();
   final _endController = TextEditingController();
   final _random = Random();
@@ -72,41 +87,62 @@ class _LotteryPageState extends State<LotteryPage>
   void initState() {
     super.initState();
     _spinController = AnimationController(vsync: this);
-    _loadDuration();
+    _loadSettings();
   }
 
-  Future<void> _loadDuration() async {
+  Future<void> _loadSettings() async {
     var seconds = 6;
+    var speed = 2;
+    var directSeconds = 6;
+    var directSpeed = 2;
     try {
       _preferences = await SharedPreferences.getInstance();
       final saved = _preferences!.getInt(_durationKey);
       if (_durationOptions.contains(saved)) seconds = saved!;
+      final savedSpeed = _preferences!.getInt(_speedKey);
+      if (_speedOptions.containsKey(savedSpeed)) speed = savedSpeed!;
+      final savedDirectSeconds = _preferences!.getInt(_directDurationKey);
+      if (_durationOptions.contains(savedDirectSeconds)) {
+        directSeconds = savedDirectSeconds!;
+      }
+      final savedDirectSpeed = _preferences!.getInt(_directSpeedKey);
+      if (_speedOptions.containsKey(savedDirectSpeed)) {
+        directSpeed = savedDirectSpeed!;
+      }
     } catch (_) {
-      // Keep the default duration when local preferences cannot be read.
+      // Keep defaults when local preferences cannot be read.
     }
     if (!mounted) return;
     setState(() {
       _spinSeconds = seconds;
-      _durationReady = true;
+      _spinSpeed = speed;
+      _directSeconds = directSeconds;
+      _directSpeed = directSpeed;
+      _settingsReady = true;
     });
   }
 
-  Future<void> _selectDuration(Set<int> selection) async {
-    final seconds = selection.first;
-    setState(() => _savingDuration = true);
+  Future<void> _saveSetting(String key, int? value) async {
+    if (value == null || _isDrawing || _savingSettings) return;
+    setState(() => _savingSettings = true);
     try {
       final preferences = _preferences ?? await SharedPreferences.getInstance();
-      if (!await preferences.setInt(_durationKey, seconds)) {
-        throw StateError('Duration was not saved');
+      if (!await preferences.setInt(key, value)) {
+        throw StateError('Lottery setting was not saved');
       }
       if (!mounted) return;
-      setState(() => _spinSeconds = seconds);
+      setState(() {
+        if (key == _durationKey) _spinSeconds = value;
+        if (key == _speedKey) _spinSpeed = value;
+        if (key == _directDurationKey) _directSeconds = value;
+        if (key == _directSpeedKey) _directSpeed = value;
+      });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('旋转时长保存失败，请重试。')));
+          .showSnackBar(const SnackBar(content: Text('抽奖设置保存失败，请重试。')));
     } finally {
-      if (mounted) setState(() => _savingDuration = false);
+      if (mounted) setState(() => _savingSettings = false);
     }
   }
 
@@ -167,7 +203,7 @@ class _LotteryPageState extends State<LotteryPage>
   }
 
   Future<void> _spinWheel() async {
-    if (_isDrawing || !_durationReady || _savingDuration) return;
+    if (_isDrawing || !_settingsReady || _savingSettings) return;
     if (_wheelNumbers.isEmpty) {
       setState(() => _error = '请先生成转盘。');
       return;
@@ -178,6 +214,7 @@ class _LotteryPageState extends State<LotteryPage>
       currentTurns: _wheelTurns,
       selectedIndex: selectedIndex,
       itemCount: _wheelNumbers.length,
+      rotationTurns: _spinSeconds * _turnsPerSecond[_spinSpeed]!,
     );
     _spinController.duration = Duration(seconds: _spinSeconds);
     _rotation = Tween<double>(
@@ -204,7 +241,7 @@ class _LotteryPageState extends State<LotteryPage>
   }
 
   void _drawDirect() {
-    if (_isDrawing) return;
+    if (_isDrawing || !_settingsReady || _savingSettings) return;
     final range = _validatedRange();
     if (range == null) return;
 
@@ -214,13 +251,16 @@ class _LotteryPageState extends State<LotteryPage>
       _isRolling = true;
       _rollingNumber = range.start + _random.nextInt(range.count);
     });
-    _rollingTimer = Timer.periodic(const Duration(milliseconds: 40), (_) {
-      setState(() {
-        _rollingNumber = range.start + _random.nextInt(range.count);
-      });
-    });
+    _rollingTimer = Timer.periodic(
+      Duration(milliseconds: _rollingIntervals[_directSpeed]!),
+      (_) {
+        setState(() {
+          _rollingNumber = range.start + _random.nextInt(range.count);
+        });
+      },
+    );
     if (_pauseMode == _PauseMode.automatic) {
-      _pauseTimer = Timer(const Duration(seconds: 3), _pauseDirect);
+      _pauseTimer = Timer(Duration(seconds: _directSeconds), _pauseDirect);
     }
   }
 
@@ -233,8 +273,43 @@ class _LotteryPageState extends State<LotteryPage>
     });
   }
 
+  Widget _lotterySettingDropdown({
+    required String label,
+    required String preferenceKey,
+    required int value,
+    required Map<int, String> options,
+    bool available = true,
+  }) {
+    final enabled =
+        available && !_isDrawing && _settingsReady && !_savingSettings;
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
+        enabled: enabled,
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          key: ValueKey(preferenceKey),
+          value: value,
+          isExpanded: true,
+          isDense: true,
+          items: [
+            for (final option in options.entries)
+              DropdownMenuItem(value: option.key, child: Text(option.value)),
+          ],
+          onChanged: enabled
+              ? (value) => _saveSetting(preferenceKey, value)
+              : null,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isWheel = _mode == _LotteryMode.wheel;
     final wheelDiameter = min(MediaQuery.sizeOf(context).width - 32, 420.0);
     final resultDiameter =
         wheelDiameter *
@@ -276,22 +351,32 @@ class _LotteryPageState extends State<LotteryPage>
                     });
                   },
           ),
-          if (_mode == _LotteryMode.wheel) ...[
-            const SizedBox(height: 16),
-            const Text('旋转时长'),
-            const SizedBox(height: 8),
-            SegmentedButton<int>(
-              segments: [
-                for (final seconds in _durationOptions)
-                  ButtonSegment(value: seconds, label: Text('$seconds 秒')),
-              ],
-              selected: {_spinSeconds},
-              onSelectionChanged:
-                  _isSpinning || !_durationReady || _savingDuration
-                  ? null
-                  : _selectDuration,
-            ),
-          ],
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _lotterySettingDropdown(
+                  label: isWheel ? '旋转时长' : '跳动时长',
+                  available: isWheel || _pauseMode == _PauseMode.automatic,
+                  preferenceKey: isWheel ? _durationKey : _directDurationKey,
+                  value: isWheel ? _spinSeconds : _directSeconds,
+                  options: {
+                    for (final seconds in _durationOptions)
+                      seconds: '$seconds 秒',
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _lotterySettingDropdown(
+                  label: isWheel ? '转速' : '跳动速度',
+                  preferenceKey: isWheel ? _speedKey : _directSpeedKey,
+                  value: isWheel ? _spinSpeed : _directSpeed,
+                  options: _speedOptions,
+                ),
+              ),
+            ],
+          ),
           if (_mode == _LotteryMode.direct) ...[
             const SizedBox(height: 16),
             SegmentedButton<_PauseMode>(
@@ -309,8 +394,8 @@ class _LotteryPageState extends State<LotteryPage>
             const SizedBox(height: 8),
             Text(
               _pauseMode == _PauseMode.automatic
-                  ? '开始后数字持续随机跳动，3 秒后自动暂停。'
-                  : '开始后数字持续随机跳动，点击暂停确定结果。',
+                  ? '开始后数字持续随机跳动，$_directSeconds 秒后自动暂停。'
+                  : '手动模式不限制时长，点击暂停确定结果。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -369,7 +454,7 @@ class _LotteryPageState extends State<LotteryPage>
                 ? (_isSpinning ? null : _generateWheel)
                 : _isRolling
                 ? (_pauseMode == _PauseMode.manual ? _pauseDirect : null)
-                : _drawDirect,
+                : (_settingsReady && !_savingSettings ? _drawDirect : null),
             icon: Icon(
               _mode == _LotteryMode.wheel
                   ? Icons.cached_rounded
@@ -393,6 +478,7 @@ class _LotteryPageState extends State<LotteryPage>
                 alignment: Alignment.center,
                 children: [
                   RotationTransition(
+                    key: const ValueKey('lottery-rotation'),
                     turns: _rotation,
                     child: CustomPaint(
                       key: const ValueKey('lottery-wheel'),
@@ -489,7 +575,7 @@ class _LotteryPageState extends State<LotteryPage>
             if (_wheelNumbers.isNotEmpty) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: _isSpinning || !_durationReady || _savingDuration
+                onPressed: _isSpinning || !_settingsReady || _savingSettings
                     ? null
                     : _spinWheel,
                 icon: const Icon(Icons.play_arrow_rounded),
