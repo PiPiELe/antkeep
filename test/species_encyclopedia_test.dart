@@ -107,7 +107,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '三尖叉多刺蚁');
     await tester.pumpAndSettle();
     expect(find.textContaining('联网查看完整资料和图片'), findsOneWidget);
-    await tester.tap(find.text('三尖叉多刺蚁'));
+    await tester.tap(find.widgetWithText(ListTile, '三尖叉多刺蚁'));
     await tester.pumpAndSettle();
 
     expect(find.byType(OnlineSpeciesDetailPage), findsOneWidget);
