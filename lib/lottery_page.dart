@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 
 enum _LotteryMode { wheel, direct }
+
+enum _PauseMode { automatic, manual }
 
 /// Returns every integer in the inclusive range in a non-sequential order.
 ///
@@ -45,11 +48,20 @@ class _LotteryPageState extends State<LotteryPage> {
   var _wheelNumbers = const <int>[];
   var _wheelTurns = 0.0;
   var _isSpinning = false;
+  var _pauseMode = _PauseMode.automatic;
+  var _isRolling = false;
+  Timer? _rollingTimer;
+  Timer? _pauseTimer;
+  int? _rollingNumber;
   int? _result;
   String? _error;
 
+  bool get _isDrawing => _isSpinning || _isRolling;
+
   @override
   void dispose() {
+    _rollingTimer?.cancel();
+    _pauseTimer?.cancel();
     _startController.dispose();
     _endController.dispose();
     super.dispose();
@@ -128,18 +140,38 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   void _drawDirect() {
+    if (_isDrawing) return;
     final range = _validatedRange();
     if (range == null) return;
 
     setState(() {
       _error = null;
-      _result = range.start + _random.nextInt(range.count);
+      _result = null;
+      _isRolling = true;
+      _rollingNumber = range.start + _random.nextInt(range.count);
+    });
+    _rollingTimer = Timer.periodic(const Duration(milliseconds: 40), (_) {
+      setState(() {
+        _rollingNumber = range.start + _random.nextInt(range.count);
+      });
+    });
+    if (_pauseMode == _PauseMode.automatic) {
+      _pauseTimer = Timer(const Duration(seconds: 3), _pauseDirect);
+    }
+  }
+
+  void _pauseDirect() {
+    _rollingTimer?.cancel();
+    _pauseTimer?.cancel();
+    setState(() {
+      _isRolling = false;
+      _result = _rollingNumber;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final wheelDiameter = min(MediaQuery.sizeOf(context).width - 64, 320.0);
+    final wheelDiameter = min(MediaQuery.sizeOf(context).width - 32, 420.0);
     return Scaffold(
       appBar: AppBar(title: const Text('数字抽奖')),
       body: ListView(
@@ -160,11 +192,11 @@ class _LotteryPageState extends State<LotteryPage> {
               ButtonSegment(
                 value: _LotteryMode.direct,
                 icon: Icon(Icons.numbers_outlined),
-                label: Text('直接抽取'),
+                label: Text('数字跳动'),
               ),
             ],
             selected: {_mode},
-            onSelectionChanged: _isSpinning
+            onSelectionChanged: _isDrawing
                 ? null
                 : (selection) {
                     setState(() {
@@ -174,13 +206,35 @@ class _LotteryPageState extends State<LotteryPage> {
                     });
                   },
           ),
+          if (_mode == _LotteryMode.direct) ...[
+            const SizedBox(height: 16),
+            SegmentedButton<_PauseMode>(
+              segments: const [
+                ButtonSegment(value: _PauseMode.automatic, label: Text('自动暂停')),
+                ButtonSegment(value: _PauseMode.manual, label: Text('手动暂停')),
+              ],
+              selected: {_pauseMode},
+              onSelectionChanged: _isRolling
+                  ? null
+                  : (selection) => setState(() {
+                      _pauseMode = selection.first;
+                    }),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _pauseMode == _PauseMode.automatic
+                  ? '开始后数字持续随机跳动，3 秒后自动暂停。'
+                  : '开始后数字持续随机跳动，点击暂停确定结果。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _startController,
-                  enabled: !_isSpinning,
+                  enabled: !_isDrawing,
                   keyboardType: const TextInputType.numberWithOptions(
                     signed: true,
                   ),
@@ -197,7 +251,7 @@ class _LotteryPageState extends State<LotteryPage> {
               Expanded(
                 child: TextField(
                   controller: _endController,
-                  enabled: !_isSpinning,
+                  enabled: !_isDrawing,
                   keyboardType: const TextInputType.numberWithOptions(
                     signed: true,
                   ),
@@ -225,17 +279,25 @@ class _LotteryPageState extends State<LotteryPage> {
           ],
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed: _isSpinning
-                ? null
-                : _mode == _LotteryMode.wheel
-                ? _generateWheel
+            onPressed: _mode == _LotteryMode.wheel
+                ? (_isSpinning ? null : _generateWheel)
+                : _isRolling
+                ? (_pauseMode == _PauseMode.manual ? _pauseDirect : null)
                 : _drawDirect,
             icon: Icon(
               _mode == _LotteryMode.wheel
                   ? Icons.cached_rounded
-                  : Icons.casino_outlined,
+                  : _isRolling
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
             ),
-            label: Text(_mode == _LotteryMode.wheel ? '生成转盘' : '抽取数字'),
+            label: Text(
+              _mode == _LotteryMode.wheel
+                  ? '生成转盘'
+                  : _isRolling
+                  ? (_pauseMode == _PauseMode.manual ? '暂停' : '数字跳动中…')
+                  : '开始抽奖',
+            ),
           ),
           if (_mode == _LotteryMode.wheel) ...[
             const SizedBox(height: 28),
@@ -253,9 +315,59 @@ class _LotteryPageState extends State<LotteryPage> {
                       painter: _LotteryWheelPainter(
                         numbers: _wheelNumbers,
                         colorScheme: Theme.of(context).colorScheme,
+                        selectedNumber: _result,
                       ),
                     ),
                   ),
+                  if (_result != null)
+                    Positioned(
+                      top: wheelDiameter * 0.11 - 24,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.3, end: 1),
+                        duration: const Duration(milliseconds: 420),
+                        curve: Curves.easeOutBack,
+                        builder: (context, scale, child) =>
+                            Transform.scale(scale: scale, child: child),
+                        child: Container(
+                          constraints: BoxConstraints(
+                            minWidth: 48,
+                            maxWidth: wheelDiameter * 0.8,
+                          ),
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '$_result',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   Positioned(
                     top: -8,
                     child: Icon(
@@ -282,7 +394,7 @@ class _LotteryPageState extends State<LotteryPage> {
               ),
             ],
           ],
-          if (_result != null) ...[
+          if (_result != null || _isRolling) ...[
             const SizedBox(height: 24),
             Card(
               color: Theme.of(context).colorScheme.primaryContainer,
@@ -290,7 +402,10 @@ class _LotteryPageState extends State<LotteryPage> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    Text('抽中数字', style: Theme.of(context).textTheme.labelLarge),
+                    Text(
+                      _isRolling ? '随机跳动中' : '抽中数字',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
                     const SizedBox(height: 6),
                     TweenAnimationBuilder<double>(
                       tween: Tween(begin: 0.65, end: 1),
@@ -299,7 +414,8 @@ class _LotteryPageState extends State<LotteryPage> {
                       builder: (context, scale, child) =>
                           Transform.scale(scale: scale, child: child),
                       child: Text(
-                        '$_result',
+                        '${_isRolling ? _rollingNumber : _result}',
+                        key: const ValueKey('lottery-number'),
                         style: Theme.of(context).textTheme.displayLarge
                             ?.copyWith(
                               color: Theme.of(context)
@@ -325,10 +441,12 @@ class _LotteryWheelPainter extends CustomPainter {
   const _LotteryWheelPainter({
     required this.numbers,
     required this.colorScheme,
+    this.selectedNumber,
   });
 
   final List<int> numbers;
   final ColorScheme colorScheme;
+  final int? selectedNumber;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -366,6 +484,7 @@ class _LotteryWheelPainter extends CustomPainter {
         true,
         border,
       );
+      if (numbers[index] == selectedNumber) continue;
       final labelAngle = startAngle + sweep / 2;
       final labelCenter =
           center + Offset(cos(labelAngle), sin(labelAngle)) * (radius * 0.78);
@@ -414,5 +533,7 @@ class _LotteryWheelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_LotteryWheelPainter oldDelegate) =>
-      oldDelegate.numbers != numbers || oldDelegate.colorScheme != colorScheme;
+      oldDelegate.numbers != numbers ||
+      oldDelegate.colorScheme != colorScheme ||
+      oldDelegate.selectedNumber != selectedNumber;
 }

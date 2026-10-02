@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/population_analysis_page.dart';
 import 'package:antkeep/colony_growth_page.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/models.dart';
@@ -14,6 +15,7 @@ import 'package:sqflite/sqflite.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final tables = <String, List<Map<String, Object?>>>{
+    'app_settings': [],
     'feeder_records': [],
     'colonies': [],
     'care_records': [],
@@ -22,6 +24,7 @@ void main() {
   final records = tables['feeder_records']!;
   late Directory directory;
   bool failColonyDeletion = false;
+  bool failOrderWrite = false;
 
   setUpAll(() async {
     directory = await Directory.systemTemp.createTemp('antkeep-feeder-test-');
@@ -76,7 +79,9 @@ void main() {
                 );
                 return count - tables['colonies']!.length;
               }
-              final table = RegExp(r'UPDATE (\w+)').firstMatch(sql)!.group(1)!;
+              final table = RegExp(r'UPDATE(?: OR IGNORE)? (\w+)')
+                  .firstMatch(sql)!
+                  .group(1)!;
               final columns = RegExp(
                 r'(\w+) = (\?|NULL)',
                 caseSensitive: false,
@@ -96,6 +101,9 @@ void main() {
             case 'insert':
               final sql = call.arguments['sql'] as String;
               final table = RegExp(r'INTO (\w+)').firstMatch(sql)!.group(1)!;
+              if (table == 'app_settings' && failOrderWrite) {
+                throw PlatformException(code: 'storage_unavailable');
+              }
               final records = tables[table]!;
               final columns = sql
                   .substring(sql.indexOf('(') + 1, sql.indexOf(')'))
@@ -103,6 +111,9 @@ void main() {
                   .map((column) => column.trim())
                   .toList();
               final values = call.arguments['arguments'] as List<dynamic>;
+              if (table == 'app_settings') {
+                records.removeWhere((row) => row['setting_key'] == values.first);
+              }
               final placeholders = sql
                   .substring(sql.lastIndexOf('(') + 1, sql.lastIndexOf(')'))
                   .split(',');
@@ -138,12 +149,14 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  setUp(() {
+  setUp(() async {
     themeController.simpleMode = false;
     failColonyDeletion = false;
+    failOrderWrite = false;
     for (final rows in tables.values) {
       rows.clear();
     }
+    await themeController.load();
   });
 
   tearDown(() {
@@ -173,6 +186,97 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(SnackBar), findsNothing);
   }
+
+  Future<void> showSortableColonies(WidgetTester tester) async {
+    final now = DateTime(2026, 10, 2);
+    for (final id in ['c', 'b', 'a']) {
+      await AppDatabase.instance.saveColony(
+        Colony(id: id, name: id, createdAt: now, updatedAt: now),
+      );
+    }
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> dragColony(WidgetTester tester, String from, String to) async {
+    final start = tester.getCenter(find.text(from));
+    final target = tester.getRect(find.byKey(ValueKey(to)));
+    final end = Offset(
+      start.dx,
+      target.center.dy > start.dy ? target.bottom + 1 : target.top - 1,
+    );
+    final gesture = await tester.startGesture(start);
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    for (var step = 1; step <= 12; step++) {
+      await gesture.moveTo(Offset.lerp(start, end, step / 12)!);
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.up();
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('long press sorts both ways and retains order after reload', (
+    tester,
+  ) async {
+    await showSortableColonies(tester);
+    await dragColony(tester, 'a', 'c');
+    expect(themeController.colonyOrder, ['b', 'c', 'a']);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      greaterThan(tester.getTopLeft(find.byKey(const ValueKey('c'))).dy),
+    );
+    await dragColony(tester, 'a', 'b');
+    expect(themeController.colonyOrder, ['a', 'b', 'c']);
+    await themeController.load();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(themeController.colonyOrder, ['a', 'b', 'c']);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+    );
+    await tester.tap(find.text('b'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ColonyDetailPage>(find.byType(ColonyDetailPage)).colonyId,
+      'b',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed ordering write restores the visible and saved order', (
+    tester,
+  ) async {
+    await showSortableColonies(tester);
+    failOrderWrite = true;
+    await dragColony(tester, 'a', 'c');
+    expect(themeController.colonyOrder, isEmpty);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+    );
+    expect(find.text('保存顺序失败，请重试'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('saved order ignores deleted IDs and appends new colonies', (
+    tester,
+  ) async {
+    await themeController.setColonyOrder(['deleted', 'b', 'a']);
+    await showSortableColonies(tester);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('b'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('a'))).dy),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('c'))).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('growth settings validate counts and persist period and path', (
     tester,
@@ -233,6 +337,75 @@ void main() {
     await tapSave(tester, '保存设置');
     expect(Colony.fromMap(tables['colonies']!.single).growth, isNull);
   });
+
+  for (final analysis in [true, false]) {
+    testWidgets(
+      '${analysis ? 'analysis' : 'detail'} forecast opens setup and refreshes after saving',
+      (tester) async {
+        final now = DateTime.now();
+        tables['colonies']!.add(
+          Colony(
+            id: 'setup-forecast',
+            name: '设置预测',
+            createdAt: now,
+            updatedAt: now,
+            initialWorkerCount: 20,
+            initialEggCount: 10,
+            initialLarvaCount: 100,
+            initialCocoonCount: 5,
+          ).toMap(),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: analysis
+                ? const PopulationAnalysisPage()
+                : const ColonyDetailPage(colonyId: 'setup-forecast'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (analysis) {
+          await tester.tap(find.byKey(const ValueKey('analysis-subject')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('蚁群 · 设置预测').last);
+        } else {
+          await tester.ensureVisible(find.byTooltip('展开种群数量'));
+          await tester.tap(find.byTooltip('展开种群数量'));
+        }
+        await tester.pumpAndSettle();
+        final setup = find.byKey(const ValueKey('population-forecast-setup'));
+        await tester.ensureVisible(setup);
+        await tester.tap(find.text('增长预测'));
+        await tester.pumpAndSettle();
+        expect(find.byType(ColonyGrowthPage), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(setup, findsOneWidget);
+        expect(Colony.fromMap(tables['colonies']!.single).growth, isNull);
+
+        await tester.ensureVisible(find.text('设置规则'));
+        await tester.tap(find.text('设置规则'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(SwitchListTile, '开启自动扩充'));
+        await tester.pumpAndSettle();
+        final workers = find.widgetWithText(TextFormField, '工净增长');
+        await tester.ensureVisible(workers);
+        await tester.enterText(workers, '1');
+        await tapSave(tester, '保存设置');
+        expect(find.byType(ColonyGrowthPage), findsNothing);
+        expect(setup, findsNothing);
+        final toggle = find.byKey(const ValueKey('population-forecast-toggle'));
+        await tester.ensureVisible(toggle);
+        expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+        expect(find.text('7 天'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('population-forecast-summary')),
+          findsOneWidget,
+        );
+        expect(tables['care_records'], isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'detail chart forecasts without adding records and keeps brood filtering',
@@ -392,9 +565,9 @@ void main() {
     expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
     await tester.tap(find.text('到家计时'));
     await tester.pumpAndSettle();
-    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
+    expect(find.text('36 天', findRichText: true), findsOneWidget);
     expect(
-      find.text('入手日期：${arrival.year}.${arrival.month}.${arrival.day}'),
+      find.text('${arrival.year}.${arrival.month}.${arrival.day}'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
@@ -967,7 +1140,9 @@ void main() {
           'updated_at': saved.updatedAt.toIso8601String(),
         });
         expect(
-          find.text('已养殖 5 天', findRichText: true).hitTestable(),
+          find
+              .text(fromList ? '已养殖 5 天' : '5 天', findRichText: true)
+              .hitTestable(),
           findsOneWidget,
         );
         expect(hint, findsNothing);
@@ -978,7 +1153,7 @@ void main() {
         await tester.tap(find.text(colony.name));
         await tester.pumpAndSettle();
         expect(
-          find.text('已养殖 5 天', findRichText: true).hitTestable(),
+          find.text('5 天', findRichText: true).hitTestable(),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
@@ -1279,16 +1454,16 @@ void main() {
       of: find.text('试管巢'),
       matching: find.byType(Card),
     );
-    expect(find.text('来源：${colony.source}'), findsOneWidget);
+    expect(find.text('网购-蚁友商店，订单备注及完整来源说明'), findsOneWidget);
     expect(
       find.descendant(
         of: profileCard,
-        matching: find.text('来源：${colony.source}'),
+        matching: find.text('网购-蚁友商店，订单备注及完整来源说明'),
       ),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: infoCard, matching: find.text('来源：${colony.source}')),
+      find.descendant(of: infoCard, matching: find.text('网购-蚁友商店，订单备注及完整来源说明')),
       findsNothing,
     );
     expect(
@@ -1339,7 +1514,7 @@ void main() {
     expect(find.text('网购'), findsOneWidget);
     await tester.enterText(sourceField, '新店铺');
     await tapSave(tester, '保存蚁群');
-    expect(find.text('来源：网购（新店铺）'), findsOneWidget);
+    expect(find.text('网购-新店铺'), findsOneWidget);
     expect(find.text('编辑后'), findsOneWidget);
     expect(find.text('大群'), findsOneWidget);
     final saved = (await AppDatabase.instance.findColony(colony.id))!;

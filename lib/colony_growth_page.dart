@@ -149,7 +149,11 @@ class _ColonyGrowthPageState extends State<ColonyGrowthPage> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('开启自动扩充'),
-            subtitle: const Text('按设定周期估算卵、幼虫、茧、工数量'),
+            subtitle: Text(
+              _enabled
+                  ? '按设定周期估算卵、幼虫、茧、工数量'
+                  : '未开启 · 设置卵、幼虫、茧、工增长规则',
+            ),
             value: _enabled,
             onChanged: _saving
                 ? null

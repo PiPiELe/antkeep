@@ -9,17 +9,20 @@ import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
 import 'colony_growth_page.dart';
+import 'memorial_page.dart';
+import 'widgets/tombstone_icon.dart';
+import 'share_cards_page.dart';
 import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'account_controller.dart';
-import 'personal_center_page.dart';
 import 'lottery_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'population_forecast_controls.dart';
 import 'domain/population_forecast.dart';
 import 'online/runtime.dart';
+import 'online/inventory_push_page.dart';
 import 'online/app_update.dart';
 import 'online/online_widgets.dart';
 import 'online/update_release_notes.dart';
@@ -37,6 +40,7 @@ import 'domain/beginner_care_notice.dart';
 import 'domain/species_profile.dart';
 import 'domain/imported_species_catalog.dart';
 import 'widgets/diary_record_actions.dart';
+import 'widgets/justified_label.dart';
 
 const _builtInSpeciesOptions = <String, List<String>>{
   '收获蚁': [
@@ -390,11 +394,14 @@ class _HomePageState extends State<HomePage>
         index: _colonyTabs.index,
         children: [
           const ColoniesPage(),
-          _EmptyState(
-            icon: Icons.local_florist_outlined,
-            title:
-                '${themeController.colonyTabName(ColonyTab.memorial)} · 敬请期待',
-            message: '为逝去的小生命留一份纪念。\n这里将用于记录死亡的蚂蚁，具体功能规划中。',
+          MemorialPage(
+            onOpenColony: (context, id) async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ColonyDetailPage(colonyId: id),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -569,16 +576,20 @@ typedef _ColonyListEntry = ({
 class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
   bool _editingAcquiredOn = false;
+  bool _savingOrder = false;
+  bool _dragging = false;
 
+  StreamSubscription<void>? _memorialChanges;
   Timer? _growthTimer;
   AppLifecycleListener? _growthLifecycle;
 
   void _refreshGrowth() {
-    if (mounted) setState(_reload);
+    if (mounted && !_savingOrder && !_dragging) setState(_reload);
   }
 
   @override
   void dispose() {
+    _memorialChanges?.cancel();
     _growthTimer?.cancel();
     _growthLifecycle?.dispose();
     super.dispose();
@@ -588,6 +599,9 @@ class _ColoniesPageState extends State<ColoniesPage> {
   void initState() {
     super.initState();
     _reload();
+    _memorialChanges = AppDatabase.instance.memorialChanges.listen(
+      (_) => _refreshGrowth(),
+    );
     _growthTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _refreshGrowth(),
@@ -600,7 +614,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
   }
 
   Future<List<_ColonyListEntry>> _loadColonies() async {
-    final colonies = await AppDatabase.instance.listColonies();
+    final loaded = await AppDatabase.instance.listColonies();
+    final remaining = {for (final colony in loaded) colony.id: colony};
+    final colonies = <Colony>[
+      for (final id in themeController.colonyOrder)
+        if (remaining.containsKey(id)) remaining.remove(id)!,
+      ...remaining.values,
+    ];
     return Future.wait(
       colonies.map((colony) async {
         final records = await AppDatabase.instance.listRecords(colony.id);
@@ -612,6 +632,35 @@ class _ColoniesPageState extends State<ColoniesPage> {
         );
       }),
     );
+  }
+
+  Future<void> _reorderColonies(
+    List<_ColonyListEntry> colonies,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (_savingOrder) return;
+    if (newIndex == oldIndex) return;
+    final previous = List<_ColonyListEntry>.of(colonies);
+    setState(() {
+      _savingOrder = true;
+      colonies.insert(newIndex, colonies.removeAt(oldIndex));
+    });
+    try {
+      await themeController.setColonyOrder(
+        colonies.map((entry) => entry.colony.id),
+      );
+    } catch (_) {
+      colonies
+        ..clear()
+        ..addAll(previous);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('保存顺序失败，请重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _savingOrder = false);
+    }
   }
 
   Future<void> _editAcquiredOn(Colony colony) async {
@@ -655,26 +704,58 @@ class _ColoniesPageState extends State<ColoniesPage> {
             message: '新入手时建立一窝蚁群，再独立记录投喂、环境、数量和照片。',
           );
         }
-        return RefreshIndicator(
-          onRefresh: () async => setState(_reload),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            itemCount: colonies.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) => _ColonyCard(
-              colony: colonies[index].colony,
-              population: colonies[index].population,
-              workers: colonies[index].workers,
-              onDurationTap: () => _editAcquiredOn(colonies[index].colony),
-              onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ColonyDetailPage(colonyId: colonies[index].colony.id),
+        return AbsorbPointer(
+          absorbing: _savingOrder,
+          child: RefreshIndicator(
+            onRefresh: () async {
+              setState(_reload);
+              await _colonies;
+            },
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              buildDefaultDragHandles: false,
+              header: colonies.length > 1
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        '长按蚁群卡片可上下拖动排序',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    )
+                  : null,
+              itemCount: colonies.length,
+              onReorderStart: (_) => _dragging = true,
+              onReorderEnd: (_) => _dragging = false,
+              onReorderItem: (oldIndex, newIndex) =>
+                  _reorderColonies(colonies, oldIndex, newIndex),
+              itemBuilder: (context, index) =>
+                  ReorderableDelayedDragStartListener(
+                    key: ValueKey(colonies[index].colony.id),
+                    index: index,
+                    enabled: colonies.length > 1 && !_savingOrder,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == colonies.length - 1 ? 0 : 10,
+                      ),
+                      child: _ColonyCard(
+                        colony: colonies[index].colony,
+                        population: colonies[index].population,
+                        workers: colonies[index].workers,
+                        onDurationTap: () =>
+                            _editAcquiredOn(colonies[index].colony),
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ColonyDetailPage(
+                                colonyId: colonies[index].colony.id,
+                              ),
+                            ),
+                          );
+                          if (mounted) setState(_reload);
+                        },
+                      ),
+                    ),
                   ),
-                );
-                if (mounted) setState(_reload);
-              },
             ),
           ),
         );
@@ -2058,41 +2139,75 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
           title: Text(colony.name),
           actions: [
             IconButton(
-              tooltip: '编辑蚁群',
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: _deleting
-                  ? null
-                  : () async {
-                      final saved = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => ColonyFormPage(colony: colony),
-                        ),
-                      );
-                      if (saved == true && mounted) setState(_reload);
-                    },
+              tooltip: '生成分享图',
+              icon: const Icon(Icons.ios_share_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ShareCardsPage(colony: colony, records: detail.records),
+                ),
+              ),
             ),
-            IconButton(
-              tooltip: '删除蚁群',
-              icon: const Icon(Icons.delete_outline),
-              color: Theme.of(context).colorScheme.error,
-              onPressed: _deleting ? null : () => _deleteColony(colony),
-            ),
+            if (!colony.archived)
+              IconButton(
+                tooltip: '移入英灵殿',
+                icon: const TombstoneIcon(),
+                onPressed: _deleting
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => MemorialFormPage(
+                              wholeColony: true,
+                              colony: colony,
+                            ),
+                          ),
+                        );
+                        if (saved == true && context.mounted) {
+                          Navigator.of(context).pop(true);
+                        }
+                      },
+              ),
+            if (!colony.archived)
+              IconButton(
+                tooltip: '编辑蚁群',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: _deleting
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => ColonyFormPage(colony: colony),
+                          ),
+                        );
+                        if (saved == true && mounted) setState(_reload);
+                      },
+              ),
+            if (!colony.archived)
+              IconButton(
+                tooltip: '删除蚁群',
+                icon: const Icon(Icons.delete_outline),
+                color: Theme.of(context).colorScheme.error,
+                onPressed: _deleting ? null : () => _deleteColony(colony),
+              ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          icon: const Icon(Icons.add),
-          label: const Text('添加记录'),
-          onPressed: _deleting
-              ? null
-              : () async {
-                  final saved = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => RecordFormPage(colony: colony),
-                    ),
-                  );
-                  if (saved == true && mounted) setState(_reload);
-                },
-        ),
+        floatingActionButton: colony.archived
+            ? null
+            : FloatingActionButton.extended(
+                icon: const Icon(Icons.add),
+                label: const Text('添加记录'),
+                onPressed: _deleting
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => RecordFormPage(colony: colony),
+                          ),
+                        );
+                        if (saved == true && mounted) setState(_reload);
+                      },
+              ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
@@ -2100,23 +2215,22 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               colony: colony,
               workers: colony.currentWorkerCount(detail.records),
               records: detail.records,
-              onDurationTap: () => _editAcquiredOn(colony),
+              onDurationTap: colony.archived
+                  ? null
+                  : () => _editAcquiredOn(colony),
             ),
             const SizedBox(height: 4),
             _ColonySummary(colony: colony),
-            if (!themeController.simpleMode) ...[
+            if (!themeController.simpleMode && !colony.archived) ...[
               const SizedBox(height: 4),
               Card(
                 child: ListTile(
                   visualDensity: const VisualDensity(vertical: -4),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  minLeadingWidth: 24,
+                  horizontalTitleGap: 8,
                   leading: const Icon(Icons.trending_up),
                   title: const Text('群落自动扩充'),
-                  subtitle: Text(
-                    colony.growth == null
-                        ? '未开启 · 设置卵、茧、工增长规则'
-                        : '${colony.growth!.frequency.label} · ${colony.growth!.path.label} · 自动估算',
-                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () async {
                     await Navigator.of(context).push<bool>(
@@ -2137,6 +2251,21 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               expanded: _populationExpanded,
               showForecast: _showForecast,
               forecastHorizon: _forecastHorizon,
+              onConfigureGrowth: themeController.simpleMode || colony.archived
+                  ? null
+                  : () async {
+                      final saved = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => ColonyGrowthPage(colony: colony),
+                        ),
+                      );
+                      if (saved == true && mounted) {
+                        setState(() {
+                          _showForecast = true;
+                          _reload();
+                        });
+                      }
+                    },
               onForecastChanged: (value) =>
                   setState(() => _showForecast = value),
               onForecastHorizonChanged: (value) =>
@@ -2161,11 +2290,50 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 now: DateTime.now(),
               ),
             ),
-            const SizedBox(height: 12),
-            Text('养蚁日记', style: Theme.of(context).textTheme.titleLarge),
-            if (detail.records.isNotEmpty)
-              Text('点击日记编辑，左滑删除', style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 20, 8, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.auto_stories_outlined,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '养蚁日记',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (detail.records.isNotEmpty)
+                        Text(
+                          '${detail.records.length} 条记录',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                    ],
+                  ),
+                  if (detail.records.isNotEmpty && !colony.archived) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '轻点编辑 · 左滑删除',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             if (detail.records.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
@@ -2175,14 +2343,29 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   message: '从一次投喂或观察开始。',
                 ),
               ),
-            ...detail.records.map(
-              (record) => DiaryRecordActions(
-                key: ValueKey(record.id),
-                onEdit: () => _editRecord(colony, record),
-                onDelete: () => _deleteRecord(record),
-                child: _RecordCard(record: record, colony: colony),
-              ),
-            ),
+            ...detail.records.map((record) {
+              final card = _RecordCard(
+                record: record,
+                colony: colony,
+                onShare: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ShareCardsPage(
+                      colony: colony,
+                      records: detail.records,
+                      initialRecord: record,
+                    ),
+                  ),
+                ),
+              );
+              return colony.archived
+                  ? card
+                  : DiaryRecordActions(
+                      key: ValueKey(record.id),
+                      onEdit: () => _editRecord(colony, record),
+                      onDelete: () => _deleteRecord(record),
+                      child: card,
+                    );
+            }),
           ],
         ),
       );
@@ -2206,7 +2389,16 @@ class _ColonyProfileSummary extends StatelessWidget {
   final Colony colony;
   final int? workers;
   final List<CareRecord> records;
-  final VoidCallback onDurationTap;
+  final VoidCallback? onDurationTap;
+
+  String get _sourceLabel => (colony.source ?? '').trim().replaceFirstMapped(
+    RegExp(r'^(野采|网购|蚁友赠送)(?:（(.*)）|\((.*)\)|\s+(.+))$', dotAll: true),
+    (match) {
+      final detail = (match.group(2) ?? match.group(3) ?? match.group(4)!)
+          .trim();
+      return detail.isEmpty ? match.group(1)! : '${match.group(1)}-$detail';
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -2221,6 +2413,37 @@ class _ColonyProfileSummary extends StatelessWidget {
       if (population.cocoons != null) '${population.cocoons} 茧',
     ];
     final scheme = Theme.of(context).colorScheme;
+    final metadataStyle = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: scheme.onSurfaceVariant);
+    final metadataLabelWidth = MediaQuery.textScalerOf(context)
+        .scale((metadataStyle?.fontSize ?? 12) * 4 + 4);
+    Widget metadataRow(
+      String label,
+      String value, {
+      VoidCallback? onTap,
+      TextStyle? valueStyle,
+    }) {
+      final row = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          JustifiedLabel(
+            text: label,
+            width: metadataLabelWidth,
+            style: metadataStyle,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value, style: valueStyle ?? metadataStyle)),
+        ],
+      );
+      return onTap == null
+          ? row
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(8),
+              child: row,
+            );
+    }
+
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2270,33 +2493,38 @@ class _ColonyProfileSummary extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final duration = Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    InkWell(
-                      onTap: onDurationTap,
-                      borderRadius: BorderRadius.circular(8),
-                      child: HusbandryDuration(
-                        colony: colony,
-                        showAcquiredDate: true,
+                    if (colony.archived)
+                      const Text('遗失的文明 · 养殖已结束')
+                    else
+                      InkWell(
+                        onTap: onDurationTap,
+                        borderRadius: BorderRadius.circular(8),
+                        child: HusbandryDuration(
+                          colony: colony,
+                          labelWidth: metadataLabelWidth,
+                        ),
                       ),
-                    ),
+                    if (colony.acquiredOn != null) ...[
+                      const SizedBox(height: 4),
+                      metadataRow(
+                        '入手日期',
+                        dottedDate(colony.acquiredOn!),
+                        onTap: onDurationTap,
+                      ),
+                    ],
                     if (colony.source?.trim().isNotEmpty == true) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        '来源：${colony.source}',
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      metadataRow(
+                        '来源',
+                        _sourceLabel,
+                        valueStyle: metadataStyle?.copyWith(letterSpacing: 0),
                       ),
                     ],
                     if (colony.purchasePriceCents != null) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        '购入价 ¥${colony.purchasePriceText}',
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
+                      metadataRow('购入价', '¥${colony.purchasePriceText}'),
                     ],
                   ],
                 );
@@ -2361,6 +2589,7 @@ class _PopulationTimeline extends StatelessWidget {
     required this.forecastHorizon,
     required this.onForecastChanged,
     required this.onForecastHorizonChanged,
+    this.onConfigureGrowth,
   });
   final Colony colony;
   final List<CareRecord> records;
@@ -2370,6 +2599,7 @@ class _PopulationTimeline extends StatelessWidget {
   final ForecastHorizon forecastHorizon;
   final ValueChanged<bool> onForecastChanged;
   final ValueChanged<ForecastHorizon> onForecastHorizonChanged;
+  final VoidCallback? onConfigureGrowth;
   final ValueChanged<bool> onIncludeBroodChanged;
   final ValueChanged<bool> onExpandedChanged;
 
@@ -2449,6 +2679,7 @@ class _PopulationTimeline extends StatelessWidget {
                     ? '请先在群落自动扩充中设置增长规则'
                     : null,
                 onEnabledChanged: onForecastChanged,
+                onConfigureGrowth: onConfigureGrowth,
                 onHorizonChanged: onForecastHorizonChanged,
               ),
               const SizedBox(height: 14),
@@ -2993,7 +3224,8 @@ class _RecordFormPageState extends State<RecordFormPage> {
 }
 
 class _RecordCard extends StatelessWidget {
-  const _RecordCard({required this.record, this.colony});
+  const _RecordCard({required this.record, this.colony, this.onShare});
+  final VoidCallback? onShare;
   final CareRecord record;
   final Colony? colony;
   @override
@@ -3035,15 +3267,26 @@ class _RecordCard extends StatelessWidget {
                 Icon(_icon(record.type)),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    record.type.label,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        record.type.label,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        _dateTime(record.occurredAt),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  _dateTime(record.occurredAt),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                if (onShare != null)
+                  IconButton(
+                    tooltip: '生成日记卡片',
+                    icon: const Icon(Icons.ios_share_outlined, size: 20),
+                    onPressed: onShare,
+                  ),
               ],
             ),
             if (record.note?.isNotEmpty == true) ...[
@@ -4392,8 +4635,22 @@ Future<void> _renameColonyTab(BuildContext context, ColonyTab tab) async {
   );
 }
 
+enum SettingsCategory {
+  appearance('外观与展示', Icons.palette_outlined),
+  online('在线服务', Icons.cloud_outlined),
+  reminders('养护提醒', Icons.notifications_active_outlined),
+  data('数据管理', Icons.storage_outlined),
+  help('帮助与反馈', Icons.help_outline),
+  about('关于与更新', Icons.info_outline);
+
+  const SettingsCategory(this.title, this.icon);
+  final String title;
+  final IconData icon;
+}
+
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.category});
+  final SettingsCategory? category;
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -4428,7 +4685,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([themeController, appUpdateController]),
+    animation: Listenable.merge([
+      themeController,
+      appUpdateController,
+      onlineController,
+    ]),
     builder: (context, _) => _buildSettings(context),
   );
 
@@ -4468,334 +4729,437 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       );
 
-  Widget _buildSettings(BuildContext context) => Center(
+  Widget _settingsList(List<Widget> children) => Center(
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 640),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          _section(context, '展示模式', [
-            SwitchListTile(
-              secondary: const Icon(Icons.view_agenda_outlined),
-              title: const Text('简化模式'),
-              subtitle: const Text('只展示蚁群、日常记录和设置；关闭后恢复全部功能入口，已有数据保留'),
-              value: themeController.simpleMode,
-              onChanged: _savingSimpleMode ? null : _setSimpleMode,
-            ),
-            for (final tab in ColonyTab.values)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: Text('${tab.defaultName}菜单名称'),
-                subtitle: Text(themeController.colonyTabName(tab)),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _renameColonyTab(context, tab),
-              ),
-          ]),
-          _section(context, '使用版本', [
-            ListTile(
-              leading: Icon(
-                themeController.edition == AppEdition.offline
-                    ? Icons.phonelink_lock_outlined
-                    : Icons.cloud_download_outlined,
-              ),
-              title: const Text('资料模式'),
-              subtitle: Text(
-                themeController.edition == AppEdition.offline
-                    ? '使用内置资料，断网可用；启动时会联网检查 Android 更新。'
-                    : '在线版可获取公共资料，并会匿名检查 Android 更新。',
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final edition in AppEdition.values)
-                    ChoiceChip(
-                      label: Text(edition.label),
-                      selected: themeController.edition == edition,
-                      onSelected: _savingEdition
-                          ? null
-                          : (selected) {
-                              if (!selected) return;
-                              _setEdition(edition);
-                            },
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                '蚁群、记录和照片都只保存在本设备。',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            OnlineSettings(
-              controller: onlineController,
-              updates: appUpdateController,
-              useOffline: () => _setEdition(AppEdition.offline),
-            ),
-          ]),
-          if (!themeController.simpleMode &&
-              themeController.edition == AppEdition.online &&
-              appUpdateController.availability !=
-                  AppUpdateAvailability.required)
-            _section(context, '个人中心', [
-              ListTile(
-                leading: const Icon(Icons.manage_accounts_outlined),
-                title: const Text('个人中心与签到'),
-                subtitle: const Text('登录账号，查看每日签到记录'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        PersonalCenterPage(controller: accountController),
-                  ),
-                ),
-              ),
-            ]),
-          _section(context, '外观与偏好', [
-            const ListTile(
-              leading: Icon(Icons.palette_outlined),
-              title: Text('主题色'),
-              subtitle: Text('选择喜欢的颜色，保存在本机'),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ThemeColorPicker(
-                selected: themeController.themeColor,
-                onChanged: (color) async {
-                  try {
-                    await themeController.setThemeColor(color);
-                  } catch (error) {
-                    if (context.mounted) _showError(context, error);
-                  }
-                },
-              ),
-            ),
-            const ListTile(
-              leading: Icon(Icons.dark_mode_outlined),
-              title: Text('外观模式'),
-              subtitle: Text('跟随系统，或固定使用浅色、深色界面'),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ThemeModePicker(
-                selected: themeController.themeMode,
-                onChanged: (mode) async {
-                  try {
-                    await themeController.setThemeMode(mode);
-                  } catch (error) {
-                    if (context.mounted) _showError(context, error);
-                  }
-                },
-              ),
-            ),
-            const Divider(height: 1),
-            SwitchListTile(
-              secondary: const Icon(Icons.lightbulb_outline),
-              title: const Text('新手注意事项'),
-              subtitle: const Text('在蚁群首页显示养蚁新手注意事项'),
-              value: themeController.beginner,
-              onChanged: (enabled) async {
-                try {
-                  await themeController.setBeginner(enabled);
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-          ]),
-          _section(context, '养护提醒', [
-            SwitchListTile(
-              secondary: const Icon(Icons.notifications_active_outlined),
-              title: const Text('本地养护提醒'),
-              subtitle: Text(
-                themeController.careRemindersEnabled
-                    ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
-                    : '关闭；开启后仅向系统申请通知权限',
-              ),
-              value: themeController.careRemindersEnabled,
-              onChanged: (enabled) async {
-                try {
-                  if (enabled) {
-                    final granted = await LocalNotificationService.instance
-                        .requestPermission();
-                    if (!granted) {
-                      if (context.mounted) {
-                        _showInfo(context, '未获得通知权限，提醒没有开启。');
-                      }
-                      return;
-                    }
-                    await LocalNotificationService.instance
-                        .scheduleDailyCareReminder(
-                          themeController.careReminderMinuteOfDay,
-                        );
-                  } else {
-                    await LocalNotificationService.instance
-                        .cancelDailyCareReminder();
-                  }
-                  await themeController.setCareReminder(
-                    enabled: enabled,
-                    minuteOfDay: themeController.careReminderMinuteOfDay,
-                  );
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-            ListTile(
-              enabled: themeController.careRemindersEnabled,
-              leading: const Icon(Icons.schedule_outlined),
-              title: const Text('提醒时间'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: Text(
-                '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}',
-              ),
-              onTap: !themeController.careRemindersEnabled
-                  ? null
-                  : () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay(
-                          hour: themeController.careReminderMinuteOfDay ~/ 60,
-                          minute: themeController.careReminderMinuteOfDay % 60,
-                        ),
-                      );
-                      if (picked == null || !context.mounted) return;
-                      final minuteOfDay = picked.hour * 60 + picked.minute;
-                      try {
-                        await LocalNotificationService.instance
-                            .scheduleDailyCareReminder(minuteOfDay);
-                        await themeController.setCareReminder(
-                          enabled: true,
-                          minuteOfDay: minuteOfDay,
-                        );
-                      } catch (error) {
-                        if (context.mounted) _showError(context, error);
-                      }
-                    },
-            ),
-          ]),
-          _section(context, '交流与反馈', [
-            ListTile(
-              leading: const Icon(Icons.qr_code_2_outlined),
-              title: const Text('交流群二维码'),
-              subtitle: const Text('微信、抖音交流群'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CommunityGroupsPage()),
-              ),
-            ),
-          ]),
-          _section(context, '数据与备份', [
-            ListTile(
-              leading: const Icon(Icons.upload_file_outlined),
-              title: const Text('导出备份'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: const Text('生成包含记录和照片的 .zip 文件'),
-              onTap: () async {
-                try {
-                  final exported = await BackupService(
-                    AppDatabase.instance,
-                    LocalMediaStore.instance,
-                  ).exportBackup();
-                  if (exported && context.mounted) {
-                    _showInfo(context, '已完成备份导出。');
-                  }
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.download_outlined),
-              title: const Text('恢复备份'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: const Text('恢复会替换本机现有蚁群与记录'),
-              onTap: () async {
-                final approved = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('恢复并替换本地数据？'),
-                    content: const Text('当前蚁群和记录会被选中的备份替换。请先导出当前数据。'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('取消'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('选择备份'),
-                      ),
-                    ],
-                  ),
-                );
-                if (approved != true || !context.mounted) return;
-                try {
-                  final restored = await BackupService(
-                    AppDatabase.instance,
-                    LocalMediaStore.instance,
-                  ).restoreBackup();
-                  if (restored && context.mounted) {
-                    _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
-                  }
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.undo_outlined),
-              title: const Text('撤销上一次恢复'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: const Text('恢复覆盖前自动保留的本地回退副本'),
-              onTap: () async {
-                final service = BackupService(
-                  AppDatabase.instance,
-                  LocalMediaStore.instance,
-                );
-                final hasRollback = await service.hasRollback();
-                if (!context.mounted) return;
-                if (!hasRollback) {
-                  _showInfo(context, '没有可撤销的恢复操作。');
-                  return;
-                }
-                final approved = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('撤销上一次恢复？'),
-                    content: const Text('当前数据会被恢复前自动保存的本地副本替换。'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('取消'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('撤销恢复'),
-                      ),
-                    ],
-                  ),
-                );
-                if (approved != true || !context.mounted) return;
-                try {
-                  await service.undoLastRestore();
-                  if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-          ]),
-        ],
+        children: children,
       ),
     ),
   );
+
+  Widget _categoryTile(BuildContext context, SettingsCategory category) {
+    final subtitle = switch (category) {
+      SettingsCategory.appearance =>
+        '${themeController.themeColor.label} · ${themeController.simpleMode ? '简化模式' : '完整模式'}',
+      SettingsCategory.online =>
+        '${themeController.edition.label} · ${onlineController.user?.username ?? '账号与公共资料'}',
+      SettingsCategory.reminders =>
+        themeController.careRemindersEnabled
+            ? '已开启 · 每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}'
+            : '未开启 · 设置每日提醒',
+      SettingsCategory.data => '数据推送、备份与恢复',
+      SettingsCategory.help => '使用指南、交流群',
+      SettingsCategory.about => switch (appUpdateController.availability) {
+        AppUpdateAvailability.required => '在线服务需更新 · 点此查看',
+        AppUpdateAvailability.optional =>
+          '发现新版本 ${appUpdateController.policy?.latestVersion}',
+        AppUpdateAvailability.none => '当前版本、检查更新',
+      },
+    };
+    return ListTile(
+      leading: Icon(category.icon),
+      title: Text(category.title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SettingsPage(category: category),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettings(BuildContext context) {
+    final category = widget.category;
+    if (category != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(category.title)),
+        body: _settingsList(_categoryContents(context, category)),
+      );
+    }
+    return _settingsList([
+      _section(context, '通用', [
+        for (final category in [
+          SettingsCategory.appearance,
+          SettingsCategory.online,
+          SettingsCategory.reminders,
+        ])
+          _categoryTile(context, category),
+      ]),
+      _section(context, '数据与支持', [
+        for (final category in [
+          SettingsCategory.data,
+          SettingsCategory.help,
+          SettingsCategory.about,
+        ])
+          _categoryTile(context, category),
+      ]),
+    ]);
+  }
+
+  List<Widget> _categoryContents(
+    BuildContext context,
+    SettingsCategory category,
+  ) => switch (category) {
+    SettingsCategory.appearance => [
+      _section(context, '展示模式', [
+        SwitchListTile(
+          secondary: const Icon(Icons.view_agenda_outlined),
+          title: const Text('简化模式'),
+          subtitle: const Text('只展示蚁群、日常记录和设置；关闭后恢复全部功能入口，已有数据保留'),
+          value: themeController.simpleMode,
+          onChanged: _savingSimpleMode ? null : _setSimpleMode,
+        ),
+        for (final tab in ColonyTab.values)
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: Text('${tab.defaultName}菜单名称'),
+            subtitle: Text(themeController.colonyTabName(tab)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _renameColonyTab(context, tab),
+          ),
+      ]),
+      _section(context, '外观与偏好', [
+        const ListTile(
+          leading: Icon(Icons.palette_outlined),
+          title: Text('主题色'),
+          subtitle: Text('选择喜欢的颜色，保存在本机'),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: ThemeColorPicker(
+            selected: themeController.themeColor,
+            onChanged: (color) async {
+              try {
+                await themeController.setThemeColor(color);
+              } catch (error) {
+                if (context.mounted) _showError(context, error);
+              }
+            },
+          ),
+        ),
+        const ListTile(
+          leading: Icon(Icons.dark_mode_outlined),
+          title: Text('外观模式'),
+          subtitle: Text('跟随系统，或固定使用浅色、深色界面'),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: ThemeModePicker(
+            selected: themeController.themeMode,
+            onChanged: (mode) async {
+              try {
+                await themeController.setThemeMode(mode);
+              } catch (error) {
+                if (context.mounted) _showError(context, error);
+              }
+            },
+          ),
+        ),
+        const Divider(height: 1),
+        SwitchListTile(
+          secondary: const Icon(Icons.lightbulb_outline),
+          title: const Text('新手注意事项'),
+          subtitle: const Text('在蚁群首页显示养蚁新手注意事项'),
+          value: themeController.beginner,
+          onChanged: (enabled) async {
+            try {
+              await themeController.setBeginner(enabled);
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+      ]),
+    ],
+    SettingsCategory.online => [
+      _section(context, '资料模式与账号', [
+        ListTile(
+          leading: Icon(
+            themeController.edition == AppEdition.offline
+                ? Icons.phonelink_lock_outlined
+                : Icons.cloud_download_outlined,
+          ),
+          title: const Text('资料模式'),
+          subtitle: Text(
+            themeController.edition == AppEdition.offline
+                ? '使用内置资料，断网可用；启动时会联网检查 Android 更新。'
+                : '在线版可获取公共资料，并会匿名检查 Android 更新。',
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final edition in AppEdition.values)
+                ChoiceChip(
+                  label: Text(edition.label),
+                  selected: themeController.edition == edition,
+                  onSelected: _savingEdition
+                      ? null
+                      : (selected) {
+                          if (!selected) return;
+                          _setEdition(edition);
+                        },
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            '蚁群、记录和照片都只保存在本设备。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        OnlineSettings(
+          controller: onlineController,
+          section: OnlineSettingsSection.account,
+          updates: appUpdateController,
+          useOffline: () => _setEdition(AppEdition.offline),
+        ),
+      ]),
+    ],
+    SettingsCategory.reminders => [
+      _section(context, '养护提醒', [
+        SwitchListTile(
+          secondary: const Icon(Icons.notifications_active_outlined),
+          title: const Text('本地养护提醒'),
+          subtitle: Text(
+            themeController.careRemindersEnabled
+                ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
+                : '关闭；开启后仅向系统申请通知权限',
+          ),
+          value: themeController.careRemindersEnabled,
+          onChanged: (enabled) async {
+            try {
+              if (enabled) {
+                final granted = await LocalNotificationService.instance
+                    .requestPermission();
+                if (!granted) {
+                  if (context.mounted) {
+                    _showInfo(context, '未获得通知权限，提醒没有开启。');
+                  }
+                  return;
+                }
+                await LocalNotificationService.instance
+                    .scheduleDailyCareReminder(
+                      themeController.careReminderMinuteOfDay,
+                    );
+              } else {
+                await LocalNotificationService.instance
+                    .cancelDailyCareReminder();
+              }
+              await themeController.setCareReminder(
+                enabled: enabled,
+                minuteOfDay: themeController.careReminderMinuteOfDay,
+              );
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+        ListTile(
+          enabled: themeController.careRemindersEnabled,
+          leading: const Icon(Icons.schedule_outlined),
+          title: const Text('提醒时间'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: Text(
+            '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}',
+          ),
+          onTap: !themeController.careRemindersEnabled
+              ? null
+              : () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(
+                      hour: themeController.careReminderMinuteOfDay ~/ 60,
+                      minute: themeController.careReminderMinuteOfDay % 60,
+                    ),
+                  );
+                  if (picked == null || !context.mounted) return;
+                  final minuteOfDay = picked.hour * 60 + picked.minute;
+                  try {
+                    await LocalNotificationService.instance
+                        .scheduleDailyCareReminder(minuteOfDay);
+                    await themeController.setCareReminder(
+                      enabled: true,
+                      minuteOfDay: minuteOfDay,
+                    );
+                  } catch (error) {
+                    if (context.mounted) _showError(context, error);
+                  }
+                },
+        ),
+      ]),
+    ],
+    SettingsCategory.data => [
+      _section(context, '数据管理', [
+        ListTile(
+          leading: const Icon(Icons.cloud_upload_outlined),
+          title: const Text('数据推送'),
+          subtitle: const Text('选择物品栏数据推送到 B 端，每天一次'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => InventoryPushPage(
+                controller: onlineController,
+                loadItems: AppDatabase.instance.listInventory,
+              ),
+            ),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.upload_file_outlined),
+          title: const Text('导出备份'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: const Text('生成包含记录和照片的 .zip 文件'),
+          onTap: () async {
+            try {
+              final exported = await BackupService(
+                AppDatabase.instance,
+                LocalMediaStore.instance,
+              ).exportBackup();
+              if (exported && context.mounted) {
+                _showInfo(context, '已完成备份导出。');
+              }
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.download_outlined),
+          title: const Text('恢复备份'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: const Text('可选择增量恢复或覆盖恢复'),
+          onTap: () async {
+            final mode = await showDialog<BackupRestoreMode>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('选择恢复方式'),
+                scrollable: true,
+                content: const Text(
+                  '增量恢复：保留本机数据，只补入缺失的蚁群、记录和物品。'
+                  '相同 ID 的数据，以及同分组同名物品，保留本机内容。\n\n'
+                  '覆盖恢复：用备份替换本机现有蚁群、记录和物品。\n\n'
+                  '两种方式都会在恢复前保存回退副本，可撤销上一次恢复。',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pop(context, BackupRestoreMode.overwrite),
+                    child: const Text('覆盖恢复'),
+                  ),
+                  FilledButton(
+                    onPressed: () =>
+                        Navigator.pop(context, BackupRestoreMode.incremental),
+                    child: const Text('增量恢复'),
+                  ),
+                ],
+              ),
+            );
+            if (mode == null || !context.mounted) return;
+            try {
+              final restored = await BackupService(
+                AppDatabase.instance,
+                LocalMediaStore.instance,
+              ).restoreBackup(mode: mode);
+              if (restored && context.mounted) {
+                _showInfo(
+                  context,
+                  '${mode == BackupRestoreMode.incremental ? '增量' : '覆盖'}恢复完成；可在设置中撤销上一次恢复。',
+                );
+              }
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.undo_outlined),
+          title: const Text('撤销上一次恢复'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: const Text('恢复操作前自动保留的本地回退副本'),
+          onTap: () async {
+            final service = BackupService(
+              AppDatabase.instance,
+              LocalMediaStore.instance,
+            );
+            final hasRollback = await service.hasRollback();
+            if (!context.mounted) return;
+            if (!hasRollback) {
+              _showInfo(context, '没有可撤销的恢复操作。');
+              return;
+            }
+            final approved = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('撤销上一次恢复？'),
+                content: const Text('当前数据会被恢复前自动保存的本地副本替换。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('取消'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('撤销恢复'),
+                  ),
+                ],
+              ),
+            );
+            if (approved != true || !context.mounted) return;
+            try {
+              await service.undoLastRestore();
+              if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+      ]),
+    ],
+    SettingsCategory.help => [
+      _section(context, '帮助与反馈', [
+        OnlineSettings(
+          controller: onlineController,
+          section: OnlineSettingsSection.help,
+          updates: appUpdateController,
+          useOffline: () => _setEdition(AppEdition.offline),
+        ),
+        ListTile(
+          leading: const Icon(Icons.qr_code_2_outlined),
+          title: const Text('交流群二维码'),
+          subtitle: const Text('微信、抖音交流群'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const CommunityGroupsPage()),
+          ),
+        ),
+      ]),
+    ],
+    SettingsCategory.about => [
+      _section(context, '版本与更新', [
+        OnlineSettings(
+          controller: onlineController,
+          section: OnlineSettingsSection.updates,
+          updates: appUpdateController,
+          useOffline: () => _setEdition(AppEdition.offline),
+        ),
+      ]),
+    ],
+  };
 }
 
 class _StoredImage extends StatelessWidget {

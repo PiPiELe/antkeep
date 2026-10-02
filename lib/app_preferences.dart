@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 abstract class AppSettingsStore {
@@ -46,6 +48,16 @@ class AppPreferences extends ChangeNotifier {
   AppEdition edition = AppEdition.offline;
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
+  List<String> _colonyOrder = const [];
+  List<String> get colonyOrder => _colonyOrder;
+
+  Future<void> setColonyOrder(Iterable<String> ids) async {
+    final order = List<String>.unmodifiable(ids.toSet());
+    await store.writeSettings({'colony_order': jsonEncode(order)});
+    _colonyOrder = order;
+    notifyListeners();
+  }
+
   final _colonyTabNames = <ColonyTab, String>{};
 
   String colonyTabName(ColonyTab tab) =>
@@ -63,6 +75,15 @@ class AppPreferences extends ChangeNotifier {
 
   Future<void> load() async {
     final values = await store.readSettings();
+    _colonyOrder = const [];
+    try {
+      final order = jsonDecode(values['colony_order'] ?? '[]');
+      if (order is List && order.every((id) => id is String)) {
+        _colonyOrder = List<String>.unmodifiable(order.cast<String>().toSet());
+      }
+    } on FormatException {
+      // Invalid local ordering must not prevent loading the other preferences.
+    }
     _colonyTabNames.clear();
     for (final tab in ColonyTab.values) {
       final name = values[tab.settingKey]?.trim();

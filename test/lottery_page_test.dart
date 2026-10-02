@@ -31,20 +31,107 @@ void main() {
     expect(sin(selectedCenter), closeTo(-1, 0.000001));
   });
 
-  testWidgets('direct draw displays a number in the entered range', (
+  Future<void> startDirectDraw(
+    WidgetTester tester, {
+    bool manual = false,
+    String start = '5',
+    String end = '8',
+  }) async {
+    await tester.pumpWidget(const MaterialApp(home: LotteryPage()));
+    await tester.tap(find.text('数字跳动'));
+    await tester.pump();
+    if (manual) {
+      await tester.tap(find.text('手动暂停'));
+      await tester.pump();
+    }
+    await tester.enterText(find.byType(TextField).at(0), start);
+    await tester.enterText(find.byType(TextField).at(1), end);
+    await tester.tap(find.text('开始抽奖'));
+    await tester.pump();
+  }
+
+  int displayedNumber(WidgetTester tester) => int.parse(
+    tester.widget<Text>(find.byKey(const ValueKey('lottery-number'))).data!,
+  );
+
+  testWidgets('automatic draw keeps rolling before stopping at three seconds', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: LotteryPage()));
-    await tester.tap(find.text('直接抽取'));
-    await tester.pump();
-    await tester.enterText(find.byType(TextField).at(0), '5');
-    await tester.enterText(find.byType(TextField).at(1), '8');
-    await tester.tap(find.text('抽取数字'));
-    await tester.pump();
-
+    await startDirectDraw(tester);
+    expect(find.text('随机跳动中'), findsOneWidget);
+    expect(find.text('抽中数字'), findsNothing);
+    for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
+      expect(field.enabled, isFalse);
+    }
+    final seen = <int>{displayedNumber(tester)};
+    for (var tick = 0; tick < 30; tick++) {
+      await tester.pump(const Duration(milliseconds: 80));
+      final number = displayedNumber(tester);
+      expect(number, inInclusiveRange(5, 8));
+      seen.add(number);
+    }
+    expect(seen.length, greaterThan(1));
+    expect(find.text('抽中数字'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('抽中数字'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    final result = displayedNumber(tester);
+    await tester.pump(const Duration(seconds: 5));
+    expect(displayedNumber(tester), result);
+    expect(find.text('开始抽奖'), findsOneWidget);
   });
+
+  testWidgets('manual draw waits for pause and can start another draw', (
+    tester,
+  ) async {
+    await startDirectDraw(tester, manual: true, start: '-8', end: '-5');
+    await tester.pump(const Duration(seconds: 10));
+    expect(find.text('随机跳动中'), findsOneWidget);
+    expect(find.text('抽中数字'), findsNothing);
+    final number = displayedNumber(tester);
+    expect(number, inInclusiveRange(-8, -5));
+    await tester.tap(find.text('暂停'));
+    await tester.pump();
+    expect(find.text('抽中数字'), findsOneWidget);
+    expect(displayedNumber(tester), number);
+    await tester.pump(const Duration(seconds: 5));
+    expect(displayedNumber(tester), number);
+
+    await tester.tap(find.text('开始抽奖'));
+    await tester.pump();
+    expect(find.text('抽中数字'), findsNothing);
+    expect(find.text('随机跳动中'), findsOneWidget);
+    await tester.tap(find.text('暂停'));
+    await tester.pump();
+  });
+
+  testWidgets('a single-number range still waits for automatic pause', (
+    tester,
+  ) async {
+    await startDirectDraw(tester, start: '7', end: '7');
+    expect(displayedNumber(tester), 7);
+    expect(find.text('抽中数字'), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('抽中数字'), findsOneWidget);
+    expect(displayedNumber(tester), 7);
+  });
+
+  testWidgets('invalid range does not start rolling', (tester) async {
+    await startDirectDraw(tester, start: '8', end: '5');
+    expect(find.textContaining('请输入有效的数字范围'), findsOneWidget);
+    expect(find.text('随机跳动中'), findsNothing);
+    expect(find.byKey(const ValueKey('lottery-number')), findsNothing);
+  });
+
+  for (final manual in [false, true]) {
+    testWidgets('leaving an active draw cancels timers (manual: $manual)', (
+      tester,
+    ) async {
+      await startDirectDraw(tester, manual: manual);
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pump(const Duration(seconds: 5));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('wheel mode validates the number of displayed options', (
     tester,
