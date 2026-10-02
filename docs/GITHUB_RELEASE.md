@@ -42,6 +42,10 @@ base64 -i /absolute/path/to/antkeep-release.jks | tr -d '\n'
 
 GitHub Release 的直接下载只提供文件分发；Android 安装时仍应核对签名与 SHA-256，且真机安装验证、商店发布是独立步骤。
 
+## Android 测试修订版本
+
+正式版显示三段版本；测试修订版显示第四段，例如 `pubspec.yaml` 的 `1.0.8+1000801` 对应 Android `1.0.8.1`。versionCode 使用 `major × 1000000 + minor × 10000 + patch × 100 + revision`，正式版 revision 为 00，测试修订为 01–99。更新策略继续使用三段正式版本；测试包按前三段比较，因此 `1.0.8.1` 可正常发现 `1.0.9`，不会将 `1.0.8` 视作更新。
+
 ## 混淆与发布检查
 
 Android release 构建必须同时开启 Dart 混淆与调试信息分离；漏传参数时 Gradle 会拒绝构建，debug 构建不受影响。本地构建示例（符号目录放在仓库外，按版本和源码提交隔离）：

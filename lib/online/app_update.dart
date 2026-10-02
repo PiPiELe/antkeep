@@ -19,6 +19,16 @@ class AppVersion implements Comparable<AppVersion> {
     }
   }
 
+  // Android test builds append a revision (1-99) to the release version.
+  // Published update policies remain three-part release versions.
+  factory AppVersion.parseInstalled(String value) {
+    final parts = value.split('.');
+    if (parts.length == 4 && RegExp(r'^[1-9]\d?$').hasMatch(parts.last)) {
+      return AppVersion.parse(parts.take(3).join('.'));
+    }
+    return AppVersion.parse(value);
+  }
+
   @override
   int compareTo(AppVersion other) {
     for (final pair in [
