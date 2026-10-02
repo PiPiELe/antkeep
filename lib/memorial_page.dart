@@ -60,7 +60,7 @@ class _MemorialPageState extends State<MemorialPage> {
         MenuItemButton(
           leadingIcon: const TombstoneIcon(size: 24),
           onPressed: () => _add(),
-          child: const Text('单独添加纪念'),
+          child: const Text('单独添加'),
         ),
         MenuItemButton(
           leadingIcon: const TombstoneIcon(size: 24),
