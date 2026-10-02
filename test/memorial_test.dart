@@ -382,6 +382,49 @@ void main() {
   }
 
   testWidgets(
+    'editing experience preserves text across collapsing and saving on a narrow screen',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final existing = memorial('edit-brood', MemorialKind.brood);
+      await tester.runAsync(() => db.saveMemorial(existing));
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(1.3)),
+            child: child!,
+          ),
+          home: MemorialFormPage(memorial: existing),
+        ),
+      );
+      await settle(tester);
+      expect(find.text('保存纪念').hitTestable(), findsOneWidget);
+      final lesson = find.widgetWithText(TextFormField, '这次学到了什么（选填）');
+      await tester.scrollUntilVisible(
+        lesson,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(lesson);
+      await tester.enterText(lesson, '保持适宜湿度');
+      await tapVisible(tester, '经验记录（选填）');
+      expect(lesson, findsNothing);
+      await tapVisible(tester, '经验记录（选填）');
+      expect(find.text('保持适宜湿度'), findsOneWidget);
+      await tapVisible(tester, '经验记录（选填）');
+      await tapVisible(tester, '保存纪念');
+      final saved = (await tester.runAsync(db.listMemorials))!.single;
+      expect(saved.lesson, '保持适宜湿度');
+      expect(saved.cause, existing.cause);
+      expect(saved.observation, existing.observation);
+      expect(saved.diedOn, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'queen continuation archives whole colony and links both memorials',
     (tester) async {
       await tester.runAsync(

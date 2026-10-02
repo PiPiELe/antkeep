@@ -296,6 +296,45 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
     }
   }
 
+  InputDecoration _fieldDecoration(String label) => InputDecoration(
+    labelText: label,
+    alignLabelWithHint: true,
+    filled: true,
+    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(
+        color: Theme.of(context).colorScheme.outlineVariant,
+      ),
+    ),
+  );
+
+  Widget _formSection({
+    required String title,
+    required List<Widget> children,
+  }) => Card(
+    margin: EdgeInsets.zero,
+    elevation: 0,
+    color: Theme.of(context).colorScheme.surface,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -307,173 +346,288 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
             : '飞升英灵殿',
       ),
     ),
-    body: AbsorbPointer(
-      absorbing: _saving,
-      child: Form(
-        key: _form,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const Center(child: TombstoneIcon(size: 64)),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                _kind.epitaph,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_kind != MemorialKind.colony)
-              DropdownButtonFormField<MemorialKind>(
-                initialValue: _kind,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: '纪念类型'),
-                items: [
-                  for (final kind in [
-                    MemorialKind.queen,
-                    MemorialKind.worker,
-                    MemorialKind.brood,
-                  ])
-                    DropdownMenuItem(value: kind, child: Text(kind.label)),
-                ],
-                onChanged: widget.memorial != null
-                    ? null
-                    : (kind) => setState(() => _kind = kind!),
-              ),
-            const SizedBox(height: 16),
-            if (_loading)
-              const LinearProgressIndicator()
-            else if (_error == '蚁群加载失败，请重试')
-              TextButton(onPressed: _loadColonies, child: Text(_error!))
-            else
-              DropdownButtonFormField<String>(
-                initialValue: _colonyId ?? '',
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: _kind == MemorialKind.colony
-                      ? '移入的蚁群 *'
-                      : '关联蚁群（选填）',
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          onPressed: _saving || _loading ? null : _save,
+          child: Text(_saving ? '保存中…' : '保存纪念'),
+        ),
+      ),
+    ),
+    body: SafeArea(
+      top: false,
+      bottom: false,
+      child: AbsorbPointer(
+        absorbing: _saving,
+        child: Form(
+          key: _form,
+          child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer
+                      .withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                items: [
-                  DropdownMenuItem(
-                    value: '',
-                    child: Text(
-                      _kind == MemorialKind.colony ? '请选择蚁群' : '不关联蚁群',
+                child: Row(
+                  children: [
+                    const TombstoneIcon(size: 40),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _kind.epitaph,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '为相伴的时光，留一份纪念',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _formSection(
+                title: '纪念信息',
+                children: [
+                  if (_kind != MemorialKind.colony)
+                    DropdownButtonFormField<MemorialKind>(
+                      initialValue: _kind,
+                      isExpanded: true,
+                      decoration: _fieldDecoration('纪念类型'),
+                      items: [
+                        for (final kind in [
+                          MemorialKind.queen,
+                          MemorialKind.worker,
+                          MemorialKind.brood,
+                        ])
+                          DropdownMenuItem(
+                            value: kind,
+                            child: Text(
+                              kind.label,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: widget.memorial != null
+                          ? null
+                          : (kind) => setState(() => _kind = kind!),
+                    ),
+                  if (_kind != MemorialKind.colony) const SizedBox(height: 12),
+                  if (_loading)
+                    const LinearProgressIndicator()
+                  else if (_error == '蚁群加载失败，请重试')
+                    TextButton(onPressed: _loadColonies, child: Text(_error!))
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: _colonyId ?? '',
+                      isExpanded: true,
+                      decoration: _fieldDecoration(
+                        _kind == MemorialKind.colony ? '移入的蚁群 *' : '关联蚁群（选填）',
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: '',
+                          child: Text(
+                            _kind == MemorialKind.colony ? '请选择蚁群' : '不关联蚁群',
+                          ),
+                        ),
+                        for (final colony in _colonies)
+                          DropdownMenuItem(
+                            value: colony.id,
+                            child: Text(
+                              colony.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged:
+                          widget.memorial?.kind == MemorialKind.colony ||
+                              widget.colony != null
+                          ? null
+                          : (id) {
+                              setState(() {
+                                _colonyId = id == '' ? null : id;
+                                if (_colonyId != null) {
+                                  final colony = _colonies.firstWhere(
+                                    (c) => c.id == _colonyId,
+                                  );
+                                  if (_name.text.trim().isEmpty ||
+                                      _kind == MemorialKind.colony) {
+                                    _name.text = colony.name;
+                                  }
+                                  if (_species.text.trim().isEmpty ||
+                                      _kind == MemorialKind.colony) {
+                                    _species.text = colony.species ?? '';
+                                  }
+                                }
+                              });
+                            },
+                    ),
+                  if (_kind == MemorialKind.queen)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '关联后可以记录蚁群的后续结局。蚁后离世不会自动结束整个蚁群，也不修改数量。',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _name,
+                    decoration: _fieldDecoration('纪念名称 *'),
+                    textInputAction: TextInputAction.next,
+                    maxLength: 80,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? '请填写纪念名称'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _species,
+                    decoration: _fieldDecoration('品种（选填）'),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 2,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    tileColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerLow,
+                    title: Text(
+                      _kind == MemorialKind.colony ? '整群结束日期（选填）' : '离世日期（选填）',
+                    ),
+                    subtitle: Text(
+                      _diedOn == null ? '未知 / 暂不填写' : chineseDate(_diedOn!),
+                    ),
+                    trailing: _diedOn == null
+                        ? const Icon(Icons.calendar_today_outlined)
+                        : IconButton(
+                            tooltip: '清除日期',
+                            onPressed: () => setState(() => _diedOn = null),
+                            icon: const Icon(Icons.close),
+                          ),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: _diedOn ?? DateTime.now(),
+                        firstDate: DateTime(1900),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null && mounted) {
+                        setState(() => _diedOn = date);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _formSection(
+                title: '告别留言',
+                children: [
+                  TextFormField(
+                    controller: _farewell,
+                    decoration: _fieldDecoration('想对它说的话（选填）'),
+                    minLines: 2,
+                    maxLines: 4,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                elevation: 0,
+                color: Theme.of(context).colorScheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ExpansionTile(
+                  initiallyExpanded: [
+                    _cause,
+                    _observation,
+                    _lesson,
+                  ].any((c) => c.text.trim().isNotEmpty),
+                  maintainState: true,
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  title: Text(
+                    '经验记录（选填）',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  subtitle: Text(
+                    '留一点经验给未来的自己',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  children: [
+                    TextFormField(
+                      controller: _cause,
+                      decoration: _fieldDecoration('离世原因（选填，可写未知）'),
+                      minLines: 1,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _observation,
+                      decoration: _fieldDecoration('最后的观察（选填）'),
+                      minLines: 2,
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _lesson,
+                      decoration: _fieldDecoration('这次学到了什么（选填）'),
+                      minLines: 2,
+                      maxLines: 4,
+                    ),
+                  ],
+                ),
+              ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
                     ),
                   ),
-                  for (final colony in _colonies)
-                    DropdownMenuItem(
-                      value: colony.id,
-                      child: Text(colony.name, overflow: TextOverflow.ellipsis),
-                    ),
-                ],
-                onChanged:
-                    widget.memorial?.kind == MemorialKind.colony ||
-                        widget.colony != null
-                    ? null
-                    : (id) {
-                        setState(() {
-                          _colonyId = id == '' ? null : id;
-                          if (_colonyId != null) {
-                            final colony = _colonies.firstWhere(
-                              (c) => c.id == _colonyId,
-                            );
-                            if (_name.text.trim().isEmpty ||
-                                _kind == MemorialKind.colony) {
-                              _name.text = colony.name;
-                            }
-                            if (_species.text.trim().isEmpty ||
-                                _kind == MemorialKind.colony) {
-                              _species.text = colony.species ?? '';
-                            }
-                          }
-                        });
-                      },
-              ),
-            if (_kind == MemorialKind.queen)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text('关联后可以记录蚁群的后续结局。蚁后离世不会自动结束整个蚁群，也不修改数量。'),
-              ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: '纪念名称 *'),
-              maxLength: 80,
-              validator: (value) =>
-                  value == null || value.trim().isEmpty ? '请填写纪念名称' : null,
-            ),
-            TextFormField(
-              controller: _species,
-              decoration: const InputDecoration(labelText: '品种（选填）'),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                _kind == MemorialKind.colony ? '整群结束日期（选填）' : '离世日期（选填）',
-              ),
-              subtitle: Text(
-                _diedOn == null ? '未知 / 暂不填写' : chineseDate(_diedOn!),
-              ),
-              trailing: _diedOn == null
-                  ? const Icon(Icons.calendar_today_outlined)
-                  : IconButton(
-                      tooltip: '清除日期',
-                      onPressed: () => setState(() => _diedOn = null),
-                      icon: const Icon(Icons.close),
-                    ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: _diedOn ?? DateTime.now(),
-                  firstDate: DateTime(1900),
-                  lastDate: DateTime.now(),
-                );
-                if (date != null && mounted) setState(() => _diedOn = date);
-              },
-            ),
-            TextFormField(
-              controller: _farewell,
-              decoration: const InputDecoration(labelText: '想对它说的话（选填）'),
-              minLines: 2,
-              maxLines: 4,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              '如果愿意，留一点经验给未来的自己',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _cause,
-              decoration: const InputDecoration(labelText: '离世原因（选填，可写未知）'),
-              maxLines: 2,
-            ),
-            TextFormField(
-              controller: _observation,
-              decoration: const InputDecoration(labelText: '最后的观察（选填）'),
-              maxLines: 3,
-            ),
-            TextFormField(
-              controller: _lesson,
-              decoration: const InputDecoration(labelText: '这次学到了什么（选填）'),
-              maxLines: 3,
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
-              ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _saving || _loading ? null : _save,
-              child: Text(_saving ? '保存中…' : '保存纪念'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
