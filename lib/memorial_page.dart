@@ -303,8 +303,8 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
         widget.memorial != null
             ? '编辑纪念'
             : widget.wholeColony
-            ? '整群移入英灵殿'
-            : '添加纪念',
+            ? '帝国飞升'
+            : '飞升英灵殿',
       ),
     ),
     body: AbsorbPointer(
