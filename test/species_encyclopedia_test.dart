@@ -94,7 +94,7 @@ void main() {
   testWidgets('non-bundled species opens its online AntDen entry', (
     tester,
   ) async {
-    final directory = await AntDenSpeciesDirectory.load();
+    final directory = (await tester.runAsync(AntDenSpeciesDirectory.load))!;
     await tester.pumpWidget(
       MaterialApp(
         home: SpeciesEncyclopediaPage(
