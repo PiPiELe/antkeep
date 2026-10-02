@@ -131,6 +131,132 @@ void main() {
     },
   );
 
+  test('incremental restore preserves local rows and photos, adds missing data and undoes', () async {
+    final before = await database.snapshot();
+    final incoming = fixture();
+    incoming['colonies'][0]['name'] = '不应覆盖';
+    incoming['colonies'].add({
+      ...incoming['colonies'][0] as Map<String, Object?>,
+      'id': 'new-colony',
+      'cover_photo_path': 'image.jpg',
+    });
+    incoming['care_records'][0]['note'] = '不应覆盖';
+    incoming['care_records'].add({
+      ...incoming['care_records'][0] as Map<String, Object?>,
+      'id': 'new-record',
+    });
+    incoming['care_records'].add({
+      ...incoming['care_records'][0] as Map<String, Object?>,
+      'id': 'new-colony-record',
+      'colony_id': 'new-colony',
+    });
+    incoming['feeder_records'][0]['note'] = '不应覆盖';
+    incoming['feeder_records'].add({
+      ...incoming['feeder_records'][0] as Map<String, Object?>,
+      'id': 'new-feeder',
+    });
+    incoming['inventory_items'][0]['quantity'] = 99;
+    incoming['inventory_items'].add({
+      ...incoming['inventory_items'][0] as Map<String, Object?>,
+      'id': 'new-item',
+      'name': '新物品',
+    });
+    await service.restoreBytes(
+      archiveBytes(incoming),
+      mode: BackupRestoreMode.incremental,
+    );
+    final after = await database.snapshot();
+    for (final table in before.keys) {
+      expect(after[table], containsAll(before[table] as List));
+    }
+    expect(after['colonies'], hasLength(2));
+    expect(after['care_records'], hasLength(3));
+    expect(after['feeder_records'], hasLength(2));
+    expect(after['inventory_items'], hasLength(2));
+    final imported = (await database.listRecords('new-colony'))
+        .single
+        .photos
+        .single;
+    expect(imported, isNot('image.jpg'));
+    expect((await database.findColony('new-colony'))!.coverPhotoPath, imported);
+    expect(await media.readImage(imported), [9, 9, 9]);
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    await service.undoLastRestore();
+    expect(await database.snapshot(), before);
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
+  });
+
+  test(
+    'repeated incremental import is idempotent and skips same-name inventory',
+    () async {
+      final incoming = fixture();
+      incoming['inventory_items'][0]['id'] = 'different-id';
+      incoming['inventory_items'][0]['group_name'] = '';
+      incoming['inventory_items'][0]['quantity'] = 99;
+      incoming['care_records'][0]['id'] = 'new-record';
+      final bytes = archiveBytes(incoming);
+      await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+      final once = await database.snapshot();
+      final photoPaths = database.photoPaths(once);
+      await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+      expect(await database.snapshot(), once);
+      expect(database.photoPaths(await database.snapshot()), photoPaths);
+      expect((await database.listInventory()).single.id, 'i');
+      expect((await database.listInventory()).single.quantity, 2);
+      expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    },
+  );
+
+  test(
+    'legacy incremental backup retains tables absent from the archive',
+    () async {
+      final before = await database.snapshot();
+      final incoming = fixture()
+        ..remove('feeder_records')
+        ..remove('inventory_items');
+      incoming['colonies'][0]['id'] = 'legacy';
+      incoming['care_records'] = [];
+      await service.restoreBytes(
+        archiveBytes(incoming, media: {}),
+        mode: BackupRestoreMode.incremental,
+      );
+      final after = await database.snapshot();
+      expect(after['colonies'], hasLength(2));
+      for (final table in [
+        'care_records',
+        'feeder_records',
+        'inventory_items',
+      ]) {
+        expect(after[table], before[table]);
+      }
+    },
+  );
+
+  test(
+    'incremental merge exceeding backup limits leaves data and rollback intact',
+    () async {
+      final before = await database.snapshot();
+      final incoming = fixture();
+      incoming['care_records'][0]['id'] = 'new-record';
+      final files = {
+        for (var i = 0; i < 499; i++) 'new-$i.jpg': <int>[i % 256],
+      };
+      incoming['care_records'][0]['photos_json'] = jsonEncode(
+        files.keys.toList(),
+      );
+      await expectLater(
+        service.restoreBytes(
+          archiveBytes(incoming, media: files),
+          mode: BackupRestoreMode.incremental,
+        ),
+        throwsFormatException,
+      );
+      expect(await database.snapshot(), before);
+      expect(await media.readImage('image.jpg'), [1, 2, 3]);
+      expect(await RollbackStore.instance.read(), previousRollback);
+    },
+  );
+
   final corruptions = <String, void Function(Map<String, dynamic>)>{
     'colony date': (d) => d['colonies'][0]['created_at'] = 'not-a-date',
     'optional date': (d) => d['colonies'][0]['acquired_on'] = 'not-a-date',
@@ -160,22 +286,24 @@ void main() {
       'group_name': '',
     }),
   };
-  for (final corruption in corruptions.entries) {
-    test(
-      'rejects ${corruption.key} without changing data, media or rollback',
-      () async {
-        final before = await database.snapshot();
-        final incoming = fixture();
-        corruption.value(incoming);
-        await expectLater(
-          service.restoreBytes(archiveBytes(incoming)),
-          throwsFormatException,
-        );
-        expect(await database.snapshot(), before);
-        expect(await media.readImage('image.jpg'), [1, 2, 3]);
-        expect(await RollbackStore.instance.read(), previousRollback);
-      },
-    );
+  for (final mode in BackupRestoreMode.values) {
+    for (final corruption in corruptions.entries) {
+      test(
+        '$mode rejects ${corruption.key} without changing data, media or rollback',
+        () async {
+          final before = await database.snapshot();
+          final incoming = fixture();
+          corruption.value(incoming);
+          await expectLater(
+            service.restoreBytes(archiveBytes(incoming), mode: mode),
+            throwsFormatException,
+          );
+          expect(await database.snapshot(), before);
+          expect(await media.readImage('image.jpg'), [1, 2, 3]);
+          expect(await RollbackStore.instance.read(), previousRollback);
+        },
+      );
+    }
   }
 
   test('legacy backups may omit newer tables and optional columns', () async {
