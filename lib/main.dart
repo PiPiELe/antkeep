@@ -2111,13 +2111,10 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 child: ListTile(
                   visualDensity: const VisualDensity(vertical: -4),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  minLeadingWidth: 24,
+                  horizontalTitleGap: 8,
                   leading: const Icon(Icons.trending_up),
                   title: const Text('群落自动扩充'),
-                  subtitle: Text(
-                    colony.growth == null
-                        ? '未开启 · 设置卵、茧、工增长规则'
-                        : '${colony.growth!.frequency.label} · ${colony.growth!.path.label} · 自动估算',
-                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () async {
                     await Navigator.of(context).push<bool>(
