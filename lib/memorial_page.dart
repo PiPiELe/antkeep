@@ -101,7 +101,10 @@ class _MemorialPageState extends State<MemorialPage> {
                       Text('为逝去的小生命留一份纪念'),
                       SizedBox(height: 8),
                       Text(
-                        '可以单独纪念蚁后或工蚁，也可以保存整个蚁群的故事。',
+                        '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
+                        '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
+                        '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
+                        '它们无声地来过，却曾竭尽全力地活着。',
                         textAlign: TextAlign.center,
                       ),
                     ],

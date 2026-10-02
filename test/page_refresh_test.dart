@@ -15,6 +15,7 @@ import 'package:sqflite/sqflite.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final tables = <String, List<Map<String, Object?>>>{
+    'app_settings': [],
     'feeder_records': [],
     'colonies': [],
     'care_records': [],
@@ -23,6 +24,7 @@ void main() {
   final records = tables['feeder_records']!;
   late Directory directory;
   bool failColonyDeletion = false;
+  bool failOrderWrite = false;
 
   setUpAll(() async {
     directory = await Directory.systemTemp.createTemp('antkeep-feeder-test-');
@@ -99,6 +101,9 @@ void main() {
             case 'insert':
               final sql = call.arguments['sql'] as String;
               final table = RegExp(r'INTO (\w+)').firstMatch(sql)!.group(1)!;
+              if (table == 'app_settings' && failOrderWrite) {
+                throw PlatformException(code: 'storage_unavailable');
+              }
               final records = tables[table]!;
               final columns = sql
                   .substring(sql.indexOf('(') + 1, sql.indexOf(')'))
@@ -106,6 +111,9 @@ void main() {
                   .map((column) => column.trim())
                   .toList();
               final values = call.arguments['arguments'] as List<dynamic>;
+              if (table == 'app_settings') {
+                records.removeWhere((row) => row['setting_key'] == values.first);
+              }
               final placeholders = sql
                   .substring(sql.lastIndexOf('(') + 1, sql.lastIndexOf(')'))
                   .split(',');
@@ -141,12 +149,14 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  setUp(() {
+  setUp(() async {
     themeController.simpleMode = false;
     failColonyDeletion = false;
+    failOrderWrite = false;
     for (final rows in tables.values) {
       rows.clear();
     }
+    await themeController.load();
   });
 
   tearDown(() {
@@ -176,6 +186,97 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(SnackBar), findsNothing);
   }
+
+  Future<void> showSortableColonies(WidgetTester tester) async {
+    final now = DateTime(2026, 10, 2);
+    for (final id in ['c', 'b', 'a']) {
+      await AppDatabase.instance.saveColony(
+        Colony(id: id, name: id, createdAt: now, updatedAt: now),
+      );
+    }
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> dragColony(WidgetTester tester, String from, String to) async {
+    final start = tester.getCenter(find.text(from));
+    final target = tester.getRect(find.byKey(ValueKey(to)));
+    final end = Offset(
+      start.dx,
+      target.center.dy > start.dy ? target.bottom + 1 : target.top - 1,
+    );
+    final gesture = await tester.startGesture(start);
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    for (var step = 1; step <= 12; step++) {
+      await gesture.moveTo(Offset.lerp(start, end, step / 12)!);
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.up();
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('long press sorts both ways and retains order after reload', (
+    tester,
+  ) async {
+    await showSortableColonies(tester);
+    await dragColony(tester, 'a', 'c');
+    expect(themeController.colonyOrder, ['b', 'c', 'a']);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      greaterThan(tester.getTopLeft(find.byKey(const ValueKey('c'))).dy),
+    );
+    await dragColony(tester, 'a', 'b');
+    expect(themeController.colonyOrder, ['a', 'b', 'c']);
+    await themeController.load();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(themeController.colonyOrder, ['a', 'b', 'c']);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+    );
+    await tester.tap(find.text('b'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ColonyDetailPage>(find.byType(ColonyDetailPage)).colonyId,
+      'b',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed ordering write restores the visible and saved order', (
+    tester,
+  ) async {
+    await showSortableColonies(tester);
+    failOrderWrite = true;
+    await dragColony(tester, 'a', 'c');
+    expect(themeController.colonyOrder, isEmpty);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+    );
+    expect(find.text('保存顺序失败，请重试'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('saved order ignores deleted IDs and appends new colonies', (
+    tester,
+  ) async {
+    await themeController.setColonyOrder(['deleted', 'b', 'a']);
+    await showSortableColonies(tester);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('b'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('a'))).dy),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('c'))).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('growth settings validate counts and persist period and path', (
     tester,
