@@ -82,6 +82,7 @@ flutter:
     - docs/data/antden-species-import.json
     - assets/community/
     - assets/memorial/
+    - assets/images/default-ant-cover.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

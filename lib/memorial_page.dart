@@ -311,6 +311,119 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
     ),
   );
 
+  Widget _dropdownField<T>({
+    required String label,
+    required T value,
+    required List<(T, String)> options,
+    required ValueChanged<T?>? onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The menu needs a known row height to reopen at the selected item.
+        // Measure using the bold selected style and reserve room for its check.
+        var itemHeight = 56.0;
+        for (final (_, text) in options) {
+          final painter =
+              TextPainter(
+                text: TextSpan(
+                  text: text,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                textDirection: Directionality.of(context),
+                textScaler: MediaQuery.textScalerOf(context),
+              )..layout(
+                maxWidth: (constraints.maxWidth - 84).clamp(
+                  1.0,
+                  double.infinity,
+                ),
+              );
+          final height = painter.height + 28;
+          if (height > itemHeight) itemHeight = height;
+          painter.dispose();
+        }
+        return Theme(
+          data: theme.copyWith(
+            focusColor: colors.primary.withValues(alpha: 0.04),
+            hoverColor: colors.primary.withValues(alpha: 0.04),
+          ),
+          child: ButtonTheme(
+            alignedDropdown: true,
+            child: DropdownButtonFormField<T>(
+              initialValue: value,
+              isExpanded: true,
+              decoration: _fieldDecoration(label),
+              borderRadius: BorderRadius.circular(16),
+              dropdownColor: colors.surfaceContainerLow,
+              elevation: 3,
+              menuMaxHeight: 320,
+              itemHeight: itemHeight,
+              icon: const Icon(Icons.expand_more_rounded),
+              iconEnabledColor: colors.primary,
+              selectedItemBuilder: (context) => [
+                for (final (_, text) in options)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              items: [
+                for (final (option, text) in options)
+                  DropdownMenuItem<T>(
+                    value: option,
+                    child: Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(minHeight: 48),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: option == value ? colors.primaryContainer : null,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              text,
+                              style: option == value
+                                  ? TextStyle(
+                                      color: colors.onPrimaryContainer,
+                                      fontWeight: FontWeight.w600,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          if (option == value) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.check_rounded,
+                              size: 20,
+                              color: colors.onPrimaryContainer,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+              onChanged: onChanged,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _formSection({
     required String title,
     required List<Widget> children,
@@ -408,23 +521,16 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
                 title: '纪念信息',
                 children: [
                   if (_kind != MemorialKind.colony)
-                    DropdownButtonFormField<MemorialKind>(
-                      initialValue: _kind,
-                      isExpanded: true,
-                      decoration: _fieldDecoration('纪念类型'),
-                      items: [
+                    _dropdownField<MemorialKind>(
+                      label: '纪念类型',
+                      value: _kind,
+                      options: [
                         for (final kind in [
                           MemorialKind.queen,
                           MemorialKind.worker,
                           MemorialKind.brood,
                         ])
-                          DropdownMenuItem(
-                            value: kind,
-                            child: Text(
-                              kind.label,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                          (kind, kind.label),
                       ],
                       onChanged: widget.memorial != null
                           ? null
@@ -436,27 +542,15 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
                   else if (_error == '蚁群加载失败，请重试')
                     TextButton(onPressed: _loadColonies, child: Text(_error!))
                   else
-                    DropdownButtonFormField<String>(
-                      initialValue: _colonyId ?? '',
-                      isExpanded: true,
-                      decoration: _fieldDecoration(
-                        _kind == MemorialKind.colony ? '移入的蚁群 *' : '关联蚁群（选填）',
-                      ),
-                      items: [
-                        DropdownMenuItem(
-                          value: '',
-                          child: Text(
-                            _kind == MemorialKind.colony ? '请选择蚁群' : '不关联蚁群',
-                          ),
-                        ),
+                    _dropdownField<String>(
+                      label: _kind == MemorialKind.colony
+                          ? '移入的蚁群 *'
+                          : '关联蚁群（选填）',
+                      value: _colonyId ?? '',
+                      options: [
+                        ('', _kind == MemorialKind.colony ? '请选择蚁群' : '不关联蚁群'),
                         for (final colony in _colonies)
-                          DropdownMenuItem(
-                            value: colony.id,
-                            child: Text(
-                              colony.name,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                          (colony.id, colony.name),
                       ],
                       onChanged:
                           widget.memorial?.kind == MemorialKind.colony ||

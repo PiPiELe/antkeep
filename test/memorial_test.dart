@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/domain/colony_growth.dart';
@@ -380,6 +381,120 @@ void main() {
       },
     );
   }
+
+  for (final dark in [false, true]) {
+    for (final wholeColony in [false, true]) {
+      testWidgets(
+        'memorial selectors handle long names and scrolling at narrow width dark=$dark whole=$wholeColony',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(320, 740));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          const longName = '最后一个需要完整阅读名称的收获蚁观察群落';
+          await tester.runAsync(() async {
+            for (var i = 0; i < 14; i++) {
+              await db.saveColony(
+                Colony(
+                  id: 'dropdown-$i',
+                  name: i == 13 ? longName : '观察蚁群 $i',
+                  species: '收获蚁',
+                  createdAt: now,
+                  updatedAt: i == 13
+                      ? now.subtract(const Duration(minutes: 1))
+                      : now.add(Duration(minutes: i)),
+                ),
+              );
+            }
+          });
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: antKeepTheme(ThemeColor.rose, dark: dark),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: const TextScaler.linear(1.4)),
+                child: child!,
+              ),
+              home: MemorialFormPage(wholeColony: wholeColony),
+            ),
+          );
+          await settle(tester);
+          if (!wholeColony) {
+            await tester.tap(
+              find.byType(DropdownButtonFormField<MemorialKind>),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            await tester.tap(find.text(MemorialKind.brood.label).last);
+            await tester.pumpAndSettle();
+            expect(find.text(MemorialKind.brood.epitaph), findsOneWidget);
+          } else {
+            expect(
+              find.byType(DropdownButtonFormField<MemorialKind>),
+              findsNothing,
+            );
+          }
+          final selector = find.byType(DropdownButtonFormField<String>);
+          await tester.ensureVisible(selector);
+          await tester.tap(selector);
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text(longName),
+            120,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(longName).last);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          final nameField = tester.widget<TextFormField>(
+            find.widgetWithText(TextFormField, '纪念名称 *'),
+          );
+          expect(nameField.controller!.text, longName);
+          await tester.ensureVisible(selector);
+          await tester.tap(selector);
+          await tester.pumpAndSettle();
+          expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+          // Dismissing an open menu must keep the chosen colony.
+          await tester.tapAt(const Offset(4, 100));
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<DropdownButtonFormField<String>>(selector)
+                .initialValue,
+            'dropdown-13',
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
+  testWidgets('linked memorial edit keeps locked selectors closed', (
+    tester,
+  ) async {
+    final existing = memorial(
+      'locked',
+      MemorialKind.queen,
+      colonyId: colony.id,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MemorialFormPage(memorial: existing, colony: colony),
+      ),
+    );
+    await settle(tester);
+    final kind = find.byType(DropdownButtonFormField<MemorialKind>);
+    await tester.tap(kind);
+    await tester.pumpAndSettle();
+    expect(find.text(MemorialKind.brood.label), findsNothing);
+    final linked = find.byType(DropdownButtonFormField<String>);
+    await tester.ensureVisible(linked);
+    await tester.tap(linked);
+    await tester.pumpAndSettle();
+    expect(find.text('不关联蚁群'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'editing experience preserves text across collapsing and saving on a narrow screen',

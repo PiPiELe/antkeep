@@ -2471,24 +2471,36 @@ class _ColonyProfileSummary extends StatelessWidget {
             );
     }
 
+    final defaultCover = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.asset(
+        'assets/images/default-ant-cover.png',
+        width: double.infinity,
+        height: 88,
+        fit: BoxFit.contain,
+        semanticLabel: '默认蚂蚁封面',
+      ),
+    );
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('蚂蚁品种', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
         Row(
           children: [
-            Expanded(
+            Flexible(
               child: Text(
-                colony.species ?? '未填写品种',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                '蚂蚁品种：${colony.species ?? '未填写品种'}',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
             if (!themeController.simpleMode &&
                 colony.species?.trim().isNotEmpty == true)
               TextButton.icon(
-                icon: const Icon(Icons.menu_book_outlined),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 48),
+                  textStyle: Theme.of(context).textTheme.bodySmall,
+                ),
+                icon: const Icon(Icons.menu_book_outlined, size: 16),
                 label: const Text('百科'),
                 onPressed: () {
                   final species = colony.species!.trim();
@@ -2505,6 +2517,16 @@ class _ColonyProfileSummary extends StatelessWidget {
               ),
           ],
         ),
+        const SizedBox(height: 8),
+        colony.coverPhotoPath == null
+            ? defaultCover
+            : _StoredImage(
+                relativePath: colony.coverPhotoPath!,
+                width: double.infinity,
+                height: 88,
+                borderRadius: 8,
+                fallback: defaultCover,
+              ),
         if (colony.isNewQueenColony || workers != null) ...[
           const SizedBox(height: 8),
           _ColonyTags(colony: colony, workers: workers),
@@ -2859,15 +2881,6 @@ class _ColonySummary extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (colony.coverPhotoPath != null) ...[
-              _StoredImage(
-                relativePath: colony.coverPhotoPath!,
-                width: double.infinity,
-                height: 180,
-                borderRadius: 12,
-              ),
-              const SizedBox(height: 8),
-            ],
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -3161,7 +3174,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
                         GrowthPath.eggToCocoonToWorker,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: '蛹数',
+                  labelText: '茧数',
                   helperText: _incremental ? '增加数量' : '当前总数',
                 ),
               ),
@@ -3278,7 +3291,7 @@ class _RecordCard extends StatelessWidget {
       if (record.humidity != null) '${record.humidity}%',
       if (record.eggCount != null) '卵 ${record.eggCount}',
       if (record.larvaCount != null) '幼虫 ${record.larvaCount}',
-      if (record.pupaCount != null) '蛹 ${record.pupaCount}',
+      if (record.pupaCount != null) '茧 ${record.pupaCount}',
       if (record.workerCount != null) '工蚁 ${record.workerCount}',
       if (record.workerMortalityCount != null)
         '工蚁死亡 ${record.workerMortalityCount}',
@@ -5245,12 +5258,14 @@ class _StoredImage extends StatelessWidget {
     required this.width,
     required this.height,
     required this.borderRadius,
+    this.fallback,
   });
 
   final String relativePath;
   final double width;
   final double height;
   final double borderRadius;
+  final Widget? fallback;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<Uint8List>(
@@ -5264,7 +5279,7 @@ class _StoredImage extends StatelessWidget {
         );
       }
       if (snapshot.hasError || snapshot.data == null) {
-        return _missingImage(context);
+        return fallback ?? _missingImage(context);
       }
       return ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
@@ -5273,7 +5288,8 @@ class _StoredImage extends StatelessWidget {
           width: width,
           height: height,
           fit: BoxFit.cover,
-          errorBuilder: (_, error, stackTrace) => _missingImage(context),
+          errorBuilder: (_, error, stackTrace) =>
+              fallback ?? _missingImage(context),
         ),
       );
     },

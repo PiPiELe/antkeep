@@ -1420,7 +1420,7 @@ void main() {
         await tester.tap(find.text('从新后养起'));
         await tester.pumpAndSettle();
         final profileCard = find.ancestor(
-          of: find.text('蚂蚁品种'),
+          of: find.textContaining('蚂蚁品种：'),
           matching: find.byType(Card),
         );
         expect(
@@ -1553,7 +1553,7 @@ void main() {
     await tester.tap(find.text('编辑前'));
     await tester.pumpAndSettle();
     final profileCard = find.ancestor(
-      of: find.text('蚂蚁品种'),
+      of: find.textContaining('蚂蚁品种：'),
       matching: find.byType(Card),
     );
     expect(
