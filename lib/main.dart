@@ -13,7 +13,6 @@ import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'account_controller.dart';
-import 'personal_center_page.dart';
 import 'lottery_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
@@ -4493,8 +4492,22 @@ Future<void> _renameColonyTab(BuildContext context, ColonyTab tab) async {
   );
 }
 
+enum SettingsCategory {
+  appearance('外观与展示', Icons.palette_outlined),
+  online('在线服务', Icons.cloud_outlined),
+  reminders('养护提醒', Icons.notifications_active_outlined),
+  data('数据管理', Icons.storage_outlined),
+  help('帮助与反馈', Icons.help_outline),
+  about('关于与更新', Icons.info_outline);
+
+  const SettingsCategory(this.title, this.icon);
+  final String title;
+  final IconData icon;
+}
+
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.category});
+  final SettingsCategory? category;
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -4529,7 +4542,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([themeController, appUpdateController]),
+    animation: Listenable.merge([
+      themeController,
+      appUpdateController,
+      onlineController,
+    ]),
     builder: (context, _) => _buildSettings(context),
   );
 
@@ -4569,348 +4586,422 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       );
 
-  Widget _buildSettings(BuildContext context) => Center(
+  Widget _settingsList(List<Widget> children) => Center(
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 640),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          _section(context, '展示模式', [
-            SwitchListTile(
-              secondary: const Icon(Icons.view_agenda_outlined),
-              title: const Text('简化模式'),
-              subtitle: const Text('只展示蚁群、日常记录和设置；关闭后恢复全部功能入口，已有数据保留'),
-              value: themeController.simpleMode,
-              onChanged: _savingSimpleMode ? null : _setSimpleMode,
-            ),
-            for (final tab in ColonyTab.values)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: Text('${tab.defaultName}菜单名称'),
-                subtitle: Text(themeController.colonyTabName(tab)),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _renameColonyTab(context, tab),
-              ),
-          ]),
-          _section(context, '使用版本', [
-            ListTile(
-              leading: Icon(
-                themeController.edition == AppEdition.offline
-                    ? Icons.phonelink_lock_outlined
-                    : Icons.cloud_download_outlined,
-              ),
-              title: const Text('资料模式'),
-              subtitle: Text(
-                themeController.edition == AppEdition.offline
-                    ? '使用内置资料，断网可用；启动时会联网检查 Android 更新。'
-                    : '在线版可获取公共资料，并会匿名检查 Android 更新。',
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final edition in AppEdition.values)
-                    ChoiceChip(
-                      label: Text(edition.label),
-                      selected: themeController.edition == edition,
-                      onSelected: _savingEdition
-                          ? null
-                          : (selected) {
-                              if (!selected) return;
-                              _setEdition(edition);
-                            },
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                '蚁群、记录和照片都只保存在本设备。',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            OnlineSettings(
-              controller: onlineController,
-              updates: appUpdateController,
-              useOffline: () => _setEdition(AppEdition.offline),
-            ),
-          ]),
-          if (!themeController.simpleMode &&
-              themeController.edition == AppEdition.online &&
-              appUpdateController.availability !=
-                  AppUpdateAvailability.required)
-            _section(context, '个人中心', [
-              ListTile(
-                leading: const Icon(Icons.manage_accounts_outlined),
-                title: const Text('个人中心与签到'),
-                subtitle: const Text('登录账号，查看每日签到记录'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        PersonalCenterPage(controller: accountController),
-                  ),
-                ),
-              ),
-            ]),
-          _section(context, '外观与偏好', [
-            const ListTile(
-              leading: Icon(Icons.palette_outlined),
-              title: Text('主题色'),
-              subtitle: Text('选择喜欢的颜色，保存在本机'),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ThemeColorPicker(
-                selected: themeController.themeColor,
-                onChanged: (color) async {
-                  try {
-                    await themeController.setThemeColor(color);
-                  } catch (error) {
-                    if (context.mounted) _showError(context, error);
-                  }
-                },
-              ),
-            ),
-            const ListTile(
-              leading: Icon(Icons.dark_mode_outlined),
-              title: Text('外观模式'),
-              subtitle: Text('跟随系统，或固定使用浅色、深色界面'),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ThemeModePicker(
-                selected: themeController.themeMode,
-                onChanged: (mode) async {
-                  try {
-                    await themeController.setThemeMode(mode);
-                  } catch (error) {
-                    if (context.mounted) _showError(context, error);
-                  }
-                },
-              ),
-            ),
-            const Divider(height: 1),
-            SwitchListTile(
-              secondary: const Icon(Icons.lightbulb_outline),
-              title: const Text('新手注意事项'),
-              subtitle: const Text('在蚁群首页显示养蚁新手注意事项'),
-              value: themeController.beginner,
-              onChanged: (enabled) async {
-                try {
-                  await themeController.setBeginner(enabled);
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-          ]),
-          _section(context, '养护提醒', [
-            SwitchListTile(
-              secondary: const Icon(Icons.notifications_active_outlined),
-              title: const Text('本地养护提醒'),
-              subtitle: Text(
-                themeController.careRemindersEnabled
-                    ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
-                    : '关闭；开启后仅向系统申请通知权限',
-              ),
-              value: themeController.careRemindersEnabled,
-              onChanged: (enabled) async {
-                try {
-                  if (enabled) {
-                    final granted = await LocalNotificationService.instance
-                        .requestPermission();
-                    if (!granted) {
-                      if (context.mounted) {
-                        _showInfo(context, '未获得通知权限，提醒没有开启。');
-                      }
-                      return;
-                    }
-                    await LocalNotificationService.instance
-                        .scheduleDailyCareReminder(
-                          themeController.careReminderMinuteOfDay,
-                        );
-                  } else {
-                    await LocalNotificationService.instance
-                        .cancelDailyCareReminder();
-                  }
-                  await themeController.setCareReminder(
-                    enabled: enabled,
-                    minuteOfDay: themeController.careReminderMinuteOfDay,
-                  );
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-            ListTile(
-              enabled: themeController.careRemindersEnabled,
-              leading: const Icon(Icons.schedule_outlined),
-              title: const Text('提醒时间'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: Text(
-                '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}',
-              ),
-              onTap: !themeController.careRemindersEnabled
-                  ? null
-                  : () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay(
-                          hour: themeController.careReminderMinuteOfDay ~/ 60,
-                          minute: themeController.careReminderMinuteOfDay % 60,
-                        ),
-                      );
-                      if (picked == null || !context.mounted) return;
-                      final minuteOfDay = picked.hour * 60 + picked.minute;
-                      try {
-                        await LocalNotificationService.instance
-                            .scheduleDailyCareReminder(minuteOfDay);
-                        await themeController.setCareReminder(
-                          enabled: true,
-                          minuteOfDay: minuteOfDay,
-                        );
-                      } catch (error) {
-                        if (context.mounted) _showError(context, error);
-                      }
-                    },
-            ),
-          ]),
-          _section(context, '交流与反馈', [
-            ListTile(
-              leading: const Icon(Icons.qr_code_2_outlined),
-              title: const Text('交流群二维码'),
-              subtitle: const Text('微信、抖音交流群'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CommunityGroupsPage()),
-              ),
-            ),
-          ]),
-          _section(context, '数据与备份', [
-            ListTile(
-              leading: const Icon(Icons.cloud_upload_outlined),
-              title: const Text('数据推送'),
-              subtitle: const Text('选择物品栏数据推送到 B 端，每天一次'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => InventoryPushPage(
-                    controller: onlineController,
-                    loadItems: AppDatabase.instance.listInventory,
-                  ),
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.upload_file_outlined),
-              title: const Text('导出备份'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: const Text('生成包含记录和照片的 .zip 文件'),
-              onTap: () async {
-                try {
-                  final exported = await BackupService(
-                    AppDatabase.instance,
-                    LocalMediaStore.instance,
-                  ).exportBackup();
-                  if (exported && context.mounted) {
-                    _showInfo(context, '已完成备份导出。');
-                  }
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.download_outlined),
-              title: const Text('恢复备份'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: const Text('恢复会替换本机现有蚁群与记录'),
-              onTap: () async {
-                final approved = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('恢复并替换本地数据？'),
-                    content: const Text('当前蚁群和记录会被选中的备份替换。请先导出当前数据。'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('取消'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('选择备份'),
-                      ),
-                    ],
-                  ),
-                );
-                if (approved != true || !context.mounted) return;
-                try {
-                  final restored = await BackupService(
-                    AppDatabase.instance,
-                    LocalMediaStore.instance,
-                  ).restoreBackup();
-                  if (restored && context.mounted) {
-                    _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
-                  }
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.undo_outlined),
-              title: const Text('撤销上一次恢复'),
-              trailing: const Icon(Icons.chevron_right),
-              subtitle: const Text('恢复覆盖前自动保留的本地回退副本'),
-              onTap: () async {
-                final service = BackupService(
-                  AppDatabase.instance,
-                  LocalMediaStore.instance,
-                );
-                final hasRollback = await service.hasRollback();
-                if (!context.mounted) return;
-                if (!hasRollback) {
-                  _showInfo(context, '没有可撤销的恢复操作。');
-                  return;
-                }
-                final approved = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('撤销上一次恢复？'),
-                    content: const Text('当前数据会被恢复前自动保存的本地副本替换。'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('取消'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('撤销恢复'),
-                      ),
-                    ],
-                  ),
-                );
-                if (approved != true || !context.mounted) return;
-                try {
-                  await service.undoLastRestore();
-                  if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
-                } catch (error) {
-                  if (context.mounted) _showError(context, error);
-                }
-              },
-            ),
-          ]),
-        ],
+        children: children,
       ),
     ),
   );
+
+  Widget _categoryTile(BuildContext context, SettingsCategory category) {
+    final subtitle = switch (category) {
+      SettingsCategory.appearance =>
+        '${themeController.themeColor.label} · ${themeController.simpleMode ? '简化模式' : '完整模式'}',
+      SettingsCategory.online =>
+        '${themeController.edition.label} · ${onlineController.user?.username ?? '账号与公共资料'}',
+      SettingsCategory.reminders =>
+        themeController.careRemindersEnabled
+            ? '已开启 · 每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}'
+            : '未开启 · 设置每日提醒',
+      SettingsCategory.data => '数据推送、备份与恢复',
+      SettingsCategory.help => '使用指南、交流群',
+      SettingsCategory.about => switch (appUpdateController.availability) {
+        AppUpdateAvailability.required => '在线服务需更新 · 点此查看',
+        AppUpdateAvailability.optional =>
+          '发现新版本 ${appUpdateController.policy?.latestVersion}',
+        AppUpdateAvailability.none => '当前版本、检查更新',
+      },
+    };
+    return ListTile(
+      leading: Icon(category.icon),
+      title: Text(category.title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SettingsPage(category: category),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettings(BuildContext context) {
+    final category = widget.category;
+    if (category != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(category.title)),
+        body: _settingsList(_categoryContents(context, category)),
+      );
+    }
+    return _settingsList([
+      _section(context, '通用', [
+        for (final category in [
+          SettingsCategory.appearance,
+          SettingsCategory.online,
+          SettingsCategory.reminders,
+        ])
+          _categoryTile(context, category),
+      ]),
+      _section(context, '数据与支持', [
+        for (final category in [
+          SettingsCategory.data,
+          SettingsCategory.help,
+          SettingsCategory.about,
+        ])
+          _categoryTile(context, category),
+      ]),
+    ]);
+  }
+
+  List<Widget> _categoryContents(
+    BuildContext context,
+    SettingsCategory category,
+  ) => switch (category) {
+    SettingsCategory.appearance => [
+      _section(context, '展示模式', [
+        SwitchListTile(
+          secondary: const Icon(Icons.view_agenda_outlined),
+          title: const Text('简化模式'),
+          subtitle: const Text('只展示蚁群、日常记录和设置；关闭后恢复全部功能入口，已有数据保留'),
+          value: themeController.simpleMode,
+          onChanged: _savingSimpleMode ? null : _setSimpleMode,
+        ),
+        for (final tab in ColonyTab.values)
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: Text('${tab.defaultName}菜单名称'),
+            subtitle: Text(themeController.colonyTabName(tab)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _renameColonyTab(context, tab),
+          ),
+      ]),
+      _section(context, '外观与偏好', [
+        const ListTile(
+          leading: Icon(Icons.palette_outlined),
+          title: Text('主题色'),
+          subtitle: Text('选择喜欢的颜色，保存在本机'),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: ThemeColorPicker(
+            selected: themeController.themeColor,
+            onChanged: (color) async {
+              try {
+                await themeController.setThemeColor(color);
+              } catch (error) {
+                if (context.mounted) _showError(context, error);
+              }
+            },
+          ),
+        ),
+        const ListTile(
+          leading: Icon(Icons.dark_mode_outlined),
+          title: Text('外观模式'),
+          subtitle: Text('跟随系统，或固定使用浅色、深色界面'),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: ThemeModePicker(
+            selected: themeController.themeMode,
+            onChanged: (mode) async {
+              try {
+                await themeController.setThemeMode(mode);
+              } catch (error) {
+                if (context.mounted) _showError(context, error);
+              }
+            },
+          ),
+        ),
+        const Divider(height: 1),
+        SwitchListTile(
+          secondary: const Icon(Icons.lightbulb_outline),
+          title: const Text('新手注意事项'),
+          subtitle: const Text('在蚁群首页显示养蚁新手注意事项'),
+          value: themeController.beginner,
+          onChanged: (enabled) async {
+            try {
+              await themeController.setBeginner(enabled);
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+      ]),
+    ],
+    SettingsCategory.online => [
+      _section(context, '资料模式与账号', [
+        ListTile(
+          leading: Icon(
+            themeController.edition == AppEdition.offline
+                ? Icons.phonelink_lock_outlined
+                : Icons.cloud_download_outlined,
+          ),
+          title: const Text('资料模式'),
+          subtitle: Text(
+            themeController.edition == AppEdition.offline
+                ? '使用内置资料，断网可用；启动时会联网检查 Android 更新。'
+                : '在线版可获取公共资料，并会匿名检查 Android 更新。',
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final edition in AppEdition.values)
+                ChoiceChip(
+                  label: Text(edition.label),
+                  selected: themeController.edition == edition,
+                  onSelected: _savingEdition
+                      ? null
+                      : (selected) {
+                          if (!selected) return;
+                          _setEdition(edition);
+                        },
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            '蚁群、记录和照片都只保存在本设备。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        OnlineSettings(
+          controller: onlineController,
+          section: OnlineSettingsSection.account,
+          updates: appUpdateController,
+          useOffline: () => _setEdition(AppEdition.offline),
+        ),
+      ]),
+    ],
+    SettingsCategory.reminders => [
+      _section(context, '养护提醒', [
+        SwitchListTile(
+          secondary: const Icon(Icons.notifications_active_outlined),
+          title: const Text('本地养护提醒'),
+          subtitle: Text(
+            themeController.careRemindersEnabled
+                ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
+                : '关闭；开启后仅向系统申请通知权限',
+          ),
+          value: themeController.careRemindersEnabled,
+          onChanged: (enabled) async {
+            try {
+              if (enabled) {
+                final granted = await LocalNotificationService.instance
+                    .requestPermission();
+                if (!granted) {
+                  if (context.mounted) {
+                    _showInfo(context, '未获得通知权限，提醒没有开启。');
+                  }
+                  return;
+                }
+                await LocalNotificationService.instance
+                    .scheduleDailyCareReminder(
+                      themeController.careReminderMinuteOfDay,
+                    );
+              } else {
+                await LocalNotificationService.instance
+                    .cancelDailyCareReminder();
+              }
+              await themeController.setCareReminder(
+                enabled: enabled,
+                minuteOfDay: themeController.careReminderMinuteOfDay,
+              );
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+        ListTile(
+          enabled: themeController.careRemindersEnabled,
+          leading: const Icon(Icons.schedule_outlined),
+          title: const Text('提醒时间'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: Text(
+            '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}',
+          ),
+          onTap: !themeController.careRemindersEnabled
+              ? null
+              : () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(
+                      hour: themeController.careReminderMinuteOfDay ~/ 60,
+                      minute: themeController.careReminderMinuteOfDay % 60,
+                    ),
+                  );
+                  if (picked == null || !context.mounted) return;
+                  final minuteOfDay = picked.hour * 60 + picked.minute;
+                  try {
+                    await LocalNotificationService.instance
+                        .scheduleDailyCareReminder(minuteOfDay);
+                    await themeController.setCareReminder(
+                      enabled: true,
+                      minuteOfDay: minuteOfDay,
+                    );
+                  } catch (error) {
+                    if (context.mounted) _showError(context, error);
+                  }
+                },
+        ),
+      ]),
+    ],
+    SettingsCategory.data => [
+      _section(context, '数据管理', [
+        ListTile(
+          leading: const Icon(Icons.cloud_upload_outlined),
+          title: const Text('数据推送'),
+          subtitle: const Text('选择物品栏数据推送到 B 端，每天一次'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => InventoryPushPage(
+                controller: onlineController,
+                loadItems: AppDatabase.instance.listInventory,
+              ),
+            ),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.upload_file_outlined),
+          title: const Text('导出备份'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: const Text('生成包含记录和照片的 .zip 文件'),
+          onTap: () async {
+            try {
+              final exported = await BackupService(
+                AppDatabase.instance,
+                LocalMediaStore.instance,
+              ).exportBackup();
+              if (exported && context.mounted) {
+                _showInfo(context, '已完成备份导出。');
+              }
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.download_outlined),
+          title: const Text('恢复备份'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: const Text('恢复会替换本机现有蚁群与记录'),
+          onTap: () async {
+            final approved = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('恢复并替换本地数据？'),
+                content: const Text('当前蚁群和记录会被选中的备份替换。请先导出当前数据。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('取消'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('选择备份'),
+                  ),
+                ],
+              ),
+            );
+            if (approved != true || !context.mounted) return;
+            try {
+              final restored = await BackupService(
+                AppDatabase.instance,
+                LocalMediaStore.instance,
+              ).restoreBackup();
+              if (restored && context.mounted) {
+                _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
+              }
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.undo_outlined),
+          title: const Text('撤销上一次恢复'),
+          trailing: const Icon(Icons.chevron_right),
+          subtitle: const Text('恢复覆盖前自动保留的本地回退副本'),
+          onTap: () async {
+            final service = BackupService(
+              AppDatabase.instance,
+              LocalMediaStore.instance,
+            );
+            final hasRollback = await service.hasRollback();
+            if (!context.mounted) return;
+            if (!hasRollback) {
+              _showInfo(context, '没有可撤销的恢复操作。');
+              return;
+            }
+            final approved = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('撤销上一次恢复？'),
+                content: const Text('当前数据会被恢复前自动保存的本地副本替换。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('取消'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('撤销恢复'),
+                  ),
+                ],
+              ),
+            );
+            if (approved != true || !context.mounted) return;
+            try {
+              await service.undoLastRestore();
+              if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
+            } catch (error) {
+              if (context.mounted) _showError(context, error);
+            }
+          },
+        ),
+      ]),
+    ],
+    SettingsCategory.help => [
+      _section(context, '帮助与反馈', [
+        OnlineSettings(
+          controller: onlineController,
+          section: OnlineSettingsSection.help,
+          updates: appUpdateController,
+          useOffline: () => _setEdition(AppEdition.offline),
+        ),
+        ListTile(
+          leading: const Icon(Icons.qr_code_2_outlined),
+          title: const Text('交流群二维码'),
+          subtitle: const Text('微信、抖音交流群'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const CommunityGroupsPage()),
+          ),
+        ),
+      ]),
+    ],
+    SettingsCategory.about => [
+      _section(context, '版本与更新', [
+        OnlineSettings(
+          controller: onlineController,
+          section: OnlineSettingsSection.updates,
+          updates: appUpdateController,
+          useOffline: () => _setEdition(AppEdition.offline),
+        ),
+      ]),
+    ],
+  };
 }
 
 class _StoredImage extends StatelessWidget {
