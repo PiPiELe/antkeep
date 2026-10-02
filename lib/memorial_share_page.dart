@@ -11,7 +11,7 @@ const memorialPosterSize = Size(400, 900);
 const _gold = Color(0xffc9ad79);
 final _memorialArtwork = <MemorialKind, Future<ui.Image>>{};
 
-/// Each memorial kind has its own bundled artwork, shared by preview and PNG.
+/// Bundled memorial artwork is shared by preview and PNG.
 Future<ui.Image> loadMemorialArtwork(MemorialKind kind) =>
     _memorialArtwork.putIfAbsent(kind, () => _decodeMemorialArtwork(kind));
 
@@ -20,6 +20,7 @@ Future<ui.Image> _decodeMemorialArtwork(MemorialKind kind) async {
     final asset = switch (kind) {
       MemorialKind.queen => 'ant-monarch.png',
       MemorialKind.worker => 'ant-warrior.png',
+      MemorialKind.brood => 'ant-brood-v3.png',
       MemorialKind.colony => 'ant-monument-v2.png',
     };
     final data = await rootBundle.load('assets/memorial/$asset');
@@ -139,6 +140,7 @@ class MemorialPosterPainter extends CustomPainter {
     final subtitle = switch (memorial.kind) {
       MemorialKind.queen => '一朝为后，一生守望',
       MemorialKind.worker => '身虽微小，亦曾守护山河',
+      MemorialKind.brood => '尚未羽化，亦值得被铭记',
       MemorialKind.colony => '城邦归于寂静，文明长存于记忆',
     };
     _text(

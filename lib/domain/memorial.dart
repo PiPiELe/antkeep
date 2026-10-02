@@ -1,6 +1,7 @@
 enum MemorialKind {
   queen('蚁后死亡', '君王死社稷'),
   worker('工蚁死亡', '将士守山河'),
+  brood('幼体夭折（幼虫／蛹／茧）', '未绽放的生命'),
   colony('整群结束', '遗失的文明');
 
   const MemorialKind(this.label, this.epitaph);

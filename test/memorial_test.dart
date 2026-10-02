@@ -83,6 +83,42 @@ void main() {
     expect((await db.listMemorials()).every((m) => m.colonyId == null), isTrue);
   });
 
+  test('brood memorial persists, edits and restores without changing colony counts', () async {
+    final original = memorial('brood', MemorialKind.brood, colonyId: colony.id);
+    await db.saveMemorial(original);
+    await db.saveMemorial(
+      Memorial.fromMap({...original.toMap(), 'farewell': '尚未羽化，亦值得被铭记'}),
+    );
+    final current = (await db.findColony(colony.id))!;
+    expect(current.toMap(), colony.toMap());
+    final snapshot = await db.snapshot();
+    BackupData.validate(snapshot);
+    await db.replaceAll(snapshot);
+    final reopened = await openDatabase(
+      '${directory.path}/antkeep/antkeep.sqlite',
+      readOnly: true,
+      singleInstance: false,
+    );
+    try {
+      final saved = Memorial.fromMap(
+        (await reopened.query('memorials')).single,
+      );
+      expect(saved.kind, MemorialKind.brood);
+      expect(saved.colonyId, colony.id);
+      expect(saved.diedOn, isNull);
+      expect(saved.farewell, '尚未羽化，亦值得被铭记');
+    } finally {
+      await reopened.close();
+    }
+    await db.saveMemorial(
+      memorial('end', MemorialKind.colony, colonyId: colony.id),
+    );
+    await db.restoreMemorialColony('end');
+    expect((await db.listMemorials()).single.kind, MemorialKind.brood);
+    await db.deleteMemorial(original.id);
+    expect(await db.listMemorials(), isEmpty);
+  });
+
   test(
     'standalone queen can be linked later and persists on a second connection',
     () async {
@@ -314,30 +350,36 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('standalone worker entry can be saved without colony or date', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const MaterialApp(home: MemorialFormPage()));
-    await settle(tester);
-    expect(find.byType(TombstoneIcon), findsOneWidget);
-    expect(find.text('君王死社稷'), findsOneWidget);
-    await tester.tap(find.byType(DropdownButtonFormField<MemorialKind>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('工蚁死亡').last);
-    await tester.pumpAndSettle();
-    expect(find.text('将士守山河'), findsOneWidget);
-    final name = find.widgetWithText(TextFormField, '纪念名称 *');
-    await tester.ensureVisible(name);
-    await tester.enterText(name, '勇敢的工蚁');
-    await tapVisible(tester, '保存纪念');
-    final saved = (await tester.runAsync(db.listMemorials))!.single;
-    expect(saved.kind, MemorialKind.worker);
-    expect(saved.colonyId, isNull);
-    expect(saved.diedOn, isNull);
-    expect(saved.name, '勇敢的工蚁');
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+  for (final (kind, label, epitaph) in [
+    (MemorialKind.worker, '工蚁死亡', '将士守山河'),
+    (MemorialKind.brood, '幼体夭折（幼虫／蛹／茧）', '未绽放的生命'),
+  ]) {
+    testWidgets(
+      'standalone ${kind.name} entry can be saved without colony or date',
+      (tester) async {
+        await tester.pumpWidget(const MaterialApp(home: MemorialFormPage()));
+        await settle(tester);
+        expect(find.byType(TombstoneIcon), findsOneWidget);
+        expect(find.text('君王死社稷'), findsOneWidget);
+        await tester.tap(find.byType(DropdownButtonFormField<MemorialKind>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+        expect(find.text(epitaph), findsOneWidget);
+        final name = find.widgetWithText(TextFormField, '纪念名称 *');
+        await tester.ensureVisible(name);
+        await tester.enterText(name, '小小生命');
+        await tapVisible(tester, '保存纪念');
+        final saved = (await tester.runAsync(db.listMemorials))!.single;
+        expect(saved.kind, kind);
+        expect(saved.colonyId, isNull);
+        expect(saved.diedOn, isNull);
+        expect(saved.name, '小小生命');
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   testWidgets(
     'queen continuation archives whole colony and links both memorials',

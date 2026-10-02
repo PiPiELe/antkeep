@@ -37,7 +37,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 18,
+      version: 19,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -83,6 +83,18 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int newVersion,
   ) async {
     if (oldVersion < 18) await _createMemorialTable(database);
+    if (oldVersion == 18) {
+      // Rebuild the CHECK constraint while retaining all existing memorials.
+      await database.execute('ALTER TABLE memorials RENAME TO memorials_old');
+      await database.execute('DROP INDEX memorial_colony_end');
+      await _createMemorialTable(database);
+      await database.execute('''INSERT INTO memorials
+        (id, kind, name, colony_id, species, died_on, farewell, cause,
+         observation, lesson, created_at)
+        SELECT id, kind, name, colony_id, species, died_on, farewell, cause,
+         observation, lesson, created_at FROM memorials_old''');
+      await database.execute('DROP TABLE memorials_old');
+    }
     if (oldVersion < 17) {
       await database.execute(
         'ALTER TABLE care_records ADD COLUMN worker_mortality_count INTEGER '
@@ -196,7 +208,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   static Future<void> _createMemorialTable(DatabaseExecutor db) async {
     await db.execute("""CREATE TABLE memorials (
-      id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('queen', 'worker', 'colony')),
+      id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('queen', 'worker', 'brood', 'colony')),
       name TEXT NOT NULL, colony_id TEXT, species TEXT, died_on TEXT,
       farewell TEXT, cause TEXT, observation TEXT, lesson TEXT, created_at TEXT NOT NULL,
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE SET NULL

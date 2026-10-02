@@ -103,6 +103,7 @@ class _MemorialPageState extends State<MemorialPage> {
                       Text(
                         '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
                         '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
+                        '纪念每一个尚未羽化、便早早沉睡的小小生命，\n'
                         '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
                         '它们无声地来过，却曾竭尽全力地活着。',
                         textAlign: TextAlign.center,
@@ -325,9 +326,14 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
             if (_kind != MemorialKind.colony)
               DropdownButtonFormField<MemorialKind>(
                 initialValue: _kind,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: '纪念类型'),
                 items: [
-                  for (final kind in [MemorialKind.queen, MemorialKind.worker])
+                  for (final kind in [
+                    MemorialKind.queen,
+                    MemorialKind.worker,
+                    MemorialKind.brood,
+                  ])
                     DropdownMenuItem(value: kind, child: Text(kind.label)),
                 ],
                 onChanged: widget.memorial != null
@@ -548,7 +554,7 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
         title: Text(restore ? '恢复到饲养列表？' : '删除这份纪念？'),
         content: Text(
           restore
-              ? '将撤销本次整群纪念，原有档案、日记和蚁后、工蚁纪念保留。自动扩充保持关闭，需要时可重新设置。'
+              ? '将撤销本次整群纪念，原有档案、日记和蚁后、工蚁、幼体纪念保留。自动扩充保持关闭，需要时可重新设置。'
               : '仅删除这份纪念，不影响关联蚁群和养护记录。',
         ),
         actions: [
