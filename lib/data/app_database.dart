@@ -242,6 +242,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
             'colonies',
             {
               'archived': 1,
+              'development_path': Colony.fromMap(colonies.single)
+                  .developmentPath
+                  .name,
               'auto_growth_json': null,
               'updated_at': DateTime.now().toIso8601String(),
             },
@@ -433,6 +436,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         whereArgs: [colony.id],
         orderBy: 'occurred_at ASC, created_at ASC, id ASC',
       )).map(CareRecord.fromMap).toList();
+      final recordIds = records.map((record) => record.id).toSet();
       var population = GrowthPopulation(
         eggs: colony.initialEggCount,
         larvae: colony.initialLarvaCount,
@@ -452,11 +456,16 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
             workers: record.workerCount ?? population.workers,
           );
         }
+        final recordId =
+            'growth:${colony.id}:${growth.startedAt.toIso8601String()}:$cycle';
+        // Incremental restore can import settled cycles while retaining an
+        // older local watermark. Keep their snapshots without applying twice.
+        if (recordIds.contains(recordId)) continue;
         population = growth.advance(population);
         await txn.insert(
           'care_records',
           CareRecord(
-            id: 'growth:${colony.id}:${growth.startedAt.toIso8601String()}:$cycle',
+            id: recordId,
             colonyId: colony.id,
             type: CareRecordType.observation,
             occurredAt: due,

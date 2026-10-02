@@ -113,6 +113,73 @@ void main() {
     },
   );
 
+  for (final path in GrowthPath.values) {
+    test(
+      'archiving legacy ${path.name} preserves history and development path',
+      () async {
+        final start = DateTime(2040, 1, 1);
+        final legacy = colony.toMap()
+          ..['initial_larva_count'] = 5
+          ..['initial_cocoon_count'] = path == GrowthPath.eggToWorker ? 0 : 5
+          ..['development_path'] = null
+          ..['auto_growth_json'] = ColonyGrowth(
+            frequency: GrowthFrequency.daily,
+            path: path,
+            startedAt: start,
+            workers: 1,
+          ).encode();
+        final record = CareRecord(
+          id: 'history',
+          colonyId: colony.id,
+          type: CareRecordType.observation,
+          occurredAt: now,
+          createdAt: now,
+          photos: ['history.jpg'],
+          note: '旧日记',
+        );
+        await db.replaceAll({
+          'colonies': [legacy],
+          'care_records': [record.toMap()],
+        });
+        await db.saveMemorial(
+          memorial('end', MemorialKind.colony, colonyId: colony.id),
+        );
+        final archived = (await db.findColony(colony.id))!;
+        expect(archived.developmentPath, path);
+        expect(archived.growth, isNull);
+        expect(
+          (await db.listRecords(colony.id)).single.toMap(),
+          record.toMap(),
+        );
+        final snapshot = await db.snapshot();
+        BackupData.validate(snapshot);
+        await db.replaceAll(snapshot);
+        await db.restoreMemorialColony('end');
+        final restored = (await db.findColony(colony.id))!;
+        expect(restored.developmentPath, path);
+        expect(restored.growth, isNull);
+        expect(restored.coverPhotoPath, colony.coverPhotoPath);
+        await db.saveRecord(
+          CareRecord(
+            id: 'worker',
+            colonyId: colony.id,
+            type: CareRecordType.observation,
+            occurredAt: start,
+            createdAt: start,
+            workerCount: 1,
+          ),
+          incremental: true,
+        );
+        final population = restored.currentPopulation(
+          await db.listRecords(colony.id),
+        );
+        expect(population.workers, 31);
+        expect(population.larvae, path == GrowthPath.eggToWorker ? 4 : 5);
+        expect(population.cocoons, path == GrowthPath.eggToWorker ? 0 : 4);
+      },
+    );
+  }
+
   test('whole colony archives atomically, retains history and restores without growth catch-up', () async {
     await db.saveRecord(
       CareRecord(

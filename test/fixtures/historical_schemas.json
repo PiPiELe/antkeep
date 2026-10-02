@@ -1,0 +1,198 @@
+{
+  "description": "Frozen CREATE statements from historical app_database.dart commits; intentionally independent of current migrations. Versions 11 and 12 have no standalone schema commit in main history.",
+  "statements": {
+    "s1": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0), specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0, initial_egg_count INTEGER, initial_cocoon_count INTEGER, auto_growth_json TEXT, initial_larva_count INTEGER, development_path TEXT, nest_type TEXT, target_temperature_lower REAL, target_temperature REAL, target_humidity_lower REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s2": "CREATE TABLE care_records ( id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, record_type TEXT NOT NULL, occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL, egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER, worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000), photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE )",
+    "s3": "CREATE INDEX records_by_colony_time ON care_records(colony_id, occurred_at DESC)",
+    "s4": "CREATE TABLE app_settings ( setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL )",
+    "s5": "CREATE TABLE inventory_items ( id TEXT PRIMARY KEY, name TEXT NOT NULL, group_name TEXT, purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER, purchased_at TEXT, expires_at TEXT, quantity INTEGER CHECK (quantity >= 0), purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0) )",
+    "s6": "CREATE UNIQUE INDEX inventory_name_in_group ON inventory_items(COALESCE(group_name, ''), name)",
+    "s7": "CREATE TABLE feeder_records ( id TEXT PRIMARY KEY, feeder_type TEXT NOT NULL, record_type TEXT NOT NULL, occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL, juvenile_count INTEGER, adult_count INTEGER, mortality_count INTEGER, purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0), created_at TEXT NOT NULL )",
+    "s8": "CREATE INDEX feeder_records_by_type_time ON feeder_records(feeder_type, occurred_at DESC)",
+    "s9": "CREATE TABLE care_records ( id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, record_type TEXT NOT NULL, occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL, egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER, photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE )",
+    "s10": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0), specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0, initial_egg_count INTEGER, initial_cocoon_count INTEGER, auto_growth_json TEXT, nest_type TEXT, target_temperature_lower REAL, target_temperature REAL, target_humidity_lower REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s11": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0), specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0, initial_egg_count INTEGER, initial_cocoon_count INTEGER, nest_type TEXT, target_temperature_lower REAL, target_temperature REAL, target_humidity_lower REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s12": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0), specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0, initial_egg_count INTEGER, initial_cocoon_count INTEGER, nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s13": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0, initial_egg_count INTEGER, initial_cocoon_count INTEGER, nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s14": "CREATE TABLE inventory_items ( id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER, purchased_at TEXT, expires_at TEXT, quantity INTEGER CHECK (quantity >= 0) )",
+    "s15": "CREATE TABLE feeder_records ( id TEXT PRIMARY KEY, feeder_type TEXT NOT NULL, record_type TEXT NOT NULL, occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL, juvenile_count INTEGER, adult_count INTEGER, mortality_count INTEGER, created_at TEXT NOT NULL )",
+    "s16": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, initial_egg_count INTEGER, initial_cocoon_count INTEGER, nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s17": "CREATE TABLE inventory_items ( id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER, purchased_at TEXT, expires_at TEXT )",
+    "s18": "CREATE TABLE inventory_items ( id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL )",
+    "s19": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s20": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, nest_type TEXT, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s21": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, nest_type TEXT, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )"
+  },
+  "versions": {
+    "1": {
+      "commit": "ad13009543299082ac88318808704685e05366b1",
+      "statements": [
+        "s21",
+        "s9",
+        "s3"
+      ]
+    },
+    "2": {
+      "commit": "fa57aa2cbb96ada56b29df432bf094d83407cb1d",
+      "statements": [
+        "s21",
+        "s9",
+        "s3",
+        "s4"
+      ]
+    },
+    "3": {
+      "commit": "95d9426eec24e8f262cdb40fbea3cac01bdd689c",
+      "statements": [
+        "s20",
+        "s9",
+        "s3",
+        "s4"
+      ]
+    },
+    "4": {
+      "commit": "e0a8519744ddcc5e80bfd4641d579a25f1900f3a",
+      "statements": [
+        "s19",
+        "s9",
+        "s3",
+        "s4"
+      ]
+    },
+    "5": {
+      "commit": "15a916fdb84d316e7ab5ac62884d342ee50b73b5",
+      "statements": [
+        "s19",
+        "s9",
+        "s3",
+        "s4",
+        "s18"
+      ]
+    },
+    "6": {
+      "commit": "b6fcd4a74fec192fc0fb027b90c7285a5ba2b952",
+      "statements": [
+        "s19",
+        "s9",
+        "s3",
+        "s4",
+        "s18",
+        "s15",
+        "s8"
+      ]
+    },
+    "7": {
+      "commit": "6e8cb57be9f6a43a429d99f7f0b04d24a3a9173f",
+      "statements": [
+        "s16",
+        "s9",
+        "s3",
+        "s4",
+        "s18",
+        "s15",
+        "s8"
+      ]
+    },
+    "8": {
+      "commit": "89ed07d1525d1eea82bfccb9b8691847a53f43b9",
+      "statements": [
+        "s16",
+        "s9",
+        "s3",
+        "s4",
+        "s17",
+        "s15",
+        "s8"
+      ]
+    },
+    "9": {
+      "commit": "7ff9c5e80b018772b346e28384a6efc247a85386",
+      "statements": [
+        "s16",
+        "s9",
+        "s3",
+        "s4",
+        "s14",
+        "s15",
+        "s8"
+      ]
+    },
+    "10": {
+      "commit": "cdab4b8a061715728c1859de6da5c5fb691db1fe",
+      "statements": [
+        "s13",
+        "s9",
+        "s3",
+        "s4",
+        "s14",
+        "s15",
+        "s8"
+      ]
+    },
+    "13": {
+      "commit": "1d270ff25f4252225eb37788e5deff144387a0d5",
+      "statements": [
+        "s12",
+        "s9",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    },
+    "14": {
+      "commit": "359a0c86a7de87c0333ee9257f9bdcc4074145f9",
+      "statements": [
+        "s11",
+        "s9",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    },
+    "15": {
+      "commit": "e18e9dda47e129ca364cf03f9661ccb1d6eec5c1",
+      "statements": [
+        "s10",
+        "s9",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    },
+    "16": {
+      "commit": "b1a7567e68ce2f0b8f32b7f42d67e7841fc3041a",
+      "statements": [
+        "s1",
+        "s9",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    },
+    "17": {
+      "commit": "045f3d11b5e17990531a9960fda5af7d46c3e671",
+      "statements": [
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    }
+  }
+}

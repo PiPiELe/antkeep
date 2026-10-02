@@ -680,7 +680,7 @@ void main() {
     expect(tables['colonies']!.single['purchase_price_cents'], 1999);
     await tester.tap(find.text('购入价测试'));
     await tester.pumpAndSettle();
-    expect(find.text('购入价 ¥19.99'), findsOneWidget);
+    expect(find.text('¥19.99'), findsOneWidget);
     for (final value in ['0', '']) {
       await tester.tap(find.byTooltip('编辑蚁群'));
       await tester.pumpAndSettle();
@@ -699,10 +699,7 @@ void main() {
         tables['colonies']!.single['purchase_price_cents'],
         value.isEmpty ? null : 0,
       );
-      expect(
-        find.text('购入价 ¥0.00'),
-        value.isEmpty ? findsNothing : findsOneWidget,
-      );
+      expect(find.text('¥0.00'), value.isEmpty ? findsNothing : findsOneWidget);
     }
   });
 

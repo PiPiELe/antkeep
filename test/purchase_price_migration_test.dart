@@ -35,6 +35,13 @@ void main() {
         await applicationDatabasePath(),
         version: 10,
         onCreate: (db, _) async {
+          await db.execute('''CREATE TABLE care_records (
+            id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, record_type TEXT NOT NULL,
+            occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL,
+            egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER,
+            photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL,
+            FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
+          )''');
           await db.execute('''CREATE TABLE colonies (
           id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT,
           source TEXT, queen_count INTEGER, initial_worker_count INTEGER,

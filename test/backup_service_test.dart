@@ -7,6 +7,7 @@ import 'package:antkeep/data/backup_service.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/data/rollback_store.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/memorial.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
@@ -113,6 +114,59 @@ void main() {
     });
     previousRollback = await service.createBackupBytes();
     await RollbackStore.instance.save(previousRollback);
+  });
+
+  test('incremental growth restore preserves history and resumes exactly once', () async {
+    final now = DateTime.now();
+    final start = now.subtract(const Duration(days: 2));
+    final colony = Colony(
+      id: 'growth',
+      name: '旧蚁群',
+      createdAt: start,
+      updatedAt: start,
+      initialWorkerCount: 10,
+      initialEggCount: 10,
+      initialLarvaCount: 10,
+      initialCocoonCount: 10,
+      developmentPath: GrowthPath.eggToWorker,
+    );
+    await database.saveColony(colony);
+    final rule = ColonyGrowth(
+      frequency: GrowthFrequency.daily,
+      path: GrowthPath.eggToWorker,
+      startedAt: start,
+      eggs: 0,
+      larvae: 0,
+      workers: 1,
+    );
+    await database.configureColonyGrowth(colony.id, rule, now: start);
+    final olderBackup = await service.createBackupBytes();
+    await database.applyColonyGrowth(now: now);
+    final history = (await database.snapshot())['care_records'];
+    final newerBackup = await service.createBackupBytes();
+    await service.restoreBytes(olderBackup);
+    await service.restoreBytes(
+      newerBackup,
+      mode: BackupRestoreMode.incremental,
+    );
+    await database.listColonies();
+    expect((await database.snapshot())['care_records'], history);
+    expect((await database.findColony(colony.id))!.growth!.completedCycles, 2);
+    final records = await database.listRecords(colony.id);
+    expect(records.map((r) => r.workerCount), [12, 11]);
+    // Importing again and restarting from a snapshot must not duplicate cycles.
+    await service.restoreBytes(
+      newerBackup,
+      mode: BackupRestoreMode.incremental,
+    );
+    await database.replaceAll(await database.snapshot());
+    await database.applyColonyGrowth(now: rule.dueAt(3));
+    final next = await database.listRecords(colony.id);
+    expect(next, hasLength(3));
+    expect(next.first.workerCount, 13);
+    expect(next.first.larvaCount, 10);
+    expect(next.skip(1).map((r) => r.toMap()), records.map((r) => r.toMap()));
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
   });
 
   test(
