@@ -2162,11 +2162,50 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 now: DateTime.now(),
               ),
             ),
-            const SizedBox(height: 12),
-            Text('养蚁日记', style: Theme.of(context).textTheme.titleLarge),
-            if (detail.records.isNotEmpty)
-              Text('点击日记编辑，左滑删除', style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 20, 8, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.auto_stories_outlined,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '养蚁日记',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (detail.records.isNotEmpty)
+                        Text(
+                          '${detail.records.length} 条记录',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                    ],
+                  ),
+                  if (detail.records.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '轻点编辑 · 左滑删除',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             if (detail.records.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
