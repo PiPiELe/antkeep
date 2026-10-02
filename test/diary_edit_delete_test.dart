@@ -4,6 +4,9 @@ import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/share_cards_page.dart';
+import 'package:antkeep/widgets/share_card_poster.dart';
+import 'package:antkeep/domain/share_card_data.dart';
 import 'package:antkeep/widgets/diary_record_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -142,6 +145,26 @@ void main() {
     await tester.ensureVisible(find.byType(DiaryRecordActions));
     await settleDatabase(tester);
   }
+
+  testWidgets('diary share opens selected record without editing it', (
+    tester,
+  ) async {
+    final original = record();
+    await tester.runAsync(() => db.saveRecord(original));
+    await openDiary(tester);
+    await tester.tap(find.byTooltip('生成日记卡片'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ShareCardsPage), findsOneWidget);
+    final poster = tester.widget<ShareCardPoster>(find.byType(ShareCardPoster));
+    expect(poster.kind, ShareCardKind.diary);
+    expect(poster.diary!.id, original.id);
+    expect(find.text('编辑日记'), findsNothing);
+    await tester.pageBack();
+    await settleDatabase(tester);
+    final records = await tester.runAsync(() => db.listRecords(colony.id));
+    expect(records!.single.note, original.note);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'tap edits existing values and preserves counts and photos on save',

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
 import 'colony_growth_page.dart';
+import 'share_cards_page.dart';
 import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
@@ -2063,6 +2064,16 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
           title: Text(colony.name),
           actions: [
             IconButton(
+              tooltip: '生成分享图',
+              icon: const Icon(Icons.ios_share_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ShareCardsPage(colony: colony, records: detail.records),
+                ),
+              ),
+            ),
+            IconButton(
               tooltip: '编辑蚁群',
               icon: const Icon(Icons.edit_outlined),
               onPressed: _deleting
@@ -2236,7 +2247,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 key: ValueKey(record.id),
                 onEdit: () => _editRecord(colony, record),
                 onDelete: () => _deleteRecord(record),
-                child: _RecordCard(record: record, colony: colony),
+                child: _RecordCard(
+                  record: record,
+                  colony: colony,
+                  onShare: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ShareCardsPage(
+                        colony: colony,
+                        records: detail.records,
+                        initialRecord: record,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -3094,7 +3117,8 @@ class _RecordFormPageState extends State<RecordFormPage> {
 }
 
 class _RecordCard extends StatelessWidget {
-  const _RecordCard({required this.record, this.colony});
+  const _RecordCard({required this.record, this.colony, this.onShare});
+  final VoidCallback? onShare;
   final CareRecord record;
   final Colony? colony;
   @override
@@ -3136,15 +3160,26 @@ class _RecordCard extends StatelessWidget {
                 Icon(_icon(record.type)),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    record.type.label,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        record.type.label,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        _dateTime(record.occurredAt),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  _dateTime(record.occurredAt),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                if (onShare != null)
+                  IconButton(
+                    tooltip: '生成日记卡片',
+                    icon: const Icon(Icons.ios_share_outlined, size: 20),
+                    onPressed: onShare,
+                  ),
               ],
             ),
             if (record.note?.isNotEmpty == true) ...[
