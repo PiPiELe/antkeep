@@ -17,11 +17,13 @@ class ShareCardsPage extends StatefulWidget {
     required this.colony,
     required this.records,
     this.initialRecord,
+    this.initialKind,
     this.now,
   });
   final Colony colony;
   final List<CareRecord> records;
   final CareRecord? initialRecord;
+  final ShareCardKind? initialKind;
   final DateTime? now;
   @override
   State<ShareCardsPage> createState() => _ShareCardsPageState();
@@ -51,9 +53,11 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
         widget.records.where((r) => r.colonyId == widget.colony.id).toList()
           ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
     _diary = widget.initialRecord ?? _records.firstOrNull;
-    _kind = widget.initialRecord == null
-        ? ShareCardKind.colony
-        : ShareCardKind.diary;
+    _kind =
+        widget.initialKind ??
+        (widget.initialRecord == null
+            ? ShareCardKind.colony
+            : ShareCardKind.diary);
     _to = shareDay(_now);
     _from = _records.isEmpty
         ? shareDay(widget.colony.acquiredOn ?? widget.colony.createdAt)

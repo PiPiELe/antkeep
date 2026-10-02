@@ -6,6 +6,12 @@ import 'package:antkeep/population_analysis_page.dart';
 import 'package:antkeep/colony_growth_page.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/domain/memorial.dart';
+import 'package:antkeep/domain/share_card_data.dart';
+import 'package:antkeep/share_content_page.dart';
+import 'package:antkeep/share_cards_page.dart';
+import 'package:antkeep/memorial_share_page.dart';
+import 'package:antkeep/widgets/share_card_poster.dart';
 import 'package:antkeep/species_encyclopedia_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,11 +26,13 @@ void main() {
     'colonies': [],
     'care_records': [],
     'inventory_items': [],
+    'memorials': [],
   };
   final records = tables['feeder_records']!;
   late Directory directory;
   bool failColonyDeletion = false;
   bool failOrderWrite = false;
+  bool failShareRead = false;
 
   setUpAll(() async {
     directory = await Directory.systemTemp.createTemp('antkeep-feeder-test-');
@@ -54,6 +62,9 @@ void main() {
               final arguments =
                   (call.arguments['arguments'] as List<dynamic>?) ?? [];
               final table = RegExp(r'FROM (\w+)').firstMatch(sql)!.group(1)!;
+              if (failShareRead && table == 'memorials') {
+                throw PlatformException(code: 'read_failed');
+              }
               final filter = RegExp(r'WHERE (\w+) = \?')
                   .firstMatch(sql)
                   ?.group(1);
@@ -112,7 +123,9 @@ void main() {
                   .toList();
               final values = call.arguments['arguments'] as List<dynamic>;
               if (table == 'app_settings') {
-                records.removeWhere((row) => row['setting_key'] == values.first);
+                records.removeWhere(
+                  (row) => row['setting_key'] == values.first,
+                );
               }
               final placeholders = sql
                   .substring(sql.lastIndexOf('(') + 1, sql.lastIndexOf(')'))
@@ -153,6 +166,7 @@ void main() {
     themeController.simpleMode = false;
     failColonyDeletion = false;
     failOrderWrite = false;
+    failShareRead = false;
     for (final rows in tables.values) {
       rows.clear();
     }
@@ -162,6 +176,109 @@ void main() {
   tearDown(() {
     themeController.simpleMode = false;
   });
+
+  testWidgets('home share stays available across tabs and simple mode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('分享'), findsOneWidget);
+    await tester.tap(find.text('英灵殿').first);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('分享'), findsOneWidget);
+    await tester.tap(find.byTooltip('分享'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ShareContentPage), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    themeController.simpleMode = true;
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('分享'), findsOneWidget);
+    expect(find.text('分析'), findsNothing);
+    await tester.tap(find.byTooltip('分享'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ShareContentPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('share selection handles empty data and retries failed loading', (
+    tester,
+  ) async {
+    failShareRead = true;
+    await tester.pumpWidget(const MaterialApp(home: ShareContentPage()));
+    await tester.pumpAndSettle();
+    expect(find.text('加载失败，点击重试'), findsOneWidget);
+    failShareRead = false;
+    await tester.tap(find.text('加载失败，点击重试'));
+    await tester.pumpAndSettle();
+    expect(find.text('还没有蚁群，请先添加蚁群'), findsOneWidget);
+    await tester.tap(find.text('纪念分享图'));
+    await tester.pumpAndSettle();
+    expect(find.text('还没有纪念，请先在英灵殿添加'), findsOneWidget);
+  });
+
+  testWidgets(
+    'share selection routes selected colony and template or memorial',
+    (tester) async {
+      final now = DateTime.now();
+      for (final id in ['a', 'b']) {
+        tables['colonies']!.add(
+          Colony(id: id, name: '蚁群$id', createdAt: now, updatedAt: now).toMap(),
+        );
+        tables['care_records']!.add(
+          CareRecord(
+            id: 'record-$id',
+            colonyId: id,
+            type: CareRecordType.observation,
+            occurredAt: now,
+            createdAt: now,
+            note: '日记$id',
+          ).toMap(),
+        );
+      }
+      final memorial = Memorial(
+        id: 'm',
+        kind: MemorialKind.queen,
+        name: '纪念测试',
+        createdAt: now,
+      );
+      tables['memorials']!.add(memorial.toMap());
+      await tester.pumpWidget(const MaterialApp(home: ShareContentPage()));
+      await tester.pumpAndSettle();
+      for (final kind in ShareCardKind.values) {
+        await tester.tap(find.widgetWithText(ChoiceChip, kind.label));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('蚁群b'));
+        await tester.pumpAndSettle();
+        final page = tester.widget<ShareCardsPage>(find.byType(ShareCardsPage));
+        expect(page.colony.id, 'b');
+        expect(page.records.map((r) => r.colonyId), ['b']);
+        expect(
+          tester.widget<ShareCardPoster>(find.byType(ShareCardPoster)).kind,
+          kind,
+        );
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text('纪念分享图'));
+      await tester.pumpAndSettle();
+      expect(find.text('蚁群b'), findsNothing);
+      await tester.tap(find.text('纪念测试'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        tester
+            .widget<MemorialSharePage>(find.byType(MemorialSharePage))
+            .memorial
+            .id,
+        'm',
+      );
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   Future<void> tapSave(WidgetTester tester, String label) async {
     FocusManager.instance.primaryFocus?.unfocus();

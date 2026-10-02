@@ -12,6 +12,7 @@ import 'colony_growth_page.dart';
 import 'memorial_page.dart';
 import 'widgets/tombstone_icon.dart';
 import 'share_cards_page.dart';
+import 'share_content_page.dart';
 import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
@@ -454,6 +455,13 @@ class _HomePageState extends State<HomePage>
               icon: const Icon(Icons.show_chart),
               label: const Text('分析'),
             ),
+          IconButton(
+            tooltip: '分享',
+            icon: const Icon(Icons.ios_share_outlined),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ShareContentPage())),
+          ),
         ],
       ),
       body: Column(
