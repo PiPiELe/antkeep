@@ -575,12 +575,14 @@ typedef _ColonyListEntry = ({
 class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
   bool _editingAcquiredOn = false;
+  bool _savingOrder = false;
+  bool _dragging = false;
 
   Timer? _growthTimer;
   AppLifecycleListener? _growthLifecycle;
 
   void _refreshGrowth() {
-    if (mounted) setState(_reload);
+    if (mounted && !_savingOrder && !_dragging) setState(_reload);
   }
 
   @override
@@ -606,7 +608,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
   }
 
   Future<List<_ColonyListEntry>> _loadColonies() async {
-    final colonies = await AppDatabase.instance.listColonies();
+    final loaded = await AppDatabase.instance.listColonies();
+    final remaining = {for (final colony in loaded) colony.id: colony};
+    final colonies = <Colony>[
+      for (final id in themeController.colonyOrder)
+        if (remaining.containsKey(id)) remaining.remove(id)!,
+      ...remaining.values,
+    ];
     return Future.wait(
       colonies.map((colony) async {
         final records = await AppDatabase.instance.listRecords(colony.id);
@@ -618,6 +626,35 @@ class _ColoniesPageState extends State<ColoniesPage> {
         );
       }),
     );
+  }
+
+  Future<void> _reorderColonies(
+    List<_ColonyListEntry> colonies,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (_savingOrder) return;
+    if (newIndex == oldIndex) return;
+    final previous = List<_ColonyListEntry>.of(colonies);
+    setState(() {
+      _savingOrder = true;
+      colonies.insert(newIndex, colonies.removeAt(oldIndex));
+    });
+    try {
+      await themeController.setColonyOrder(
+        colonies.map((entry) => entry.colony.id),
+      );
+    } catch (_) {
+      colonies
+        ..clear()
+        ..addAll(previous);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('保存顺序失败，请重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _savingOrder = false);
+    }
   }
 
   Future<void> _editAcquiredOn(Colony colony) async {
@@ -661,26 +698,58 @@ class _ColoniesPageState extends State<ColoniesPage> {
             message: '新入手时建立一窝蚁群，再独立记录投喂、环境、数量和照片。',
           );
         }
-        return RefreshIndicator(
-          onRefresh: () async => setState(_reload),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            itemCount: colonies.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) => _ColonyCard(
-              colony: colonies[index].colony,
-              population: colonies[index].population,
-              workers: colonies[index].workers,
-              onDurationTap: () => _editAcquiredOn(colonies[index].colony),
-              onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ColonyDetailPage(colonyId: colonies[index].colony.id),
+        return AbsorbPointer(
+          absorbing: _savingOrder,
+          child: RefreshIndicator(
+            onRefresh: () async {
+              setState(_reload);
+              await _colonies;
+            },
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              buildDefaultDragHandles: false,
+              header: colonies.length > 1
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        '长按蚁群卡片可上下拖动排序',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    )
+                  : null,
+              itemCount: colonies.length,
+              onReorderStart: (_) => _dragging = true,
+              onReorderEnd: (_) => _dragging = false,
+              onReorderItem: (oldIndex, newIndex) =>
+                  _reorderColonies(colonies, oldIndex, newIndex),
+              itemBuilder: (context, index) =>
+                  ReorderableDelayedDragStartListener(
+                    key: ValueKey(colonies[index].colony.id),
+                    index: index,
+                    enabled: colonies.length > 1 && !_savingOrder,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == colonies.length - 1 ? 0 : 10,
+                      ),
+                      child: _ColonyCard(
+                        colony: colonies[index].colony,
+                        population: colonies[index].population,
+                        workers: colonies[index].workers,
+                        onDurationTap: () =>
+                            _editAcquiredOn(colonies[index].colony),
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ColonyDetailPage(
+                                colonyId: colonies[index].colony.id,
+                              ),
+                            ),
+                          );
+                          if (mounted) setState(_reload);
+                        },
+                      ),
+                    ),
                   ),
-                );
-                if (mounted) setState(_reload);
-              },
             ),
           ),
         );
