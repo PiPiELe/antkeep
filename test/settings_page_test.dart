@@ -48,6 +48,8 @@ void main() {
               for (final entry in settings.entries)
                 {'setting_key': entry.key, 'setting_value': entry.value},
             ];
+          case 'update':
+            return 0; // Bundled inventory seed maintenance.
           case 'insert':
             if (failWrites) {
               throw PlatformException(code: 'storage_unavailable');
@@ -241,7 +243,7 @@ void main() {
     expect(restarted.colonyTabName(ColonyTab.memorial), '星光纪念馆');
     await tester.tap(find.text('星光纪念馆'));
     await tester.pumpAndSettle();
-    expect(find.text('星光纪念馆 · 敬请期待'), findsOneWidget);
+    expect(find.text('单独添加纪念'), findsOneWidget);
     await tester.longPress(find.text('星光纪念馆'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '   ');
@@ -256,7 +258,7 @@ void main() {
     await tester.tap(find.text('恢复默认'));
     await tester.pumpAndSettle();
     expect(find.text('英灵殿'), findsOneWidget);
-    expect(find.text('英灵殿 · 敬请期待'), findsOneWidget);
+    expect(find.text('单独添加纪念'), findsOneWidget);
     await restarted.load();
     expect(restarted.colonyTabName(ColonyTab.memorial), '英灵殿');
     expect(restarted.colonyTabName(ColonyTab.colonies), '蚂蚁之家');

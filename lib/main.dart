@@ -9,6 +9,8 @@ import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
 import 'colony_growth_page.dart';
+import 'memorial_page.dart';
+import 'widgets/tombstone_icon.dart';
 import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
@@ -391,11 +393,14 @@ class _HomePageState extends State<HomePage>
         index: _colonyTabs.index,
         children: [
           const ColoniesPage(),
-          _EmptyState(
-            icon: Icons.local_florist_outlined,
-            title:
-                '${themeController.colonyTabName(ColonyTab.memorial)} · 敬请期待',
-            message: '为逝去的小生命留一份纪念。\n这里将用于记录死亡的蚂蚁，具体功能规划中。',
+          MemorialPage(
+            onOpenColony: (context, id) async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ColonyDetailPage(colonyId: id),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -571,6 +576,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
   bool _editingAcquiredOn = false;
 
+  StreamSubscription<void>? _memorialChanges;
   Timer? _growthTimer;
   AppLifecycleListener? _growthLifecycle;
 
@@ -580,6 +586,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
 
   @override
   void dispose() {
+    _memorialChanges?.cancel();
     _growthTimer?.cancel();
     _growthLifecycle?.dispose();
     super.dispose();
@@ -589,6 +596,9 @@ class _ColoniesPageState extends State<ColoniesPage> {
   void initState() {
     super.initState();
     _reload();
+    _memorialChanges = AppDatabase.instance.memorialChanges.listen(
+      (_) => _refreshGrowth(),
+    );
     _growthTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _refreshGrowth(),
@@ -2058,42 +2068,66 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         appBar: AppBar(
           title: Text(colony.name),
           actions: [
-            IconButton(
-              tooltip: '编辑蚁群',
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: _deleting
-                  ? null
-                  : () async {
-                      final saved = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => ColonyFormPage(colony: colony),
-                        ),
-                      );
-                      if (saved == true && mounted) setState(_reload);
-                    },
-            ),
-            IconButton(
-              tooltip: '删除蚁群',
-              icon: const Icon(Icons.delete_outline),
-              color: Theme.of(context).colorScheme.error,
-              onPressed: _deleting ? null : () => _deleteColony(colony),
-            ),
+            if (!colony.archived)
+              IconButton(
+                tooltip: '移入英灵殿',
+                icon: const TombstoneIcon(),
+                onPressed: _deleting
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => MemorialFormPage(
+                              wholeColony: true,
+                              colony: colony,
+                            ),
+                          ),
+                        );
+                        if (saved == true && context.mounted) {
+                          Navigator.of(context).pop(true);
+                        }
+                      },
+              ),
+            if (!colony.archived)
+              IconButton(
+                tooltip: '编辑蚁群',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: _deleting
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => ColonyFormPage(colony: colony),
+                          ),
+                        );
+                        if (saved == true && mounted) setState(_reload);
+                      },
+              ),
+            if (!colony.archived)
+              IconButton(
+                tooltip: '删除蚁群',
+                icon: const Icon(Icons.delete_outline),
+                color: Theme.of(context).colorScheme.error,
+                onPressed: _deleting ? null : () => _deleteColony(colony),
+              ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          icon: const Icon(Icons.add),
-          label: const Text('添加记录'),
-          onPressed: _deleting
-              ? null
-              : () async {
-                  final saved = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => RecordFormPage(colony: colony),
-                    ),
-                  );
-                  if (saved == true && mounted) setState(_reload);
-                },
-        ),
+        floatingActionButton: colony.archived
+            ? null
+            : FloatingActionButton.extended(
+                icon: const Icon(Icons.add),
+                label: const Text('添加记录'),
+                onPressed: _deleting
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => RecordFormPage(colony: colony),
+                          ),
+                        );
+                        if (saved == true && mounted) setState(_reload);
+                      },
+              ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
@@ -2101,11 +2135,13 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               colony: colony,
               workers: colony.currentWorkerCount(detail.records),
               records: detail.records,
-              onDurationTap: () => _editAcquiredOn(colony),
+              onDurationTap: colony.archived
+                  ? null
+                  : () => _editAcquiredOn(colony),
             ),
             const SizedBox(height: 4),
             _ColonySummary(colony: colony),
-            if (!themeController.simpleMode) ...[
+            if (!themeController.simpleMode && !colony.archived) ...[
               const SizedBox(height: 4),
               Card(
                 child: ListTile(
@@ -2135,7 +2171,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               expanded: _populationExpanded,
               showForecast: _showForecast,
               forecastHorizon: _forecastHorizon,
-              onConfigureGrowth: themeController.simpleMode
+              onConfigureGrowth: themeController.simpleMode || colony.archived
                   ? null
                   : () async {
                       final saved = await Navigator.of(context).push<bool>(
@@ -2206,7 +2242,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                         ),
                     ],
                   ),
-                  if (detail.records.isNotEmpty) ...[
+                  if (detail.records.isNotEmpty && !colony.archived) ...[
                     const SizedBox(height: 6),
                     Text(
                       '轻点编辑 · 左滑删除',
@@ -2228,12 +2264,14 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ),
               ),
             ...detail.records.map(
-              (record) => DiaryRecordActions(
-                key: ValueKey(record.id),
-                onEdit: () => _editRecord(colony, record),
-                onDelete: () => _deleteRecord(record),
-                child: _RecordCard(record: record, colony: colony),
-              ),
+              (record) => colony.archived
+                  ? _RecordCard(record: record, colony: colony)
+                  : DiaryRecordActions(
+                      key: ValueKey(record.id),
+                      onEdit: () => _editRecord(colony, record),
+                      onDelete: () => _deleteRecord(record),
+                      child: _RecordCard(record: record, colony: colony),
+                    ),
             ),
           ],
         ),
@@ -2258,7 +2296,7 @@ class _ColonyProfileSummary extends StatelessWidget {
   final Colony colony;
   final int? workers;
   final List<CareRecord> records;
-  final VoidCallback onDurationTap;
+  final VoidCallback? onDurationTap;
 
   String get _sourceLabel => (colony.source ?? '').trim().replaceFirstMapped(
     RegExp(r'^(野采|网购|蚁友赠送)(?:（(.*)）|\((.*)\)|\s+(.+))$', dotAll: true),
@@ -2364,14 +2402,17 @@ class _ColonyProfileSummary extends StatelessWidget {
                 final duration = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    InkWell(
-                      onTap: onDurationTap,
-                      borderRadius: BorderRadius.circular(8),
-                      child: HusbandryDuration(
-                        colony: colony,
-                        labelWidth: metadataLabelWidth,
+                    if (colony.archived)
+                      const Text('遗失的文明 · 养殖已结束')
+                    else
+                      InkWell(
+                        onTap: onDurationTap,
+                        borderRadius: BorderRadius.circular(8),
+                        child: HusbandryDuration(
+                          colony: colony,
+                          labelWidth: metadataLabelWidth,
+                        ),
                       ),
-                    ),
                     if (colony.acquiredOn != null) ...[
                       const SizedBox(height: 4),
                       metadataRow(
@@ -4837,7 +4878,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   final restored = await BackupService(
                     AppDatabase.instance,
                     LocalMediaStore.instance,
-                  ).restoreBackup();
+                  ).restoreBackup(mode: BackupRestoreMode.overwrite);
                   if (restored && context.mounted) {
                     _showInfo(context, '已恢复备份；可在设置中撤销上一次恢复。');
                   }

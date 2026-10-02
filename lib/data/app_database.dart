@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+
+import '../domain/memorial.dart';
 
 import 'package:sqflite/sqflite.dart';
 
@@ -26,13 +29,15 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   AppDatabase._();
   static final instance = AppDatabase._();
   Database? _database;
+  final _memorialChanges = StreamController<void>.broadcast();
+  Stream<void> get memorialChanges => _memorialChanges.stream;
 
   Future<void> open() async {
     if (_database != null) return;
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 17,
+      version: 18,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -66,6 +71,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await database.execute(
       'CREATE INDEX records_by_colony_time ON care_records(colony_id, occurred_at DESC)',
     );
+    await _createMemorialTable(database);
     await _createSettingsTable(database);
     await _createInventoryTable(database);
     await _createFeederRecordsTable(database);
@@ -76,6 +82,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 18) await _createMemorialTable(database);
     if (oldVersion < 17) {
       await database.execute(
         'ALTER TABLE care_records ADD COLUMN worker_mortality_count INTEGER '
@@ -185,6 +192,116 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'ALTER TABLE colonies ADD COLUMN target_humidity_lower REAL',
       );
     }
+  }
+
+  static Future<void> _createMemorialTable(DatabaseExecutor db) async {
+    await db.execute("""CREATE TABLE memorials (
+      id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('queen', 'worker', 'colony')),
+      name TEXT NOT NULL, colony_id TEXT, species TEXT, died_on TEXT,
+      farewell TEXT, cause TEXT, observation TEXT, lesson TEXT, created_at TEXT NOT NULL,
+      FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE SET NULL
+    )""");
+    await db.execute(
+      "CREATE UNIQUE INDEX memorial_colony_end ON memorials(colony_id) WHERE kind = 'colony'",
+    );
+  }
+
+  Future<List<Memorial>> listMemorials() async => (await _db.query(
+    'memorials',
+    orderBy: 'COALESCE(died_on, created_at) DESC, created_at DESC',
+  )).map(Memorial.fromMap).toList();
+
+  Future<void> saveMemorial(Memorial memorial) async {
+    memorial.validate();
+    await _db.transaction((txn) async {
+      final existing = await txn.query(
+        'memorials',
+        where: 'id = ?',
+        whereArgs: [memorial.id],
+      );
+      if (existing.isNotEmpty) {
+        final original = Memorial.fromMap(existing.single);
+        if (original.kind != memorial.kind ||
+            (original.kind == MemorialKind.colony &&
+                original.colonyId != memorial.colonyId)) {
+          throw const FormatException('纪念类型及整群纪念的关联蚁群不能更改。');
+        }
+      }
+      if (memorial.colonyId != null) {
+        final colonies = await txn.query(
+          'colonies',
+          where: 'id = ?',
+          whereArgs: [memorial.colonyId],
+        );
+        if (colonies.isEmpty) throw StateError('关联蚁群已不存在');
+        if (memorial.kind == MemorialKind.colony && existing.isEmpty) {
+          if (colonies.single['archived'] == 1) throw StateError('该蚁群已移入英灵殿');
+          // Keep history untouched. Restoring requires opting into growth again,
+          // otherwise it would generate estimates for the time spent archived.
+          await txn.update(
+            'colonies',
+            {
+              'archived': 1,
+              'auto_growth_json': null,
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [memorial.colonyId],
+          );
+        }
+      } else if (memorial.kind == MemorialKind.colony && existing.isEmpty) {
+        throw const FormatException('整群移入需要选择蚁群。');
+      }
+      if (existing.isEmpty) {
+        await txn.insert('memorials', memorial.toMap());
+      } else {
+        await txn.update(
+          'memorials',
+          memorial.toMap()..remove('created_at'),
+          where: 'id = ?',
+          whereArgs: [memorial.id],
+        );
+      }
+    });
+    _memorialChanges.add(null);
+  }
+
+  Future<void> restoreMemorialColony(String memorialId) async {
+    await _db.transaction((txn) async {
+      final rows = await txn.query(
+        'memorials',
+        where: 'id = ? AND kind = ?',
+        whereArgs: [memorialId, 'colony'],
+      );
+      if (rows.isEmpty || rows.single['colony_id'] == null) {
+        throw StateError('关联蚁群已不存在');
+      }
+      await txn.update(
+        'colonies',
+        {'archived': 0, 'updated_at': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [rows.single['colony_id']],
+      );
+      await txn.delete('memorials', where: 'id = ?', whereArgs: [memorialId]);
+    });
+    _memorialChanges.add(null);
+  }
+
+  Future<void> deleteMemorial(String id) async {
+    await _db.transaction((txn) async {
+      final rows = await txn.query(
+        'memorials',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (rows.isNotEmpty &&
+          rows.single['kind'] == 'colony' &&
+          rows.single['colony_id'] != null) {
+        throw StateError('请先恢复蚁群，避免丢失整群纪念入口');
+      }
+      await txn.delete('memorials', where: 'id = ?', whereArgs: [id]);
+    });
+    _memorialChanges.add(null);
   }
 
   static Future<void> _createSettingsTable(DatabaseExecutor executor) =>
@@ -368,6 +485,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   Future<void> deleteColony(String id) async {
     // Foreign keys cascade the deletion to this colony's care records.
     await _db.delete('colonies', where: 'id = ?', whereArgs: [id]);
+    _memorialChanges.add(null);
   }
 
   @override
@@ -688,6 +806,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   Future<Map<String, dynamic>> snapshot() => _db.transaction(
     (txn) async => {
+      'memorials': await txn.query('memorials'),
       'colonies': await txn.query('colonies'),
       'care_records': await txn.query('care_records'),
       'feeder_records': await txn.query('feeder_records'),
@@ -726,10 +845,17 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await _db.transaction((transaction) async {
       if (inventoryItems != null) await transaction.delete('inventory_items');
       await transaction.delete('feeder_records');
+      await transaction.delete('memorials');
       await transaction.delete('care_records');
       await transaction.delete('colonies');
       for (final colony in colonies) {
         await transaction.insert('colonies', colony);
+      }
+      for (final row in snapshot['memorials'] as List? ?? const []) {
+        await transaction.insert(
+          'memorials',
+          Map<String, Object?>.from(row as Map),
+        );
       }
       for (final record in records) {
         await transaction.insert('care_records', record);
@@ -743,5 +869,6 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         }
       }
     });
+    _memorialChanges.add(null);
   }
 }

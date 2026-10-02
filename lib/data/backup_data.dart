@@ -1,4 +1,5 @@
 import '../domain/models.dart';
+import '../domain/memorial.dart';
 
 /// Validate before touching either the live data or the previous rollback copy.
 /// Model readers check field types and dates; the remaining checks mirror the
@@ -28,6 +29,24 @@ class BackupData {
     final colonyIds = colonies.map((row) => row['id']).toSet();
     if (records.any((row) => !colonyIds.contains(row['colony_id']))) {
       throw const FormatException('备份中有记录引用了不存在的蚁群。');
+    }
+    final memorials = _rows(
+      data,
+      'memorials',
+      (row) => Memorial.fromMap(row).toMap(),
+    );
+    final ended = <Object?>{};
+    for (final memorial in memorials) {
+      final colonyId = memorial['colony_id'];
+      if (colonyId != null && !colonyIds.contains(colonyId)) {
+        throw const FormatException('纪念记录引用了不存在的蚁群。');
+      }
+      if (memorial['kind'] == 'colony' && colonyId != null) {
+        if (!ended.add(colonyId) ||
+            colonies.firstWhere((c) => c['id'] == colonyId)['archived'] != 1) {
+          throw const FormatException('整群纪念与蚁群归档状态不一致。');
+        }
+      }
     }
     final names = <(String, String)>{};
     for (final item in items) {
