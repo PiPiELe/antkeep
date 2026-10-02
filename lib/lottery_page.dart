@@ -172,6 +172,12 @@ class _LotteryPageState extends State<LotteryPage> {
   @override
   Widget build(BuildContext context) {
     final wheelDiameter = min(MediaQuery.sizeOf(context).width - 32, 420.0);
+    final resultDiameter =
+        wheelDiameter *
+        (0.30 + max(0, (_result?.toString().length ?? 0) - 3) * 0.025).clamp(
+          0.30,
+          0.46,
+        );
     return Scaffold(
       appBar: AppBar(title: const Text('数字抽奖')),
       body: ListView(
@@ -304,24 +310,25 @@ class _LotteryPageState extends State<LotteryPage> {
             Center(
               child: Stack(
                 clipBehavior: Clip.none,
-                alignment: Alignment.topCenter,
+                alignment: Alignment.center,
                 children: [
                   AnimatedRotation(
                     turns: _wheelTurns,
                     duration: const Duration(milliseconds: 2200),
                     curve: Curves.easeOutCubic,
                     child: CustomPaint(
+                      key: const ValueKey('lottery-wheel'),
                       size: Size.square(wheelDiameter),
                       painter: _LotteryWheelPainter(
                         numbers: _wheelNumbers,
                         colorScheme: Theme.of(context).colorScheme,
-                        selectedNumber: _result,
+                        labelStyle: Theme.of(context).textTheme.bodySmall!,
                       ),
                     ),
                   ),
                   if (_result != null)
-                    Positioned(
-                      top: wheelDiameter * 0.11 - 24,
+                    SizedBox.square(
+                      dimension: resultDiameter,
                       child: TweenAnimationBuilder<double>(
                         tween: Tween(begin: 0.3, end: 1),
                         duration: const Duration(milliseconds: 420),
@@ -329,17 +336,13 @@ class _LotteryPageState extends State<LotteryPage> {
                         builder: (context, scale, child) =>
                             Transform.scale(scale: scale, child: child),
                         child: Container(
-                          constraints: BoxConstraints(
-                            minWidth: 48,
-                            maxWidth: wheelDiameter * 0.8,
-                          ),
-                          height: 48,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          key: const ValueKey('lottery-wheel-result'),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Theme.of(context)
                                 .colorScheme
                                 .primaryContainer,
-                            borderRadius: BorderRadius.circular(24),
+                            shape: BoxShape.circle,
                             border: Border.all(
                               color: Theme.of(context).colorScheme.primary,
                               width: 2,
@@ -352,24 +355,44 @@ class _LotteryPageState extends State<LotteryPage> {
                               ),
                             ],
                           ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              '$_result',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '抽中数字',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
+                                  ),
+                                ),
                               ),
-                            ),
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    '$_result',
+                                    key: const ValueKey('lottery-number'),
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                   Positioned(
-                    top: -8,
+                    top: -22,
                     child: Icon(
                       Icons.arrow_drop_down,
                       size: 44,
@@ -394,7 +417,8 @@ class _LotteryPageState extends State<LotteryPage> {
               ),
             ],
           ],
-          if (_result != null || _isRolling) ...[
+          if (_mode == _LotteryMode.direct &&
+              (_result != null || _isRolling)) ...[
             const SizedBox(height: 24),
             Card(
               color: Theme.of(context).colorScheme.primaryContainer,
@@ -441,12 +465,12 @@ class _LotteryWheelPainter extends CustomPainter {
   const _LotteryWheelPainter({
     required this.numbers,
     required this.colorScheme,
-    this.selectedNumber,
+    required this.labelStyle,
   });
 
   final List<int> numbers;
   final ColorScheme colorScheme;
-  final int? selectedNumber;
+  final TextStyle labelStyle;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -455,7 +479,7 @@ class _LotteryWheelPainter extends CustomPainter {
     final fill = Paint()..style = PaintingStyle.fill;
     final border = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
+      ..strokeWidth = numbers.length > 20 ? 0.6 : 2
       ..color = colorScheme.outlineVariant;
 
     if (numbers.isEmpty) {
@@ -484,26 +508,80 @@ class _LotteryWheelPainter extends CustomPainter {
         true,
         border,
       );
-      if (numbers[index] == selectedNumber) continue;
       final labelAngle = startAngle + sweep / 2;
-      final labelCenter =
-          center + Offset(cos(labelAngle), sin(labelAngle)) * (radius * 0.78);
-      canvas.save();
-      canvas.translate(labelCenter.dx, labelCenter.dy);
-      canvas.rotate(labelAngle + pi / 2);
-      _paintText(
-        canvas,
-        '${numbers[index]}',
-        Offset.zero,
-        Colors.white,
-        min(26, max(8, 180 / numbers.length)),
-      );
-      canvas.restore();
+      if (numbers.length > 20) {
+        _paintRadialLabel(canvas, center, radius, labelAngle, sweep, index);
+      } else {
+        final labelCenter =
+            center + Offset(cos(labelAngle), sin(labelAngle)) * (radius * 0.78);
+        canvas.save();
+        canvas.translate(labelCenter.dx, labelCenter.dy);
+        canvas.rotate(labelAngle + pi / 2);
+        _paintText(
+          canvas,
+          '${numbers[index]}',
+          Offset.zero,
+          _labelColor(index),
+          min(26, max(8, 180 / numbers.length)),
+          maxWidth: radius * min(0.8, sweep * 0.62),
+          maxHeight: radius * 0.25,
+        );
+        canvas.restore();
+      }
     }
     fill.color = colorScheme.surface;
     canvas.drawCircle(center, radius * 0.16, fill);
     canvas.drawCircle(center, radius * 0.16, border);
   }
+
+  void _paintRadialLabel(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double angle,
+    double sweep,
+    int index,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: '${numbers[index]}',
+        style: labelStyle.copyWith(
+          color: _labelColor(index),
+          fontSize: 14,
+          height: 1,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    // Fit the full label inside the wedge, including at its narrow inner end.
+    final halfSweep = tan(sweep / 2) * 0.85;
+    final outerRadius = radius * 0.93;
+    final scale = min(
+      1.0,
+      min(
+        radius * 0.42 / painter.width,
+        2 *
+            outerRadius *
+            halfSweep /
+            (painter.height + 2 * painter.width * halfSweep),
+      ),
+    );
+    final labelRadius = outerRadius - painter.width * scale / 2;
+    final labelCenter = center + Offset(cos(angle), sin(angle)) * labelRadius;
+    canvas.save();
+    canvas.translate(labelCenter.dx, labelCenter.dy);
+    canvas.rotate(angle);
+    canvas.scale(scale);
+    painter.paint(canvas, -painter.size.center(Offset.zero));
+    canvas.restore();
+    painter.dispose();
+  }
+
+  Color _labelColor(int index) =>
+      _segmentColor(index, numbers.length).computeLuminance() > 0.4
+      ? Colors.black87
+      : Colors.white;
 
   Color _segmentColor(int index, int count) {
     final hue = (index * 360 / count + 330) % 360;
@@ -515,12 +593,14 @@ class _LotteryWheelPainter extends CustomPainter {
     String text,
     Offset center,
     Color color,
-    double size,
-  ) {
+    double size, {
+    double maxWidth = double.infinity,
+    double maxHeight = double.infinity,
+  }) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
+        style: labelStyle.copyWith(
           color: color,
           fontSize: size,
           fontWeight: FontWeight.bold,
@@ -528,12 +608,21 @@ class _LotteryWheelPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    painter.paint(canvas, center - painter.size.center(Offset.zero));
+    final scale = min(
+      1.0,
+      min(maxWidth / painter.width, maxHeight / painter.height),
+    );
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(scale);
+    painter.paint(canvas, -painter.size.center(Offset.zero));
+    canvas.restore();
+    painter.dispose();
   }
 
   @override
   bool shouldRepaint(_LotteryWheelPainter oldDelegate) =>
       oldDelegate.numbers != numbers ||
       oldDelegate.colorScheme != colorScheme ||
-      oldDelegate.selectedNumber != selectedNumber;
+      oldDelegate.labelStyle != labelStyle;
 }
