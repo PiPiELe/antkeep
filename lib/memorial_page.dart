@@ -52,98 +52,98 @@ class _MemorialPageState extends State<MemorialPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Padding(
-        padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            FilledButton.icon(
-              onPressed: () => _add(),
-              icon: const Icon(Icons.add),
-              label: const Text('单独添加纪念'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _add(wholeColony: true),
-              icon: const TombstoneIcon(size: 20),
-              label: const Text('整群移入'),
-            ),
-          ],
+  Widget build(BuildContext context) => Scaffold(
+    floatingActionButton: MenuAnchor(
+      alignmentOffset: const Offset(0, 8),
+      consumeOutsideTap: true,
+      menuChildren: [
+        MenuItemButton(
+          leadingIcon: const TombstoneIcon(size: 24),
+          onPressed: () => _add(),
+          child: const Text('单独添加纪念'),
         ),
+        MenuItemButton(
+          leadingIcon: const TombstoneIcon(size: 24),
+          onPressed: () => _add(wholeColony: true),
+          child: const Text('整群移入'),
+        ),
+      ],
+      builder: (context, controller, child) => FloatingActionButton(
+        heroTag: 'memorial-add',
+        tooltip: '添加纪念',
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+        child: const TombstoneIcon(size: 28),
       ),
-      Expanded(
-        child: FutureBuilder<List<Memorial>>(
-          future: _items,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: TextButton(
-                  onPressed: () => setState(_reload),
-                  child: const Text('加载失败，点击重试'),
-                ),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final items = snapshot.data!;
-            if (items.isEmpty) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TombstoneIcon(size: 64),
-                      SizedBox(height: 16),
-                      Text('为逝去的小生命留一份纪念'),
-                      SizedBox(height: 8),
-                      Text(
-                        '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
-                        '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
-                        '纪念每一个尚未羽化、便早早沉睡的小小生命，\n'
-                        '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
-                        '它们无声地来过，却曾竭尽全力地活着。',
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+    ),
+    body: FutureBuilder<List<Memorial>>(
+      future: _items,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: TextButton(
+              onPressed: () => setState(_reload),
+              child: const Text('加载失败，点击重试'),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final items = snapshot.data!;
+        if (items.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TombstoneIcon(size: 64),
+                  SizedBox(height: 16),
+                  Text('为逝去的小生命留一份纪念'),
+                  SizedBox(height: 8),
+                  Text(
+                    '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
+                    '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
+                    '纪念每一个尚未羽化、便早早沉睡的小小生命，\n'
+                    '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
+                    '它们无声地来过，却曾竭尽全力地活着。',
+                    textAlign: TextAlign.center,
                   ),
+                ],
+              ),
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return Card(
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: const TombstoneIcon(size: 44),
+                title: Text(item.name),
+                subtitle: Text(
+                  '${item.kind.epitaph}\n${item.species ?? item.kind.label} · ${item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!)}',
                 ),
-              );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return Card(
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: const TombstoneIcon(size: 44),
-                    title: Text(item.name),
-                    subtitle: Text(
-                      '${item.kind.epitaph}\n${item.species ?? item.kind.label} · ${item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!)}',
-                    ),
-                    isThreeLine: true,
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => MemorialDetailPage(
-                          memorialId: item.id,
-                          onOpenColony: widget.onOpenColony,
-                        ),
-                      ),
+                isThreeLine: true,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MemorialDetailPage(
+                      memorialId: item.id,
+                      onOpenColony: widget.onOpenColony,
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             );
           },
-        ),
-      ),
-    ],
+        );
+      },
+    ),
   );
 }
 
