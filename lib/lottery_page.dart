@@ -139,7 +139,7 @@ class _LotteryPageState extends State<LotteryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final wheelDiameter = min(MediaQuery.sizeOf(context).width - 64, 320.0);
+    final wheelDiameter = min(MediaQuery.sizeOf(context).width - 32, 420.0);
     return Scaffold(
       appBar: AppBar(title: const Text('数字抽奖')),
       body: ListView(
