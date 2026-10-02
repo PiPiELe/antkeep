@@ -396,6 +396,7 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
             children: [
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: ShareCardKind.values
                     .map(
                       (kind) => ChoiceChip(
@@ -437,6 +438,7 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
               if (_kind == ShareCardKind.comparison)
                 Wrap(
                   spacing: 12,
+                  runSpacing: 8,
                   children: [
                     OutlinedButton(
                       onPressed: () => _changeDate(first: true),
@@ -505,6 +507,7 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
                 const SizedBox(height: 16),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
                     ChoiceChip(
                       label: const Text('浅色手账'),
@@ -518,8 +521,10 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
                     for (
                       var i = 0;
@@ -542,6 +547,7 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
                       ),
                   ],
                 ),
+                const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
                   initialValue: _alignment,
                   decoration: const InputDecoration(labelText: '照片裁切位置'),
@@ -571,6 +577,7 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
                 ),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
                     FilterChip(
                       label: const Text('数量'),

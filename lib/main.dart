@@ -1339,6 +1339,17 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(widget.colony == null ? '新入手蚁群' : '编辑蚁群')),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      maintainBottomViewPadding: true,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? '保存中…' : '保存蚁群'),
+        ),
+      ),
+    ),
     body: Form(
       key: _formKey,
       child: ListView(
@@ -1365,7 +1376,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 child: TextButton.icon(
                   onPressed: _enterCustomSpecies,
                   icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('未收录？手动填写品种'),
+                  label: const Text(
+                    '未收录？手动填写品种',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ),
             ],
@@ -1701,11 +1715,6 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 _CoverPhotoPreview(image: _coverPreview!),
               ],
             ],
-          ),
-          const SizedBox(height: 28),
-          FilledButton(
-            onPressed: _saving ? null : _save,
-            child: Text(_saving ? '保存中…' : '保存蚁群'),
           ),
         ],
       ),
