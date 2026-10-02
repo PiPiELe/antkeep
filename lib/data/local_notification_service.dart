@@ -49,11 +49,25 @@ class LocalNotificationService {
     return androidGranted ?? iosGranted ?? true;
   }
 
-  Future<void> scheduleDailyCareReminder(int minuteOfDay) async {
+  /// Returns false when Android must fall back to an inexact reminder.
+  Future<bool> scheduleDailyCareReminder(
+    int minuteOfDay, {
+    bool requestExactPermission = false,
+  }) async {
     if (minuteOfDay < 0 || minuteOfDay >= 24 * 60) {
       throw ArgumentError.value(minuteOfDay, 'minuteOfDay');
     }
     await initialize();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    var exact =
+        android == null ||
+        (await android.canScheduleExactNotifications() ?? false);
+    if (!exact && requestExactPermission) {
+      exact = await android.requestExactAlarmsPermission() ?? false;
+    }
     await _plugin.zonedSchedule(
       id: _dailyCareReminderId,
       title: '蚁记养护提醒',
@@ -69,9 +83,12 @@ class LocalNotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: exact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
+    return exact;
   }
 
   Future<void> cancelDailyCareReminder() async {

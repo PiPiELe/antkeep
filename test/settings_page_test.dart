@@ -101,12 +101,17 @@ void main() {
   }
 
   testWidgets(
-    'settings home groups controls and data actions into six destinations',
+    'settings home groups controls and data actions into five destinations',
     (tester) async {
       await tester.pumpWidget(app());
       await tester.pumpAndSettle();
       for (final category in SettingsCategory.values) {
-        expect(find.text(category.title), findsOneWidget);
+        expect(
+          find.text(category.title),
+          category == SettingsCategory.reminders
+              ? findsNothing
+              : findsOneWidget,
+        );
       }
       expect(find.byType(SwitchListTile), findsNothing);
       expect(find.byType(ChoiceChip), findsNothing);
@@ -434,7 +439,6 @@ void main() {
         for (final entry in {
           '在线服务': ['在线版'],
           '外观与展示': ['简化模式', '薰衣草紫', '深色'],
-          '养护提醒': ['本地养护提醒', '提醒时间'],
           '数据管理': ['数据推送', '撤销上一次恢复'],
           '帮助与反馈': ['交流群二维码'],
           '关于与更新': ['检查更新'],
@@ -451,6 +455,24 @@ void main() {
           await tester.pageBack();
           await tester.pumpAndSettle();
         }
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: antKeepTheme(ThemeColor.forest, dark: dark),
+            home: const Scaffold(body: DiscoverPage()),
+          ),
+        );
+        await openCategory(tester, '养护提醒');
+        for (final label in ['本地养护提醒', '提醒时间']) {
+          await tester.scrollUntilVisible(find.text(label), 180);
+          expect(tester.takeException(), isNull);
+        }
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.byType(DiscoverPage), findsOneWidget);
+        await themeController.setSimpleMode(true);
+        await tester.pumpWidget(app(dark: dark));
+        await openCategory(tester, '养护提醒');
+        expect(find.text('本地养护提醒'), findsOneWidget);
       },
     );
   }

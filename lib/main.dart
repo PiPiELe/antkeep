@@ -3376,6 +3376,27 @@ class DiscoverPage extends StatelessWidget {
             vertical: 8,
           ),
           leading: Icon(
+            Icons.notifications_active_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('养护提醒'),
+          subtitle: const Text('设置每天的本地养护提醒'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  const SettingsPage(category: SettingsCategory.reminders),
+            ),
+          ),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Icon(
             Icons.menu_book_outlined,
             color: Theme.of(context).colorScheme.primary,
           ),
@@ -4793,7 +4814,7 @@ class _SettingsPageState extends State<SettingsPage> {
         for (final category in [
           SettingsCategory.appearance,
           SettingsCategory.online,
-          SettingsCategory.reminders,
+          if (themeController.simpleMode) SettingsCategory.reminders,
         ])
           _categoryTile(context, category),
       ]),
@@ -4943,11 +4964,12 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: Text(
             themeController.careRemindersEnabled
                 ? '每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)} 提醒；不上传任何数据'
-                : '关闭；开启后仅向系统申请通知权限',
+                : '关闭；开启后申请通知权限，Android 还会申请闹钟和提醒权限',
           ),
           value: themeController.careRemindersEnabled,
           onChanged: (enabled) async {
             try {
+              var exact = true;
               if (enabled) {
                 final granted = await LocalNotificationService.instance
                     .requestPermission();
@@ -4957,9 +4979,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   }
                   return;
                 }
-                await LocalNotificationService.instance
+                exact = await LocalNotificationService.instance
                     .scheduleDailyCareReminder(
                       themeController.careReminderMinuteOfDay,
+                      requestExactPermission: true,
                     );
               } else {
                 await LocalNotificationService.instance
@@ -4969,6 +4992,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 enabled: enabled,
                 minuteOfDay: themeController.careReminderMinuteOfDay,
               );
+              if (!exact && context.mounted) {
+                _showInfo(context, '未获得闹钟和提醒权限，已设置普通提醒，可能延迟。');
+              }
             } catch (error) {
               if (context.mounted) _showError(context, error);
             }
@@ -4995,12 +5021,18 @@ class _SettingsPageState extends State<SettingsPage> {
                   if (picked == null || !context.mounted) return;
                   final minuteOfDay = picked.hour * 60 + picked.minute;
                   try {
-                    await LocalNotificationService.instance
-                        .scheduleDailyCareReminder(minuteOfDay);
+                    final exact = await LocalNotificationService.instance
+                        .scheduleDailyCareReminder(
+                          minuteOfDay,
+                          requestExactPermission: true,
+                        );
                     await themeController.setCareReminder(
                       enabled: true,
                       minuteOfDay: minuteOfDay,
                     );
+                    if (!exact && context.mounted) {
+                      _showInfo(context, '未获得闹钟和提醒权限，已设置普通提醒，可能延迟。');
+                    }
                   } catch (error) {
                     if (context.mounted) _showError(context, error);
                   }
