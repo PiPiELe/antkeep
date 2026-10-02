@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/population_analysis_page.dart';
 import 'package:antkeep/colony_growth_page.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/models.dart';
@@ -235,6 +236,75 @@ void main() {
     await tapSave(tester, '保存设置');
     expect(Colony.fromMap(tables['colonies']!.single).growth, isNull);
   });
+
+  for (final analysis in [true, false]) {
+    testWidgets(
+      '${analysis ? 'analysis' : 'detail'} forecast opens setup and refreshes after saving',
+      (tester) async {
+        final now = DateTime.now();
+        tables['colonies']!.add(
+          Colony(
+            id: 'setup-forecast',
+            name: '设置预测',
+            createdAt: now,
+            updatedAt: now,
+            initialWorkerCount: 20,
+            initialEggCount: 10,
+            initialLarvaCount: 100,
+            initialCocoonCount: 5,
+          ).toMap(),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: analysis
+                ? const PopulationAnalysisPage()
+                : const ColonyDetailPage(colonyId: 'setup-forecast'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (analysis) {
+          await tester.tap(find.byKey(const ValueKey('analysis-subject')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('蚁群 · 设置预测').last);
+        } else {
+          await tester.ensureVisible(find.byTooltip('展开种群数量'));
+          await tester.tap(find.byTooltip('展开种群数量'));
+        }
+        await tester.pumpAndSettle();
+        final setup = find.byKey(const ValueKey('population-forecast-setup'));
+        await tester.ensureVisible(setup);
+        await tester.tap(find.text('增长预测'));
+        await tester.pumpAndSettle();
+        expect(find.byType(ColonyGrowthPage), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(setup, findsOneWidget);
+        expect(Colony.fromMap(tables['colonies']!.single).growth, isNull);
+
+        await tester.ensureVisible(find.text('设置规则'));
+        await tester.tap(find.text('设置规则'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(SwitchListTile, '开启自动扩充'));
+        await tester.pumpAndSettle();
+        final workers = find.widgetWithText(TextFormField, '工净增长');
+        await tester.ensureVisible(workers);
+        await tester.enterText(workers, '1');
+        await tapSave(tester, '保存设置');
+        expect(find.byType(ColonyGrowthPage), findsNothing);
+        expect(setup, findsNothing);
+        final toggle = find.byKey(const ValueKey('population-forecast-toggle'));
+        await tester.ensureVisible(toggle);
+        expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+        expect(find.text('7 天'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('population-forecast-summary')),
+          findsOneWidget,
+        );
+        expect(tables['care_records'], isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'detail chart forecasts without adding records and keeps brood filtering',
