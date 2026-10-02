@@ -3,8 +3,10 @@ import 'dart:math';
 import 'package:antkeep/lottery_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   test('wheel range is shuffled and retains every number', () {
     expect(
       shuffledLotteryRange(1, 6, random: Random(4)),
@@ -142,7 +144,7 @@ void main() {
     final generateButton = find.text('生成转盘');
     await tester.ensureVisible(generateButton);
     await tester.tap(generateButton);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.textContaining('2 到 100 个数字'), findsOneWidget);
   });
@@ -156,35 +158,108 @@ void main() {
     final generateButton = find.text('生成转盘');
     await tester.ensureVisible(generateButton);
     await tester.tap(generateButton);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('转盘数字已随机打乱。'));
+    await tester.scrollUntilVisible(
+      find.text('转盘数字已随机打乱。'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('转盘数字已随机打乱。'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('wheel result is only shown after the spin finishes', (
-    tester,
-  ) async {
+  for (final seconds in [4, 6, 8, 10]) {
+    testWidgets('wheel waits for the selected $seconds seconds', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: LotteryPage()));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<SegmentedButton<int>>(find.byType(SegmentedButton<int>))
+            .selected,
+        {6},
+      );
+      await tester.tap(find.text('$seconds 秒'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), '1');
+      await tester.enterText(find.byType(TextField).at(1), '4');
+      await tester.ensureVisible(find.text('生成转盘'));
+      await tester.tap(find.text('生成转盘'));
+      await tester.pump();
+      await tester.scrollUntilVisible(find.text('转动转盘'), 200);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('转动转盘'));
+      await tester.pump();
+      expect(find.text('转盘转动中…'), findsOneWidget);
+      expect(find.text('抽中数字'), findsNothing);
+      await tester.pump(Duration(seconds: seconds - 1));
+      expect(find.text('抽中数字'), findsNothing);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump();
+      expect(find.text('转动转盘'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('lottery-wheel-result')),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pump();
+      expect(find.text('抽中数字'), findsOneWidget);
+      expect(displayedNumber(tester), inInclusiveRange(1, 4));
+      expect(tester.takeException(), isNull);
+
+      // A second draw must use the same duration and clear the old result.
+      await tester.scrollUntilVisible(
+        find.text('转动转盘'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('转动转盘'));
+      await tester.pump();
+      expect(find.text('抽中数字'), findsNothing);
+      await tester.pump(Duration(seconds: seconds));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump();
+      expect(find.text('转动转盘'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('lottery-wheel-result')),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pump();
+      expect(find.text('抽中数字'), findsOneWidget);
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpWidget(const MaterialApp(home: LotteryPage()));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<SegmentedButton<int>>(find.byType(SegmentedButton<int>))
+            .selected,
+        {seconds},
+      );
+    });
+  }
+
+  testWidgets('leaving an active wheel cancels the animation', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LotteryPage()));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), '1');
     await tester.enterText(find.byType(TextField).at(1), '4');
-    final generateButton = find.text('生成转盘');
-    await tester.ensureVisible(generateButton);
-    await tester.tap(generateButton);
+    await tester.ensureVisible(find.text('生成转盘'));
+    await tester.tap(find.text('生成转盘'));
     await tester.pump();
-    await tester.drag(find.byType(ListView), const Offset(0, -600));
-    await tester.pump();
-
+    await tester.scrollUntilVisible(find.text('转动转盘'), 200);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('转动转盘'));
     await tester.pump();
     expect(find.text('转盘转动中…'), findsOneWidget);
-    expect(find.text('抽中数字'), findsNothing);
-
-    await tester.pump(const Duration(milliseconds: 2200));
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
-    await tester.pump();
-    expect(find.text('抽中数字'), findsOneWidget);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump(const Duration(seconds: 10));
     expect(tester.takeException(), isNull);
   });
 }
