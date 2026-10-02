@@ -315,9 +315,59 @@ class _LotteryPageState extends State<LotteryPage> {
                       painter: _LotteryWheelPainter(
                         numbers: _wheelNumbers,
                         colorScheme: Theme.of(context).colorScheme,
+                        selectedNumber: _result,
                       ),
                     ),
                   ),
+                  if (_result != null)
+                    Positioned(
+                      top: wheelDiameter * 0.11 - 24,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.3, end: 1),
+                        duration: const Duration(milliseconds: 420),
+                        curve: Curves.easeOutBack,
+                        builder: (context, scale, child) =>
+                            Transform.scale(scale: scale, child: child),
+                        child: Container(
+                          constraints: BoxConstraints(
+                            minWidth: 48,
+                            maxWidth: wheelDiameter * 0.8,
+                          ),
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '$_result',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   Positioned(
                     top: -8,
                     child: Icon(
@@ -391,10 +441,12 @@ class _LotteryWheelPainter extends CustomPainter {
   const _LotteryWheelPainter({
     required this.numbers,
     required this.colorScheme,
+    this.selectedNumber,
   });
 
   final List<int> numbers;
   final ColorScheme colorScheme;
+  final int? selectedNumber;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -432,6 +484,7 @@ class _LotteryWheelPainter extends CustomPainter {
         true,
         border,
       );
+      if (numbers[index] == selectedNumber) continue;
       final labelAngle = startAngle + sweep / 2;
       final labelCenter =
           center + Offset(cos(labelAngle), sin(labelAngle)) * (radius * 0.78);
@@ -480,5 +533,7 @@ class _LotteryWheelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_LotteryWheelPainter oldDelegate) =>
-      oldDelegate.numbers != numbers || oldDelegate.colorScheme != colorScheme;
+      oldDelegate.numbers != numbers ||
+      oldDelegate.colorScheme != colorScheme ||
+      oldDelegate.selectedNumber != selectedNumber;
 }
