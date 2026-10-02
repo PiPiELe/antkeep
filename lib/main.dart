@@ -164,6 +164,9 @@ const _nestTypeOptions = [
   '加气砖巢',
   '生态缸巢',
   '3D 打印巢',
+  '酱料杯',
+  '自制巢',
+  '饭盒',
 ];
 
 Future<void> main() async {
