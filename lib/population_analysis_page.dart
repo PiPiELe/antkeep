@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'data/app_database.dart';
+import 'colony_growth_page.dart';
 import 'date_display.dart';
 import 'domain/models.dart';
 import 'domain/mortality_analysis.dart';
@@ -62,6 +63,37 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   void _reloadColonies() {
     _colonies = (widget.loadColonies ?? AppDatabase.instance.listColonies)();
     _colonies.ignore();
+  }
+
+  Future<void> _configureGrowth() async {
+    final colony = _colony;
+    if (colony == null) return;
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ColonyGrowthPage(colony: colony)),
+    );
+    if (saved != true || !mounted) return;
+    try {
+      final colonies =
+          await (widget.loadColonies ?? AppDatabase.instance.listColonies)();
+      if (!mounted) return;
+      setState(() {
+        _colonies = Future.value(colonies);
+        _colony = colonies.where((c) => c.id == colony.id).firstOrNull;
+        if (_colony == null) {
+          _selectedId = null;
+          _points = null;
+          _showForecast = false;
+        } else {
+          _showForecast = _colony!.growth != null;
+          _reloadPoints();
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('刷新增长规则失败，请重新进入分析页重试')),
+      );
+    }
   }
 
   Future<_PopulationSeries> _loadPoints() async {
@@ -245,6 +277,8 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                           enabled: _showForecast,
                           horizon: _forecastHorizon,
                           unavailableReason: _forecastUnavailableReason,
+                          onConfigureGrowth:
+                              _colony == null ? null : _configureGrowth,
                           onEnabledChanged: (value) => setState(() {
                             _showForecast = value;
                             _reloadPoints();

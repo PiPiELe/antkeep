@@ -12,25 +12,40 @@ class PopulationForecastControls extends StatelessWidget {
     required this.onEnabledChanged,
     required this.onHorizonChanged,
     this.unavailableReason,
+    this.onConfigureGrowth,
   });
   final bool enabled;
   final ForecastHorizon horizon;
   final ValueChanged<bool> onEnabledChanged;
   final ValueChanged<ForecastHorizon> onHorizonChanged;
   final String? unavailableReason;
+  final VoidCallback? onConfigureGrowth;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      SwitchListTile.adaptive(
-        key: const ValueKey('population-forecast-toggle'),
-        contentPadding: EdgeInsets.zero,
-        title: const Text('增长预测'),
-        subtitle: Text(unavailableReason ?? '按自动扩充规则预测，最长 1 个月'),
-        value: enabled && unavailableReason == null,
-        onChanged: unavailableReason == null ? onEnabledChanged : null,
-      ),
+      if (unavailableReason != null && onConfigureGrowth != null)
+        ListTile(
+          key: const ValueKey('population-forecast-setup'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('增长预测'),
+          subtitle: Text(unavailableReason!),
+          onTap: onConfigureGrowth,
+          trailing: TextButton(
+            onPressed: onConfigureGrowth,
+            child: const Text('设置规则'),
+          ),
+        )
+      else
+        SwitchListTile.adaptive(
+          key: const ValueKey('population-forecast-toggle'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('增长预测'),
+          subtitle: Text(unavailableReason ?? '按自动扩充规则预测，最长 1 个月'),
+          value: enabled && unavailableReason == null,
+          onChanged: unavailableReason == null ? onEnabledChanged : null,
+        ),
       if (enabled && unavailableReason == null) ...[
         Wrap(
           spacing: 8,

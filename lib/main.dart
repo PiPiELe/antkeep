@@ -2138,6 +2138,21 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               expanded: _populationExpanded,
               showForecast: _showForecast,
               forecastHorizon: _forecastHorizon,
+              onConfigureGrowth: themeController.simpleMode
+                  ? null
+                  : () async {
+                      final saved = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => ColonyGrowthPage(colony: colony),
+                        ),
+                      );
+                      if (saved == true && mounted) {
+                        setState(() {
+                          _showForecast = true;
+                          _reload();
+                        });
+                      }
+                    },
               onForecastChanged: (value) =>
                   setState(() => _showForecast = value),
               onForecastHorizonChanged: (value) =>
@@ -2404,6 +2419,7 @@ class _PopulationTimeline extends StatelessWidget {
     required this.forecastHorizon,
     required this.onForecastChanged,
     required this.onForecastHorizonChanged,
+    this.onConfigureGrowth,
   });
   final Colony colony;
   final List<CareRecord> records;
@@ -2413,6 +2429,7 @@ class _PopulationTimeline extends StatelessWidget {
   final ForecastHorizon forecastHorizon;
   final ValueChanged<bool> onForecastChanged;
   final ValueChanged<ForecastHorizon> onForecastHorizonChanged;
+  final VoidCallback? onConfigureGrowth;
   final ValueChanged<bool> onIncludeBroodChanged;
   final ValueChanged<bool> onExpandedChanged;
 
@@ -2492,6 +2509,7 @@ class _PopulationTimeline extends StatelessWidget {
                     ? '请先在群落自动扩充中设置增长规则'
                     : null,
                 onEnabledChanged: onForecastChanged,
+                onConfigureGrowth: onConfigureGrowth,
                 onHorizonChanged: onForecastHorizonChanged,
               ),
               const SizedBox(height: 14),
