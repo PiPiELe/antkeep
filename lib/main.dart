@@ -301,8 +301,15 @@ class _AntKeepAppState extends State<AntKeepApp> {
         supportedLocales: const [Locale('zh', 'CN')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         debugShowCheckedModeBanner: false,
-        theme: antKeepTheme(themeController.themeColor),
-        darkTheme: antKeepTheme(themeController.themeColor, dark: true),
+        theme: antKeepTheme(
+          themeController.themeColor,
+          fontColor: themeController.fontColor,
+        ),
+        darkTheme: antKeepTheme(
+          themeController.themeColor,
+          dark: true,
+          fontColor: themeController.fontColor,
+        ),
         themeMode: themeController.themeMode,
         home: themeController.onboardingCompleted
             ? const HomePage()
@@ -4867,6 +4874,24 @@ class _SettingsPageState extends State<SettingsPage> {
             onChanged: (color) async {
               try {
                 await themeController.setThemeColor(color);
+              } catch (error) {
+                if (context.mounted) _showError(context, error);
+              }
+            },
+          ),
+        ),
+        const ListTile(
+          leading: Icon(Icons.text_fields),
+          title: Text('字体颜色'),
+          subtitle: Text('独立于主题色，保存在本机；深色模式使用对应浅色'),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: FontColorPicker(
+            selected: themeController.fontColor,
+            onChanged: (color) async {
+              try {
+                await themeController.setFontColor(color);
               } catch (error) {
                 if (context.mounted) _showError(context, error);
               }

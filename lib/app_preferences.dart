@@ -12,11 +12,34 @@ enum ThemeColor {
   ocean('海洋蓝', Color(0xff32639a)),
   amber('琥珀橙', Color(0xff946020)),
   lavender('薰衣草紫', Color(0xff79569c)),
-  rose('玫瑰粉', Color(0xffa4486b));
+  rose('玫瑰粉', Color(0xffa4486b)),
+  mistBlue('雾蓝', Color(0xffafc2db)),
+  white('纯白', Colors.white);
 
   const ThemeColor(this.label, this.color);
   final String label;
   final Color color;
+}
+
+enum FontColor {
+  theme('跟随主题', null, null),
+  ink('墨黑', Color(0xff000000), Color(0xfff5f5f5)),
+  graphite('石墨灰', Color(0xff424242), Color(0xffd6d6d6)),
+  navy('深蓝', Color(0xff243b53), Color(0xffbfd3ea)),
+  green('墨绿', Color(0xff285943), Color(0xffb7dbc7)),
+  brown('栗棕', Color(0xff654735), Color(0xffe5cbb8)),
+  purple('暗紫', Color(0xff59446b), Color(0xffd8c4e8));
+
+  const FontColor(this.label, this.color, this.darkColor);
+  final String label;
+  final Color? color;
+  final Color? darkColor;
+
+  Color? resolve(bool dark) => dark ? darkColor : color;
+
+  String hex(bool dark) => resolve(dark) == null
+      ? '自动'
+      : '#${(resolve(dark)!.toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 }
 
 enum AppEdition {
@@ -48,6 +71,7 @@ class AppPreferences extends ChangeNotifier {
   AppEdition edition = AppEdition.offline;
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
+  FontColor fontColor = FontColor.theme;
   List<String> _colonyOrder = const [];
   List<String> get colonyOrder => _colonyOrder;
 
@@ -113,6 +137,10 @@ class AppPreferences extends ChangeNotifier {
       (color) => color.name == values['theme_color'],
       orElse: () => ThemeColor.forest,
     );
+    fontColor = FontColor.values.firstWhere(
+      (color) => color.name == values['font_color'],
+      orElse: () => FontColor.theme,
+    );
     notifyListeners();
   }
 
@@ -146,6 +174,12 @@ class AppPreferences extends ChangeNotifier {
   Future<void> setThemeColor(ThemeColor color) async {
     await store.writeSettings({'theme_color': color.name});
     themeColor = color;
+    notifyListeners();
+  }
+
+  Future<void> setFontColor(FontColor color) async {
+    await store.writeSettings({'font_color': color.name});
+    fontColor = color;
     notifyListeners();
   }
 
@@ -186,20 +220,107 @@ class AppPreferences extends ChangeNotifier {
   }
 }
 
-ThemeData antKeepTheme(ThemeColor color, {bool dark = false}) => ThemeData(
-  colorScheme: ColorScheme.fromSeed(
+ThemeData antKeepTheme(
+  ThemeColor color, {
+  bool dark = false,
+  FontColor fontColor = FontColor.theme,
+}) {
+  var scheme = ColorScheme.fromSeed(
     seedColor: dark && color == ThemeColor.forest
         ? const Color(0xff7da985)
         : color.color,
     brightness: dark ? Brightness.dark : Brightness.light,
-  ),
-  scaffoldBackgroundColor: dark ? const Color(0xff0d0f0d) : null,
-  appBarTheme: dark
-      ? const AppBarTheme(backgroundColor: Color(0xff121512))
-      : null,
-  cardColor: dark ? const Color(0xff181c18) : null,
-  useMaterial3: true,
-  inputDecorationTheme: const InputDecorationTheme(
-    border: OutlineInputBorder(),
-  ),
-);
+  );
+  if (color == ThemeColor.mistBlue) {
+    // Keep the requested accent exact instead of the seed-generated shade.
+    scheme = scheme.copyWith(
+      primaryContainer: color.color,
+      onPrimaryContainer: Colors.black,
+      secondaryContainer: color.color,
+      onSecondaryContainer: Colors.black,
+    );
+  } else if (color == ThemeColor.white) {
+    final foreground = dark ? Colors.white : Colors.black;
+    final background = dark ? const Color(0xff121212) : Colors.white;
+    final container = dark ? const Color(0xff242424) : const Color(0xfff5f5f5);
+    scheme = scheme.copyWith(
+      primary: foreground,
+      onPrimary: background,
+      primaryContainer: container,
+      onPrimaryContainer: foreground,
+      secondary: foreground,
+      onSecondary: background,
+      secondaryContainer: container,
+      onSecondaryContainer: foreground,
+      tertiary: foreground,
+      onTertiary: background,
+      tertiaryContainer: container,
+      onTertiaryContainer: foreground,
+      surface: background,
+      onSurface: foreground,
+      onSurfaceVariant: foreground,
+      surfaceDim: container,
+      surfaceBright: background,
+      surfaceContainerLowest: background,
+      surfaceContainerLow: background,
+      surfaceContainer: container,
+      surfaceContainerHigh: container,
+      surfaceContainerHighest: container,
+      surfaceTint: Colors.transparent,
+      outline: foreground,
+      outlineVariant: dark ? const Color(0xff424242) : const Color(0xffdddddd),
+      inverseSurface: foreground,
+      onInverseSurface: background,
+      inversePrimary: background,
+    );
+  }
+  final monochrome = color == ThemeColor.white;
+  final theme = ThemeData(
+    colorScheme: scheme,
+    scaffoldBackgroundColor: monochrome
+        ? scheme.surface
+        : dark
+        ? const Color(0xff0d0f0d)
+        : null,
+    appBarTheme: monochrome
+        ? AppBarTheme(
+            backgroundColor: scheme.surface,
+            surfaceTintColor: Colors.transparent,
+          )
+        : dark
+        ? const AppBarTheme(backgroundColor: Color(0xff121512))
+        : null,
+    cardColor: monochrome
+        ? scheme.surface
+        : dark
+        ? const Color(0xff181c18)
+        : null,
+    filledButtonTheme: color == ThemeColor.mistBlue
+        ? FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              backgroundColor: color.color,
+              foregroundColor: Colors.black,
+            ),
+          )
+        : null,
+    useMaterial3: true,
+    inputDecorationTheme: const InputDecorationTheme(
+      border: OutlineInputBorder(),
+    ),
+  );
+  final textColor = fontColor.resolve(dark);
+  if (textColor == null) return theme;
+  // Text preferences must not recolor icons or status/button foregrounds.
+  final textTheme = theme.textTheme.apply(
+    bodyColor: textColor,
+    displayColor: textColor,
+  );
+  return theme.copyWith(
+    textTheme: textTheme,
+    listTileTheme: ListTileThemeData(textColor: textColor),
+    inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+      labelStyle: TextStyle(color: textColor),
+      hintStyle: TextStyle(color: textColor),
+    ),
+  );
+}

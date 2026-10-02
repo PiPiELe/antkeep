@@ -89,6 +89,55 @@ void main() {
     home: const Scaffold(body: SettingsPage()),
   );
 
+  testWidgets('theme and font pickers apply, persist and report failed saves', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      AnimatedBuilder(
+        animation: themeController,
+        builder: (context, _) => MaterialApp(
+          theme: antKeepTheme(
+            themeController.themeColor,
+            fontColor: themeController.fontColor,
+          ),
+          home: const Scaffold(body: SettingsPage()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('外观与展示'));
+    await tester.pumpAndSettle();
+    Future<void> choose(String label) async {
+      await Scrollable.ensureVisible(
+        tester.element(find.text(label)),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, label));
+      await tester.pumpAndSettle();
+    }
+
+    await choose('雾蓝');
+    expect(settings['theme_color'], 'mistBlue');
+    await choose('深蓝 #243B53');
+    expect(settings['font_color'], 'navy');
+    expect(
+      Theme.of(tester.element(find.text('字体颜色'))).textTheme.bodyMedium!.color,
+      FontColor.navy.color,
+    );
+    await choose('纯白');
+    expect(settings['theme_color'], 'white');
+    expect(themeController.fontColor, FontColor.navy);
+    failWrites = true;
+    await choose('墨绿 #285943');
+    expect(themeController.fontColor, FontColor.navy);
+    expect(find.byType(SnackBar), findsOneWidget);
+    failWrites = false;
+    await choose('跟随主题');
+    expect(settings['font_color'], 'theme');
+    expect(tester.takeException(), isNull);
+  });
+
   bool selected(WidgetTester tester, String label) => tester
       .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label))
       .selected;
@@ -438,7 +487,13 @@ void main() {
         await tester.pumpWidget(app(dark: dark));
         for (final entry in {
           '在线服务': ['在线版'],
-          '外观与展示': ['简化模式', '薰衣草紫', '深色'],
+          '外观与展示': [
+            '简化模式',
+            '雾蓝',
+            '纯白',
+            dark ? '深蓝 #BFD3EA' : '深蓝 #243B53',
+            '深色',
+          ],
           '数据管理': ['数据推送', '撤销上一次恢复'],
           '帮助与反馈': ['交流群二维码'],
           '关于与更新': ['检查更新'],

@@ -475,13 +475,56 @@ class ThemeColorPicker extends StatelessWidget {
     children: [
       for (final color in ThemeColor.values)
         ChoiceChip(
-          avatar: CircleAvatar(backgroundColor: color.color),
+          avatar: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: CircleAvatar(backgroundColor: color.color),
+          ),
           label: Text(color.label),
           selected: selected == color,
           onSelected: onChanged == null ? null : (_) => onChanged!(color),
         ),
     ],
   );
+}
+
+class FontColorPicker extends StatelessWidget {
+  const FontColorPicker({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+  final FontColor selected;
+  final ValueChanged<FontColor> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final color in FontColor.values)
+          ChoiceChip(
+            avatar: color == FontColor.theme
+                ? const Icon(Icons.format_color_reset, size: 18)
+                : CircleAvatar(backgroundColor: color.resolve(dark)),
+            label: Text(
+              color == FontColor.theme
+                  ? color.label
+                  : '${color.label} ${color.hex(dark)}',
+            ),
+            selected: selected == color,
+            onSelected: (_) => onChanged(color),
+          ),
+      ],
+    );
+  }
 }
 
 class ThemeModePicker extends StatelessWidget {
