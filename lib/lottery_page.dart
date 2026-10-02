@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum _LotteryMode { wheel, direct }
 
@@ -31,7 +32,7 @@ double wheelTurnsForSelectedIndex({
   required double currentTurns,
   required int selectedIndex,
   required int itemCount,
-}) => currentTurns.ceilToDouble() + 5 - (selectedIndex + 0.5) / itemCount;
+}) => currentTurns.ceilToDouble() + 3 - (selectedIndex + 0.5) / itemCount;
 
 class LotteryPage extends StatefulWidget {
   const LotteryPage({super.key});
@@ -40,7 +41,16 @@ class LotteryPage extends StatefulWidget {
   State<LotteryPage> createState() => _LotteryPageState();
 }
 
-class _LotteryPageState extends State<LotteryPage> {
+class _LotteryPageState extends State<LotteryPage>
+    with SingleTickerProviderStateMixin {
+  static const _durationOptions = [4, 6, 8, 10];
+  static const _durationKey = 'lottery_wheel_seconds';
+  late final AnimationController _spinController;
+  Animation<double> _rotation = const AlwaysStoppedAnimation(0);
+  SharedPreferences? _preferences;
+  var _spinSeconds = 6;
+  var _durationReady = false;
+  var _savingDuration = false;
   final _startController = TextEditingController();
   final _endController = TextEditingController();
   final _random = Random();
@@ -59,7 +69,50 @@ class _LotteryPageState extends State<LotteryPage> {
   bool get _isDrawing => _isSpinning || _isRolling;
 
   @override
+  void initState() {
+    super.initState();
+    _spinController = AnimationController(vsync: this);
+    _loadDuration();
+  }
+
+  Future<void> _loadDuration() async {
+    var seconds = 6;
+    try {
+      _preferences = await SharedPreferences.getInstance();
+      final saved = _preferences!.getInt(_durationKey);
+      if (_durationOptions.contains(saved)) seconds = saved!;
+    } catch (_) {
+      // Keep the default duration when local preferences cannot be read.
+    }
+    if (!mounted) return;
+    setState(() {
+      _spinSeconds = seconds;
+      _durationReady = true;
+    });
+  }
+
+  Future<void> _selectDuration(Set<int> selection) async {
+    final seconds = selection.first;
+    setState(() => _savingDuration = true);
+    try {
+      final preferences = _preferences ?? await SharedPreferences.getInstance();
+      if (!await preferences.setInt(_durationKey, seconds)) {
+        throw StateError('Duration was not saved');
+      }
+      if (!mounted) return;
+      setState(() => _spinSeconds = seconds);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('旋转时长保存失败，请重试。')));
+    } finally {
+      if (mounted) setState(() => _savingDuration = false);
+    }
+  }
+
+  @override
   void dispose() {
+    _spinController.dispose();
     _rollingTimer?.cancel();
     _pauseTimer?.cancel();
     _startController.dispose();
@@ -114,24 +167,35 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   Future<void> _spinWheel() async {
+    if (_isDrawing || !_durationReady || _savingDuration) return;
     if (_wheelNumbers.isEmpty) {
       setState(() => _error = '请先生成转盘。');
       return;
     }
 
     final selectedIndex = _random.nextInt(_wheelNumbers.length);
+    final targetTurns = wheelTurnsForSelectedIndex(
+      currentTurns: _wheelTurns,
+      selectedIndex: selectedIndex,
+      itemCount: _wheelNumbers.length,
+    );
+    _spinController.duration = Duration(seconds: _spinSeconds);
+    _rotation = Tween<double>(
+      begin: _wheelTurns,
+      end: targetTurns,
+    ).animate(_spinController.drive(CurveTween(curve: Curves.easeOutCubic)));
     setState(() {
       _error = null;
       _result = null;
       _isSpinning = true;
-      _wheelTurns = wheelTurnsForSelectedIndex(
-        currentTurns: _wheelTurns,
-        selectedIndex: selectedIndex,
-        itemCount: _wheelNumbers.length,
-      );
+      _wheelTurns = targetTurns;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 2200));
+    try {
+      await _spinController.forward(from: 0).orCancel;
+    } on TickerCanceled {
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _isSpinning = false;
@@ -212,6 +276,22 @@ class _LotteryPageState extends State<LotteryPage> {
                     });
                   },
           ),
+          if (_mode == _LotteryMode.wheel) ...[
+            const SizedBox(height: 16),
+            const Text('旋转时长'),
+            const SizedBox(height: 8),
+            SegmentedButton<int>(
+              segments: [
+                for (final seconds in _durationOptions)
+                  ButtonSegment(value: seconds, label: Text('$seconds 秒')),
+              ],
+              selected: {_spinSeconds},
+              onSelectionChanged:
+                  _isSpinning || !_durationReady || _savingDuration
+                  ? null
+                  : _selectDuration,
+            ),
+          ],
           if (_mode == _LotteryMode.direct) ...[
             const SizedBox(height: 16),
             SegmentedButton<_PauseMode>(
@@ -312,10 +392,8 @@ class _LotteryPageState extends State<LotteryPage> {
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-                  AnimatedRotation(
-                    turns: _wheelTurns,
-                    duration: const Duration(milliseconds: 2200),
-                    curve: Curves.easeOutCubic,
+                  RotationTransition(
+                    turns: _rotation,
                     child: CustomPaint(
                       key: const ValueKey('lottery-wheel'),
                       size: Size.square(wheelDiameter),
@@ -411,7 +489,9 @@ class _LotteryPageState extends State<LotteryPage> {
             if (_wheelNumbers.isNotEmpty) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: _isSpinning ? null : _spinWheel,
+                onPressed: _isSpinning || !_durationReady || _savingDuration
+                    ? null
+                    : _spinWheel,
                 icon: const Icon(Icons.play_arrow_rounded),
                 label: Text(_isSpinning ? '转盘转动中…' : '转动转盘'),
               ),
