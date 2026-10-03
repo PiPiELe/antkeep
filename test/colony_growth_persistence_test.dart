@@ -90,6 +90,40 @@ void main() {
   );
 
   test(
+    'automatic catch-up preserves mortality before and between cycles',
+    () async {
+      final colony = await seed('mortality-growth');
+      for (final entry in [
+        (1, start.add(const Duration(hours: 1)), 3),
+        (2, start.add(const Duration(hours: 25)), 2),
+      ]) {
+        await db.saveRecord(
+          CareRecord(
+            id: 'growth-death-${entry.$1}',
+            colonyId: colony.id,
+            type: CareRecordType.mortality,
+            occurredAt: entry.$2,
+            createdAt: entry.$2,
+            workerMortalityCount: entry.$3,
+          ),
+        );
+      }
+      final end = start.add(const Duration(days: 3));
+      await db.applyColonyGrowth(now: end, colonyId: colony.id);
+      var records = await db.listRecords(colony.id);
+      expect(
+        records.where((r) => r.workerCount != null).map((r) => r.workerCount),
+        [18, 17, 18],
+      );
+      expect(colony.currentWorkerCount(records), 18);
+      await db.applyColonyGrowth(now: end, colonyId: colony.id);
+      records = await db.listRecords(colony.id);
+      expect(records, hasLength(5));
+      expect(colony.currentWorkerCount(records), 18);
+    },
+  );
+
+  test(
     'actual observations override counts before later automatic cycles',
     () async {
       await seed('observed');

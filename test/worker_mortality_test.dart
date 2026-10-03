@@ -14,7 +14,14 @@ void main() {
   late Directory directory;
   final db = AppDatabase.instance;
   final at = DateTime(2026, 1, 1);
-  final colony = Colony(id: 'colony', name: '测试', createdAt: at, updatedAt: at);
+  final colony = Colony(
+    id: 'colony',
+    name: '测试',
+    createdAt: at,
+    updatedAt: at,
+    queenCount: 1,
+    initialWorkerCount: 100,
+  );
   CareRecord record(int? deaths) => CareRecord(
     id: 'record',
     colonyId: colony.id,
@@ -108,6 +115,42 @@ void main() {
     },
   );
 
+  test('death counts replay after database edit, restore, type change and deletion', () async {
+    final known = Colony.fromMap({
+      ...colony.toMap(),
+      'id': 'known-population',
+      'initial_worker_count': 100,
+    });
+    await db.saveColony(known);
+    CareRecord event(int deaths) => CareRecord.fromMap({
+      ...record(deaths).toMap(),
+      'id': 'known-death',
+      'colony_id': known.id,
+    });
+    Future<int?> workers() async =>
+        known.currentWorkerCount(await db.listRecords(known.id));
+    await db.saveRecord(event(3), incremental: true);
+    expect(await workers(), 97);
+    await db.updateRecord(event(5));
+    expect(await workers(), 95);
+    final snapshot = await db.snapshot();
+    BackupData.validate(snapshot);
+    await db.replaceAll(snapshot);
+    expect(await workers(), 95);
+    await db.updateRecord(
+      CareRecord.fromMap({
+        ...event(5).toMap(),
+        'record_type': CareRecordType.observation.storageValue,
+        'worker_mortality_count': null,
+      }),
+    );
+    expect(await workers(), 100);
+    await db.updateRecord(event(5));
+    await db.deleteRecord(event(5));
+    expect(await workers(), 100);
+    await db.deleteColony(known.id);
+  });
+
   Future<void> settle(WidgetTester tester) async {
     for (var frame = 0; frame < 20; frame++) {
       await tester.pump(const Duration(milliseconds: 50));
@@ -152,6 +195,7 @@ void main() {
     await save(tester);
     final saved = await tester.runAsync(() => db.listRecords(colony.id));
     expect(saved!.single.workerMortalityCount, 3);
+    expect(colony.currentWorkerCount(saved), 97);
     expect(saved.single.type, CareRecordType.mortality);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -227,12 +271,13 @@ void main() {
       );
       await settle(tester);
       final card = find.byKey(const ValueKey('colony-mortality-analysis'));
-      Future<void> showCard() async {
+      Future<void> showCard(int workers) async {
         tester
             .state<ScrollableState>(find.byType(Scrollable).first)
             .position
             .jumpTo(0);
         await settle(tester);
+        expect(find.text('$workers 工蚁'), findsOneWidget);
         await tester.scrollUntilVisible(
           card,
           250,
@@ -241,7 +286,7 @@ void main() {
         await settle(tester);
       }
 
-      await showCard();
+      await showCard(96);
       expect(
         find.descendant(of: card, matching: find.text('每日工蚁死亡数量')),
         findsNothing,
@@ -294,7 +339,7 @@ void main() {
       await settle(tester);
       await tester.enterText(deaths, '5');
       await save(tester);
-      await showCard();
+      await showCard(94);
       expect(
         find.descendant(
           of: card,
@@ -314,7 +359,7 @@ void main() {
       await settle(tester);
       await tester.tap(find.text('确认删除'));
       await settle(tester);
-      await showCard();
+      await showCard(99);
       expect(
         find.descendant(of: card, matching: find.text('数据不足，暂无法比较')),
         findsOneWidget,

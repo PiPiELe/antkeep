@@ -32,8 +32,8 @@ class PopulationPoint {
   final int count;
 }
 
-/// Uses only observed values. Missing quantities never become zero or carry
-/// forward from a different observation. Duplicate instants use the last entry.
+/// Uses observed stage counts and replays worker deaths against the latest total.
+/// Unknown quantities remain unknown. Duplicate instants keep the last result.
 List<PopulationPoint> colonyPopulation(
   Colony colony,
   List<CareRecord> records,
@@ -55,13 +55,16 @@ List<PopulationPoint> colonyPopulation(
 
   add(colony.acquiredOn ?? colony.createdAt, initial);
   final ordered = records.where((r) => r.colonyId == colony.id).toList()
-    ..sort((a, b) {
-      final order = a.createdAt.compareTo(b.createdAt);
-      return order != 0 ? order : a.id.compareTo(b.id);
-    });
+    ..sort(CareRecord.comparePopulationOrder);
+  var workers = colony.initialWorkerCount;
   for (final record in ordered) {
+    workers = record.workerCountAfter(workers);
     add(record.occurredAt, switch (metric) {
-      PopulationMetric.workers => record.workerCount,
+      PopulationMetric.workers =>
+        (record.workerCount != null && record.workerCount! >= 0) ||
+                record.workerDeaths > 0
+            ? workers
+            : null,
       PopulationMetric.eggs => record.eggCount,
       PopulationMetric.larvae => record.larvaCount,
       PopulationMetric.pupae => record.pupaCount,
@@ -114,14 +117,12 @@ List<PopulationPoint> colonyPopulationTotal(
 
   add(colony.acquiredOn ?? colony.createdAt);
   final ordered = records.where((r) => r.colonyId == colony.id).toList()
-    ..sort((a, b) {
-      final order = a.createdAt.compareTo(b.createdAt);
-      return order != 0 ? order : a.id.compareTo(b.id);
-    });
+    ..sort(CareRecord.comparePopulationOrder);
   for (final record in ordered) {
     var changed = false;
-    final worker = valid(record.workerCount);
-    if (worker != null) {
+    final worker = record.workerCountAfter(workers);
+    if (worker != null &&
+        (valid(record.workerCount) != null || record.workerDeaths > 0)) {
       workers = worker;
       changed = true;
     }

@@ -80,10 +80,7 @@ class Colony {
 
   GrowthPopulation currentPopulation(Iterable<CareRecord> records) {
     final sorted = records.where((r) => r.colonyId == id).toList()
-      ..sort((a, b) {
-        final time = a.occurredAt.compareTo(b.occurredAt);
-        return time != 0 ? time : a.createdAt.compareTo(b.createdAt);
-      });
+      ..sort(CareRecord.comparePopulationOrder);
     var eggs = initialEggCount;
     var larvae = initialLarvaCount;
     var cocoons = initialCocoonCount;
@@ -92,7 +89,7 @@ class Colony {
       eggs = record.eggCount ?? eggs;
       larvae = record.larvaCount ?? larvae;
       cocoons = record.pupaCount ?? cocoons;
-      workers = record.workerCount ?? workers;
+      workers = record.workerCountAfter(workers);
     }
     return GrowthPopulation(
       eggs: eggs,
@@ -102,16 +99,8 @@ class Colony {
     );
   }
 
-  int? currentWorkerCount(Iterable<CareRecord> records) {
-    CareRecord? latest;
-    for (final record in records) {
-      if (record.colonyId != id || record.workerCount == null) continue;
-      if (latest == null || record.occurredAt.isAfter(latest.occurredAt)) {
-        latest = record;
-      }
-    }
-    return latest?.workerCount ?? initialWorkerCount;
-  }
+  int? currentWorkerCount(Iterable<CareRecord> records) =>
+      currentPopulation(records).workers;
 
   factory Colony.fromMap(Map<String, Object?> map) => Colony(
     id: map['id']! as String,
@@ -219,6 +208,27 @@ class CareRecord {
   final int? workerMortalityCount;
   final List<String> photos;
   final DateTime createdAt;
+
+  /// Stable event ordering shared by current counts and quantity charts.
+  static int comparePopulationOrder(CareRecord a, CareRecord b) {
+    final time = a.occurredAt.compareTo(b.occurredAt);
+    if (time != 0) return time;
+    final created = a.createdAt.compareTo(b.createdAt);
+    return created != 0 ? created : a.id.compareTo(b.id);
+  }
+
+  int get workerDeaths =>
+      type == CareRecordType.mortality && (workerMortalityCount ?? 0) > 0
+      ? workerMortalityCount!
+      : 0;
+
+  /// Explicit totals already include deaths; otherwise replay the death event.
+  /// Unknown populations stay unknown and historical overcounts stop at zero.
+  int? workerCountAfter(int? previous) {
+    if (workerCount != null && workerCount! >= 0) return workerCount;
+    if (previous == null || previous < 0) return null;
+    return workerDeaths > previous ? 0 : previous - workerDeaths;
+  }
 
   factory CareRecord.fromMap(Map<String, Object?> map) => CareRecord(
     id: map['id']! as String,
