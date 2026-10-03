@@ -102,8 +102,8 @@ void main() {
           Colony(
             id: id,
             name: id,
-            createdAt: now,
-            updatedAt: now,
+            createdAt: previous.subtract(const Duration(days: 1)),
+            updatedAt: today,
             initialWorkerCount: 10,
           ),
       ];
@@ -167,7 +167,7 @@ void main() {
       expect(find.text('已记录死亡量上升'), findsOneWidget);
       await tester.tap(find.text('数量分析'));
       await tester.pumpAndSettle();
-      expect(find.text('工蚁 · 最近 10 只 · 1 个时间点'), findsOneWidget);
+      expect(find.text('工蚁 · 最近 1 只 · 3 个时间点'), findsOneWidget);
       expect(find.text('已记录死亡量上升'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('analysis-subject')));
       await tester.pumpAndSettle();
