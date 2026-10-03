@@ -59,7 +59,7 @@ class AppUpdateController extends ChangeNotifier {
     try {
       final raw = await api.request('/api/public/app-update/android');
       final candidate = AppUpdatePolicy.decode(raw);
-      final installed = AppVersion.parse(await currentVersion());
+      final installed = AppVersion.parseInstalled(await currentVersion());
       if (!_current(generation)) return;
       policy = candidate;
       availability =
