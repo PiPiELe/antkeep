@@ -1,0 +1,160 @@
+name: Deliver Android APK to server
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Check connection or build and upload an APK
+        type: choice
+        options: [check, upload]
+        default: check
+        required: true
+      channel:
+        description: Release channel
+        type: choice
+        options: [main, xiaomi, vivo]
+        default: main
+        required: true
+      tag:
+        description: Existing immutable tag on the selected release branch (upload only)
+        type: string
+      api_base_url:
+        description: Public API HTTPS origin; empty keeps unconfigured features offline
+        type: string
+      account_base_url:
+        description: Account API HTTPS origin; does not enable disabled account features
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: antkeep-apk-server
+  cancel-in-progress: false
+jobs:
+  deliver:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      CHANNEL: ${{ inputs.channel }}
+      API_BASE_URL: ${{ inputs.api_base_url }}
+      ACCOUNT_BASE_URL: ${{ inputs.account_base_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure restricted SSH identity
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          HOST_KEYS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$HOST_KEYS"
+          install -m 700 -d "$RUNNER_TEMP/antkeep-ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/antkeep-ssh/key"
+          printf '%s\n' "$HOST_KEYS" > "$RUNNER_TEMP/antkeep-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/antkeep-ssh/"*
+          cat > "$RUNNER_TEMP/antkeep-ssh/config" <<EOF
+          Host antkeep-ci
+            HostName 101.201.76.135
+            User antkeep-apk-ci
+            IdentityFile $RUNNER_TEMP/antkeep-ssh/key
+            UserKnownHostsFile $RUNNER_TEMP/antkeep-ssh/known_hosts
+            StrictHostKeyChecking yes
+            IdentitiesOnly yes
+            BatchMode yes
+            ConnectTimeout 15
+          EOF
+      - name: Verify server connection without uploading
+        run: ssh -F "$RUNNER_TEMP/antkeep-ssh/config" antkeep-ci check
+      - name: Resolve immutable release source
+        if: inputs.operation == 'upload'
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_TAG"
+          branch=release
+          if [ "$CHANNEL" != main ]; then branch="release-$CHANNEL"; fi
+          sha=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          git rev-parse --verify "refs/remotes/origin/$branch"
+          git merge-base --is-ancestor "$sha" "refs/remotes/origin/$branch"
+          git checkout --detach "$sha"
+          echo "SOURCE_SHA=$sha" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import os, urllib.parse
+          for name in ('API_BASE_URL', 'ACCOUNT_BASE_URL'):
+              value = os.environ[name]
+              parsed = urllib.parse.urlsplit(value)
+              if value and (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password):
+                  raise SystemExit(f'{name} must be an HTTPS URL without credentials')
+          PY
+      - uses: actions/setup-java@v4
+        if: inputs.operation == 'upload'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        if: inputs.operation == 'upload'
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+      - name: Restore signing configuration
+        if: inputs.operation == 'upload'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" && test -n "$STORE_PASSWORD"
+          umask 077
+          printf '%s' "$KEYSTORE" | base64 --decode > android/app/antkeep-release.jks
+          printf 'storeFile=app/antkeep-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
+      - name: Test and build signed APK
+        if: inputs.operation == 'upload'
+        run: |
+          set -euo pipefail
+          flutter pub get
+          git diff --exit-code -- pubspec.lock
+          flutter analyze
+          flutter test
+          flutter build apk --release --dart-define="ANTKEEP_API_BASE_URL=$API_BASE_URL" --dart-define="ANTKEEP_ACCOUNT_BASE_URL=$ACCOUNT_BASE_URL"
+      - name: Inspect and upload immutable APK
+        if: inputs.operation == 'upload'
+        run: |
+          set -euo pipefail
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk"
+          "$build_tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/apk-badging.txt"
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          text = Path(os.environ['RUNNER_TEMP'] + '/apk-badging.txt').read_text()
+          package = re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", text)
+          version = re.search(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$', Path('pubspec.yaml').read_text(), re.M)
+          if not package or not version or package[1] != 'com.pipiele.antkeep' or package[2] != version[2] or package[3] != version[1] or 'application-debuggable' in text:
+              raise SystemExit('APK identity/version/debuggable validation failed')
+          suffix = '' if os.environ['CHANNEL'] == 'main' else '-' + os.environ['CHANNEL']
+          name = f'AntKeep-{version[1]}-{version[2]}{suffix}.apk'
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('APK_NAME=' + name + '\n')
+          PY
+          name=$(tail -1 "$GITHUB_ENV" | cut -d= -f2-)
+          mkdir -p delivery
+          cp "$apk" "delivery/$name"
+          digest=$(sha256sum "delivery/$name" | cut -d' ' -f1)
+          printf '%s  %s\n' "$digest" "$name" > "delivery/$name.sha256"
+          ssh -F "$RUNNER_TEMP/antkeep-ssh/config" antkeep-ci "upload $name $digest $SOURCE_SHA" < "delivery/$name"
+          curl --fail --location --retry 2 "https://pipicbb.xyz/apk/$name" -o "$RUNNER_TEMP/download.apk"
+          echo "$digest  $RUNNER_TEMP/download.apk" | sha256sum --check
+          printf 'APK: https://pipicbb.xyz/apk/%s\n\nCommit: %s\n\nSHA256: %s\n' "$name" "$SOURCE_SHA" "$digest" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: inputs.operation == 'upload' && always()
+        with:
+          name: android-delivery-${{ inputs.channel }}-${{ github.run_id }}
+          path: delivery/
+          if-no-files-found: ignore
+      - name: Remove runner credentials
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/antkeep-ssh" android/key.properties android/app/antkeep-release.jks
