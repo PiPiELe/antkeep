@@ -5,11 +5,11 @@ import 'package:archive/archive.dart';
 class BackupArchive {
   BackupArchive._();
 
-  static const maxInputBytes = 128 * 1024 * 1024;
-  static const maxEntries = 500;
-  static const maxTotalUncompressedBytes = 192 * 1024 * 1024;
-  static const maxSingleFileBytes = 24 * 1024 * 1024;
-  static const maxManifestBytes = 1024 * 1024;
+  static const maxInputBytes = 512 * 1024 * 1024;
+  static const maxEntries = 2000;
+  static const maxTotalUncompressedBytes = 768 * 1024 * 1024;
+  static const maxSingleFileBytes = 64 * 1024 * 1024;
+  static const maxManifestBytes = 8 * 1024 * 1024;
 
   static Uint8List encode(Archive archive) {
     validateArchive(archive);
@@ -20,7 +20,9 @@ class BackupArchive {
 
   static void _validateInputSize(Uint8List bytes) {
     if (bytes.length > maxInputBytes) {
-      throw const FormatException('备份文件超过 128 MB 的大小上限。');
+      throw FormatException(
+        '备份文件超过 ${maxInputBytes ~/ (1024 * 1024)} MB 的大小上限。',
+      );
     }
   }
 

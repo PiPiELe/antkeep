@@ -9,20 +9,31 @@ class RollbackStore {
   static final instance = RollbackStore._();
 
   Future<void> save(Uint8List bytes) async {
-    final destination = await _file();
+    final destination = await file();
     final temporary = File('${destination.path}.tmp');
     await temporary.writeAsBytes(bytes, flush: true);
     await temporary.rename(destination.path);
   }
 
-  Future<Uint8List?> read() async {
-    final file = await _file();
-    return await file.exists() ? file.readAsBytes() : null;
+  Future<void> saveFile(File source) async {
+    final destination = await file();
+    final temporary = File('${destination.path}.tmp');
+    try {
+      await source.copy(temporary.path);
+      await temporary.rename(destination.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
   }
 
-  Future<bool> exists() async => (await _file()).exists();
+  Future<Uint8List?> read() async {
+    final source = await file();
+    return await source.exists() ? source.readAsBytes() : null;
+  }
 
-  Future<File> _file() async {
+  Future<bool> exists() async => (await file()).exists();
+
+  Future<File> file() async {
     final root = await getApplicationSupportDirectory();
     final directory = Directory(path.join(root.path, 'antkeep'));
     await directory.create(recursive: true);
