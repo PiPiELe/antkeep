@@ -1,5 +1,6 @@
 package com.pipiele.antkeep
 
+import android.content.Intent
 import android.content.ContentValues
 import android.os.Build
 import android.os.Environment
@@ -9,8 +10,16 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var backupBridge: BackupBridge? = null
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (backupBridge?.onActivityResult(requestCode, resultCode, data) == true) return
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        backupBridge = BackupBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pipiele.antkeep/share_image")
             .setMethodCallHandler { call, result ->
                 if (call.method != "saveImage") {

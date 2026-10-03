@@ -5124,10 +5124,13 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: const Text('生成包含记录和照片的 .zip 文件'),
           onTap: () async {
             try {
-              final exported = await BackupService(
-                AppDatabase.instance,
-                LocalMediaStore.instance,
-              ).exportBackup();
+              final exported = await _runBackupTask(
+                context,
+                () => BackupService(
+                  AppDatabase.instance,
+                  LocalMediaStore.instance,
+                ).exportBackup(),
+              );
               if (exported && context.mounted) {
                 _showInfo(context, '已完成备份导出。');
               }
@@ -5173,10 +5176,13 @@ class _SettingsPageState extends State<SettingsPage> {
             );
             if (mode == null || !context.mounted) return;
             try {
-              final restored = await BackupService(
-                AppDatabase.instance,
-                LocalMediaStore.instance,
-              ).restoreBackup(mode: mode);
+              final restored = await _runBackupTask(
+                context,
+                () => BackupService(
+                  AppDatabase.instance,
+                  LocalMediaStore.instance,
+                ).restoreBackup(mode: mode),
+              );
               if (restored && context.mounted) {
                 _showInfo(
                   context,
@@ -5223,7 +5229,7 @@ class _SettingsPageState extends State<SettingsPage> {
             );
             if (approved != true || !context.mounted) return;
             try {
-              await service.undoLastRestore();
+              await _runBackupTask(context, service.undoLastRestore);
               if (context.mounted) _showInfo(context, '已撤销上一次恢复。');
             } catch (error) {
               if (context.mounted) _showError(context, error);
@@ -5386,6 +5392,32 @@ String _dateTime(DateTime value) =>
     '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 String _timeOfDay(int minuteOfDay) =>
     '${(minuteOfDay ~/ 60).toString().padLeft(2, '0')}:${(minuteOfDay % 60).toString().padLeft(2, '0')}';
+Future<T> _runBackupTask<T>(BuildContext context, Future<T> Function() action) async {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final route = DialogRoute<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Expanded(child: Text('正在处理备份，请稍候…')),
+          ],
+        ),
+      ),
+    ),
+  );
+  navigator.push(route);
+  try {
+    return await action();
+  } finally {
+    if (route.isActive) navigator.removeRoute(route);
+  }
+}
+
 void _showError(BuildContext context, Object error) =>
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('操作未完成：$error')));

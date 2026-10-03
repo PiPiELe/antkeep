@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:antkeep/data/app_database.dart';
+import 'package:antkeep/data/database_path.dart';
 import 'package:antkeep/data/backup_archive.dart';
+import 'package:antkeep/data/backup_resources.dart';
 import 'package:antkeep/data/backup_service.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/data/rollback_store.dart';
@@ -294,7 +297,7 @@ void main() {
       final incoming = fixture();
       incoming['care_records'][0]['id'] = 'new-record';
       final files = {
-        for (var i = 0; i < 499; i++) 'new-$i.jpg': <int>[i % 256],
+        for (var i = 0; i < 1999; i++) 'new-$i.jpg': <int>[i % 256],
       };
       incoming['care_records'][0]['photos_json'] = jsonEncode(
         files.keys.toList(),
@@ -484,6 +487,64 @@ void main() {
     }
   }
 
+  test('database failure restores overwritten photos and previous rollback', () async {
+    final before = await database.snapshot();
+    final db = await openDatabase(await applicationDatabasePath());
+    await db.execute("CREATE TRIGGER reject_restore BEFORE INSERT ON colonies BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END");
+    try {
+      await expectLater(service.restoreBytes(archiveBytes(fixture())), throwsA(isA<DatabaseException>()));
+      expect(await database.snapshot(), before);
+      expect(await media.readImage('image.jpg'), [1, 2, 3]);
+      expect(await RollbackStore.instance.read(), previousRollback);
+    } finally {
+      await db.execute('DROP TRIGGER reject_restore');
+    }
+  });
+
+  test('file APIs restore and undo without a byte-array export', () async {
+    final output = File('${directory.path}/streamed.zip');
+    await service.writeBackupFile(output);
+    await media.restoreFiles({'image.jpg': [6, 6]});
+    await service.restoreFile(output);
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    await service.undoLastRestore();
+    expect(await media.readImage('image.jpg'), [6, 6]);
+  });
+
+  test('disk shortage leaves database, photos and previous rollback intact', () async {
+    final before = await database.snapshot();
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(BackupResources.channel, (_) async => {'freeDisk': 1, 'availableMemory': 1024 * 1024 * 1024});
+    try {
+      await expectLater(service.restoreBytes(archiveBytes(fixture())), throwsStateError);
+      expect(await database.snapshot(), before);
+      expect(await media.readImage('image.jpg'), [1, 2, 3]);
+      expect(await RollbackStore.instance.read(), previousRollback);
+    } finally {
+      messenger.setMockMethodCallHandler(BackupResources.channel, null);
+    }
+  });
+
+  test('corrupt attachment preserves database, photos and previous rollback', () async {
+    final before = await database.snapshot();
+    final zip = archiveBytes(fixture());
+    // Corrupt central CRC while keeping the local CRC consistent so extraction
+    // must detect the actual mismatch, rather than only validating headers.
+    final view = ByteData.sublistView(zip);
+    for (var i = 0; i + 46 <= zip.length; i++) {
+      if (view.getUint32(i, Endian.little) == 0x02014b50 &&
+          utf8.decode(zip.sublist(i + 46, i + 46 + view.getUint16(i + 28, Endian.little))).startsWith('media/')) {
+        final offset = view.getUint32(i + 42, Endian.little);
+        view.setUint32(i + 16, 123, Endian.little);
+        view.setUint32(offset + 14, 123, Endian.little);
+      }
+    }
+    await expectLater(service.restoreBytes(zip), throwsFormatException);
+    expect(await database.snapshot(), before);
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    expect(await RollbackStore.instance.read(), previousRollback);
+  });
+
   test('legacy backups may omit newer tables and optional columns', () async {
     final time = '2026-09-01T00:00:00.000';
     await service.restoreBytes(
@@ -502,30 +563,30 @@ void main() {
   });
 
   test(
-    '499 photos export and restore successfully at the entry limit',
+    '1999 photos export and restore successfully at the entry limit',
     () async {
       final files = {
-        for (var i = 0; i < 499; i++) 'image-$i.jpg': <int>[i % 256],
+        for (var i = 0; i < 1999; i++) 'image-$i.jpg': <int>[i % 256],
       };
       final data = fixture();
       data['care_records'][0]['photos_json'] = jsonEncode(files.keys.toList());
       await media.restoreFiles(files);
       await database.replaceAll(data);
       final bytes = await service.createBackupBytes();
-      expect(BackupArchive.decode(bytes).files, hasLength(500));
+      expect(BackupArchive.decode(bytes).files, hasLength(2000));
       await database.replaceAll(fixture());
       await service.restoreBytes(bytes);
-      expect((await database.listRecords('c')).single.photos, hasLength(499));
-      expect(await media.readImage('image-498.jpg'), files['image-498.jpg']);
+      expect((await database.listRecords('c')).single.photos, hasLength(1999));
+      expect(await media.readImage('image-1998.jpg'), files['image-1998.jpg']);
     },
   );
 
   test(
-    '500 photos fail export explicitly before reading attachments',
+    '2000 photos fail export explicitly before reading attachments',
     () async {
       final data = fixture();
       data['care_records'][0]['photos_json'] = jsonEncode([
-        for (var i = 0; i < 500; i++) 'absent-$i.jpg',
+        for (var i = 0; i < 2000; i++) 'absent-$i.jpg',
       ]);
       await database.replaceAll(data);
       await expectLater(
@@ -534,7 +595,7 @@ void main() {
           isA<FormatException>().having(
             (error) => error.message,
             'message',
-            contains('499'),
+            contains('1999'),
           ),
         ),
       );

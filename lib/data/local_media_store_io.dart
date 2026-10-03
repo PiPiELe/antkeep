@@ -6,6 +6,8 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'backup_resources.dart';
+
 class LocalMediaStore {
   LocalMediaStore._();
   static final instance = LocalMediaStore._();
@@ -53,6 +55,54 @@ class LocalMediaStore {
       files[relativePath] = await file.readAsBytes();
     }
     return files;
+  }
+
+  Future<Map<String, String>> filePaths(Iterable<String> names) async {
+    final files = <String, String>{};
+    for (final name in names) {
+      final file = await _fileFor(name);
+      if (!await file.exists()) throw StateError('备份无法创建：缺少照片 $name');
+      files[name] = file.path;
+    }
+    return files;
+  }
+
+  Future<int> overwrittenBytes(Iterable<String> names) async {
+    var size = 0;
+    for (final name in names) {
+      final file = await _fileFor(name);
+      if (await file.exists()) size += await file.length();
+    }
+    return size;
+  }
+
+  Future<DiskMediaRestore> installFiles(
+    Map<String, String> files,
+    Directory undo,
+  ) async {
+    await undo.create(recursive: true);
+    final previous = <String, String?>{};
+    final change = DiskMediaRestore._(this, previous);
+    try {
+      for (final entry in files.entries) {
+        final destination = await _fileFor(entry.key);
+        if (await destination.exists()) {
+          final saved = await destination.copy(path.join(undo.path, entry.key));
+          previous[entry.key] = saved.path;
+        } else {
+          previous[entry.key] = null;
+        }
+        await File(entry.value).copy(destination.path);
+      }
+      return change;
+    } catch (_) {
+      try {
+        await change.rollback();
+      } catch (_) {
+        throw BackupRecoveryFailure(undo.parent.path);
+      }
+      rethrow;
+    }
   }
 
   Future<void> restoreFiles(Map<String, List<int>> files) async {
@@ -115,4 +165,21 @@ class MediaRestore {
   final Set<String> _created;
 
   Future<void> rollback() => _store._restorePrevious(_previous, _created);
+}
+
+class DiskMediaRestore {
+  DiskMediaRestore._(this._store, this._previous);
+  final LocalMediaStore _store;
+  final Map<String, String?> _previous;
+
+  Future<void> rollback() async {
+    for (final entry in _previous.entries) {
+      final destination = await _store._fileFor(entry.key);
+      if (entry.value != null) {
+        await File(entry.value!).copy(destination.path);
+      } else if (await destination.exists()) {
+        await destination.delete();
+      }
+    }
+  }
 }
