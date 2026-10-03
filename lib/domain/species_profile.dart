@@ -72,7 +72,7 @@ final speciesProfiles = [
   SpeciesProfile(
     name: '费氏弓背蚁',
     scientificName: 'Camponotus fedtschenkoi',
-    aliases: ['黑金弓背蚁', '黑斑弓背蚁'],
+    aliases: ['黑金弓背蚁', '红金弓背蚁', '黑斑弓背蚁'],
     difficulty: 3,
     subfamily: '蚁亚科 Formicinae',
     genus: '弓背蚁属 Camponotus',
