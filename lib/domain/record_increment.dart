@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'colony_growth.dart';
 import 'models.dart';
 
@@ -34,6 +36,7 @@ CareRecord resolveRecordIncrement(
     return result;
   }
 
+  final workers = count('工蚁', base.workers, record.workerCount, 0);
   return CareRecord.fromMap({
     ...record.toMap(),
     'egg_count': count('卵', base.eggs, record.eggCount, record.larvaCount ?? 0),
@@ -46,6 +49,10 @@ CareRecord resolveRecordIncrement(
     'pupa_count': withCocoons
         ? count('茧', base.cocoons, record.pupaCount, record.workerCount ?? 0)
         : null,
-    'worker_count': count('工蚁', base.workers, record.workerCount, 0),
+    // A death-only record stays an event so edits/deletion can be replayed.
+    // When an increment produces a snapshot, store its post-death total.
+    'worker_count': workers == null
+        ? null
+        : math.max(0, workers - record.workerDeaths),
   });
 }

@@ -465,7 +465,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
             eggs: record.eggCount ?? population.eggs,
             larvae: record.larvaCount ?? population.larvae,
             cocoons: record.pupaCount ?? population.cocoons,
-            workers: record.workerCount ?? population.workers,
+            workers: record.workerCountAfter(population.workers),
           );
         }
         final recordId =

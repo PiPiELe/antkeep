@@ -80,7 +80,7 @@ List<PopulationPoint> colonyPopulationForecast(
   for (final record in known) {
     eggs = valid(record.eggCount) ?? eggs;
     cocoons = valid(record.pupaCount) ?? cocoons;
-    workers = valid(record.workerCount) ?? workers;
+    workers = record.workerCountAfter(workers);
     larvae = valid(record.larvaCount) ?? larvae;
   }
   var population = GrowthPopulation(

@@ -3070,9 +3070,12 @@ class _RecordFormPageState extends State<RecordFormPage> {
           TextField(
             controller: _workerMortality,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: '工蚁死亡数量',
-              helperText: '本次死亡数量，不清楚可留空',
+              helperMaxLines: 3,
+              helperText: _incremental
+                  ? '自动扣减工蚁数量，最低为 0；数量未知时仅记录死亡数'
+                  : '工蚁总数留空时自动扣减，最低为 0；填写总数则以总数为准，未知时仅记录死亡数',
             ),
           ),
         ],
