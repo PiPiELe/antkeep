@@ -42,7 +42,7 @@ void main() {
         );
       }
       expect(importedSpeciesAliases['Messor ebeninus'], '乌檀收获蚁');
-      expect(importedSpeciesAliases['Camponotus fedtschenkoi'], '费氏弓背蚁（黑金弓背蚁）');
+      expect(importedSpeciesAliases['Camponotus fedtschenkoi'], '费氏弓背蚁');
       expect(importedSpeciesAliases.containsKey('拟黑多刺蚁'), isFalse);
       expect(importedSpeciesAliases.containsKey('无颚齿收获蚁'), isFalse);
       expect(importedSpeciesSearchAliases['肩角弓背蚁'], hasLength(2));

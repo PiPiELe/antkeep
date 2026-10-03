@@ -29,6 +29,7 @@ void main() {
     for (final name in [
       '费氏弓背蚁',
       '黑金弓背蚁',
+      '红金弓背蚁',
       '黑斑弓背蚁',
       '费氏弓背蚁（黑金弓背蚁）',
       '费氏弓背蚁（自定义俗名）',
@@ -62,7 +63,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SpeciesEncyclopediaPage), findsOneWidget);
 
-    for (final query in ['黑金', '黑斑', ' CAMPONOTUS FEDTSCHENKOI ', '蚁亚科']) {
+    for (final query in [
+      '黑金',
+      '红金',
+      '黑斑',
+      ' CAMPONOTUS FEDTSCHENKOI ',
+      '蚁亚科',
+    ]) {
       await tester.enterText(find.byType(TextField), query);
       await tester.pumpAndSettle();
       expect(find.text('费氏弓背蚁'), findsOneWidget);

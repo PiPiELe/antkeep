@@ -926,7 +926,10 @@ void main() {
   for (final (query, category, species, nickname) in [
     ('乌檀', '收获蚁', '乌檀收获蚁', '乌檀收获蚁'),
     (' MYRMECIA PILOSULA ', '牛蚁', '多毛牛蚁', '多毛牛蚁'),
-    ('费事弓背蚁', '弓背蚁', '费氏弓背蚁（黑金弓背蚁）', '黑金弓背蚁'),
+    ('费事弓背蚁', '弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
+    ('黑金', '弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
+    ('红金', '弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
+    ('黑斑', '弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
     ('子弹蚁', '子弹蚁', '子弹蚁', '子弹蚁'),
   ]) {
     testWidgets('top-level search selects and saves $query directly', (
@@ -1078,54 +1081,65 @@ void main() {
     },
   );
 
-  testWidgets('formal and common species names save and reopen together', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FloatingActionButton, '蚁群'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('未收录？手动填写品种'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('确认'));
-    await tester.pumpAndSettle();
-    expect(find.text('请至少填写一个名称'), findsOneWidget);
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '学名 / 正式名'),
-      ' Camponotus fedtschenkoi ',
+  for (final (formal, common) in [
+    ('Camponotus fedtschenkoi', '黑金弓背蚁'),
+    ('费氏弓背蚁', '黑金弓背蚁'),
+    ('费氏弓背蚁', '红金弓背蚁'),
+    ('费氏弓背蚁', '黑斑弓背蚁'),
+  ]) {
+    testWidgets(
+      'formal and common species names save and reopen: $formal $common',
+      (tester) async {
+        await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FloatingActionButton, '蚁群'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('未收录？手动填写品种'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('确认'));
+        await tester.pumpAndSettle();
+        expect(find.text('请至少填写一个名称'), findsOneWidget);
+        await tester.enterText(
+          find.widgetWithText(TextFormField, '学名 / 正式名'),
+          ' $formal ',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextFormField, '通用名（可选）'),
+          ' $common ',
+        );
+        await tester.tap(find.text('确认'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('colony-name')),
+          '双名称蚁群',
+        );
+        await fillRequiredColonyCounts(tester);
+        await tapSave(tester, '保存蚁群');
+        final saved = (await AppDatabase.instance.listColonies()).single;
+        expect(saved.species, '$formal（$common）');
+        expect(Colony.fromMap(saved.toMap()).species, saved.species);
+        await tester.tap(find.text('双名称蚁群'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('编辑蚁群'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('未收录？手动填写品种'));
+        await tester.pumpAndSettle();
+        expect(find.text(formal), findsOneWidget);
+        expect(find.text(common), findsOneWidget);
+        await tester.enterText(
+          find.widgetWithText(TextFormField, '通用名（可选）'),
+          '取消的名称',
+        );
+        await tester.tap(find.text('取消'));
+        await tester.pumpAndSettle();
+        await tapSave(tester, '保存蚁群');
+        expect(
+          (await AppDatabase.instance.findColony(saved.id))!.species,
+          saved.species,
+        );
+      },
     );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '通用名（可选）'),
-      ' 黑金弓背蚁 ',
-    );
-    await tester.tap(find.text('确认'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('colony-name')), '双名称蚁群');
-    await fillRequiredColonyCounts(tester);
-    await tapSave(tester, '保存蚁群');
-    final saved = (await AppDatabase.instance.listColonies()).single;
-    expect(saved.species, 'Camponotus fedtschenkoi（黑金弓背蚁）');
-    expect(Colony.fromMap(saved.toMap()).species, saved.species);
-    await tester.tap(find.text('双名称蚁群'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('编辑蚁群'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('未收录？手动填写品种'));
-    await tester.pumpAndSettle();
-    expect(find.text('Camponotus fedtschenkoi'), findsOneWidget);
-    expect(find.text('黑金弓背蚁'), findsOneWidget);
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '通用名（可选）'),
-      '取消的名称',
-    );
-    await tester.tap(find.text('取消'));
-    await tester.pumpAndSettle();
-    await tapSave(tester, '保存蚁群');
-    expect(
-      (await AppDatabase.instance.findColony(saved.id))!.species,
-      saved.species,
-    );
-  });
+  }
 
   testWidgets('manual species accepts a common name without a formal name', (
     tester,
@@ -1150,7 +1164,10 @@ void main() {
     (tester) async {
       final date = DateTime(2026, 9, 1);
       for (final (oldName, formalName, combinedName, nickname) in [
-        ('黑金弓背蚁', '费氏弓背蚁', '费氏弓背蚁（黑金弓背蚁）', '黑金弓背蚁'),
+        ('黑金弓背蚁', '费氏弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
+        ('红金弓背蚁', '费氏弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
+        ('黑斑弓背蚁', '费氏弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
+        ('费氏弓背蚁（黑金弓背蚁）', '费氏弓背蚁', '费氏弓背蚁', '费氏弓背蚁'),
         ('原生收获蚁', '野蛮收获蚁', '野蛮收获蚁（原生收获蚁）', '原生收获蚁'),
       ]) {
         await tester.pumpWidget(
@@ -1171,6 +1188,20 @@ void main() {
         final field = find.widgetWithText(TextFormField, '品种分类/细分种类');
         expect(tester.widget<TextFormField>(field).enabled, isTrue);
         expect(find.textContaining(' / $oldName'), findsOneWidget);
+        if (formalName == '费氏弓背蚁') {
+          await tester.tap(find.text('未收录？手动填写品种'));
+          await tester.pumpAndSettle();
+          final commonField = tester.widget<TextFormField>(
+            find.widgetWithText(TextFormField, '通用名（可选）'),
+          );
+          expect(
+            commonField.initialValue,
+            oldName.contains('（') ? '黑金弓背蚁' : oldName,
+          );
+          await tester.tap(find.text('取消'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining(' / $oldName'), findsOneWidget);
+        }
         await tester.tap(field);
         await tester.pumpAndSettle();
         final search = find.descendant(
@@ -1180,9 +1211,9 @@ void main() {
         for (final query in [oldName, formalName]) {
           await tester.enterText(search, query);
           await tester.pumpAndSettle();
-          expect(find.text(combinedName), findsOneWidget);
+          expect(find.widgetWithText(ListTile, combinedName), findsOneWidget);
         }
-        await tester.tap(find.text(combinedName));
+        await tester.tap(find.widgetWithText(ListTile, combinedName));
         await tester.pumpAndSettle();
         expect(find.textContaining(' / $combinedName'), findsOneWidget);
         expect(find.text(nickname), findsOneWidget);

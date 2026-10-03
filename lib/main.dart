@@ -59,7 +59,7 @@ const _builtInSpeciesOptions = <String, List<String>>{
     '希伯来收获蚁',
   ],
   '弓背蚁': [
-    '费氏弓背蚁（黑金弓背蚁）',
+    '费氏弓背蚁',
     '大头弓背蚁',
     '尼科巴弓背蚁',
     '巴瑞弓背蚁',
@@ -114,9 +114,9 @@ const _builtInSpeciesAliases = <String, String>{
   '铺道蚁': '草地铺道蚁',
   '全蚁巨首蚁': '全异巨首蚁',
   '拟广腹弓背蚁': '拟光腹弓背蚁',
-  '费氏弓背蚁': '费氏弓背蚁（黑金弓背蚁）',
-  '费事弓背蚁': '费氏弓背蚁（黑金弓背蚁）',
-  '黑金弓背蚁': '费氏弓背蚁（黑金弓背蚁）',
+  '费氏弓背蚁（黑金弓背蚁）': '费氏弓背蚁',
+  '费事弓背蚁': '费氏弓背蚁',
+  '黑金弓背蚁': '费氏弓背蚁',
   '野蛮收获蚁': '野蛮收获蚁（原生收获蚁）',
   '原生收获蚁': '野蛮收获蚁（原生收获蚁）',
   '巨首收获蚁': '巨首收获蚁（肯尼亚收获蚁）',
@@ -1219,7 +1219,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   }
 
   String _speciesNickname(String species) {
-    final displayName = _speciesAliases[species] ?? species;
+    final displayName = species.contains('（')
+        ? species
+        : _speciesAliases[species] ?? species;
     final match = RegExp(r'（([^（）]+)）').firstMatch(displayName);
     if (match == null) return displayName;
 
@@ -1259,11 +1261,18 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   }
 
   Future<void> _enterCustomSpecies() async {
-    final currentName =
-        _speciesAliases[_selectedSpecies] ?? _selectedSpecies ?? '';
+    final selectedName = _selectedSpecies ?? '';
+    // Keep the keeper's saved common name when editing an existing record.
+    final currentName = selectedName.contains('（')
+        ? selectedName
+        : _speciesAliases[selectedName] ?? selectedName;
     final names = RegExp(r'^(.*?)（([^（）]+)）$').firstMatch(currentName);
     var speciesName = names?.group(1) ?? currentName;
-    var commonName = names?.group(2) ?? '';
+    var commonName =
+        names?.group(2) ??
+        (findSpeciesProfile(selectedName)?.aliases.contains(selectedName) == true
+            ? selectedName
+            : '');
     final formKey = GlobalKey<FormState>();
     final species = await showDialog<String>(
       context: context,
