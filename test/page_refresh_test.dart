@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/diary_preferences.dart';
+import 'package:antkeep/diary_settings_page.dart';
 import 'package:antkeep/population_analysis_page.dart';
 import 'package:antkeep/colony_growth_page.dart';
 import 'package:antkeep/domain/colony_growth.dart';
@@ -18,6 +20,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
+
+Future<void> revealSetting(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    250,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.pumpAndSettle();
+  await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
+  await tester.pumpAndSettle();
+}
+
+Future<void> openStatisticsSettings(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('统计设置'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('统计设置'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -177,6 +197,191 @@ void main() {
   tearDown(() {
     themeController.simpleMode = false;
   });
+
+  for (final archived in [false, true]) {
+    testWidgets(
+      'diary presets preserve records and allow full detail, archived=$archived',
+      (tester) async {
+        final now = DateTime.now();
+        final colony = Colony(
+          id: 'display',
+          name: '展示测试',
+          createdAt: now,
+          updatedAt: now,
+          archived: archived,
+          initialWorkerCount: 12,
+          targetTemperature: 25,
+          showSpecialized: true,
+          specializedCount: 2,
+        );
+        tables['colonies']!.add(colony.toMap());
+        tables['care_records']!.add(
+          CareRecord(
+            id: 'display-record',
+            colonyId: colony.id,
+            type: CareRecordType.observation,
+            occurredAt: now,
+            createdAt: now,
+            eggCount: 9,
+            workerMortalityCount: 1,
+            temperature: 28,
+            note: '观察备注',
+          ).toMap(),
+        );
+        final before = Map<String, Object?>.from(
+          tables['care_records']!.single,
+        );
+        final colonyBefore = Map<String, Object?>.from(
+          tables['colonies']!.single,
+        );
+        await tester.pumpWidget(
+          const MaterialApp(home: ColonyDetailPage(colonyId: 'display')),
+        );
+        await tester.pumpAndSettle();
+        final menu = find.byKey(const ValueKey('diary-settings-menu'));
+        await tester.scrollUntilVisible(
+          menu,
+          250,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(MenuItemButton, '紧凑'));
+        await tester.pumpAndSettle();
+        expect(themeController.diary.preset, DiaryPreset.compact);
+        expect(themeController.diary.incremental, isTrue);
+        await tester.scrollUntilVisible(
+          find.text('查看详情'),
+          250,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('卵 9'), findsNothing);
+        expect(find.textContaining('工蚁死亡 1'), findsOneWidget);
+        expect(find.textContaining('高于预设上限'), findsOneWidget);
+        await tester.tap(find.text('查看详情'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('卵 9'), findsOneWidget);
+        expect(find.byType(RecordFormPage), findsNothing);
+        expect(tables['care_records']!.single, before);
+        expect(tables['colonies']!.single, colonyBefore);
+        await themeController.load();
+        expect(themeController.diary.preset, DiaryPreset.compact);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  testWidgets(
+    'quantity-only diary keeps a summary and presets do not change population',
+    (tester) async {
+      final now = DateTime.now();
+      final colony = Colony(
+        id: 'quantity-only',
+        name: '数量记录',
+        createdAt: now,
+        updatedAt: now,
+        initialWorkerCount: 12,
+      );
+      tables['colonies']!.add(colony.toMap());
+      final record = CareRecord(
+        id: 'count',
+        colonyId: colony.id,
+        type: CareRecordType.observation,
+        occurredAt: now,
+        createdAt: now,
+        eggCount: 9,
+      );
+      tables['care_records']!.add(record.toMap());
+      final population = colony.currentPopulation([record]);
+      await themeController.setDiary(
+        themeController.diary.select(DiaryPreset.daily),
+      );
+      await tester.pumpWidget(
+        const MaterialApp(home: ColonyDetailPage(colonyId: 'quantity-only')),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('已记录种群数量'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('卵 9'), findsNothing);
+      expect(find.text('已记录种群数量'), findsOneWidget);
+      await tester.ensureVisible(find.text('查看详情'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('查看详情'));
+      await tester.pumpAndSettle();
+      expect(find.text('卵 9'), findsOneWidget);
+      final after = colony.currentPopulation(
+        tables['care_records']!.map(CareRecord.fromMap),
+      );
+      expect(after.eggs, population.eggs);
+      expect(after.workers, population.workers);
+    },
+  );
+
+  testWidgets(
+    'unified settings include colony rules and preserve incremental default on history edits',
+    (tester) async {
+      final now = DateTime.now();
+      final colony = Colony(
+        id: 'entry-settings',
+        name: '录入设置',
+        createdAt: now,
+        updatedAt: now,
+      );
+      tables['colonies']!.add(colony.toMap());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RecordFormPage(
+            colony: colony,
+            record: CareRecord(
+              id: 'old',
+              colonyId: colony.id,
+              type: CareRecordType.observation,
+              occurredAt: DateTime(2026, 10, 1, 12, 30),
+              createdAt: now,
+              workerCount: 12,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('日记设置'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DiarySettingsPage), findsOneWidget);
+      final toggle = find.widgetWithText(SwitchListTile, '增量');
+      await revealSetting(tester, toggle);
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+      final specific = find.widgetWithText(CheckboxListTile, '记录具体时间');
+      await revealSetting(tester, specific);
+      expect(tester.widget<CheckboxListTile>(specific).value, isTrue);
+      await tester.tap(specific);
+      await tester.pumpAndSettle();
+      expect(tester.widget<CheckboxListTile>(specific).value, isFalse);
+      await tester.tap(specific);
+      await tester.pumpAndSettle();
+      expect(find.byType(TimePickerDialog), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<CheckboxListTile>(specific).value, isFalse);
+      await revealSetting(tester, find.text('特化'));
+      await tester.tap(find.text('特化'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ColonyFormPage), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('仅记录日期'), findsOneWidget);
+      expect(themeController.diary.incremental, isTrue);
+    },
+  );
 
   testWidgets('home share stays available across tabs and simple mode', (
     tester,
@@ -509,8 +714,9 @@ void main() {
           await tester.tap(find.byTooltip('展开种群数量'));
         }
         await tester.pumpAndSettle();
+        if (!analysis) await openStatisticsSettings(tester);
         final setup = find.byKey(const ValueKey('population-forecast-setup'));
-        await tester.ensureVisible(setup);
+        await revealSetting(tester, setup);
         await tester.tap(find.text('增长预测'));
         await tester.pumpAndSettle();
         expect(find.byType(ColonyGrowthPage), findsOneWidget);
@@ -534,6 +740,10 @@ void main() {
         await tester.ensureVisible(toggle);
         expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
         expect(find.text('7 天'), findsOneWidget);
+        if (!analysis) {
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+        }
         expect(
           find.byKey(const ValueKey('population-forecast-summary')),
           findsOneWidget,
@@ -575,28 +785,33 @@ void main() {
       await tester.ensureVisible(find.byTooltip('展开种群数量'));
       await tester.tap(find.byTooltip('展开种群数量'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(toggle);
+      await openStatisticsSettings(tester);
+      await revealSetting(tester, toggle);
       expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
       await tester.tap(toggle);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('7 天'));
       await tester.tap(find.text('7 天'));
       await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       final summary = find.byKey(const ValueKey('population-forecast-summary'));
       await tester.ensureVisible(summary);
       expect(find.textContaining('28 只（估算）'), findsOneWidget);
-      await Scrollable.ensureVisible(
-        tester.element(find.text('带卵幼')),
-        alignment: 0.5,
-      );
+      await openStatisticsSettings(tester);
+      await revealSetting(tester, find.text('带卵幼'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('带卵幼'));
       await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(find.textContaining('126 只（估算）'), findsOneWidget);
       expect(tables['care_records'], isEmpty);
-      await tester.ensureVisible(toggle);
-      await tester.pumpAndSettle();
+      await openStatisticsSettings(tester);
+      await revealSetting(tester, toggle);
       await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      await tester.pageBack();
       await tester.pumpAndSettle();
       expect(summary, findsNothing);
       expect(tester.takeException(), isNull);
@@ -1741,8 +1956,11 @@ void main() {
       find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,
     );
-    await tester.ensureVisible(find.text('带卵幼'));
+    await openStatisticsSettings(tester);
+    await revealSetting(tester, find.text('带卵幼'));
     await tester.tap(find.text('带卵幼'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('colony-population-chart')),
@@ -2020,12 +2238,12 @@ void main() {
     await tester.tap(find.text('添加记录'));
     await tester.pumpAndSettle();
     final toggle = find.widgetWithText(SwitchListTile, '增量');
-    await tester.scrollUntilVisible(
-      toggle,
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.tap(find.byTooltip('日记设置'));
+    await tester.pumpAndSettle();
+    await revealSetting(tester, toggle);
     expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     final field = find.widgetWithText(TextField, '幼虫数');
     await tester.scrollUntilVisible(
       field,
@@ -2039,9 +2257,12 @@ void main() {
     await tester.ensureVisible(find.text('添加记录'));
     await tester.tap(find.text('添加记录'));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -250));
+    await tester.tap(find.byTooltip('日记设置'));
     await tester.pumpAndSettle();
+    await revealSetting(tester, toggle);
     await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       field,

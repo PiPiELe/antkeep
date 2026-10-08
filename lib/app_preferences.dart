@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import 'diary_preferences.dart';
+
 abstract class AppSettingsStore {
   Future<Map<String, String>> readSettings();
   Future<void> writeSettings(Map<String, String> values);
@@ -63,6 +65,16 @@ class AppPreferences extends ChangeNotifier {
   AppPreferences(this.store);
   final AppSettingsStore store;
 
+  DiaryPreferences diary = const DiaryPreferences();
+
+  Future<void> setDiary(DiaryPreferences value) async {
+    await store.writeSettings({
+      'diary_preferences': jsonEncode(value.toJson()),
+    });
+    diary = value;
+    notifyListeners();
+  }
+
   bool onboardingCompleted = false;
   bool beginner = false;
   bool simpleMode = false;
@@ -99,6 +111,15 @@ class AppPreferences extends ChangeNotifier {
 
   Future<void> load() async {
     final values = await store.readSettings();
+    diary = const DiaryPreferences();
+    try {
+      final savedDiary = jsonDecode(values['diary_preferences'] ?? '{}');
+      if (savedDiary is Map<String, dynamic>) {
+        diary = DiaryPreferences.fromJson(savedDiary);
+      }
+    } on FormatException {
+      // A damaged preference must not prevent opening local records.
+    }
     _colonyOrder = const [];
     try {
       final order = jsonDecode(values['colony_order'] ?? '[]');

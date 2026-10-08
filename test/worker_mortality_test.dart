@@ -174,7 +174,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
 
     expect(find.textContaining('发生日期：'), findsOneWidget);
-    expect(find.text('记录具体时间'), findsOneWidget);
+    expect(find.text('仅记录日期'), findsOneWidget);
+    expect(find.byTooltip('日记设置'), findsOneWidget);
     expect(find.text('具体时间：'), findsNothing);
     expect(find.byIcon(Icons.save_outlined), findsOneWidget);
     expect(find.byTooltip('保存记录'), findsOneWidget);

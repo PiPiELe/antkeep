@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'diary_preferences.dart';
+import 'diary_settings_page.dart';
 import 'colony_growth_page.dart';
 import 'memorial_page.dart';
 import 'widgets/skull_icon.dart';
@@ -2019,6 +2021,46 @@ class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
   }
 }
 
+Future<Colony?> _openDiarySettings(
+  BuildContext context,
+  Colony colony, {
+  bool? recordIncremental,
+  ValueChanged<bool>? onRecordIncrementalChanged,
+  bool editingRecord = false,
+  bool specificTime = false,
+  Future<bool> Function(bool)? onSpecificTimeChanged,
+}) async {
+  var current = colony;
+  Future<Colony?> edit(bool growth) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => growth
+            ? ColonyGrowthPage(colony: current)
+            : ColonyFormPage(colony: current),
+      ),
+    );
+    current = await AppDatabase.instance.findColony(colony.id) ?? current;
+    return current;
+  }
+
+  await Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => DiarySettingsPage(
+        preferences: themeController,
+        colony: current,
+        onEditColony: colony.archived ? null : () => edit(false),
+        onConfigureGrowth: colony.archived ? null : () => edit(true),
+        recordIncremental: recordIncremental,
+        onRecordIncrementalChanged: onRecordIncrementalChanged,
+        editingRecord: editingRecord,
+        specificTime: specificTime,
+        onSpecificTimeChanged: onSpecificTimeChanged,
+      ),
+    ),
+  );
+  return current;
+}
+
 class ColonyDetailPage extends StatefulWidget {
   const ColonyDetailPage({super.key, required this.colonyId});
   final String colonyId;
@@ -2030,11 +2072,30 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   late Future<_Detail> _detail;
   bool _deleting = false;
   bool _editingAcquiredOn = false;
-  bool _includeBrood = false;
-  bool _populationExpanded = false;
-  bool _mortalityExpanded = false;
-  bool _showForecast = false;
-  ForecastHorizon _forecastHorizon = ForecastHorizon.month;
+  DiaryDisplay get _display => themeController.diary.display;
+  bool get _includeBrood => _display.includeBrood;
+  bool get _populationExpanded => _display.populationExpanded;
+  bool get _mortalityExpanded => _display.mortalityExpanded;
+  bool get _showForecast => _display.forecast;
+  ForecastHorizon get _forecastHorizon => _display.horizon;
+
+  void _preferencesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _updateDisplay(DiaryDisplay value) async {
+    try {
+      await themeController.setDiary(themeController.diary.customize(value));
+    } catch (_) {
+      if (mounted) _showError(context, '设置保存失败，请重试');
+    }
+  }
+
+  Future<void> _settings(Colony colony) async {
+    await _openDiarySettings(context, colony);
+    if (mounted) setState(_reload);
+  }
+
   Timer? _growthTimer;
   AppLifecycleListener? _growthLifecycle;
 
@@ -2044,6 +2105,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
 
   @override
   void dispose() {
+    themeController.removeListener(_preferencesChanged);
     _growthTimer?.cancel();
     _growthLifecycle?.dispose();
     super.dispose();
@@ -2052,6 +2114,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   @override
   void initState() {
     super.initState();
+    themeController.addListener(_preferencesChanged);
     _reload();
     _growthTimer = Timer.periodic(
       const Duration(minutes: 1),
@@ -2118,12 +2181,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   }
 
   Future<void> _editRecord(Colony colony, CareRecord record) async {
-    final saved = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => RecordFormPage(colony: colony, record: record),
       ),
     );
-    if (saved == true && mounted) setState(_reload);
+    if (mounted) setState(_reload);
   }
 
   Future<void> _deleteRecord(CareRecord record) async {
@@ -2268,12 +2331,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 onPressed: _deleting
                     ? null
                     : () async {
-                        final saved = await Navigator.of(context).push<bool>(
+                        await Navigator.of(context).push<bool>(
                           MaterialPageRoute(
                             builder: (_) => RecordFormPage(colony: colony),
                           ),
                         );
-                        if (saved == true && mounted) setState(_reload);
+                        if (mounted) setState(_reload);
                       },
               ),
         body: ListView(
@@ -2311,30 +2374,20 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                         ),
                       );
                       if (saved == true && mounted) {
-                        setState(() {
-                          _showForecast = true;
-                          _reload();
-                        });
+                        await _updateDisplay(_display.copyWith(forecast: true));
+                        if (mounted) setState(_reload);
                       }
                     },
-              onForecastChanged: (value) =>
-                  setState(() => _showForecast = value),
-              onForecastHorizonChanged: (value) =>
-                  setState(() => _forecastHorizon = value),
-              onIncludeBroodChanged: (value) {
-                setState(() => _includeBrood = value);
-              },
-              onExpandedChanged: (value) {
-                setState(() => _populationExpanded = value);
-              },
+              onOpenSettings: () => _settings(colony),
+              onExpandedChanged: (value) =>
+                  _updateDisplay(_display.copyWith(populationExpanded: value)),
             ),
             const SizedBox(height: 4),
             WorkerMortalityAnalysisCard(
               key: const ValueKey('colony-mortality-analysis'),
               expanded: _mortalityExpanded,
-              onExpandedChanged: (value) {
-                setState(() => _mortalityExpanded = value);
-              },
+              onExpandedChanged: (value) =>
+                  _updateDisplay(_display.copyWith(mortalityExpanded: value)),
               points: dailyWorkerMortality(
                 colony.id,
                 detail.records,
@@ -2361,22 +2414,54 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
-                      if (detail.records.isNotEmpty)
-                        Text(
-                          '${detail.records.length} 条记录',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                        ),
+                      MenuAnchor(
+                        builder: (context, controller, child) =>
+                            TextButton.icon(
+                              key: const ValueKey('diary-settings-menu'),
+                              onPressed: () => controller.isOpen
+                                  ? controller.close()
+                                  : controller.open(),
+                              icon: const Icon(Icons.tune, size: 18),
+                              label: Text(themeController.diary.preset.label),
+                            ),
+                        menuChildren: [
+                          for (final preset in DiaryPreset.values)
+                            MenuItemButton(
+                              onPressed: () async {
+                                try {
+                                  await themeController.setDiary(
+                                    themeController.diary.select(preset),
+                                  );
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    _showError(context, '设置保存失败，请重试');
+                                  }
+                                }
+                              },
+                              leadingIcon:
+                                  themeController.diary.preset == preset
+                                  ? const Icon(Icons.check, size: 18)
+                                  : null,
+                              child: Text(preset.label),
+                            ),
+                          MenuItemButton(
+                            onPressed: () => _settings(colony),
+                            leadingIcon: const Icon(
+                              Icons.settings_outlined,
+                              size: 18,
+                            ),
+                            child: const Text('日记设置'),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  if (detail.records.isNotEmpty && !colony.archived) ...[
+                  if (detail.records.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '轻点编辑 · 左滑删除',
+                      colony.archived
+                          ? '${detail.records.length} 条记录'
+                          : '${detail.records.length} 条记录 · 轻点编辑 · 左滑删除',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -2398,6 +2483,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               final card = _RecordCard(
                 record: record,
                 colony: colony,
+                display: _display,
                 onShare: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => ShareCardsPage(
@@ -2725,24 +2811,20 @@ class _PopulationTimeline extends StatelessWidget {
     required this.records,
     required this.includeBrood,
     required this.expanded,
-    required this.onIncludeBroodChanged,
     required this.onExpandedChanged,
     required this.showForecast,
+    required this.onOpenSettings,
     required this.forecastHorizon,
-    required this.onForecastChanged,
-    required this.onForecastHorizonChanged,
     this.onConfigureGrowth,
   });
   final Colony colony;
   final List<CareRecord> records;
+  final VoidCallback onOpenSettings;
   final bool includeBrood;
   final bool expanded;
   final bool showForecast;
   final ForecastHorizon forecastHorizon;
-  final ValueChanged<bool> onForecastChanged;
-  final ValueChanged<ForecastHorizon> onForecastHorizonChanged;
   final VoidCallback? onConfigureGrowth;
-  final ValueChanged<bool> onIncludeBroodChanged;
   final ValueChanged<bool> onExpandedChanged;
 
   @override
@@ -2806,31 +2888,14 @@ class _PopulationTimeline extends StatelessWidget {
             ),
             if (expanded) ...[
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      description,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  FilterChip(
-                    avatar: const Icon(Icons.circle_outlined, size: 18),
-                    label: const Text('带卵幼'),
-                    selected: includeBrood,
-                    onSelected: onIncludeBroodChanged,
-                  ),
-                ],
-              ),
-              PopulationForecastControls(
-                enabled: showForecast,
-                horizon: forecastHorizon,
-                unavailableReason: colony.growth == null
-                    ? '请先在群落自动扩充中设置增长规则'
-                    : null,
-                onEnabledChanged: onForecastChanged,
-                onConfigureGrowth: onConfigureGrowth,
-                onHorizonChanged: onForecastHorizonChanged,
+              Text(description, style: Theme.of(context).textTheme.bodySmall),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onOpenSettings,
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('统计设置'),
+                ),
               ),
               const SizedBox(height: 14),
               if (points.isEmpty)
@@ -3021,9 +3086,30 @@ class _RecordFormPageState extends State<RecordFormPage> {
   var _hasSpecificTime = false;
   var _saving = false;
   var _incremental = true;
+  late Colony _colony = widget.colony;
+
+  Future<void> _settings() async {
+    final updated = await _openDiarySettings(
+      context,
+      _colony,
+      recordIncremental: _incremental,
+      onRecordIncrementalChanged: (value) {
+        if (mounted) setState(() => _incremental = value);
+      },
+      editingRecord: widget.record != null,
+      specificTime: _hasSpecificTime,
+      onSpecificTimeChanged: (value) async {
+        await _setSpecificTime(value);
+        return _hasSpecificTime;
+      },
+    );
+    if (mounted && updated != null) setState(() => _colony = updated);
+  }
+
   @override
   void initState() {
     super.initState();
+    _incremental = themeController.diary.incremental;
     final record = widget.record;
     if (record == null) return;
     _type = record.type;
@@ -3083,7 +3169,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
       }
       final record = CareRecord(
         id: widget.record?.id ?? const Uuid().v4(),
-        colonyId: widget.colony.id,
+        colonyId: _colony.id,
         type: _type,
         occurredAt: _occurredAt,
         note: _textOrNull(_note.text),
@@ -3092,8 +3178,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
         eggCount: int.tryParse(_eggs.text),
         larvaCount: int.tryParse(_larvae.text),
         pupaCount:
-            _incremental &&
-                widget.colony.developmentPath == GrowthPath.eggToWorker
+            _incremental && _colony.developmentPath == GrowthPath.eggToWorker
             ? null
             : int.tryParse(_pupae.text),
         workerCount: int.tryParse(_workers.text),
@@ -3176,8 +3261,13 @@ class _RecordFormPageState extends State<RecordFormPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(widget.record == null ? '记录 ${widget.colony.name}' : '编辑日记'),
+      title: Text(widget.record == null ? '记录 ${_colony.name}' : '编辑日记'),
       actions: [
+        IconButton(
+          tooltip: '日记设置',
+          onPressed: _saving ? null : _settings,
+          icon: const Icon(Icons.tune),
+        ),
         IconButton(
           tooltip: _saving ? '保存中…' : '保存记录',
           onPressed: _saving ? null : _save,
@@ -3229,14 +3319,11 @@ class _RecordFormPageState extends State<RecordFormPage> {
           icon: const Icon(Icons.calendar_today_outlined),
           label: Text('发生日期：${_date(_occurredAt)}'),
         ),
-        CheckboxListTile(
+        ListTile(
           contentPadding: EdgeInsets.zero,
-          value: _hasSpecificTime,
-          onChanged: _saving
-              ? null
-              : (enabled) => _setSpecificTime(enabled ?? false),
-          title: const Text('记录具体时间'),
-          subtitle: const Text('默认仅保存年月日'),
+          title: Text(_hasSpecificTime ? '已记录具体时间' : '仅记录日期'),
+          trailing: const Icon(Icons.tune, size: 18),
+          onTap: _saving ? null : _settings,
         ),
         if (_hasSpecificTime)
           OutlinedButton.icon(
@@ -3281,25 +3368,25 @@ class _RecordFormPageState extends State<RecordFormPage> {
             ),
           ],
         ),
-        if (widget.record != null)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('编辑时填写该次记录的数量总数，留空表示该项未知。'),
-          )
-        else
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('增量'),
-            value: _incremental,
-            onChanged: _saving
-                ? null
-                : (value) => setState(() => _incremental = value),
-            subtitle: Text(
-              _incremental
-                  ? '填写增加值，自动扣减上一阶段；${widget.colony.developmentPath.label}。未知数量请先关闭增量填写总数。'
-                  : '填写当前总数，留空不修改',
-            ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            widget.record != null
+                ? '编辑记录 · 总数'
+                : _incremental
+                ? '数量录入 · 增量'
+                : '数量录入 · 总数',
           ),
+          subtitle: Text(
+            widget.record != null
+                ? '填写该次记录的数量总数，留空表示该项未知。'
+                : _incremental
+                ? '填写增加值，自动扣减上一阶段；${_colony.developmentPath.label}。未知数量请先改为总数。'
+                : '填写当前总数，留空不修改',
+          ),
+          trailing: const Icon(Icons.tune, size: 18),
+          onTap: _saving ? null : _settings,
+        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -3334,8 +3421,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
                 controller: _pupae,
                 enabled:
                     !_incremental ||
-                    widget.colony.developmentPath ==
-                        GrowthPath.eggToCocoonToWorker,
+                    _colony.developmentPath == GrowthPath.eggToCocoonToWorker,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: '茧数',
@@ -3422,13 +3508,49 @@ class _RecordFormPageState extends State<RecordFormPage> {
   );
 }
 
-class _RecordCard extends StatelessWidget {
-  const _RecordCard({required this.record, this.colony, this.onShare});
+class _RecordCard extends StatefulWidget {
+  const _RecordCard({
+    required this.record,
+    this.colony,
+    this.onShare,
+    this.display = const DiaryDisplay(),
+  });
+  final DiaryDisplay display;
   final VoidCallback? onShare;
   final CareRecord record;
   final Colony? colony;
   @override
+  State<_RecordCard> createState() => _RecordCardState();
+}
+
+class _RecordCardState extends State<_RecordCard> {
+  bool _expanded = false;
+  CareRecord get record => widget.record;
+  Colony? get colony => widget.colony;
+  VoidCallback? get onShare => widget.onShare;
+  @override
+  void didUpdateWidget(covariant _RecordCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.display != widget.display ||
+        oldWidget.record.id != record.id) {
+      _expanded = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final display = _expanded ? const DiaryDisplay() : widget.display;
+    final hasCounts =
+        record.eggCount != null ||
+        record.larvaCount != null ||
+        record.pupaCount != null ||
+        record.workerCount != null;
+    final canExpand =
+        (!widget.display.counts && hasCounts) ||
+        (!widget.display.environment &&
+            (record.temperature != null || record.humidity != null)) ||
+        (!widget.display.photos && record.photos.isNotEmpty) ||
+        (!widget.display.fullNotes && record.note?.isNotEmpty == true);
     final temperatureAbove =
         record.temperature != null &&
         colony?.targetTemperature != null &&
@@ -3446,12 +3568,15 @@ class _RecordCard extends StatelessWidget {
         colony?.targetHumidityLower != null &&
         record.humidity! < colony!.targetHumidityLower!;
     final facts = <String>[
-      if (record.temperature != null) '${record.temperature}°C',
-      if (record.humidity != null) '${record.humidity}%',
-      if (record.eggCount != null) '卵 ${record.eggCount}',
-      if (record.larvaCount != null) '幼虫 ${record.larvaCount}',
-      if (record.pupaCount != null) '茧 ${record.pupaCount}',
-      if (record.workerCount != null) '工蚁 ${record.workerCount}',
+      if (display.environment && record.temperature != null)
+        '${record.temperature}°C',
+      if (display.environment && record.humidity != null) '${record.humidity}%',
+      if (display.counts && record.eggCount != null) '卵 ${record.eggCount}',
+      if (display.counts && record.larvaCount != null)
+        '幼虫 ${record.larvaCount}',
+      if (display.counts && record.pupaCount != null) '茧 ${record.pupaCount}',
+      if (display.counts && record.workerCount != null)
+        '工蚁 ${record.workerCount}',
       if (record.workerMortalityCount != null)
         '工蚁死亡 ${record.workerMortalityCount}',
     ];
@@ -3490,7 +3615,19 @@ class _RecordCard extends StatelessWidget {
             ),
             if (record.note?.isNotEmpty == true) ...[
               const SizedBox(height: 10),
-              Text(record.note!),
+              Text(
+                record.note!,
+                maxLines: display.fullNotes ? null : 1,
+                overflow: display.fullNotes ? null : TextOverflow.ellipsis,
+              ),
+            ],
+            if (!display.counts &&
+                hasCounts &&
+                facts.isEmpty &&
+                record.note?.isNotEmpty != true &&
+                record.photos.isEmpty) ...[
+              const SizedBox(height: 10),
+              const Text('已记录种群数量'),
             ],
             if (facts.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -3521,7 +3658,16 @@ class _RecordCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (record.photos.isNotEmpty) ...[
+            if (record.photos.isNotEmpty && !display.photos) ...[
+              const SizedBox(height: 10),
+              Text('${record.photos.length} 张照片'),
+            ],
+            if (canExpand)
+              TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(_expanded ? '收起详情' : '查看详情'),
+              ),
+            if (record.photos.isNotEmpty && display.photos) ...[
               const SizedBox(height: 12),
               SizedBox(
                 height: 88,
