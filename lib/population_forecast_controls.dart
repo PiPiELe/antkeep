@@ -26,15 +26,37 @@ class PopulationForecastControls extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       if (unavailableReason != null && onConfigureGrowth != null)
-        ListTile(
+        InkWell(
           key: const ValueKey('population-forecast-setup'),
-          contentPadding: EdgeInsets.zero,
-          title: const Text('增长预测'),
-          subtitle: Text(unavailableReason!),
           onTap: onConfigureGrowth,
-          trailing: TextButton(
-            onPressed: onConfigureGrowth,
-            child: const Text('设置规则'),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '增长预测',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onConfigureGrowth,
+                      child: const Text('设置规则'),
+                    ),
+                  ],
+                ),
+                Text(
+                  unavailableReason!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         )
       else

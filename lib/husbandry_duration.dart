@@ -102,9 +102,9 @@ class _HusbandryDurationState extends State<HusbandryDuration>
               TextSpan(
                 text: '$days',
                 style: TextStyle(
-                  fontSize: widget.compact ? 44 : 72,
+                  fontSize: widget.compact ? 42 : 72,
                   height: 1,
-                  letterSpacing: -3,
+                  letterSpacing: widget.compact ? -1 : -3,
                   fontWeight: FontWeight.w700,
                   color: theme.colorScheme.primary,
                 ),

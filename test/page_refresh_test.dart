@@ -917,7 +917,7 @@ void main() {
     expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
     await tester.tap(find.text('到家计时'));
     await tester.pumpAndSettle();
-    expect(find.text('36 天', findRichText: true), findsOneWidget);
+    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
     expect(
       find.text('${arrival.year}.${arrival.month}.${arrival.day}'),
       findsOneWidget,
@@ -925,7 +925,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('360px detail keeps metadata left of duration', (tester) async {
+  testWidgets('360px detail keeps duration above readable metadata', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -951,9 +953,9 @@ void main() {
     final date = find.text('${arrival.year}.${arrival.month}.${arrival.day}');
     final source = find.text('本地合成测试数据（非真实饲养记录）');
     final days = find.text('已养殖 36 天', findRichText: true);
-    expect(tester.getTopLeft(date).dx, lessThan(tester.getTopLeft(days).dx));
+    expect(tester.getTopLeft(days).dy, lessThan(tester.getTopLeft(date).dy));
     expect(tester.getTopLeft(date).dy, lessThan(tester.getTopLeft(source).dy));
-    expect(tester.getTopRight(source).dx, lessThan(tester.getTopLeft(days).dx));
+    expect(tester.getSize(source).width, greaterThan(180));
     expect(tester.getSize(days).height, lessThan(64));
     expect(tester.takeException(), isNull);
   });
@@ -978,6 +980,16 @@ void main() {
           createdAt: now,
           updatedAt: now,
         ).toMap(),
+      );
+      await AppDatabase.instance.saveRecord(
+        CareRecord(
+          id: 'responsive-detail-record',
+          colonyId: 'responsive-detail',
+          type: CareRecordType.observation,
+          occurredAt: now,
+          createdAt: now,
+          note: '布局验收日记',
+        ),
       );
       for (final width in [320.0, 360.0, 440.0]) {
         tester.view.physicalSize = Size(width, 800);
@@ -1005,6 +1017,18 @@ void main() {
           greaterThan(tester.getRect(cover).bottom),
         );
         expect(find.text('网购-蚂蚁牧场'), findsOneWidget);
+        final recordCard = find.ancestor(
+          of: find.text('布局验收日记'),
+          matching: find.byType(Card),
+        );
+        await tester.ensureVisible(recordCard);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(recordCard).bottom,
+          lessThanOrEqualTo(
+            tester.getRect(find.widgetWithText(FilledButton, '添加记录')).top,
+          ),
+        );
         expect(tester.takeException(), isNull);
       }
       tester.view.physicalSize = const Size(360, 800);
@@ -1615,9 +1639,7 @@ void main() {
           'updated_at': saved.updatedAt.toIso8601String(),
         });
         expect(
-          find
-              .text(fromList ? '已养殖 5 天' : '5 天', findRichText: true)
-              .hitTestable(),
+          find.text('已养殖 5 天', findRichText: true).hitTestable(),
           findsOneWidget,
         );
         expect(hint, findsNothing);
@@ -1628,7 +1650,7 @@ void main() {
         await tester.tap(find.text(colony.name));
         await tester.pumpAndSettle();
         expect(
-          find.text('5 天', findRichText: true).hitTestable(),
+          find.text('已养殖 5 天', findRichText: true).hitTestable(),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
