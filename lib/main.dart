@@ -2177,6 +2177,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         );
       }
       final colony = detail!.colony!;
+      final compactAppBar = MediaQuery.sizeOf(context).width < 400;
       return Scaffold(
         appBar: AppBar(
           title: Text(colony.name),
@@ -2191,7 +2192,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ),
               ),
             ),
-            if (!colony.archived)
+            if (!colony.archived && !compactAppBar)
               IconButton(
                 tooltip: '移入英灵殿',
                 icon: const SkullIcon(),
@@ -2226,12 +2227,36 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                         if (saved == true && mounted) setState(_reload);
                       },
               ),
-            if (!colony.archived)
+            if (!colony.archived && !compactAppBar)
               IconButton(
                 tooltip: '删除蚁群',
                 icon: const Icon(Icons.delete_outline),
                 color: Theme.of(context).colorScheme.error,
                 onPressed: _deleting ? null : () => _deleteColony(colony),
+              ),
+            if (!colony.archived && compactAppBar)
+              PopupMenuButton<String>(
+                tooltip: '更多操作',
+                enabled: !_deleting,
+                onSelected: (action) async {
+                  if (action == 'delete') {
+                    await _deleteColony(colony);
+                    return;
+                  }
+                  final saved = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          MemorialFormPage(wholeColony: true, colony: colony),
+                    ),
+                  );
+                  if (saved == true && context.mounted) {
+                    Navigator.of(context).pop(true);
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'memorial', child: Text('移入英灵殿')),
+                  PopupMenuItem(value: 'delete', child: Text('删除蚁群')),
+                ],
               ),
           ],
         ),
@@ -2490,59 +2515,61 @@ class _ColonyProfileSummary extends StatelessWidget {
         semanticLabel: '默认蚂蚁封面',
       ),
     );
+    final speciesHeader = Row(
+      children: [
+        Flexible(
+          child: Text(
+            '蚂蚁品种：${colony.species ?? '未填写品种'}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        if (!themeController.simpleMode &&
+            colony.species?.trim().isNotEmpty == true)
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: Theme.of(context).textTheme.bodySmall,
+            ),
+            icon: const Icon(Icons.menu_book_outlined, size: 16),
+            label: const Text('百科'),
+            onPressed: () {
+              final species = colony.species!.trim();
+              final query = _speciesAliases[species] ?? species;
+              final profile = findSpeciesProfile(query);
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => profile == null
+                      ? SpeciesEncyclopediaPage(initialQuery: query)
+                      : SpeciesDetailPage(profile: profile),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+    final cover = colony.coverPhotoPath == null
+        ? defaultCover
+        : _StoredImage(
+            relativePath: colony.coverPhotoPath!,
+            width: double.infinity,
+            height: 96,
+            borderRadius: 8,
+            fallback: defaultCover,
+          );
+    final hasTags =
+        colony.isNewQueenColony ||
+        workers != null ||
+        colony.nestType?.isNotEmpty == true;
+    final tags = _ColonyTags(colony: colony, workers: workers);
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                '蚂蚁品种：${colony.species ?? '未填写品种'}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-            if (!themeController.simpleMode &&
-                colony.species?.trim().isNotEmpty == true)
-              TextButton.icon(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: Theme.of(context).textTheme.bodySmall,
-                ),
-                icon: const Icon(Icons.menu_book_outlined, size: 16),
-                label: const Text('百科'),
-                onPressed: () {
-                  final species = colony.species!.trim();
-                  final query = _speciesAliases[species] ?? species;
-                  final profile = findSpeciesProfile(query);
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => profile == null
-                          ? SpeciesEncyclopediaPage(initialQuery: query)
-                          : SpeciesDetailPage(profile: profile),
-                    ),
-                  );
-                },
-              ),
-          ],
-        ),
+        speciesHeader,
         const SizedBox(height: 2),
-        colony.coverPhotoPath == null
-            ? defaultCover
-            : _StoredImage(
-                relativePath: colony.coverPhotoPath!,
-                width: double.infinity,
-                height: 96,
-                borderRadius: 8,
-                fallback: defaultCover,
-              ),
-        if (colony.isNewQueenColony ||
-            workers != null ||
-            colony.nestType?.isNotEmpty == true) ...[
-          const SizedBox(height: 8),
-          _ColonyTags(colony: colony, workers: workers),
-        ],
+        cover,
+        if (hasTags) ...[const SizedBox(height: 8), tags],
       ],
     );
     return Card(
@@ -2553,34 +2580,19 @@ class _ColonyProfileSummary extends StatelessWidget {
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final stacked =
-                    constraints.maxWidth < 320 ||
+                final largeText =
                     MediaQuery.textScalerOf(context).scale(12) > 18;
-                final compactStacked =
-                    constraints.maxWidth < 320 &&
-                    MediaQuery.textScalerOf(context).scale(12) <= 18;
-                final duration = Column(
+                final compact = constraints.maxWidth < 420 && !largeText;
+                final stacked = constraints.maxWidth < 320 || largeText;
+                final metadata = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (colony.archived)
-                      const Text('遗失的文明 · 养殖已结束')
-                    else
-                      InkWell(
-                        onTap: onDurationTap,
-                        borderRadius: BorderRadius.circular(8),
-                        child: HusbandryDuration(
-                          colony: colony,
-                          labelWidth: durationLabelWidth,
-                        ),
-                      ),
-                    if (colony.acquiredOn != null) ...[
-                      const SizedBox(height: 4),
+                    if (colony.acquiredOn != null)
                       metadataRow(
                         '入手日期',
                         dottedDate(colony.acquiredOn!),
                         onTap: onDurationTap,
                       ),
-                    ],
                     if (colony.source?.trim().isNotEmpty == true) ...[
                       const SizedBox(height: 8),
                       metadataRow(
@@ -2595,11 +2607,32 @@ class _ColonyProfileSummary extends StatelessWidget {
                     ],
                   ],
                 );
-                if (compactStacked) {
+                final duration = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (colony.archived)
+                      const Text('遗失的文明 · 养殖已结束')
+                    else
+                      InkWell(
+                        onTap: onDurationTap,
+                        borderRadius: BorderRadius.circular(8),
+                        child: HusbandryDuration(
+                          colony: colony,
+                          labelWidth: durationLabelWidth,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    metadata,
+                  ],
+                );
+                if (compact) {
+                  final durationWidth = constraints.maxWidth < 300
+                      ? 116.0
+                      : 128.0;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      identity,
+                      speciesHeader,
                       const SizedBox(height: 4),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2608,43 +2641,19 @@ class _ColonyProfileSummary extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const SizedBox(height: 10),
-                                if (colony.acquiredOn != null)
-                                  metadataRow(
-                                    '入手日期',
-                                    dottedDate(colony.acquiredOn!),
-                                    onTap: onDurationTap,
-                                  ),
-                                if (colony.source?.trim().isNotEmpty ==
-                                    true) ...[
-                                  const SizedBox(height: 4),
-                                  metadataRow(
-                                    '来源',
-                                    _sourceLabel,
-                                    valueStyle: metadataStyle?.copyWith(
-                                      letterSpacing: 0,
-                                    ),
-                                  ),
-                                ],
-                                if (colony.purchasePriceCents != null) ...[
+                                cover,
+                                if (colony.acquiredOn != null ||
+                                    colony.source?.trim().isNotEmpty == true ||
+                                    colony.purchasePriceCents != null) ...[
                                   const SizedBox(height: 8),
-                                  metadataRow(
-                                    '购入价',
-                                    '¥${colony.purchasePriceText}',
-                                  ),
+                                  metadata,
                                 ],
                               ],
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Container(
-                            width: 1,
-                            height: 56,
-                            color: scheme.outlineVariant.withValues(alpha: .3),
-                          ),
-                          const SizedBox(width: 12),
                           SizedBox(
-                            width: 116,
+                            width: durationWidth,
                             child: colony.archived
                                 ? const Text('遗失的文明 · 养殖已结束')
                                 : InkWell(
@@ -2652,12 +2661,13 @@ class _ColonyProfileSummary extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(8),
                                     child: HusbandryDuration(
                                       colony: colony,
-                                      compactStacked: true,
+                                      compact: true,
                                     ),
                                   ),
                           ),
                         ],
                       ),
+                      if (hasTags) ...[const SizedBox(height: 8), tags],
                     ],
                   );
                 }

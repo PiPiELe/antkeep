@@ -13,6 +13,7 @@ import 'package:antkeep/share_cards_page.dart';
 import 'package:antkeep/memorial_share_page.dart';
 import 'package:antkeep/widgets/share_card_poster.dart';
 import 'package:antkeep/species_encyclopedia_page.dart';
+import 'package:antkeep/husbandry_duration.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -496,10 +497,7 @@ void main() {
             matching: find.byType(Card),
           );
           expect(
-            find.descendant(
-              of: populationCard,
-              matching: find.text('自动扩充'),
-            ),
+            find.descendant(of: populationCard, matching: find.text('自动扩充')),
             findsOneWidget,
           );
           await tester.tap(find.text('自动扩充'));
@@ -744,6 +742,68 @@ void main() {
     expect(tester.getSize(days).height, lessThan(64));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'phone detail keeps the cover beside duration and actions usable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final now = DateTime.now();
+      final acquiredOn = DateTime(now.year, now.month, now.day - 16);
+      tables['colonies']!.add(
+        Colony(
+          id: 'responsive-detail',
+          name: '猎镰猛蚁蚁群',
+          species: '猎镰猛蚁',
+          acquiredOn: acquiredOn,
+          source: '网购-蚂蚁牧场',
+          queenCount: 5,
+          initialWorkerCount: 55,
+          createdAt: now,
+          updatedAt: now,
+        ).toMap(),
+      );
+      for (final width in [320.0, 360.0, 440.0]) {
+        tester.view.physicalSize = Size(width, 800);
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: ColonyDetailPage(colonyId: 'responsive-detail'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final cover = find.byWidgetPredicate(
+          (widget) => widget is Image && widget.semanticLabel == '默认蚂蚁封面',
+        );
+        expect(
+          tester.getRect(find.byType(HusbandryDuration)).left,
+          greaterThan(tester.getRect(cover).right),
+        );
+        expect(
+          tester
+              .getRect(
+                find.text(
+                  '${acquiredOn.year}.${acquiredOn.month}.${acquiredOn.day}',
+                ),
+              )
+              .top,
+          greaterThan(tester.getRect(cover).bottom),
+        );
+        expect(find.text('网购-蚂蚁牧场'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+      tester.view.physicalSize = const Size(360, 800);
+      await tester.pump();
+      await tester.tap(find.byTooltip('更多操作'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('删除蚁群'));
+      await tester.pumpAndSettle();
+      expect(find.text('删除蚁群？'), findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(tables['colonies'], hasLength(1));
+    },
+  );
 
   testWidgets(
     'simple mode keeps colony and diary creation and restores detail',
