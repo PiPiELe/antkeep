@@ -192,13 +192,13 @@ void main() {
       expect(find.text('增量'), findsNothing);
       await tester.enterText(find.widgetWithText(TextField, '备注'), '日记已修改');
       await tester.scrollUntilVisible(
-        find.text('保存记录'),
+        find.text('已有照片'),
         250,
         scrollable: find.byType(Scrollable).first,
       );
       await settleDatabase(tester);
       expect(find.text('已有照片'), findsOneWidget);
-      await tester.tap(find.text('保存记录'));
+      await tester.tap(find.byTooltip('保存记录'));
       await settleDatabase(tester);
       await tester.scrollUntilVisible(
         find.text('日记已修改'),
