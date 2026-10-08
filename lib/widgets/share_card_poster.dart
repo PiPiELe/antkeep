@@ -126,171 +126,198 @@ class ShareCardPoster extends StatelessWidget {
     );
     return ColoredBox(
       color: dark ? const Color(0xff202b26) : const Color(0xfff7f3e9),
-      child: DefaultTextStyle(
-        style: style,
-        child: Padding(
-          padding: const EdgeInsets.all(26),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              label('ANTKEEP  /  ${kind.label}'),
-              const SizedBox(height: 16),
-              headline(colony.name),
-              if (colony.species?.isNotEmpty ?? false) label(colony.species!),
-              const SizedBox(height: 22),
-              if (kind == ShareCardKind.colony) ...[
-                if (photos.isNotEmpty) ...[
-                  photo(0),
-                  const SizedBox(height: 22),
+      child: CustomPaint(
+        painter: _AntBackgroundPainter(accent),
+        child: DefaultTextStyle(
+          style: style,
+          child: Padding(
+            padding: const EdgeInsets.all(26),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: label('ANTKEEP  /  ${kind.label}')),
+                    const SizedBox(width: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: Image.asset(
+                        'assets/branding/antkeep-app-icon.png',
+                        width: 18,
+                        height: 18,
+                        excludeFromSemantics: true,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '蚁记',
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                headline(colony.name),
+                if (colony.species?.isNotEmpty ?? false) label(colony.species!),
+                const SizedBox(height: 22),
+                if (kind == ShareCardKind.colony) ...[
+                  if (photos.isNotEmpty) ...[
+                    photo(0),
+                    const SizedBox(height: 22),
+                  ],
+                  if (showDuration && days != null) ...[
+                    headline('已陪伴 $days 天'),
+                    const SizedBox(height: 14),
+                  ],
+                  if (showCounts) counts(stats),
+                  if (showDates) ...[
+                    const SizedBox(height: 12),
+                    label('截至 ${shareDate(now)} · 最近已知记录'),
+                  ],
                 ],
-                if (showDuration && days != null) ...[
-                  headline('已陪伴 $days 天'),
-                  const SizedBox(height: 14),
+                if (kind == ShareCardKind.diary && diary != null) ...[
+                  headline(diary!.type.label),
+                  if (showDates) label(shareDate(diary!.occurredAt)),
+                  if (photos.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    photo(0),
+                  ],
+                  if (showNote && caption.trim().isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Text(caption.trim()),
+                  ],
+                  if (showCounts) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 14,
+                      runSpacing: 6,
+                      children: [
+                        for (final entry in {
+                          '工蚁': diary!.workerCount,
+                          '卵': diary!.eggCount,
+                          '幼虫': diary!.larvaCount,
+                          '茧': diary!.pupaCount,
+                        }.entries)
+                          if (entry.value != null)
+                            Text(
+                              '${entry.key} ${entry.value}${isEstimatedRecord(diary!) ? '（估算）' : ''}',
+                            ),
+                      ],
+                    ),
+                  ],
+                  if (showEnvironment &&
+                      (diary!.temperature != null ||
+                          diary!.humidity != null)) ...[
+                    const SizedBox(height: 12),
+                    label(
+                      [
+                        if (diary!.temperature != null)
+                          '${diary!.temperature} ℃',
+                        if (diary!.humidity != null) '${diary!.humidity}% RH',
+                      ].join('  ·  '),
+                    ),
+                  ],
                 ],
-                if (showCounts) counts(stats),
-                if (showDates) ...[
-                  const SizedBox(height: 12),
-                  label('截至 ${shareDate(now)} · 最近已知记录'),
-                ],
-              ],
-              if (kind == ShareCardKind.diary && diary != null) ...[
-                headline(diary!.type.label),
-                if (showDates) label(shareDate(diary!.occurredAt)),
-                if (photos.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  photo(0),
-                ],
-                if (showNote && caption.trim().isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  Text(caption.trim()),
-                ],
-                if (showCounts) ...[
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 14,
-                    runSpacing: 6,
+                if (kind == ShareCardKind.comparison) ...[
+                  if (showDuration) ...[
+                    headline(
+                      '${DateTime.utc(to.year, to.month, to.day).difference(DateTime.utc(from.year, from.month, from.day)).inDays} 天的变化',
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final entry in {
-                        '工蚁': diary!.workerCount,
-                        '卵': diary!.eggCount,
-                        '幼虫': diary!.larvaCount,
-                        '茧': diary!.pupaCount,
-                      }.entries)
-                        if (entry.value != null)
-                          Text(
-                            '${entry.key} ${entry.value}${isEstimatedRecord(diary!) ? '（估算）' : ''}',
-                          ),
+                      comparisonSide(from, 0),
+                      const SizedBox(width: 14),
+                      comparisonSide(to, 1),
                     ],
                   ),
+                  if (showCounts) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      shareWorkerChange(
+                        firstSnapshot.workers,
+                        lastSnapshot.workers,
+                      ),
+                    ),
+                    label('数量取截至所选日期的最近已知记录'),
+                  ],
                 ],
-                if (showEnvironment &&
-                    (diary!.temperature != null ||
-                        diary!.humidity != null)) ...[
-                  const SizedBox(height: 12),
-                  label(
-                    [
-                      if (diary!.temperature != null) '${diary!.temperature} ℃',
-                      if (diary!.humidity != null) '${diary!.humidity}% RH',
-                    ].join('  ·  '),
-                  ),
-                ],
-              ],
-              if (kind == ShareCardKind.comparison) ...[
-                if (showDuration) ...[
-                  headline(
-                    '${DateTime.utc(to.year, to.month, to.day).difference(DateTime.utc(from.year, from.month, from.day)).inDays} 天的变化',
-                  ),
+                if (kind == ShareCardKind.monthly) ...[
+                  headline('${month.year} 年 ${month.month} 月'),
+                  if (showDates)
+                    label(
+                      '${shareDate(report.start)} — ${shareDate(report.end)}',
+                    ),
                   const SizedBox(height: 16),
-                ],
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    comparisonSide(from, 0),
-                    const SizedBox(width: 14),
-                    comparisonSide(to, 1),
-                  ],
-                ),
-                if (showCounts) ...[
-                  const SizedBox(height: 20),
                   Text(
-                    shareWorkerChange(
-                      firstSnapshot.workers,
-                      lastSnapshot.workers,
+                    '${report.diaryCount} 篇日记  ·  ${report.activeDays} 天留下记录',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  label('数量取截至所选日期的最近已知记录'),
-                ],
-              ],
-              if (kind == ShareCardKind.monthly) ...[
-                headline('${month.year} 年 ${month.month} 月'),
-                if (showDates)
-                  label(
-                    '${shareDate(report.start)} — ${shareDate(report.end)}',
-                  ),
-                const SizedBox(height: 16),
-                Text(
-                  '${report.diaryCount} 篇日记  ·  ${report.activeDays} 天留下记录',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (report.estimateCount > 0)
-                  label('另有 ${report.estimateCount} 条自动估算记录'),
-                if (showCounts) ...[
-                  const SizedBox(height: 12),
-                  Text(report.change),
-                  if (report.records.isNotEmpty)
-                    label(
-                      '月初（或入手时）${report.before.workers.text} → 月末截至 ${report.after.workers.text}',
-                    ),
-                  if (report.workerRecords.length >= 2) ...[
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      height: 70,
-                      width: double.infinity,
-                      child: CustomPaint(
-                        painter: _TrendPainter(report.workerRecords, accent),
+                  if (report.estimateCount > 0)
+                    label('另有 ${report.estimateCount} 条自动估算记录'),
+                  if (showCounts) ...[
+                    const SizedBox(height: 12),
+                    Text(report.change),
+                    if (report.records.isNotEmpty)
+                      label(
+                        '月初（或入手时）${report.before.workers.text} → 月末截至 ${report.after.workers.text}',
                       ),
-                    ),
-                    label(
-                      '工蚁记录趋势${report.workerRecords.any(isEstimatedRecord) ? ' · 含估算' : ''}',
-                    ),
+                    if (report.workerRecords.length >= 2) ...[
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        height: 70,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: _TrendPainter(report.workerRecords, accent),
+                        ),
+                      ),
+                      label(
+                        '工蚁记录趋势${report.workerRecords.any(isEstimatedRecord) ? ' · 含估算' : ''}',
+                      ),
+                    ],
+                  ],
+                  if (report.records.isEmpty) ...[
+                    const SizedBox(height: 20),
+                    const Text('这个月还没有留下养护记录。'),
+                  ],
+                  if (photos.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    for (var i = 0; i < photos.length; i += 2)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Expanded(child: photo(i, ratio: 1)),
+                            if (i + 1 < photos.length) ...[
+                              const SizedBox(width: 10),
+                              Expanded(child: photo(i + 1, ratio: 1)),
+                            ],
+                          ],
+                        ),
+                      ),
                   ],
                 ],
-                if (report.records.isEmpty) ...[
-                  const SizedBox(height: 20),
-                  const Text('这个月还没有留下养护记录。'),
+                if (kind != ShareCardKind.diary &&
+                    showNote &&
+                    caption.trim().isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Text(caption.trim()),
                 ],
-                if (photos.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  for (var i = 0; i < photos.length; i += 2)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          Expanded(child: photo(i, ratio: 1)),
-                          if (i + 1 < photos.length) ...[
-                            const SizedBox(width: 10),
-                            Expanded(child: photo(i + 1, ratio: 1)),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
+                const SizedBox(height: 28),
+                Divider(color: accent.withValues(alpha: .25)),
+                const SizedBox(height: 8),
+                label('蚁记 AntKeep  ·  记录微小生命的成长'),
               ],
-              if (kind != ShareCardKind.diary &&
-                  showNote &&
-                  caption.trim().isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Text(caption.trim()),
-              ],
-              const SizedBox(height: 28),
-              Divider(color: accent.withValues(alpha: .25)),
-              const SizedBox(height: 8),
-              label('蚁记 AntKeep  ·  记录微小生命的成长'),
-            ],
+            ),
           ),
         ),
       ),
@@ -342,4 +369,69 @@ class _TrendPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TrendPainter old) =>
       old.records != records || old.color != color;
+}
+
+/// Subtle ant silhouettes stay in the margins and export with the card.
+class _AntBackgroundPainter extends CustomPainter {
+  const _AntBackgroundPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    void ant(Offset center, double scale, double angle, double opacity) {
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(angle);
+      canvas.scale(scale);
+      // Apply opacity once to the complete silhouette so overlapping strokes
+      // do not accumulate into bright spots at the joints.
+      canvas.saveLayer(
+        const Rect.fromLTWH(-18, -27, 36, 53),
+        Paint()..color = Color.fromRGBO(255, 255, 255, opacity),
+      );
+      final body = Paint()..color = color.withValues(alpha: 1);
+      final line = Paint()
+        ..color = body.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawOval(const Rect.fromLTWH(-5, -17, 10, 11), body);
+      canvas.drawOval(const Rect.fromLTWH(-3, -5, 6, 10), body);
+      canvas.drawOval(const Rect.fromLTWH(-6, 7, 12, 17), body);
+      canvas.drawLine(const Offset(0, 3), const Offset(0, 10), line);
+      for (final side in [-1.0, 1.0]) {
+        for (var i = 0; i < 3; i++) {
+          final y = -3.0 + i * 4;
+          canvas.drawPath(
+            Path()
+              ..moveTo(side * 2, y)
+              ..lineTo(side * 10, y + (i - 1) * 5)
+              ..lineTo(side * 16, y + (i - 1) * 9 + 3),
+            line,
+          );
+        }
+        canvas.drawPath(
+          Path()
+            ..moveTo(side * 3, -14)
+            ..lineTo(side * 7, -22)
+            ..lineTo(side * 12, -25),
+          line,
+        );
+      }
+      canvas.restore();
+      canvas.restore();
+    }
+
+    ant(Offset(size.width - 20, size.height * .58), 1.0, .45, .10);
+    ant(Offset(13, size.height - 66), 1.3, -.35, .08);
+    ant(Offset(size.width - 57, size.height - 29), .65, 1.1, .12);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _AntBackgroundPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

@@ -80,6 +80,7 @@ flutter:
 
   assets:
     - docs/data/antden-species-import.json
+    - assets/branding/antkeep-app-icon.png
     - assets/community/
     - assets/memorial/
     - assets/images/default-ant-cover.png

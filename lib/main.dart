@@ -10,7 +10,7 @@ import 'package:uuid/uuid.dart';
 import 'app_preferences.dart';
 import 'colony_growth_page.dart';
 import 'memorial_page.dart';
-import 'widgets/tombstone_icon.dart';
+import 'widgets/skull_icon.dart';
 import 'share_cards_page.dart';
 import 'share_content_page.dart';
 import 'community_groups_page.dart';
@@ -428,7 +428,11 @@ class _HomePageState extends State<HomePage>
                 controller: _colonyTabs,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                dividerColor: Colors.transparent,
+                // Keep the colony switcher visually separate from page content;
+                // the selected-tab indicator alone was too easy to miss.
+                dividerColor: Theme.of(context).colorScheme.outlineVariant
+                    .withValues(alpha: .55),
+                dividerHeight: 1,
                 labelPadding: const EdgeInsets.symmetric(horizontal: 12),
                 labelStyle: Theme.of(context).textTheme.titleMedium,
                 onTap: (_) => setState(() {}),
@@ -1014,6 +1018,8 @@ class _ColonyTags extends StatelessWidget {
       children: [
         if (colony.isNewQueenColony) badge('新后群', scheme.primary, crown: true),
         if (scale != null) badge(scale.label, color),
+        if (colony.nestType?.isNotEmpty == true)
+          badge(colony.nestType!, scheme.onSurfaceVariant),
       ],
     );
   }
@@ -1270,7 +1276,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     var speciesName = names?.group(1) ?? currentName;
     var commonName =
         names?.group(2) ??
-        (findSpeciesProfile(selectedName)?.aliases.contains(selectedName) == true
+        (findSpeciesProfile(selectedName)?.aliases.contains(selectedName) ==
+                true
             ? selectedName
             : '');
     final formKey = GlobalKey<FormState>();
@@ -2187,7 +2194,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             if (!colony.archived)
               IconButton(
                 tooltip: '移入英灵殿',
-                icon: const TombstoneIcon(),
+                icon: const SkullIcon(),
                 onPressed: _deleting
                     ? null
                     : () async {
@@ -2255,29 +2262,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   ? null
                   : () => _editAcquiredOn(colony),
             ),
-            const SizedBox(height: 4),
-            _ColonySummary(colony: colony),
-            if (!themeController.simpleMode && !colony.archived) ...[
+            if (colony.targetTemperatureLower != null ||
+                colony.targetTemperature != null ||
+                colony.targetHumidityLower != null ||
+                colony.targetHumidity != null) ...[
               const SizedBox(height: 4),
-              Card(
-                child: ListTile(
-                  visualDensity: const VisualDensity(vertical: -4),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  minLeadingWidth: 24,
-                  horizontalTitleGap: 8,
-                  leading: const Icon(Icons.trending_up),
-                  title: const Text('群落自动扩充'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => ColonyGrowthPage(colony: colony),
-                      ),
-                    );
-                    if (mounted) setState(_reload);
-                  },
-                ),
-              ),
+              _ColonySummary(colony: colony),
             ],
             const SizedBox(height: 4),
             _PopulationTimeline(
@@ -2451,8 +2441,18 @@ class _ColonyProfileSummary extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final metadataStyle = Theme.of(context).textTheme.bodySmall
         ?.copyWith(color: scheme.onSurfaceVariant);
-    final metadataLabelWidth = MediaQuery.textScalerOf(context)
-        .scale((metadataStyle?.fontSize ?? 12) * 4 + 4);
+    double metadataLabelWidth(String label) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: metadataStyle),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final width = painter.width + 1;
+      painter.dispose();
+      return width;
+    }
+
+    final durationLabelWidth = metadataLabelWidth('已养殖');
     Widget metadataRow(
       String label,
       String value, {
@@ -2464,7 +2464,7 @@ class _ColonyProfileSummary extends StatelessWidget {
         children: [
           JustifiedLabel(
             text: label,
-            width: metadataLabelWidth,
+            width: metadataLabelWidth(label),
             style: metadataStyle,
           ),
           const SizedBox(width: 8),
@@ -2485,7 +2485,7 @@ class _ColonyProfileSummary extends StatelessWidget {
       child: Image.asset(
         'assets/images/default-ant-cover.png',
         width: double.infinity,
-        height: 88,
+        height: 96,
         fit: BoxFit.contain,
         semanticLabel: '默认蚂蚁封面',
       ),
@@ -2506,7 +2506,8 @@ class _ColonyProfileSummary extends StatelessWidget {
               TextButton.icon(
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 48),
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   textStyle: Theme.of(context).textTheme.bodySmall,
                 ),
                 icon: const Icon(Icons.menu_book_outlined, size: 16),
@@ -2526,17 +2527,19 @@ class _ColonyProfileSummary extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 2),
         colony.coverPhotoPath == null
             ? defaultCover
             : _StoredImage(
                 relativePath: colony.coverPhotoPath!,
                 width: double.infinity,
-                height: 88,
+                height: 96,
                 borderRadius: 8,
                 fallback: defaultCover,
               ),
-        if (colony.isNewQueenColony || workers != null) ...[
+        if (colony.isNewQueenColony ||
+            workers != null ||
+            colony.nestType?.isNotEmpty == true) ...[
           const SizedBox(height: 8),
           _ColonyTags(colony: colony, workers: workers),
         ],
@@ -2544,12 +2547,18 @@ class _ColonyProfileSummary extends StatelessWidget {
     );
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
+                final stacked =
+                    constraints.maxWidth < 320 ||
+                    MediaQuery.textScalerOf(context).scale(12) > 18;
+                final compactStacked =
+                    constraints.maxWidth < 320 &&
+                    MediaQuery.textScalerOf(context).scale(12) <= 18;
                 final duration = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2561,7 +2570,7 @@ class _ColonyProfileSummary extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                         child: HusbandryDuration(
                           colony: colony,
-                          labelWidth: metadataLabelWidth,
+                          labelWidth: durationLabelWidth,
                         ),
                       ),
                     if (colony.acquiredOn != null) ...[
@@ -2586,11 +2595,76 @@ class _ColonyProfileSummary extends StatelessWidget {
                     ],
                   ],
                 );
-                if (constraints.maxWidth < 320 ||
-                    MediaQuery.textScalerOf(context).scale(12) > 18) {
+                if (compactStacked) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [identity, const SizedBox(height: 12), duration],
+                    children: [
+                      identity,
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 10),
+                                if (colony.acquiredOn != null)
+                                  metadataRow(
+                                    '入手日期',
+                                    dottedDate(colony.acquiredOn!),
+                                    onTap: onDurationTap,
+                                  ),
+                                if (colony.source?.trim().isNotEmpty ==
+                                    true) ...[
+                                  const SizedBox(height: 4),
+                                  metadataRow(
+                                    '来源',
+                                    _sourceLabel,
+                                    valueStyle: metadataStyle?.copyWith(
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ],
+                                if (colony.purchasePriceCents != null) ...[
+                                  const SizedBox(height: 8),
+                                  metadataRow(
+                                    '购入价',
+                                    '¥${colony.purchasePriceText}',
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 1,
+                            height: 56,
+                            color: scheme.outlineVariant.withValues(alpha: .3),
+                          ),
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: 116,
+                            child: colony.archived
+                                ? const Text('遗失的文明 · 养殖已结束')
+                                : InkWell(
+                                    onTap: onDurationTap,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: HusbandryDuration(
+                                      colony: colony,
+                                      compactStacked: true,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [identity, const SizedBox(height: 4), duration],
                   );
                 }
                 return Row(
@@ -2600,7 +2674,7 @@ class _ColonyProfileSummary extends StatelessWidget {
                     const SizedBox(width: 12),
                     Container(
                       width: 1,
-                      height: 72,
+                      height: 128,
                       color: scheme.outlineVariant.withValues(alpha: .3),
                     ),
                     const SizedBox(width: 12),
@@ -2609,12 +2683,12 @@ class _ColonyProfileSummary extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             Divider(
               height: 1,
               color: scheme.outlineVariant.withValues(alpha: .3),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             Wrap(
               spacing: 20,
               runSpacing: 6,
@@ -2701,6 +2775,14 @@ class _PopulationTimeline extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                if (onConfigureGrowth != null)
+                  Tooltip(
+                    message: '设置群落自动扩充',
+                    child: TextButton(
+                      onPressed: onConfigureGrowth,
+                      child: const Text('自动扩充'),
+                    ),
+                  ),
                 IconButton(
                   tooltip: expanded ? '折叠种群数量' : '展开种群数量',
                   onPressed: () => onExpandedChanged(!expanded),
@@ -2894,8 +2976,6 @@ class _ColonySummary extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (colony.nestType?.isNotEmpty == true)
-                  Chip(label: Text(colony.nestType!)),
                 if (temperatureRange != null)
                   Chip(label: Text(temperatureRange)),
                 if (humidityRange != null) Chip(label: Text(humidityRange)),
@@ -4275,7 +4355,11 @@ class _DlcPageState extends State<DlcPage> {
           child: Card(
             child: ListTile(
               leading: CircleAvatar(child: Icon(_feederIcon(feeder))),
-              title: Text(feeder.label),
+              title: Text(
+                feeder.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: FutureBuilder<FeederRecord?>(
                 future: _counts[feeder],
                 builder: (context, snapshot) {
@@ -4321,38 +4405,34 @@ class _FeederSummary extends StatelessWidget {
   final String? text;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 190,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Expanded(
-          child: text == null
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(time!, style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: 2),
-                    Text(
-                      count!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                )
-              : Text(
-                  text!,
-                  textAlign: TextAlign.end,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (text == null)
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(time!, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 2),
+            Text(
+              count!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        )
+      else
+        Text(
+          text!,
+          textAlign: TextAlign.end,
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        const SizedBox(width: 8),
-        const Icon(Icons.chevron_right),
-      ],
-    ),
+      const SizedBox(width: 8),
+      const Icon(Icons.chevron_right),
+    ],
   );
 }
 
@@ -5497,7 +5577,10 @@ String _dateTime(DateTime value) => value.hour == 0 && value.minute == 0
     : '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 String _timeOfDay(int minuteOfDay) =>
     '${(minuteOfDay ~/ 60).toString().padLeft(2, '0')}:${(minuteOfDay % 60).toString().padLeft(2, '0')}';
-Future<T> _runBackupTask<T>(BuildContext context, Future<T> Function() action) async {
+Future<T> _runBackupTask<T>(
+  BuildContext context,
+  Future<T> Function() action,
+) async {
   final navigator = Navigator.of(context, rootNavigator: true);
   final route = DialogRoute<void>(
     context: context,
