@@ -66,11 +66,35 @@ class _OnboardingPageState extends State<OnboardingPage> {
         },
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('欢迎使用蚁记'),
+            title: const Text('蚁记'),
             leading: _step == 0
                 ? null
                 : BackButton(onPressed: _saving ? null : _back),
             automaticallyImplyLeading: false,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Semantics(
+                  label: '引导进度：第 ${_step + 1} 步，共 4 步',
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      child: Text(
+                        '${_step + 1} / 4',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           body: SafeArea(
             child: Center(
@@ -101,7 +125,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
+                                    _OnboardingProgress(currentStep: _step),
+                                    const SizedBox(height: 24),
                                     if (_step == 0) ...[
+                                      _welcomeBanner(context),
+                                      const SizedBox(height: 28),
                                       Text(
                                         '选择使用版本',
                                         style: Theme.of(context)
@@ -110,7 +138,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                       ),
                                       const SizedBox(height: 8),
                                       const Text(
-                                        '离线版使用内置资料；在线版可获取后台发布的最新资料和配置。',
+                                        '先决定资料来源。养殖记录、照片和备份始终只保存在你的设备上。',
+                                        style: TextStyle(height: 1.5),
                                       ),
                                       const SizedBox(height: 24),
                                       _editionCard(
@@ -268,13 +297,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                   setState(() => _step++);
                                 }
                               },
-                        child: Text(
-                          _saving
-                              ? '正在保存…'
-                              : _step == 3 || (_step == 2 && _beginner == false)
-                              ? '开始使用'
-                              : '下一步',
-                          textAlign: TextAlign.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _saving
+                                  ? '正在保存…'
+                                  : _step == 3 ||
+                                        (_step == 2 && _beginner == false)
+                                  ? '开始使用'
+                                  : '下一步',
+                            ),
+                            if (!_saving) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.arrow_forward_rounded, size: 18),
+                            ],
+                          ],
                         ),
                       ),
                     ),
@@ -287,6 +325,51 @@ class _OnboardingPageState extends State<OnboardingPage> {
       ),
     ),
   );
+
+  Widget _welcomeBanner(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: colors.primary,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(Icons.hive_outlined, color: colors.onPrimary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '从第一窝蚁群开始',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colors.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '用几步完成初始设置，之后就能专心记录成长。',
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: colors.onPrimaryContainer, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _editionCard(
     BuildContext context,
@@ -318,16 +401,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   _error = null;
                 }),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 112),
+            constraints: const BoxConstraints(minHeight: 104),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(15),
               child: Row(
                 children: [
                   Icon(
                     icon,
                     color: selected ? colors.primary : colors.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,7 +440,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Icon(
                     selected
                         ? Icons.radio_button_checked
@@ -403,16 +486,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   _error = null;
                 }),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 112),
+            constraints: const BoxConstraints(minHeight: 104),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(15),
               child: Row(
                 children: [
                   Icon(
                     icon,
                     color: selected ? colors.primary : colors.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,7 +525,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Icon(
                     selected
                         ? Icons.radio_button_checked
@@ -453,6 +536,64 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardingProgress extends StatelessWidget {
+  const _OnboardingProgress({required this.currentStep});
+
+  final int currentStep;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      label: '设置进度：第 ${currentStep + 1} 步，共 4 步',
+      child: ExcludeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  '快速设置',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '第 ${currentStep + 1} 步',
+                  style: Theme.of(context).textTheme.labelMedium
+                      ?.copyWith(color: colors.onSurfaceVariant),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (var index = 0; index < 4; index++) ...[
+                  Expanded(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: index <= currentStep
+                            ? colors.primary
+                            : colors.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  if (index < 3) const SizedBox(width: 6),
+                ],
+              ],
+            ),
+          ],
         ),
       ),
     );

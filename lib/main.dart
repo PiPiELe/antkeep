@@ -2927,7 +2927,8 @@ class _RecordFormPageState extends State<RecordFormPage> {
   final _workerMortality = TextEditingController();
   final _photos = <XFile>[];
   var _type = CareRecordType.observation;
-  var _occurredAt = DateTime.now();
+  var _occurredAt = DateUtils.dateOnly(DateTime.now());
+  var _hasSpecificTime = false;
   var _saving = false;
   var _incremental = true;
   @override
@@ -2937,6 +2938,8 @@ class _RecordFormPageState extends State<RecordFormPage> {
     if (record == null) return;
     _type = record.type;
     _occurredAt = record.occurredAt;
+    _hasSpecificTime =
+        record.occurredAt.hour != 0 || record.occurredAt.minute != 0;
     _note.text = record.note ?? '';
     _temperature.text = record.temperature?.toString() ?? '';
     _humidity.text = record.humidity?.toString() ?? '';
@@ -3026,7 +3029,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
     }
   }
 
-  Future<void> _pickTime() async {
+  Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
       firstDate: DateTime(2000),
@@ -3034,20 +3037,49 @@ class _RecordFormPageState extends State<RecordFormPage> {
       initialDate: _occurredAt,
     );
     if (date == null || !mounted) return;
+    setState(
+      () => _occurredAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        _hasSpecificTime ? _occurredAt.hour : 0,
+        _hasSpecificTime ? _occurredAt.minute : 0,
+      ),
+    );
+  }
+
+  Future<bool> _changeSpecificTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+      initialTime: _hasSpecificTime
+          ? TimeOfDay.fromDateTime(_occurredAt)
+          : TimeOfDay.now(),
     );
-    if (time != null) {
+    if (time != null && mounted) {
       setState(
         () => _occurredAt = DateTime(
-          date.year,
-          date.month,
-          date.day,
+          _occurredAt.year,
+          _occurredAt.month,
+          _occurredAt.day,
           time.hour,
           time.minute,
         ),
       );
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _setSpecificTime(bool enabled) async {
+    if (!enabled) {
+      setState(() {
+        _hasSpecificTime = false;
+        _occurredAt = DateUtils.dateOnly(_occurredAt);
+      });
+      return;
+    }
+    if (await _changeSpecificTime() && mounted) {
+      setState(() => _hasSpecificTime = true);
     }
   }
 
@@ -3055,6 +3087,19 @@ class _RecordFormPageState extends State<RecordFormPage> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(widget.record == null ? '记录 ${widget.colony.name}' : '编辑日记'),
+      actions: [
+        IconButton(
+          tooltip: _saving ? '保存中…' : '保存记录',
+          onPressed: _saving ? null : _save,
+          icon: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save_outlined),
+        ),
+      ],
     ),
     body: ListView(
       padding: const EdgeInsets.all(16),
@@ -3090,10 +3135,27 @@ class _RecordFormPageState extends State<RecordFormPage> {
         ],
         const SizedBox(height: 16),
         OutlinedButton.icon(
-          onPressed: _pickTime,
-          icon: const Icon(Icons.schedule),
-          label: Text('发生时间：${_dateTime(_occurredAt)}'),
+          onPressed: _pickDate,
+          icon: const Icon(Icons.calendar_today_outlined),
+          label: Text('发生日期：${_date(_occurredAt)}'),
         ),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _hasSpecificTime,
+          onChanged: _saving
+              ? null
+              : (enabled) => _setSpecificTime(enabled ?? false),
+          title: const Text('记录具体时间'),
+          subtitle: const Text('默认仅保存年月日'),
+        ),
+        if (_hasSpecificTime)
+          OutlinedButton.icon(
+            onPressed: _saving ? null : _changeSpecificTime,
+            icon: const Icon(Icons.schedule),
+            label: Text(
+              '具体时间：${_timeOfDay(_occurredAt.hour * 60 + _occurredAt.minute)}',
+            ),
+          ),
         const SizedBox(height: 12),
         TextField(
           controller: _note,
@@ -3265,11 +3327,6 @@ class _RecordFormPageState extends State<RecordFormPage> {
             ),
           ),
         ],
-        const SizedBox(height: 28),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: Text(_saving ? '保存中…' : '保存记录'),
-        ),
       ],
     ),
   );
@@ -4385,7 +4442,8 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
   final _adults = TextEditingController();
   final _mortality = TextEditingController();
   var _type = FeederRecordType.observation;
-  var _occurredAt = DateTime.now();
+  var _occurredAt = DateUtils.dateOnly(DateTime.now());
+  var _hasSpecificTime = false;
   var _saving = false;
 
   @override
@@ -4404,7 +4462,7 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
     super.dispose();
   }
 
-  Future<void> _pickTime() async {
+  Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
       firstDate: DateTime(2000),
@@ -4412,20 +4470,49 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
       initialDate: _occurredAt,
     );
     if (date == null || !mounted) return;
+    setState(
+      () => _occurredAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        _hasSpecificTime ? _occurredAt.hour : 0,
+        _hasSpecificTime ? _occurredAt.minute : 0,
+      ),
+    );
+  }
+
+  Future<bool> _changeSpecificTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+      initialTime: _hasSpecificTime
+          ? TimeOfDay.fromDateTime(_occurredAt)
+          : TimeOfDay.now(),
     );
-    if (time != null) {
+    if (time != null && mounted) {
       setState(
         () => _occurredAt = DateTime(
-          date.year,
-          date.month,
-          date.day,
+          _occurredAt.year,
+          _occurredAt.month,
+          _occurredAt.day,
           time.hour,
           time.minute,
         ),
       );
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _setSpecificTime(bool enabled) async {
+    if (!enabled) {
+      setState(() {
+        _hasSpecificTime = false;
+        _occurredAt = DateUtils.dateOnly(_occurredAt);
+      });
+      return;
+    }
+    if (await _changeSpecificTime() && mounted) {
+      setState(() => _hasSpecificTime = true);
     }
   }
 
@@ -4482,10 +4569,27 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
-            onPressed: _pickTime,
-            icon: const Icon(Icons.schedule),
-            label: Text('发生时间：${_dateTime(_occurredAt)}'),
+            onPressed: _pickDate,
+            icon: const Icon(Icons.calendar_today_outlined),
+            label: Text('发生日期：${_date(_occurredAt)}'),
           ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _hasSpecificTime,
+            onChanged: _saving
+                ? null
+                : (enabled) => _setSpecificTime(enabled ?? false),
+            title: const Text('记录具体时间'),
+            subtitle: const Text('默认仅保存年月日'),
+          ),
+          if (_hasSpecificTime)
+            OutlinedButton.icon(
+              onPressed: _saving ? null : _changeSpecificTime,
+              icon: const Icon(Icons.schedule),
+              label: Text(
+                '具体时间：${_timeOfDay(_occurredAt.hour * 60 + _occurredAt.minute)}',
+              ),
+            ),
           const SizedBox(height: 12),
           TextField(
             controller: _note,
@@ -5388,8 +5492,9 @@ IconData _feederRecordIcon(FeederRecordType type) => switch (type) {
 
 String? _textOrNull(String value) => value.trim().isEmpty ? null : value.trim();
 String _date(DateTime value) => chineseDate(value);
-String _dateTime(DateTime value) =>
-    '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+String _dateTime(DateTime value) => value.hour == 0 && value.minute == 0
+    ? _date(value)
+    : '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 String _timeOfDay(int minuteOfDay) =>
     '${(minuteOfDay ~/ 60).toString().padLeft(2, '0')}:${(minuteOfDay % 60).toString().padLeft(2, '0')}';
 Future<T> _runBackupTask<T>(BuildContext context, Future<T> Function() action) async {

@@ -283,13 +283,19 @@ void main() {
   Future<void> tapSave(WidgetTester tester, String label) async {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text(label),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(label));
+    final isDiaryRecord =
+        label == '保存记录' && find.byType(RecordFormPage).evaluate().isNotEmpty;
+    if (isDiaryRecord) {
+      await tester.tap(find.byTooltip('保存记录'));
+    } else {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label));
+    }
     await tester.pumpAndSettle();
     if (label == '保存蚁群' &&
         find.byType(ColonyGrowthPage).evaluate().isNotEmpty) {
@@ -1913,10 +1919,18 @@ void main() {
     await tester.tap(find.text('添加记录'));
     await tester.pumpAndSettle();
     final toggle = find.widgetWithText(SwitchListTile, '增量');
-    await tester.ensureVisible(toggle);
+    await tester.scrollUntilVisible(
+      toggle,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
     final field = find.widgetWithText(TextField, '幼虫数');
-    await tester.ensureVisible(field);
+    await tester.scrollUntilVisible(
+      field,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(field, '2');
     await tapSave(tester, '保存记录');
     var saved = CareRecord.fromMap(tables['care_records']!.single);
@@ -1924,10 +1938,15 @@ void main() {
     await tester.ensureVisible(find.text('添加记录'));
     await tester.tap(find.text('添加记录'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(toggle);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -250));
+    await tester.pumpAndSettle();
     await tester.tap(toggle);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(field);
+    await tester.scrollUntilVisible(
+      field,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(field, '4');
     await tapSave(tester, '保存记录');
     saved = CareRecord.fromMap(tables['care_records']!.first);
