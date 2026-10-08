@@ -155,6 +155,8 @@ void main() {
     await preferences.load();
     await tester.pumpWidget(testApp(preferences));
     expect(find.text('选择使用版本'), findsOneWidget);
+    expect(find.text('从第一窝蚁群开始'), findsOneWidget);
+    expect(find.text('1 / 4'), findsOneWidget);
     expect(find.byType(BackButton), findsNothing);
     expect(
       tester

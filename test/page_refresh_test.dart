@@ -283,13 +283,19 @@ void main() {
   Future<void> tapSave(WidgetTester tester, String label) async {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text(label),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(label));
+    final isDiaryRecord =
+        label == '保存记录' && find.byType(RecordFormPage).evaluate().isNotEmpty;
+    if (isDiaryRecord) {
+      await tester.tap(find.byTooltip('保存记录'));
+    } else {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label));
+    }
     await tester.pumpAndSettle();
     if (label == '保存蚁群' &&
         find.byType(ColonyGrowthPage).evaluate().isNotEmpty) {
@@ -485,6 +491,19 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(find.text('蚁群 · 设置预测').last);
         } else {
+          final populationCard = find.ancestor(
+            of: find.text('种群数量'),
+            matching: find.byType(Card),
+          );
+          expect(
+            find.descendant(of: populationCard, matching: find.text('自动扩充')),
+            findsOneWidget,
+          );
+          await tester.tap(find.text('自动扩充'));
+          await tester.pumpAndSettle();
+          expect(find.byType(ColonyGrowthPage), findsOneWidget);
+          await tester.pageBack();
+          await tester.pumpAndSettle();
           await tester.ensureVisible(find.byTooltip('展开种群数量'));
           await tester.tap(find.byTooltip('展开种群数量'));
         }
@@ -682,11 +701,46 @@ void main() {
     expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
     await tester.tap(find.text('到家计时'));
     await tester.pumpAndSettle();
-    expect(find.text('36 天', findRichText: true), findsOneWidget);
+    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
     expect(
       find.text('${arrival.year}.${arrival.month}.${arrival.day}'),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('360px detail keeps duration above readable metadata', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final arrival = DateTime(now.year, now.month, now.day - 36);
+    tables['colonies']!.add(
+      Colony(
+        id: 'narrow-duration',
+        name: '窄屏布局',
+        species: '黑金弓背蚁',
+        acquiredOn: arrival,
+        source: '本地合成测试数据（非真实饲养记录）',
+        createdAt: now,
+        updatedAt: now,
+      ).toMap(),
+    );
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('窄屏布局'));
+    await tester.pumpAndSettle();
+
+    final date = find.text('${arrival.year}.${arrival.month}.${arrival.day}');
+    final source = find.text('本地合成测试数据（非真实饲养记录）');
+    final days = find.text('已养殖 36 天', findRichText: true);
+    expect(tester.getTopLeft(days).dy, lessThan(tester.getTopLeft(date).dy));
+    expect(tester.getTopLeft(date).dy, lessThan(tester.getTopLeft(source).dy));
+    expect(tester.getSize(source).width, greaterThan(180));
+    expect(tester.getSize(days).height, lessThan(64));
     expect(tester.takeException(), isNull);
   });
 
@@ -715,7 +769,7 @@ void main() {
       expect(find.text('简化测试'), findsOneWidget);
       await tester.tap(find.text('简化测试'));
       await tester.pumpAndSettle();
-      expect(find.text('群落自动扩充'), findsNothing);
+      expect(find.text('自动扩充'), findsNothing);
       expect(find.text('种群数量'), findsOneWidget);
       expect(find.text('百科'), findsNothing);
       await tester.scrollUntilVisible(
@@ -739,7 +793,7 @@ void main() {
       themeController.simpleMode = false;
       await tester.tap(find.text('简化测试'));
       await tester.pumpAndSettle();
-      expect(find.text('群落自动扩充'), findsOneWidget);
+      expect(find.text('自动扩充'), findsOneWidget);
       expect(find.text('种群数量'), findsOneWidget);
       expect(tables['colonies'], hasLength(1));
       expect(tables['care_records'], hasLength(1));
@@ -1285,9 +1339,7 @@ void main() {
           'updated_at': saved.updatedAt.toIso8601String(),
         });
         expect(
-          find
-              .text(fromList ? '已养殖 5 天' : '5 天', findRichText: true)
-              .hitTestable(),
+          find.text('已养殖 5 天', findRichText: true).hitTestable(),
           findsOneWidget,
         );
         expect(hint, findsNothing);
@@ -1298,7 +1350,7 @@ void main() {
         await tester.tap(find.text(colony.name));
         await tester.pumpAndSettle();
         expect(
-          find.text('5 天', findRichText: true).hitTestable(),
+          find.text('已养殖 5 天', findRichText: true).hitTestable(),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
@@ -1595,9 +1647,9 @@ void main() {
       find.descendant(of: profileCard, matching: find.text('1 蚁后')),
       findsOneWidget,
     );
-    final infoCard = find.ancestor(
-      of: find.text('试管巢'),
-      matching: find.byType(Card),
+    expect(
+      find.descendant(of: profileCard, matching: find.text('试管巢')),
+      findsOneWidget,
     );
     expect(find.text('网购-蚁友商店，订单备注及完整来源说明'), findsOneWidget);
     expect(
@@ -1606,14 +1658,6 @@ void main() {
         matching: find.text('网购-蚁友商店，订单备注及完整来源说明'),
       ),
       findsOneWidget,
-    );
-    expect(
-      find.descendant(of: infoCard, matching: find.text('网购-蚁友商店，订单备注及完整来源说明')),
-      findsNothing,
-    );
-    expect(
-      find.descendant(of: infoCard, matching: find.text('入手 2026年9月1日')),
-      findsNothing,
     );
     expect(find.text('种群数量'), findsOneWidget);
     expect(find.text('5 卵'), findsOneWidget);
@@ -1913,10 +1957,18 @@ void main() {
     await tester.tap(find.text('添加记录'));
     await tester.pumpAndSettle();
     final toggle = find.widgetWithText(SwitchListTile, '增量');
-    await tester.ensureVisible(toggle);
+    await tester.scrollUntilVisible(
+      toggle,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
     final field = find.widgetWithText(TextField, '幼虫数');
-    await tester.ensureVisible(field);
+    await tester.scrollUntilVisible(
+      field,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(field, '2');
     await tapSave(tester, '保存记录');
     var saved = CareRecord.fromMap(tables['care_records']!.single);
@@ -1924,10 +1976,15 @@ void main() {
     await tester.ensureVisible(find.text('添加记录'));
     await tester.tap(find.text('添加记录'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(toggle);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -250));
+    await tester.pumpAndSettle();
     await tester.tap(toggle);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(field);
+    await tester.scrollUntilVisible(
+      field,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(field, '4');
     await tapSave(tester, '保存记录');
     saved = CareRecord.fromMap(tables['care_records']!.first);
@@ -2081,10 +2138,18 @@ void main() {
   testWidgets(
     'saved feeder records appear immediately and update the summary',
     (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: DlcPage())),
       );
       await tester.pumpAndSettle();
+      for (final label in ['杜比亚', '樱桃蟑螂', '面包虫', '蛐蛐']) {
+        expect(tester.getSize(find.text(label)).height, lessThan(30));
+      }
+      expect(tester.takeException(), isNull);
       await tester.tap(find.text('杜比亚'));
       await tester.pumpAndSettle();
       expect(find.text('还没有杜比亚记录'), findsOneWidget);

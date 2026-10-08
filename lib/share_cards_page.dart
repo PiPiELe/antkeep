@@ -39,6 +39,7 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
   late DateTime _from, _to, _month;
   bool _dark = false, _counts = true, _dates = true, _duration = true;
   bool _environment = true, _note = true, _busy = false;
+  bool _diaryExpanded = false;
   int _alignment = 0;
   List<String?> _photoPaths = [];
   List<Uint8List?> _photos = [];
@@ -398,46 +399,121 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: ShareCardKind.values
-                    .map(
-                      (kind) => ChoiceChip(
-                        label: Text(kind.label),
-                        selected: _kind == kind,
-                        onSelected: (_) => setState(() {
-                          if (_kind == kind) return;
-                          _kind = kind;
-                          _defaults();
-                        }),
-                      ),
-                    )
-                    .toList(),
+              ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) {
+                  final fade = (16 / bounds.width).clamp(0.0, 0.5);
+                  return LinearGradient(
+                    colors: const [
+                      Colors.transparent,
+                      Colors.white,
+                      Colors.white,
+                      Colors.transparent,
+                    ],
+                    stops: [0, fade, 1 - fade, 1],
+                  ).createShader(bounds);
+                },
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    spacing: 8,
+                    children: ShareCardKind.values
+                        .map(
+                          (kind) => ChoiceChip(
+                            label: Text(kind.label),
+                            selected: _kind == kind,
+                            onSelected: (_) => setState(() {
+                              if (_kind == kind) return;
+                              _kind = kind;
+                              _defaults();
+                            }),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               if (_kind == ShareCardKind.diary && _records.isNotEmpty)
-                DropdownButtonFormField<String>(
-                  key: ValueKey(_diary?.id),
-                  initialValue: _diary?.id,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: '选择日记'),
-                  items: _records
-                      .map(
-                        (r) => DropdownMenuItem(
-                          value: r.id,
-                          child: Text(
-                            '${shareDate(r.occurredAt)} · ${r.type.label} · ${r.note ?? '无备注'}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    InkWell(
+                      key: const ValueKey('diary-selector'),
+                      borderRadius: BorderRadius.circular(4),
+                      onTap: () =>
+                          setState(() => _diaryExpanded = !_diaryExpanded),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(labelText: '选择日记'),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${shareDate(_diary!.occurredAt)} · ${_diary!.type.label}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(
+                              _diaryExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                            ),
+                          ],
                         ),
-                      )
-                      .toList(),
-                  onChanged: (id) => setState(() {
-                    _diary = _records.firstWhere((r) => r.id == id);
-                    _defaults();
-                  }),
+                      ),
+                    ),
+                    if (_diaryExpanded) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        key: const ValueKey('diary-options'),
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.sizeOf(context).height * 0.35,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListView.builder(
+                          primary: false,
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: _records.length,
+                          itemBuilder: (context, index) {
+                            final r = _records[index];
+                            final selected = r.id == _diary?.id;
+                            return ListTile(
+                              selected: selected,
+                              selectedTileColor: Theme.of(context)
+                                  .colorScheme
+                                  .secondaryContainer,
+                              title: Text(
+                                '${shareDate(r.occurredAt)} · ${r.type.label}',
+                              ),
+                              subtitle: Text(
+                                r.note?.trim().isNotEmpty == true
+                                    ? r.note!
+                                    : '无备注',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: selected
+                                  ? const Icon(Icons.check)
+                                  : null,
+                              onTap: () => setState(() {
+                                _diary = r;
+                                _diaryExpanded = false;
+                                _defaults();
+                              }),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               if (_kind == ShareCardKind.comparison)
                 Wrap(
@@ -509,112 +585,262 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('浅色手账'),
-                      selected: !_dark,
-                      onSelected: (_) => setState(() => _dark = false),
+                Card(
+                  margin: EdgeInsets.zero,
+                  elevation: 0,
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
                     ),
-                    ChoiceChip(
-                      label: const Text('深色摄影'),
-                      selected: _dark,
-                      onSelected: (_) => setState(() => _dark = true),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (
-                      var i = 0;
-                      i <
-                          (_kind == ShareCardKind.comparison
-                              ? 2
-                              : _kind == ShareCardKind.monthly
-                              ? 4
-                              : 1);
-                      i++
-                    )
-                      OutlinedButton.icon(
-                        onPressed: () => _choosePhoto(i),
-                        icon: const Icon(Icons.photo_outlined),
-                        label: Text(
-                          _kind == ShareCardKind.comparison
-                              ? (i == 0 ? '开始照片' : '结束照片')
-                              : '照片 ${i + 1}',
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '分享设置',
+                          style: Theme.of(context).textTheme.titleSmall,
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  initialValue: _alignment,
-                  decoration: const InputDecoration(labelText: '照片裁切位置'),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('居中')),
-                    DropdownMenuItem(value: 1, child: Text('靠上')),
-                    DropdownMenuItem(value: 2, child: Text('靠下')),
-                  ],
-                  onChanged: (value) => setState(() => _alignment = value!),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ChoiceChip(
+                              label: const Text('浅色手账'),
+                              selected: !_dark,
+                              onSelected: (_) => setState(() => _dark = false),
+                            ),
+                            ChoiceChip(
+                              label: const Text('深色摄影'),
+                              selected: _dark,
+                              onSelected: (_) => setState(() => _dark = true),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final paired =
+                                constraints.maxWidth >= 260 &&
+                                MediaQuery.textScalerOf(context).scale(14) <=
+                                    18;
+                            final width = paired
+                                ? (constraints.maxWidth - 8) / 2
+                                : constraints.maxWidth;
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                for (
+                                  var i = 0;
+                                  i <
+                                      (_kind == ShareCardKind.comparison
+                                          ? 2
+                                          : _kind == ShareCardKind.monthly
+                                          ? 4
+                                          : 1);
+                                  i++
+                                )
+                                  SizedBox(
+                                    width: width,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(0, 48),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: () => _choosePhoto(i),
+                                      icon: const Icon(
+                                        Icons.photo_outlined,
+                                        size: 20,
+                                      ),
+                                      label: Text(
+                                        _kind == ShareCardKind.comparison
+                                            ? (i == 0 ? '开始照片' : '结束照片')
+                                            : '照片 ${i + 1}',
+                                      ),
+                                    ),
+                                  ),
+                                SizedBox(
+                                  width: width,
+                                  child: DropdownButtonFormField<int>(
+                                    initialValue: _alignment,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(
+                                      prefixText: '照片裁切  ',
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 0,
+                                        child: Text('居中'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 1,
+                                        child: Text('靠上'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 2,
+                                        child: Text('靠下'),
+                                      ),
+                                    ],
+                                    onChanged: (value) =>
+                                        setState(() => _alignment = value!),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        if (_kind == ShareCardKind.diary &&
+                            (_diary?.note?.characters.length ?? 0) > 600)
+                          const Text('原日记较长，分享文字默认取前 600 字，可在下方调整。'),
+                        Stack(
+                          children: [
+                            TextField(
+                              controller: _caption,
+                              maxLength: 600,
+                              buildCounter: (
+                                _, {
+                                required currentLength,
+                                required isFocused,
+                                required maxLength,
+                              }) => null,
+                              minLines: 2,
+                              maxLines: 6,
+                              decoration: InputDecoration(
+                                labelText: _kind == ShareCardKind.diary
+                                    ? '分享文字'
+                                    : '写一句话（可选）',
+                                alignLabelWithHint: true,
+                                contentPadding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  12,
+                                  12,
+                                  36,
+                                ),
+                                border: const OutlineInputBorder(),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            Positioned(
+                              right: 12,
+                              bottom: 10,
+                              child: IgnorePointer(
+                                child: Text(
+                                  '${_caption.text.characters.length}/600',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_kind == ShareCardKind.diary)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12, top: 4),
+                            child: Text(
+                              '不修改原日记',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '展示内容',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            FilterChip(
+                              showCheckmark: false,
+                              visualDensity: VisualDensity.compact,
+                              labelPadding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              label: const Text('数量'),
+                              selected: _counts,
+                              onSelected: (v) => setState(() => _counts = v),
+                            ),
+                            if (_kind != ShareCardKind.monthly)
+                              FilterChip(
+                                showCheckmark: false,
+                                visualDensity: VisualDensity.compact,
+                                labelPadding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                label: const Text('日期'),
+                                selected: _dates,
+                                onSelected: (v) => setState(() => _dates = v),
+                              ),
+                            if (_kind == ShareCardKind.colony ||
+                                _kind == ShareCardKind.comparison)
+                              FilterChip(
+                                showCheckmark: false,
+                                visualDensity: VisualDensity.compact,
+                                labelPadding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                label: const Text('天数'),
+                                selected: _duration,
+                                onSelected: (v) =>
+                                    setState(() => _duration = v),
+                              ),
+                            if (_kind == ShareCardKind.diary)
+                              FilterChip(
+                                showCheckmark: false,
+                                visualDensity: VisualDensity.compact,
+                                labelPadding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                label: const Text('温湿度'),
+                                selected: _environment,
+                                onSelected: (v) =>
+                                    setState(() => _environment = v),
+                              ),
+                            FilterChip(
+                              showCheckmark: false,
+                              visualDensity: VisualDensity.compact,
+                              labelPadding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              label: const Text('文字'),
+                              selected: _note,
+                              onSelected: (v) => setState(() => _note = v),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                if (_kind == ShareCardKind.diary &&
-                    (_diary?.note?.characters.length ?? 0) > 600)
-                  const Text('原日记较长，分享文字默认取前 600 字，可在下方调整。'),
-                TextField(
-                  controller: _caption,
-                  maxLength: 600,
-                  minLines: 2,
-                  maxLines: 6,
-                  decoration: InputDecoration(
-                    labelText: _kind == ShareCardKind.diary
-                        ? '分享文字（不修改原日记）'
-                        : '写一句话（可选）',
-                    border: const OutlineInputBorder(),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilterChip(
-                      label: const Text('数量'),
-                      selected: _counts,
-                      onSelected: (v) => setState(() => _counts = v),
-                    ),
-                    if (_kind != ShareCardKind.monthly)
-                      FilterChip(
-                        label: const Text('日期'),
-                        selected: _dates,
-                        onSelected: (v) => setState(() => _dates = v),
-                      ),
-                    if (_kind == ShareCardKind.colony ||
-                        _kind == ShareCardKind.comparison)
-                      FilterChip(
-                        label: const Text('天数'),
-                        selected: _duration,
-                        onSelected: (v) => setState(() => _duration = v),
-                      ),
-                    if (_kind == ShareCardKind.diary)
-                      FilterChip(
-                        label: const Text('温湿度'),
-                        selected: _environment,
-                        onSelected: (v) => setState(() => _environment = v),
-                      ),
-                    FilterChip(
-                      label: const Text('文字'),
-                      selected: _note,
-                      onSelected: (v) => setState(() => _note = v),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
                 const Text('图片在本机生成，不上传数据。保存后可自行分享。'),
               ],
             ],

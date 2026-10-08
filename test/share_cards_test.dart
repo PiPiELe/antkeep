@@ -100,6 +100,48 @@ void main() {
     },
   );
 
+  testWidgets('caption count stays inside the field for diary and comparison', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ShareCardsPage(
+          colony: colony,
+          records: [record],
+          initialRecord: record,
+          now: now,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> expectCountInside(String count) async {
+      await tester.ensureVisible(find.byType(TextField));
+      await tester.pumpAndSettle();
+      final field = tester.getRect(find.byType(TextField));
+      final counter = tester.getRect(find.text(count));
+      expect(field.contains(counter.topLeft), isTrue);
+      expect(field.contains(counter.bottomRight), isTrue);
+    }
+
+    await expectCountInside('5/600');
+    await tester.enterText(find.byType(TextField), 'abc');
+    await tester.pumpAndSettle();
+    await expectCountInside('3/600');
+
+    final comparison = find.widgetWithText(ChoiceChip, '成长对比');
+    await tester.ensureVisible(comparison);
+    await tester.tap(comparison);
+    await tester.pumpAndSettle();
+    await expectCountInside('0/600');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('no diary gives explicit empty state and disables save', (
     tester,
   ) async {
@@ -151,6 +193,64 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('diary menu stays bounded and switches preview', (tester) async {
+    final records = List.generate(
+      30,
+      (i) => CareRecord(
+        id: 'menu-$i',
+        colonyId: 'c',
+        type: CareRecordType.observation,
+        occurredAt: now.subtract(Duration(days: i)),
+        createdAt: now,
+        note: '日记 $i：${'很长的观察内容' * 20}',
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ShareCardsPage(
+          colony: colony,
+          records: records,
+          initialRecord: records.first,
+          now: now,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final selector = find.byKey(const ValueKey('diary-selector'));
+    final before = tester.getRect(selector);
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(selector), before);
+    final options = find.byKey(const ValueKey('diary-options'));
+    expect(tester.getTopLeft(options).dy, greaterThanOrEqualTo(before.bottom));
+    expect(
+      tester.getSize(options).height,
+      lessThanOrEqualTo(
+        tester.view.physicalSize.height / tester.view.devicePixelRatio * 0.35,
+      ),
+    );
+    await tester.drag(
+      find.descendant(of: options, matching: find.byType(ListView)),
+      const Offset(0, -160),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getRect(selector), before);
+    await tester.drag(
+      find.descendant(of: options, matching: find.byType(ListView)),
+      const Offset(0, 400),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check), findsWidgets);
+    await tester.tap(find.text(records[1].note!).last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ShareCardPoster>(find.byType(ShareCardPoster)).diary!.id,
+      records[1].id,
+    );
+    expect(options, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'PNG export generates 1080px image and passes bytes to native saver',

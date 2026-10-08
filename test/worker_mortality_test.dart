@@ -161,16 +161,34 @@ void main() {
   }
 
   Future<void> save(WidgetTester tester) async {
-    await tester.scrollUntilVisible(
-      find.text('保存记录'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('保存记录'));
+    await tester.tap(find.byTooltip('保存记录'));
     await settle(tester);
   }
 
   final deaths = find.widgetWithText(TextField, '工蚁死亡数量');
+
+  testWidgets('new diary defaults to date only and keeps top save fixed', (
+    tester,
+  ) async {
+    await tester.runAsync(() => db.deleteRecord(record(null)));
+    await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
+
+    expect(find.textContaining('发生日期：'), findsOneWidget);
+    expect(find.text('记录具体时间'), findsOneWidget);
+    expect(find.text('具体时间：'), findsNothing);
+    expect(find.byIcon(Icons.save_outlined), findsOneWidget);
+    expect(find.byTooltip('保存记录'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('保存记录'));
+    await settle(tester);
+
+    final saved = await tester.runAsync(() => db.listRecords(colony.id));
+    expect(saved!.single.occurredAt.hour, 0);
+    expect(saved.single.occurredAt.minute, 0);
+    await tester.runAsync(() => db.deleteRecord(saved.single));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('hidden by default, death input validates and saves', (
     tester,
   ) async {

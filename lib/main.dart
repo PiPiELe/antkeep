@@ -10,7 +10,7 @@ import 'package:uuid/uuid.dart';
 import 'app_preferences.dart';
 import 'colony_growth_page.dart';
 import 'memorial_page.dart';
-import 'widgets/tombstone_icon.dart';
+import 'widgets/skull_icon.dart';
 import 'share_cards_page.dart';
 import 'share_content_page.dart';
 import 'community_groups_page.dart';
@@ -428,7 +428,11 @@ class _HomePageState extends State<HomePage>
                 controller: _colonyTabs,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                dividerColor: Colors.transparent,
+                // Keep the colony switcher visually separate from page content;
+                // the selected-tab indicator alone was too easy to miss.
+                dividerColor: Theme.of(context).colorScheme.outlineVariant
+                    .withValues(alpha: .55),
+                dividerHeight: 1,
                 labelPadding: const EdgeInsets.symmetric(horizontal: 12),
                 labelStyle: Theme.of(context).textTheme.titleMedium,
                 onTap: (_) => setState(() {}),
@@ -1014,6 +1018,8 @@ class _ColonyTags extends StatelessWidget {
       children: [
         if (colony.isNewQueenColony) badge('新后群', scheme.primary, crown: true),
         if (scale != null) badge(scale.label, color),
+        if (colony.nestType?.isNotEmpty == true)
+          badge(colony.nestType!, scheme.onSurfaceVariant),
       ],
     );
   }
@@ -1270,7 +1276,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     var speciesName = names?.group(1) ?? currentName;
     var commonName =
         names?.group(2) ??
-        (findSpeciesProfile(selectedName)?.aliases.contains(selectedName) == true
+        (findSpeciesProfile(selectedName)?.aliases.contains(selectedName) ==
+                true
             ? selectedName
             : '');
     final formKey = GlobalKey<FormState>();
@@ -2170,6 +2177,13 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         );
       }
       final colony = detail!.colony!;
+      Future<void> addRecord() async {
+        final saved = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => RecordFormPage(colony: colony)),
+        );
+        if (saved == true && mounted) setState(_reload);
+      }
+
       return Scaffold(
         appBar: AppBar(
           title: Text(colony.name),
@@ -2187,7 +2201,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             if (!colony.archived)
               IconButton(
                 tooltip: '移入英灵殿',
-                icon: const TombstoneIcon(),
+                icon: const SkullIcon(),
                 onPressed: _deleting
                     ? null
                     : () async {
@@ -2228,24 +2242,21 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               ),
           ],
         ),
-        floatingActionButton: colony.archived
+        bottomNavigationBar: colony.archived
             ? null
-            : FloatingActionButton.extended(
-                icon: const Icon(Icons.add),
-                label: const Text('添加记录'),
-                onPressed: _deleting
-                    ? null
-                    : () async {
-                        final saved = await Navigator.of(context).push<bool>(
-                          MaterialPageRoute(
-                            builder: (_) => RecordFormPage(colony: colony),
-                          ),
-                        );
-                        if (saved == true && mounted) setState(_reload);
-                      },
+            : SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: FilledButton.icon(
+                    onPressed: _deleting ? null : addRecord,
+                    icon: const Icon(Icons.add),
+                    label: const Text('添加记录'),
+                  ),
+                ),
               ),
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             _ColonyProfileSummary(
               colony: colony,
@@ -2255,29 +2266,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   ? null
                   : () => _editAcquiredOn(colony),
             ),
-            const SizedBox(height: 4),
-            _ColonySummary(colony: colony),
-            if (!themeController.simpleMode && !colony.archived) ...[
+            if (colony.targetTemperatureLower != null ||
+                colony.targetTemperature != null ||
+                colony.targetHumidityLower != null ||
+                colony.targetHumidity != null) ...[
               const SizedBox(height: 4),
-              Card(
-                child: ListTile(
-                  visualDensity: const VisualDensity(vertical: -4),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  minLeadingWidth: 24,
-                  horizontalTitleGap: 8,
-                  leading: const Icon(Icons.trending_up),
-                  title: const Text('群落自动扩充'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => ColonyGrowthPage(colony: colony),
-                      ),
-                    );
-                    if (mounted) setState(_reload);
-                  },
-                ),
-              ),
+              _ColonySummary(colony: colony),
             ],
             const SizedBox(height: 4),
             _PopulationTimeline(
@@ -2327,7 +2321,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 20, 8, 12),
+              padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2359,7 +2353,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                     ],
                   ),
                   if (detail.records.isNotEmpty && !colony.archived) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 2),
                     Text(
                       '轻点编辑 · 左滑删除',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -2451,8 +2445,17 @@ class _ColonyProfileSummary extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final metadataStyle = Theme.of(context).textTheme.bodySmall
         ?.copyWith(color: scheme.onSurfaceVariant);
-    final metadataLabelWidth = MediaQuery.textScalerOf(context)
-        .scale((metadataStyle?.fontSize ?? 12) * 4 + 4);
+    double metadataLabelWidth(String label) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: metadataStyle),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final width = painter.width + 1;
+      painter.dispose();
+      return width;
+    }
+
     Widget metadataRow(
       String label,
       String value, {
@@ -2464,7 +2467,7 @@ class _ColonyProfileSummary extends StatelessWidget {
         children: [
           JustifiedLabel(
             text: label,
-            width: metadataLabelWidth,
+            width: metadataLabelWidth(label),
             style: metadataStyle,
           ),
           const SizedBox(width: 8),
@@ -2485,139 +2488,121 @@ class _ColonyProfileSummary extends StatelessWidget {
       child: Image.asset(
         'assets/images/default-ant-cover.png',
         width: double.infinity,
-        height: 88,
-        fit: BoxFit.contain,
+        height: 92,
+        fit: BoxFit.cover,
         semanticLabel: '默认蚂蚁封面',
       ),
     );
-    final identity = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                '蚂蚁品种：${colony.species ?? '未填写品种'}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-            if (!themeController.simpleMode &&
-                colony.species?.trim().isNotEmpty == true)
-              TextButton.icon(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 48),
-                  textStyle: Theme.of(context).textTheme.bodySmall,
-                ),
-                icon: const Icon(Icons.menu_book_outlined, size: 16),
-                label: const Text('百科'),
-                onPressed: () {
-                  final species = colony.species!.trim();
-                  final query = _speciesAliases[species] ?? species;
-                  final profile = findSpeciesProfile(query);
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => profile == null
-                          ? SpeciesEncyclopediaPage(initialQuery: query)
-                          : SpeciesDetailPage(profile: profile),
-                    ),
-                  );
-                },
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        colony.coverPhotoPath == null
-            ? defaultCover
-            : _StoredImage(
-                relativePath: colony.coverPhotoPath!,
-                width: double.infinity,
-                height: 88,
-                borderRadius: 8,
-                fallback: defaultCover,
-              ),
-        if (colony.isNewQueenColony || workers != null) ...[
-          const SizedBox(height: 8),
-          _ColonyTags(colony: colony, workers: workers),
-        ],
-      ],
-    );
+    final cover = colony.coverPhotoPath == null
+        ? defaultCover
+        : _StoredImage(
+            relativePath: colony.coverPhotoPath!,
+            width: double.infinity,
+            height: 92,
+            borderRadius: 8,
+            fallback: defaultCover,
+          );
+    final duration = colony.archived
+        ? const Text('遗失的文明 · 养殖已结束')
+        : InkWell(
+            onTap: onDurationTap,
+            borderRadius: BorderRadius.circular(8),
+            child: HusbandryDuration(colony: colony, compactStacked: true),
+          );
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '蚂蚁品种：${colony.species ?? '未填写品种'}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                if (!themeController.simpleMode &&
+                    colony.species?.trim().isNotEmpty == true)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    icon: const Icon(Icons.menu_book_outlined, size: 16),
+                    label: const Text('百科'),
+                    onPressed: () {
+                      final species = colony.species!.trim();
+                      final query = _speciesAliases[species] ?? species;
+                      final profile = findSpeciesProfile(query);
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => profile == null
+                              ? SpeciesEncyclopediaPage(initialQuery: query)
+                              : SpeciesDetailPage(profile: profile),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
             LayoutBuilder(
               builder: (context, constraints) {
-                final duration = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (colony.archived)
-                      const Text('遗失的文明 · 养殖已结束')
-                    else
-                      InkWell(
-                        onTap: onDurationTap,
-                        borderRadius: BorderRadius.circular(8),
-                        child: HusbandryDuration(
-                          colony: colony,
-                          labelWidth: metadataLabelWidth,
-                        ),
-                      ),
-                    if (colony.acquiredOn != null) ...[
-                      const SizedBox(height: 4),
-                      metadataRow(
-                        '入手日期',
-                        dottedDate(colony.acquiredOn!),
-                        onTap: onDurationTap,
-                      ),
-                    ],
-                    if (colony.source?.trim().isNotEmpty == true) ...[
-                      const SizedBox(height: 8),
-                      metadataRow(
-                        '来源',
-                        _sourceLabel,
-                        valueStyle: metadataStyle?.copyWith(letterSpacing: 0),
-                      ),
-                    ],
-                    if (colony.purchasePriceCents != null) ...[
-                      const SizedBox(height: 8),
-                      metadataRow('购入价', '¥${colony.purchasePriceText}'),
-                    ],
-                  ],
-                );
-                if (constraints.maxWidth < 320 ||
+                if (constraints.maxWidth < 280 ||
                     MediaQuery.textScalerOf(context).scale(12) > 18) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [identity, const SizedBox(height: 12), duration],
+                    children: [cover, const SizedBox(height: 8), duration],
                   );
                 }
                 return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(child: identity),
+                    Expanded(flex: 4, child: cover),
                     const SizedBox(width: 12),
-                    Container(
-                      width: 1,
-                      height: 72,
-                      color: scheme.outlineVariant.withValues(alpha: .3),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(width: 138, child: duration),
+                    Expanded(flex: 5, child: duration),
                   ],
                 );
               },
             ),
-            const SizedBox(height: 12),
+            if (colony.isNewQueenColony ||
+                workers != null ||
+                colony.nestType?.isNotEmpty == true) ...[
+              const SizedBox(height: 10),
+              _ColonyTags(colony: colony, workers: workers),
+            ],
+            if (colony.acquiredOn != null ||
+                colony.source?.trim().isNotEmpty == true ||
+                colony.purchasePriceCents != null) ...[
+              const SizedBox(height: 10),
+              if (colony.acquiredOn != null)
+                metadataRow(
+                  '入手日期',
+                  dottedDate(colony.acquiredOn!),
+                  onTap: onDurationTap,
+                ),
+              if (colony.source?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 4),
+                metadataRow('来源', _sourceLabel),
+              ],
+              if (colony.purchasePriceCents != null) ...[
+                const SizedBox(height: 4),
+                metadataRow('购入价', '¥${colony.purchasePriceText}'),
+              ],
+            ],
+            const SizedBox(height: 10),
             Divider(
               height: 1,
               color: scheme.outlineVariant.withValues(alpha: .3),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Wrap(
-              spacing: 20,
-              runSpacing: 6,
+              spacing: 16,
+              runSpacing: 4,
               children: [
                 for (final quantity
                     in quantities.isEmpty ? ['尚未补充数量'] : quantities)
@@ -2701,6 +2686,14 @@ class _PopulationTimeline extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                if (onConfigureGrowth != null)
+                  Tooltip(
+                    message: '设置群落自动扩充',
+                    child: TextButton(
+                      onPressed: onConfigureGrowth,
+                      child: const Text('自动扩充'),
+                    ),
+                  ),
                 IconButton(
                   tooltip: expanded ? '折叠种群数量' : '展开种群数量',
                   onPressed: () => onExpandedChanged(!expanded),
@@ -2713,19 +2706,21 @@ class _PopulationTimeline extends StatelessWidget {
               ],
             ),
             if (expanded) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Row(
                 children: [
                   Expanded(
                     child: Text(
-                      description,
+                      '统计范围：$description',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   FilterChip(
-                    avatar: const Icon(Icons.circle_outlined, size: 18),
                     label: const Text('带卵幼'),
                     selected: includeBrood,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     onSelected: onIncludeBroodChanged,
                   ),
                 ],
@@ -2740,7 +2735,7 @@ class _PopulationTimeline extends StatelessWidget {
                 onConfigureGrowth: onConfigureGrowth,
                 onHorizonChanged: onForecastHorizonChanged,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               if (points.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
@@ -2748,12 +2743,12 @@ class _PopulationTimeline extends StatelessWidget {
                 )
               else ...[
                 Text('最近 ${points.last.count} · ${points.length} 个时间点'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Semantics(
                   label: '种群数量时间折线图，$description。',
                   child: SizedBox(
                     key: const ValueKey('colony-population-chart'),
-                    height: 180,
+                    height: 160,
                     width: double.infinity,
                     child: CustomPaint(
                       painter: _ColonyPopulationChartPainter(
@@ -2894,8 +2889,6 @@ class _ColonySummary extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (colony.nestType?.isNotEmpty == true)
-                  Chip(label: Text(colony.nestType!)),
                 if (temperatureRange != null)
                   Chip(label: Text(temperatureRange)),
                 if (humidityRange != null) Chip(label: Text(humidityRange)),
@@ -2927,7 +2920,8 @@ class _RecordFormPageState extends State<RecordFormPage> {
   final _workerMortality = TextEditingController();
   final _photos = <XFile>[];
   var _type = CareRecordType.observation;
-  var _occurredAt = DateTime.now();
+  var _occurredAt = DateUtils.dateOnly(DateTime.now());
+  var _hasSpecificTime = false;
   var _saving = false;
   var _incremental = true;
   @override
@@ -2937,6 +2931,8 @@ class _RecordFormPageState extends State<RecordFormPage> {
     if (record == null) return;
     _type = record.type;
     _occurredAt = record.occurredAt;
+    _hasSpecificTime =
+        record.occurredAt.hour != 0 || record.occurredAt.minute != 0;
     _note.text = record.note ?? '';
     _temperature.text = record.temperature?.toString() ?? '';
     _humidity.text = record.humidity?.toString() ?? '';
@@ -3026,7 +3022,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
     }
   }
 
-  Future<void> _pickTime() async {
+  Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
       firstDate: DateTime(2000),
@@ -3034,20 +3030,49 @@ class _RecordFormPageState extends State<RecordFormPage> {
       initialDate: _occurredAt,
     );
     if (date == null || !mounted) return;
+    setState(
+      () => _occurredAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        _hasSpecificTime ? _occurredAt.hour : 0,
+        _hasSpecificTime ? _occurredAt.minute : 0,
+      ),
+    );
+  }
+
+  Future<bool> _changeSpecificTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+      initialTime: _hasSpecificTime
+          ? TimeOfDay.fromDateTime(_occurredAt)
+          : TimeOfDay.now(),
     );
-    if (time != null) {
+    if (time != null && mounted) {
       setState(
         () => _occurredAt = DateTime(
-          date.year,
-          date.month,
-          date.day,
+          _occurredAt.year,
+          _occurredAt.month,
+          _occurredAt.day,
           time.hour,
           time.minute,
         ),
       );
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _setSpecificTime(bool enabled) async {
+    if (!enabled) {
+      setState(() {
+        _hasSpecificTime = false;
+        _occurredAt = DateUtils.dateOnly(_occurredAt);
+      });
+      return;
+    }
+    if (await _changeSpecificTime() && mounted) {
+      setState(() => _hasSpecificTime = true);
     }
   }
 
@@ -3055,6 +3080,19 @@ class _RecordFormPageState extends State<RecordFormPage> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(widget.record == null ? '记录 ${widget.colony.name}' : '编辑日记'),
+      actions: [
+        IconButton(
+          tooltip: _saving ? '保存中…' : '保存记录',
+          onPressed: _saving ? null : _save,
+          icon: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save_outlined),
+        ),
+      ],
     ),
     body: ListView(
       padding: const EdgeInsets.all(16),
@@ -3090,10 +3128,27 @@ class _RecordFormPageState extends State<RecordFormPage> {
         ],
         const SizedBox(height: 16),
         OutlinedButton.icon(
-          onPressed: _pickTime,
-          icon: const Icon(Icons.schedule),
-          label: Text('发生时间：${_dateTime(_occurredAt)}'),
+          onPressed: _pickDate,
+          icon: const Icon(Icons.calendar_today_outlined),
+          label: Text('发生日期：${_date(_occurredAt)}'),
         ),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _hasSpecificTime,
+          onChanged: _saving
+              ? null
+              : (enabled) => _setSpecificTime(enabled ?? false),
+          title: const Text('记录具体时间'),
+          subtitle: const Text('默认仅保存年月日'),
+        ),
+        if (_hasSpecificTime)
+          OutlinedButton.icon(
+            onPressed: _saving ? null : _changeSpecificTime,
+            icon: const Icon(Icons.schedule),
+            label: Text(
+              '具体时间：${_timeOfDay(_occurredAt.hour * 60 + _occurredAt.minute)}',
+            ),
+          ),
         const SizedBox(height: 12),
         TextField(
           controller: _note,
@@ -3265,11 +3320,6 @@ class _RecordFormPageState extends State<RecordFormPage> {
             ),
           ),
         ],
-        const SizedBox(height: 28),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: Text(_saving ? '保存中…' : '保存记录'),
-        ),
       ],
     ),
   );
@@ -4218,7 +4268,11 @@ class _DlcPageState extends State<DlcPage> {
           child: Card(
             child: ListTile(
               leading: CircleAvatar(child: Icon(_feederIcon(feeder))),
-              title: Text(feeder.label),
+              title: Text(
+                feeder.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: FutureBuilder<FeederRecord?>(
                 future: _counts[feeder],
                 builder: (context, snapshot) {
@@ -4264,38 +4318,34 @@ class _FeederSummary extends StatelessWidget {
   final String? text;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 190,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Expanded(
-          child: text == null
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(time!, style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: 2),
-                    Text(
-                      count!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                )
-              : Text(
-                  text!,
-                  textAlign: TextAlign.end,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (text == null)
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(time!, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 2),
+            Text(
+              count!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        )
+      else
+        Text(
+          text!,
+          textAlign: TextAlign.end,
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        const SizedBox(width: 8),
-        const Icon(Icons.chevron_right),
-      ],
-    ),
+      const SizedBox(width: 8),
+      const Icon(Icons.chevron_right),
+    ],
   );
 }
 
@@ -4385,7 +4435,8 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
   final _adults = TextEditingController();
   final _mortality = TextEditingController();
   var _type = FeederRecordType.observation;
-  var _occurredAt = DateTime.now();
+  var _occurredAt = DateUtils.dateOnly(DateTime.now());
+  var _hasSpecificTime = false;
   var _saving = false;
 
   @override
@@ -4404,7 +4455,7 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
     super.dispose();
   }
 
-  Future<void> _pickTime() async {
+  Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
       firstDate: DateTime(2000),
@@ -4412,20 +4463,49 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
       initialDate: _occurredAt,
     );
     if (date == null || !mounted) return;
+    setState(
+      () => _occurredAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        _hasSpecificTime ? _occurredAt.hour : 0,
+        _hasSpecificTime ? _occurredAt.minute : 0,
+      ),
+    );
+  }
+
+  Future<bool> _changeSpecificTime() async {
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+      initialTime: _hasSpecificTime
+          ? TimeOfDay.fromDateTime(_occurredAt)
+          : TimeOfDay.now(),
     );
-    if (time != null) {
+    if (time != null && mounted) {
       setState(
         () => _occurredAt = DateTime(
-          date.year,
-          date.month,
-          date.day,
+          _occurredAt.year,
+          _occurredAt.month,
+          _occurredAt.day,
           time.hour,
           time.minute,
         ),
       );
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _setSpecificTime(bool enabled) async {
+    if (!enabled) {
+      setState(() {
+        _hasSpecificTime = false;
+        _occurredAt = DateUtils.dateOnly(_occurredAt);
+      });
+      return;
+    }
+    if (await _changeSpecificTime() && mounted) {
+      setState(() => _hasSpecificTime = true);
     }
   }
 
@@ -4482,10 +4562,27 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
-            onPressed: _pickTime,
-            icon: const Icon(Icons.schedule),
-            label: Text('发生时间：${_dateTime(_occurredAt)}'),
+            onPressed: _pickDate,
+            icon: const Icon(Icons.calendar_today_outlined),
+            label: Text('发生日期：${_date(_occurredAt)}'),
           ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _hasSpecificTime,
+            onChanged: _saving
+                ? null
+                : (enabled) => _setSpecificTime(enabled ?? false),
+            title: const Text('记录具体时间'),
+            subtitle: const Text('默认仅保存年月日'),
+          ),
+          if (_hasSpecificTime)
+            OutlinedButton.icon(
+              onPressed: _saving ? null : _changeSpecificTime,
+              icon: const Icon(Icons.schedule),
+              label: Text(
+                '具体时间：${_timeOfDay(_occurredAt.hour * 60 + _occurredAt.minute)}',
+              ),
+            ),
           const SizedBox(height: 12),
           TextField(
             controller: _note,
@@ -5388,11 +5485,15 @@ IconData _feederRecordIcon(FeederRecordType type) => switch (type) {
 
 String? _textOrNull(String value) => value.trim().isEmpty ? null : value.trim();
 String _date(DateTime value) => chineseDate(value);
-String _dateTime(DateTime value) =>
-    '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+String _dateTime(DateTime value) => value.hour == 0 && value.minute == 0
+    ? _date(value)
+    : '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 String _timeOfDay(int minuteOfDay) =>
     '${(minuteOfDay ~/ 60).toString().padLeft(2, '0')}:${(minuteOfDay % 60).toString().padLeft(2, '0')}';
-Future<T> _runBackupTask<T>(BuildContext context, Future<T> Function() action) async {
+Future<T> _runBackupTask<T>(
+  BuildContext context,
+  Future<T> Function() action,
+) async {
   final navigator = Navigator.of(context, rootNavigator: true);
   final route = DialogRoute<void>(
     context: context,
