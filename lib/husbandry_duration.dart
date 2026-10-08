@@ -11,6 +11,7 @@ class HusbandryDuration extends StatefulWidget {
     super.key,
     required this.colony,
     this.expanded = false,
+    this.compact = false,
     this.showAcquiredDate = false,
     this.labelWidth,
     this.onTap,
@@ -18,6 +19,7 @@ class HusbandryDuration extends StatefulWidget {
 
   final Colony colony;
   final bool expanded;
+  final bool compact;
   final bool showAcquiredDate;
   final double? labelWidth;
   final VoidCallback? onTap;
@@ -100,7 +102,7 @@ class _HusbandryDurationState extends State<HusbandryDuration>
               TextSpan(
                 text: '$days',
                 style: TextStyle(
-                  fontSize: 72,
+                  fontSize: widget.compact ? 44 : 72,
                   height: 1,
                   letterSpacing: -3,
                   fontWeight: FontWeight.w700,
