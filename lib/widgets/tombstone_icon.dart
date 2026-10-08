@@ -55,15 +55,10 @@ class _TombstonePainter extends CustomPainter {
       ..quadraticBezierTo(17, 9, 18, 8.8);
     for (final side in [-1.0, 1.0]) {
       appendages
-        ..moveTo(16 + side * 0.7, 13)
-        ..lineTo(16 + side * 2.5, 12.5)
-        ..lineTo(16 + side * 3.3, 11.4)
-        ..moveTo(16 + side * 0.8, 13.9)
-        ..lineTo(16 + side * 2.7, 14)
-        ..lineTo(16 + side * 3.6, 15.2)
-        ..moveTo(16 + side * 0.7, 14.7)
-        ..lineTo(16 + side * 2.2, 15.8)
-        ..lineTo(16 + side * 2.9, 17.3);
+        ..moveTo(16 + side * 0.8, 13.1)
+        ..quadraticBezierTo(16 + side * 2.2, 12.6, 16 + side * 3, 11.5)
+        ..moveTo(16 + side * 0.8, 15)
+        ..quadraticBezierTo(16 + side * 2.1, 15.5, 16 + side * 2.9, 16.8);
     }
     canvas.drawPath(appendages, paint);
     canvas.drawLine(const Offset(16, 11.4), const Offset(16, 17), paint);
