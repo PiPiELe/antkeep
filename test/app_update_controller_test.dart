@@ -51,6 +51,48 @@ AppUpdateController controller({
 );
 
 void main() {
+  test('installed revisions compare against release policies without format errors', () async {
+    for (final entry in [
+      ('1.0.7', null, AppUpdateAvailability.none),
+      ('1.0.8', null, AppUpdateAvailability.none),
+      ('1.0.9', null, AppUpdateAvailability.optional),
+      ('1.0.9', '1.0.9', AppUpdateAvailability.required),
+    ]) {
+      final updates = controller(
+        respond: (_) async =>
+            response(policy(latest: entry.$1, minimum: entry.$2), 200),
+        currentVersion: () async => '1.0.8.1',
+      );
+      await updates.setOnline(true);
+      await updates.check(manual: true);
+      expect(updates.error, isNull);
+      expect(updates.policy, isNotNull);
+      expect(updates.availability, entry.$3);
+      updates.dispose();
+    }
+  });
+
+  test(
+    'installed revision parsing does not relax published policy validation',
+    () {
+      expect(AppVersion.parseInstalled('1.0.8').toString(), '1.0.8');
+      expect(AppVersion.parseInstalled('1.0.8.99').toString(), '1.0.8');
+      for (final invalid in [
+        '1.0.8.0',
+        '1.0.8.01',
+        '1.0.8.100',
+        '1.0.8.beta',
+        '1.0.8.1.1',
+      ]) {
+        expect(() => AppVersion.parseInstalled(invalid), throwsFormatException);
+      }
+      expect(
+        () => AppUpdatePolicy.decode(policy(latest: '1.0.8.1')),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('installed 1.0.3 detects the published 1.0.4 policy', () async {
     final updates = controller(
       respond: (_) async =>
