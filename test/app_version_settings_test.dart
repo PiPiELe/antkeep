@@ -14,6 +14,10 @@ class _Store implements OnlineStore {
   Future<String?> readContent() async => null;
   @override
   Future<void> writeContent(String content) async {}
+  @override
+  Future<String?> readSeenAnnouncement() async => null;
+  @override
+  Future<void> writeSeenAnnouncement(String id) async {}
 }
 
 void main() {
