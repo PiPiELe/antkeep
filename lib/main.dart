@@ -11,6 +11,7 @@ import 'app_preferences.dart';
 import 'diary_preferences.dart';
 import 'diary_settings_page.dart';
 import 'colony_growth_page.dart';
+import 'care_tasks_section.dart';
 import 'memorial_page.dart';
 import 'widgets/skull_icon.dart';
 import 'share_cards_page.dart';
@@ -35,6 +36,7 @@ import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/care_task.dart';
 import 'domain/mortality_analysis.dart';
 import 'domain/colony_growth.dart';
 import 'domain/population_analysis.dart';
@@ -658,6 +660,7 @@ typedef _ColonyListEntry = ({
   Colony colony,
   GrowthPopulation population,
   int? workers,
+  List<CareTask> dueTasks,
 });
 
 class _ColoniesPageState extends State<ColoniesPage> {
@@ -702,6 +705,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
 
   Future<List<_ColonyListEntry>> _loadColonies() async {
     final loaded = await AppDatabase.instance.listColonies();
+    final tasks = await AppDatabase.instance.listCareTasks();
     final remaining = {for (final colony in loaded) colony.id: colony};
     final colonies = <Colony>[
       for (final id in themeController.colonyOrder)
@@ -716,6 +720,12 @@ class _ColoniesPageState extends State<ColoniesPage> {
           colony: colony,
           population: population,
           workers: population.workers,
+          dueTasks: tasks
+              .where(
+                (task) =>
+                    task.colonyId == colony.id && task.isDue(DateTime.now()),
+              )
+              .toList(),
         );
       }),
     );
@@ -828,6 +838,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
                         colony: colonies[index].colony,
                         population: colonies[index].population,
                         workers: colonies[index].workers,
+                        dueTasks: colonies[index].dueTasks,
                         onDurationTap: () =>
                             _editAcquiredOn(colonies[index].colony),
                         onTap: () async {
@@ -856,12 +867,14 @@ class _ColonyCard extends StatelessWidget {
     required this.colony,
     required this.population,
     required this.workers,
+    required this.dueTasks,
     required this.onTap,
     required this.onDurationTap,
   });
   final Colony colony;
   final GrowthPopulation population;
   final int? workers;
+  final List<CareTask> dueTasks;
   final VoidCallback onTap;
   final VoidCallback onDurationTap;
 
@@ -997,6 +1010,16 @@ class _ColonyCard extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 10),
+              if (dueTasks.isNotEmpty) ...[
+                Text(
+                  '今日待办：${dueTasks.map((task) => task.type.label).join('、')}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Divider(
                 height: 1,
                 color: theme.colorScheme.outlineVariant.withValues(alpha: .3),
@@ -2455,6 +2478,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               _ColonySummary(colony: colony),
             ],
             const SizedBox(height: 4),
+            CareTasksSection(
+              colony: colony,
+              onRecord: (task) async {
+                final saved = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => RecordFormPage(colony: colony, task: task),
+                  ),
+                );
+                if (saved == true && mounted) setState(_reload);
+                return saved == true;
+              },
+            ),
+            const SizedBox(height: 4),
             _PopulationTimeline(
               colony: colony,
               records: detail.records,
@@ -3132,9 +3168,15 @@ class _ColonySummary extends StatelessWidget {
 }
 
 class RecordFormPage extends StatefulWidget {
-  const RecordFormPage({super.key, required this.colony, this.record});
+  const RecordFormPage({
+    super.key,
+    required this.colony,
+    this.record,
+    this.task,
+  });
   final Colony colony;
   final CareRecord? record;
+  final CareTask? task;
   @override
   State<RecordFormPage> createState() => _RecordFormPageState();
 }
@@ -3148,8 +3190,12 @@ class _RecordFormPageState extends State<RecordFormPage> {
   final _pupae = TextEditingController();
   final _workers = TextEditingController();
   final _workerMortality = TextEditingController();
+  final _feedingFood = TextEditingController();
+  final _feedingAmount = TextEditingController();
   final _photos = <XFile>[];
   var _type = CareRecordType.observation;
+  FeedingResponse? _feedingResponse;
+  bool? _feedingLeftovers;
   var _occurredAt = DateUtils.dateOnly(DateTime.now());
   var _hasSpecificTime = false;
   var _saving = false;
@@ -3179,7 +3225,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
     super.initState();
     _incremental = themeController.diary.incremental;
     final record = widget.record;
-    if (record == null) return;
+    if (record == null) {
+      if (widget.task != null) _type = widget.task!.type.recordType;
+      return;
+    }
     _type = record.type;
     _occurredAt = record.occurredAt;
     _hasSpecificTime =
@@ -3192,6 +3241,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
     _pupae.text = record.pupaCount?.toString() ?? '';
     _workers.text = record.workerCount?.toString() ?? '';
     _workerMortality.text = record.workerMortalityCount?.toString() ?? '';
+    _feedingFood.text = record.feedingFood ?? '';
+    _feedingAmount.text = record.feedingAmount ?? '';
+    _feedingResponse = record.feedingResponse;
+    _feedingLeftovers = record.feedingLeftovers;
     // Stored counts are snapshots, even if originally entered as increments.
     _incremental = false;
   }
@@ -3207,6 +3260,8 @@ class _RecordFormPageState extends State<RecordFormPage> {
       _pupae,
       _workers,
       _workerMortality,
+      _feedingFood,
+      _feedingAmount,
     ]) {
       c.dispose();
     }
@@ -3215,6 +3270,12 @@ class _RecordFormPageState extends State<RecordFormPage> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (_type == CareRecordType.feeding &&
+        (_feedingFood.text.trim().length > 80 ||
+            _feedingAmount.text.trim().length > 80)) {
+      _showError(context, '食物和投喂量最多填写 80 个字符');
+      return;
+    }
     for (final controller in [
       _eggs,
       _larvae,
@@ -3282,6 +3343,18 @@ class _RecordFormPageState extends State<RecordFormPage> {
           workerMortalityCount: _type == CareRecordType.mortality
               ? int.tryParse(_workerMortality.text.trim())
               : null,
+          feedingFood: _type == CareRecordType.feeding
+              ? _textOrNull(_feedingFood.text)
+              : null,
+          feedingAmount: _type == CareRecordType.feeding
+              ? _textOrNull(_feedingAmount.text)
+              : null,
+          feedingResponse: _type == CareRecordType.feeding
+              ? _feedingResponse
+              : null,
+          feedingLeftovers: _type == CareRecordType.feeding
+              ? _feedingLeftovers
+              : null,
           photos: photos,
           createdAt: widget.record?.createdAt ?? DateTime.now(),
         );
@@ -3290,6 +3363,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
             record,
             incremental: _incremental,
             recalculateAllGrowth: globalUpdate,
+            completingTaskId: widget.task?.id,
           );
         } else {
           await AppDatabase.instance.updateRecord(
@@ -3403,11 +3477,66 @@ class _RecordFormPageState extends State<RecordFormPage> {
                 (type) => ChoiceChip(
                   label: Text(type.label),
                   selected: _type == type,
-                  onSelected: (_) => setState(() => _type = type),
+                  onSelected: widget.task == null
+                      ? (_) => setState(() => _type = type)
+                      : null,
                 ),
               )
               .toList(),
         ),
+        if (_type == CareRecordType.feeding) ...[
+          const SizedBox(height: 16),
+          Text('投喂结果（可选）', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _feedingFood,
+            maxLength: 80,
+            decoration: const InputDecoration(
+              labelText: '食物',
+              hintText: '例如：面包虫',
+            ),
+          ),
+          TextField(
+            controller: _feedingAmount,
+            maxLength: 80,
+            decoration: const InputDecoration(
+              labelText: '投喂量',
+              hintText: '例如：半只',
+            ),
+          ),
+          DropdownButtonFormField<FeedingResponse>(
+            initialValue: _feedingResponse,
+            decoration: const InputDecoration(labelText: '进食情况'),
+            items: [
+              for (final response in FeedingResponse.values)
+                DropdownMenuItem(value: response, child: Text(response.label)),
+            ],
+            onChanged: (value) => setState(() => _feedingResponse = value),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text('是否有剩余食物'),
+              for (final option in <(bool?, String)>[
+                (null, '未知'),
+                (false, '无'),
+                (true, '有'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: ChoiceChip(
+                    label: Text(option.$2),
+                    selected: _feedingLeftovers == option.$1,
+                    onSelected: (_) =>
+                        setState(() => _feedingLeftovers = option.$1),
+                  ),
+                ),
+            ],
+          ),
+        ],
         if (_type == CareRecordType.mortality) ...[
           const SizedBox(height: 16),
           TextField(
@@ -3686,6 +3815,16 @@ class _RecordCardState extends State<_RecordCard> {
         ? remaining!.eggs! + remaining.larvae! + remaining.cocoons!
         : null;
     final facts = <String>[
+      if (record.type == CareRecordType.feeding && record.feedingFood != null)
+        '食物 ${record.feedingFood}',
+      if (record.type == CareRecordType.feeding && record.feedingAmount != null)
+        '投喂 ${record.feedingAmount}',
+      if (record.type == CareRecordType.feeding &&
+          record.feedingResponse != null)
+        record.feedingResponse!.label,
+      if (record.type == CareRecordType.feeding &&
+          record.feedingLeftovers != null)
+        record.feedingLeftovers! ? '有剩余' : '无剩余',
       if (display.environment && record.temperature != null)
         '${record.temperature}°C',
       if (display.environment && record.humidity != null) '${record.humidity}%',
@@ -5614,9 +5753,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: const Text('选择恢复方式'),
                 scrollable: true,
                 content: const Text(
-                  '增量恢复：保留本机数据，只补入缺失的蚁群、记录和物品。'
-                  '相同 ID 的数据，以及同分组同名物品，保留本机内容。\n\n'
-                  '覆盖恢复：用备份替换本机现有蚁群、记录和物品。\n\n'
+                  '增量恢复：保留本机数据，只补入缺失的蚁群、记录、待办和物品。'
+                  '相同 ID 的数据、同一蚁群同类型待办，以及同分组同名物品，保留本机内容。\n\n'
+                  '覆盖恢复：用备份替换本机现有蚁群、记录和待办。'
+                  '旧备份没有待办时，本机待办也会被清空。\n\n'
                   '两种方式都会在恢复前保存回退副本，可撤销上一次恢复。',
                 ),
                 actions: [
@@ -5826,6 +5966,7 @@ class _ErrorState extends StatelessWidget {
 IconData _icon(CareRecordType type) => switch (type) {
   CareRecordType.feeding => Icons.restaurant_outlined,
   CareRecordType.watering => Icons.water_drop_outlined,
+  CareRecordType.cleaning => Icons.cleaning_services_outlined,
   CareRecordType.observation => Icons.visibility_outlined,
   CareRecordType.environment => Icons.thermostat_outlined,
   CareRecordType.relocation => Icons.home_work_outlined,

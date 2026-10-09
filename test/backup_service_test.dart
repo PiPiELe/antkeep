@@ -10,6 +10,7 @@ import 'package:antkeep/data/backup_service.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/data/rollback_store.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/domain/care_task.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/memorial.dart';
 import 'package:archive/archive.dart';
@@ -58,6 +59,7 @@ Map<String, dynamic> fixture() {
 Uint8List archiveBytes(
   Map<String, dynamic> data, {
   Map<String, List<int>>? media,
+  int version = 1,
 }) {
   media ??= {
     'image.jpg': [9, 9, 9],
@@ -65,7 +67,7 @@ Uint8List archiveBytes(
   final manifest = utf8.encode(
     jsonEncode({
       'format': 'antkeep',
-      'version': 1,
+      'version': version,
       'data': data,
       'media': media.keys.toList(),
     }),
@@ -117,6 +119,70 @@ void main() {
     });
     previousRollback = await service.createBackupBytes();
     await RollbackStore.instance.save(previousRollback);
+  });
+
+  test(
+    'ZIP restore keeps colony tasks and structured feeding results',
+    () async {
+      final today = DateTime(2026, 10, 9);
+      await database.saveCareTask(
+        CareTask(
+          id: 'care-feeding',
+          colonyId: 'c',
+          type: CareTaskType.feeding,
+          intervalDays: 4,
+          nextDueOn: today,
+        ),
+      );
+      await database.saveRecord(
+        CareRecord(
+          id: 'feeding-result',
+          colonyId: 'c',
+          type: CareRecordType.feeding,
+          occurredAt: today,
+          createdAt: today,
+          feedingFood: '杜比亚',
+          feedingAmount: '1只',
+          feedingResponse: FeedingResponse.normal,
+          feedingLeftovers: true,
+        ),
+      );
+      final expected = await database.snapshot();
+      final bytes = await service.createBackupBytes();
+      await database.replaceAll(fixture());
+      await service.restoreBytes(bytes, mode: BackupRestoreMode.overwrite);
+      expect(await database.snapshot(), expected);
+    },
+  );
+
+  test('incremental restore keeps the local plan for the same type', () async {
+    final date = DateTime(2026, 10, 9);
+    final local = CareTask(
+      id: 'local-plan',
+      colonyId: 'c',
+      type: CareTaskType.watering,
+      intervalDays: 2,
+      nextDueOn: date,
+    );
+    await database.saveCareTask(local);
+    final incoming = fixture();
+    incoming['care_tasks'] = [
+      CareTask(
+        id: 'other-plan',
+        colonyId: 'c',
+        type: CareTaskType.watering,
+        intervalDays: 5,
+        nextDueOn: date.add(const Duration(days: 5)),
+      ).toMap(),
+    ];
+    await service.restoreBytes(
+      archiveBytes(incoming),
+      mode: BackupRestoreMode.incremental,
+    );
+    final tasks = await database.listCareTasks(colonyId: 'c');
+    expect(tasks, hasLength(1));
+    expect(tasks.single.id, local.id);
+    expect(tasks.single.intervalDays, 2);
   });
 
   test('incremental growth restore preserves history and resumes exactly once', () async {
@@ -560,6 +626,56 @@ void main() {
     expect(await database.listFeederRecords(FeederType.cricket), isEmpty);
     // Older backups did not cover inventory, so existing items remain intact.
     expect((await database.listInventory()).single.id, 'i');
+  });
+
+  test('format 1 and 2 feeding history imports without new fields', () async {
+    for (final version in [1, 2]) {
+      await database.replaceAll(fixture());
+      final localTask = CareTask(
+        id: 'local-task',
+        colonyId: 'c',
+        type: CareTaskType.feeding,
+        intervalDays: 3,
+        nextDueOn: DateTime(2026, 10, 9),
+      );
+      await database.saveCareTask(localTask);
+      final oldData = fixture();
+      final oldRecord = Map<String, Object?>.from(oldData['care_records'][0]);
+      oldRecord['id'] = 'old-feeding';
+      oldRecord['record_type'] = 'feeding';
+      oldRecord['note'] = '旧版投喂：果蝇，已吃完';
+      oldRecord.removeWhere((key, _) => key.startsWith('feeding_'));
+      oldData['care_records'] = [oldRecord];
+      if (version == 2) oldData['memorials'] = <Map<String, Object?>>[];
+      await service.restoreBytes(
+        archiveBytes(oldData, version: version),
+        mode: BackupRestoreMode.incremental,
+      );
+      final records = await database.listRecords('c');
+      final imported = records.singleWhere(
+        (record) => record.id == 'old-feeding',
+      );
+      expect(imported.note, '旧版投喂：果蝇，已吃完');
+      expect(imported.feedingFood, isNull);
+      expect(imported.feedingAmount, isNull);
+      expect(imported.feedingResponse, isNull);
+      expect(imported.feedingLeftovers, isNull);
+      expect(await media.readImage(imported.photos.single), [9, 9, 9]);
+      expect(
+        (await database.listCareTasks(colonyId: 'c')).single.id,
+        localTask.id,
+      );
+
+      await service.restoreBytes(
+        archiveBytes(oldData, version: version),
+        mode: BackupRestoreMode.overwrite,
+      );
+      final restored = (await database.listRecords('c')).single;
+      expect(restored.id, 'old-feeding');
+      expect(restored.note, '旧版投喂：果蝇，已吃完');
+      expect(await media.readImage(restored.photos.single), [9, 9, 9]);
+      expect(await database.listCareTasks(colonyId: 'c'), isEmpty);
+    }
   });
 
   test(

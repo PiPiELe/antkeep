@@ -1,5 +1,5 @@
 {
-  "description": "Frozen CREATE statements from historical app_database.dart commits; intentionally independent of current migrations. Versions 11 and 12 have no standalone schema commit in main history.",
+  "description": "Frozen CREATE statements from historical app_database.dart commits; versions 11 and 12 are reconstructed from adjacent released schemas and their migrations. All fixtures stay independent of current migrations.",
   "statements": {
     "s1": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0), specialized_count INTEGER, show_specialized INTEGER NOT NULL DEFAULT 0, initial_egg_count INTEGER, initial_cocoon_count INTEGER, auto_growth_json TEXT, initial_larva_count INTEGER, development_path TEXT, nest_type TEXT, target_temperature_lower REAL, target_temperature REAL, target_humidity_lower REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
     "s2": "CREATE TABLE care_records ( id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, record_type TEXT NOT NULL, occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL, egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER, worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000), photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE )",
@@ -21,7 +21,12 @@
     "s18": "CREATE TABLE inventory_items ( id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL )",
     "s19": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, nest_type TEXT, target_temperature REAL, target_humidity REAL, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
     "s20": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, initial_worker_count INTEGER, nest_type TEXT, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
-    "s21": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, nest_type TEXT, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )"
+    "s21": "CREATE TABLE colonies ( id TEXT PRIMARY KEY, name TEXT NOT NULL, species TEXT, acquired_on TEXT, source TEXT, queen_count INTEGER, nest_type TEXT, cover_photo_path TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL )",
+    "s22": "CREATE TABLE memorials ( id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('queen', 'worker', 'colony')), name TEXT NOT NULL, colony_id TEXT, species TEXT, died_on TEXT, farewell TEXT, cause TEXT, observation TEXT, lesson TEXT, created_at TEXT NOT NULL, FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE SET NULL )",
+    "s23": "CREATE TABLE memorials ( id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('queen', 'worker', 'brood', 'colony')), name TEXT NOT NULL, colony_id TEXT, species TEXT, died_on TEXT, farewell TEXT, cause TEXT, observation TEXT, lesson TEXT, created_at TEXT NOT NULL, FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE SET NULL )",
+    "s24": "CREATE TABLE care_records ( id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, record_type TEXT NOT NULL, occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL, egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER, worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000), auto_growth_rule_json TEXT, photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE )",
+    "s25": "CREATE UNIQUE INDEX memorial_colony_end ON memorials(colony_id) WHERE kind = 'colony'",
+    "s26": "CREATE TABLE inventory_items ( id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER, purchased_at TEXT, expires_at TEXT, quantity INTEGER CHECK (quantity >= 0), purchase_price_cents INTEGER CHECK (purchase_price_cents >= 0) )"
   },
   "versions": {
     "1": {
@@ -129,6 +134,30 @@
         "s8"
       ]
     },
+    "11": {
+      "commit": "reconstructed-v11",
+      "statements": [
+        "s12",
+        "s9",
+        "s3",
+        "s4",
+        "s14",
+        "s7",
+        "s8"
+      ]
+    },
+    "12": {
+      "commit": "reconstructed-v12",
+      "statements": [
+        "s12",
+        "s9",
+        "s3",
+        "s4",
+        "s26",
+        "s7",
+        "s8"
+      ]
+    },
     "13": {
       "commit": "1d270ff25f4252225eb37788e5deff144387a0d5",
       "statements": [
@@ -187,6 +216,51 @@
         "s1",
         "s2",
         "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    },
+    "18": {
+      "commit": "4fe80a5",
+      "statements": [
+        "s1",
+        "s2",
+        "s3",
+        "s22",
+        "s25",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    },
+    "19": {
+      "commit": "7190a27",
+      "statements": [
+        "s1",
+        "s2",
+        "s3",
+        "s23",
+        "s25",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8"
+      ]
+    },
+    "20": {
+      "commit": "2dc04ef96699f6386cbac990ca0c9f559bb2be8d",
+      "statements": [
+        "s1",
+        "s24",
+        "s3",
+        "s23",
+        "s25",
         "s4",
         "s5",
         "s6",

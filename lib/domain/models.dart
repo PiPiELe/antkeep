@@ -191,6 +191,10 @@ class CareRecord {
     this.pupaCount,
     this.workerCount,
     this.workerMortalityCount,
+    this.feedingFood,
+    this.feedingAmount,
+    this.feedingResponse,
+    this.feedingLeftovers,
     this.growthRule,
     this.photos = const [],
   });
@@ -207,6 +211,10 @@ class CareRecord {
   final int? pupaCount;
   final int? workerCount;
   final int? workerMortalityCount;
+  final String? feedingFood;
+  final String? feedingAmount;
+  final FeedingResponse? feedingResponse;
+  final bool? feedingLeftovers;
 
   /// Rule used for an automatic estimate; null means a user-entered snapshot.
   final ColonyGrowth? growthRule;
@@ -257,6 +265,17 @@ class CareRecord {
     pupaCount: map['pupa_count'] as int?,
     workerCount: map['worker_count'] as int?,
     workerMortalityCount: map['worker_mortality_count'] as int?,
+    feedingFood: map['feeding_food'] as String?,
+    feedingAmount: map['feeding_amount'] as String?,
+    feedingResponse: map['feeding_response'] == null
+        ? null
+        : FeedingResponse.fromStorage(map['feeding_response'] as String),
+    feedingLeftovers: switch (map['feeding_leftovers']) {
+      null => null,
+      0 => false,
+      1 => true,
+      _ => throw const FormatException('无效的剩余食物状态'),
+    },
     growthRule: ColonyGrowth.decode(map['auto_growth_rule_json']),
     photos: _stringList(map['photos_json']),
     createdAt: DateTime.parse(map['created_at']! as String),
@@ -275,6 +294,12 @@ class CareRecord {
     'pupa_count': pupaCount,
     'worker_count': workerCount,
     'worker_mortality_count': workerMortalityCount,
+    'feeding_food': feedingFood,
+    'feeding_amount': feedingAmount,
+    'feeding_response': feedingResponse?.storageValue,
+    'feeding_leftovers': feedingLeftovers == null
+        ? null
+        : (feedingLeftovers! ? 1 : 0),
     'auto_growth_rule_json': growthRule?.encode(),
     'photos_json': jsonEncode(photos),
     'created_at': createdAt.toIso8601String(),
@@ -482,6 +507,7 @@ enum FeederRecordType {
 enum CareRecordType {
   feeding('feeding', '投喂'),
   watering('watering', '补水'),
+  cleaning('cleaning', '清洁'),
   observation('observation', '观察'),
   environment('environment', '环境'),
   relocation('relocation', '换巢'),
@@ -496,6 +522,23 @@ enum CareRecordType {
   static CareRecordType fromStorage(String value) => values.firstWhere(
     (type) => type.storageValue == value,
     orElse: () => CareRecordType.note,
+  );
+}
+
+enum FeedingResponse {
+  eager('eager', '进食积极'),
+  normal('normal', '正常进食'),
+  little('little', '少量进食'),
+  refused('refused', '未进食'),
+  unobserved('unobserved', '尚未观察');
+
+  const FeedingResponse(this.storageValue, this.label);
+  final String storageValue;
+  final String label;
+
+  static FeedingResponse fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () => throw FormatException('无效的进食情况：$value'),
   );
 }
 

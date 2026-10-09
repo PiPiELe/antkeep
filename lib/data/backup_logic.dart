@@ -93,12 +93,20 @@ mixin BackupLogic {
           if (table == 'inventory_items')
             (row['group_name'] ?? '', row['name']),
       };
+      final taskTypes = {
+        for (final row in existing)
+          if (table == 'care_tasks') (row['colony_id'], row['task_type']),
+      };
       final additions = <Map<String, Object?>>[];
       for (final entry in incoming[table] as List? ?? const []) {
         final row = Map<String, Object?>.from(entry as Map);
         if (ids.contains(row['id'])) continue;
         if (table == 'inventory_items' &&
             names.contains((row['group_name'] ?? '', row['name']))) {
+          continue;
+        }
+        if (table == 'care_tasks' &&
+            !taskTypes.add((row['colony_id'], row['task_type']))) {
           continue;
         }
         if (table == 'memorials' &&
@@ -153,6 +161,7 @@ mixin BackupLogic {
         data['care_records'] is! List ||
         (manifest['version'] == 2 && data['memorials'] is! List) ||
         (data['feeder_records'] != null && data['feeder_records'] is! List) ||
+        (data['care_tasks'] != null && data['care_tasks'] is! List) ||
         (data['inventory_items'] != null && data['inventory_items'] is! List) ||
         manifest['media'] is! List ||
         !(manifest['media'] as List).every((path) => path is String)) {

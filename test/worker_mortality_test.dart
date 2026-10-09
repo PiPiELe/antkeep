@@ -55,7 +55,11 @@ void main() {
       'care_records',
       record(null).toMap()
         ..remove('worker_mortality_count')
-        ..remove('auto_growth_rule_json'),
+        ..remove('auto_growth_rule_json')
+        ..remove('feeding_food')
+        ..remove('feeding_amount')
+        ..remove('feeding_response')
+        ..remove('feeding_leftovers'),
     );
     await legacy.close();
     await db.open();

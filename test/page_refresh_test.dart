@@ -46,6 +46,7 @@ void main() {
     'feeder_records': [],
     'colonies': [],
     'care_records': [],
+    'care_tasks': [],
     'inventory_items': [],
     'memorials': [],
   };
@@ -316,6 +317,12 @@ void main() {
 
       await tester.pumpWidget(
         const MaterialApp(home: ColonyDetailPage(colonyId: 'death-balance')),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.textContaining('工蚁死亡 1 · 剩余 蚁后 1 · 工蚁 9 · 卵幼茧子 9'),
+        250,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
       expect(

@@ -7,6 +7,7 @@ import 'package:antkeep/data/backup_service.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/domain/memorial.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -129,7 +130,9 @@ void main() {
                 CareRecord(
                   id: 'record-$id',
                   colonyId: id,
-                  type: CareRecordType.observation,
+                  type: id == 'active'
+                      ? CareRecordType.feeding
+                      : CareRecordType.observation,
                   occurredAt: date,
                   createdAt: date,
                   eggCount: 0,
@@ -139,7 +142,7 @@ void main() {
                   workerMortalityCount: 0,
                   temperature: 26.5,
                   humidity: 60,
-                  note: '历史日记',
+                  note: id == 'active' ? '历史投喂：果蝇，已吃完' : '历史日记',
                   photos: ['diary.jpg'],
                 ).toMap(),
             ],
@@ -182,6 +185,18 @@ void main() {
               {'setting_key': 'themeMode', 'setting_value': 'dark'},
               {'setting_key': 'custom-history', 'setting_value': '历史设置'},
             ],
+            'memorials': [
+              Memorial(
+                id: 'memorial-archived',
+                kind: MemorialKind.colony,
+                name: '历史蚁群纪念',
+                colonyId: 'archived',
+                species: '收获蚁',
+                diedOn: date,
+                farewell: '再见',
+                createdAt: date,
+              ).toMap(),
+            ],
           };
           for (final table in tables.keys) {
             final columns = (await db.rawQuery('PRAGMA table_info($table)'))
@@ -212,7 +227,7 @@ void main() {
           path,
           options: factory.options,
         );
-        expect(await upgraded.getVersion(), 20);
+        expect(await upgraded.getVersion(), 21);
         expect(await upgraded.rawQuery('PRAGMA foreign_key_check'), isEmpty);
         expect(
           (await upgraded.rawQuery('PRAGMA integrity_check'))
@@ -239,7 +254,20 @@ void main() {
             reason: 'v$version ${entry.key}',
           );
         }
-        expect(after['memorials'], isEmpty);
+        expect(after['memorials'], version < 18 ? isEmpty : hasLength(1));
+        expect(after['care_tasks'], isEmpty);
+        for (final record in after['care_records']!) {
+          expect(record['feeding_food'], isNull);
+          expect(record['feeding_amount'], isNull);
+          expect(record['feeding_response'], isNull);
+          expect(record['feeding_leftovers'], isNull);
+        }
+        final oldFeeding = CareRecord.fromMap(
+          after['care_records']!.singleWhere((row) => row['id'] == 'record-active'),
+        );
+        expect(oldFeeding.type, CareRecordType.feeding);
+        expect(oldFeeding.note, '历史投喂：果蝇，已吃完');
+        expect(oldFeeding.photos, ['diary.jpg']);
         if (version < 17) {
           expect(
             after['care_records']!.map((r) => r['worker_mortality_count']),
@@ -337,7 +365,7 @@ void main() {
         path,
         options: factory.options,
       );
-      expect(await retry.getVersion(), 20);
+      expect(await retry.getVersion(), 21);
       expect((await retry.query('care_records')).length, 2);
       await retry.close();
     },

@@ -109,7 +109,7 @@ void main() {
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
     );
     try {
-      expect(await database.getVersion(), 20);
+      expect(await database.getVersion(), 21);
       expect(await database.query('memorials'), hasLength(4));
       expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       await expectLater(
