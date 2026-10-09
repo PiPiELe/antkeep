@@ -6,6 +6,7 @@ import '../domain/memorial.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/models.dart';
+import '../domain/care_task.dart';
 import '../domain/colony_growth.dart';
 import '../domain/record_increment.dart';
 import '../domain/spending_analysis.dart';
@@ -37,7 +38,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 20,
+      version: 21,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -66,6 +67,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER,
       worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000),
       auto_growth_rule_json TEXT,
+      feeding_food TEXT, feeding_amount TEXT, feeding_response TEXT,
+      feeding_leftovers INTEGER CHECK (feeding_leftovers IN (0, 1)),
       photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL,
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
     )''');
@@ -73,6 +76,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       'CREATE INDEX records_by_colony_time ON care_records(colony_id, occurred_at DESC)',
     );
     await _createMemorialTable(database);
+    await _createCareTasksTable(database);
     await _createSettingsTable(database);
     await _createInventoryTable(database);
     await _createFeederRecordsTable(database);
@@ -83,6 +87,21 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 21) {
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN feeding_food TEXT',
+      );
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN feeding_amount TEXT',
+      );
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN feeding_response TEXT',
+      );
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN feeding_leftovers INTEGER CHECK (feeding_leftovers IN (0, 1))',
+      );
+      await _createCareTasksTable(database);
+    }
     if (oldVersion < 20) {
       await database.execute(
         'ALTER TABLE care_records ADD COLUMN auto_growth_rule_json TEXT',
@@ -553,6 +572,69 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     _memorialChanges.add(null);
   }
 
+  static Future<void> _createCareTasksTable(DatabaseExecutor database) async {
+    await database.execute('''CREATE TABLE care_tasks (
+      id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, task_type TEXT NOT NULL,
+      interval_days INTEGER NOT NULL CHECK (interval_days BETWEEN 1 AND 365),
+      next_due_on TEXT NOT NULL, last_completed_on TEXT,
+      UNIQUE (colony_id, task_type),
+      FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
+    )''');
+    await database.execute(
+      'CREATE INDEX care_tasks_by_due ON care_tasks(next_due_on)',
+    );
+  }
+
+  Future<List<CareTask>> listCareTasks({String? colonyId}) async =>
+      (await _db.query(
+        'care_tasks',
+        where: colonyId == null ? null : 'colony_id = ?',
+        whereArgs: colonyId == null ? null : [colonyId],
+        orderBy: 'next_due_on ASC, task_type ASC',
+      )).map(CareTask.fromMap).toList();
+
+  Future<void> saveCareTask(CareTask task) async {
+    // Validate the same bounds for direct callers and backup imports.
+    CareTask.fromMap(task.toMap());
+    final colony = await findColony(task.colonyId);
+    if (colony == null || colony.archived) throw StateError('蚁群已归档或不存在');
+    await _db.transaction((transaction) async {
+      final existing = await transaction.query(
+        'care_tasks',
+        where: 'id = ?',
+        whereArgs: [task.id],
+      );
+      if (existing.isEmpty) {
+        await transaction.insert('care_tasks', task.toMap());
+      } else {
+        final old = CareTask.fromMap(existing.single);
+        if (old.colonyId != task.colonyId || old.type != task.type) {
+          throw StateError('不能改变已有待办的蚁群或类型');
+        }
+        await transaction.update(
+          'care_tasks',
+          task.toMap(),
+          where: 'id = ?',
+          whereArgs: [task.id],
+        );
+      }
+    });
+  }
+
+  Future<void> deleteCareTask(String id) async =>
+      _db.delete('care_tasks', where: 'id = ?', whereArgs: [id]);
+
+  Future<void> postponeCareTask(CareTask task) async {
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    await _db.update(
+      'care_tasks',
+      {'next_due_on': tomorrow.toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [task.id],
+    );
+  }
+
   @override
   Future<List<CareRecord>> listRecords(String colonyId) async {
     await applyColonyGrowth(colonyId: colonyId);
@@ -579,6 +661,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     CareRecord record, {
     bool incremental = false,
     bool recalculateAllGrowth = false,
+    String? completingTaskId,
   }) => _db.transaction((transaction) async {
     await _applyGrowth(transaction, DateTime.now(), record.colonyId);
     final before = await _growthReplayRecords(transaction, record.colonyId);
@@ -605,6 +688,31 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       );
     }
     await transaction.insert('care_records', resolved.toMap());
+    if (completingTaskId != null) {
+      final tasks = await transaction.query(
+        'care_tasks',
+        where: 'id = ? AND colony_id = ?',
+        whereArgs: [completingTaskId, record.colonyId],
+      );
+      if (tasks.isEmpty) throw StateError('待办已不存在');
+      final task = CareTask.fromMap(tasks.single);
+      if (task.type.recordType != record.type) throw StateError('待办类型与日记不一致');
+      final today = DateTime.now();
+      final done = DateTime(today.year, today.month, today.day);
+      await transaction.update(
+        'care_tasks',
+        {
+          'last_completed_on': done.toIso8601String(),
+          'next_due_on': DateTime(
+            done.year,
+            done.month,
+            done.day + task.intervalDays,
+          ).toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [task.id],
+      );
+    }
     await _recalculateGrowthEstimates(
       transaction,
       record.colonyId,
@@ -717,7 +825,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       where: 'id = ?',
       whereArgs: [colonyId],
     );
-    final colony = colonyRows.isEmpty ? null : Colony.fromMap(colonyRows.single);
+    final colony = colonyRows.isEmpty
+        ? null
+        : Colony.fromMap(colonyRows.single);
     final growth = colony?.archived == false ? colony?.growth : null;
     if (growth == null) return false;
     final nextDue = growth.dueAt(growth.completedCycles + 1);
@@ -1141,6 +1251,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       'memorials': await txn.query('memorials'),
       'colonies': await txn.query('colonies'),
       'care_records': await txn.query('care_records'),
+      'care_tasks': await txn.query('care_tasks'),
       'feeder_records': await txn.query('feeder_records'),
       'inventory_items': await txn.query('inventory_items'),
     },
@@ -1171,6 +1282,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     final feederRecords = (snapshot['feeder_records'] as List? ?? const [])
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
+    final careTasks = (snapshot['care_tasks'] as List? ?? const [])
+        .map((row) => Map<String, Object?>.from(row as Map))
+        .toList();
     final inventoryItems = (snapshot['inventory_items'] as List?)
         ?.map((row) => Map<String, Object?>.from(row as Map))
         .toList();
@@ -1179,6 +1293,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       await transaction.delete('feeder_records');
       await transaction.delete('memorials');
       await transaction.delete('care_records');
+      await transaction.delete('care_tasks');
       await transaction.delete('colonies');
       for (final colony in colonies) {
         await transaction.insert('colonies', colony);
@@ -1191,6 +1306,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       }
       for (final record in records) {
         await transaction.insert('care_records', record);
+      }
+      for (final task in careTasks) {
+        await transaction.insert('care_tasks', task);
       }
       for (final record in feederRecords) {
         await transaction.insert('feeder_records', record);

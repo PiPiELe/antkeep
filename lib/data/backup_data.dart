@@ -1,4 +1,5 @@
 import '../domain/models.dart';
+import '../domain/care_task.dart';
 import '../domain/memorial.dart';
 
 /// Validate before touching either the live data or the previous rollback copy.
@@ -20,6 +21,11 @@ class BackupData {
       (row) => CareRecord.fromMap(row).toMap(),
       required: true,
     );
+    final tasks = _rows(
+      data,
+      'care_tasks',
+      (row) => CareTask.fromMap(row).toMap(),
+    );
     _rows(data, 'feeder_records', (row) => FeederRecord.fromMap(row).toMap());
     final items = _rows(
       data,
@@ -29,6 +35,13 @@ class BackupData {
     final colonyIds = colonies.map((row) => row['id']).toSet();
     if (records.any((row) => !colonyIds.contains(row['colony_id']))) {
       throw const FormatException('备份中有记录引用了不存在的蚁群。');
+    }
+    final taskTypes = <(Object?, Object?)>{};
+    for (final task in tasks) {
+      if (!colonyIds.contains(task['colony_id']) ||
+          !taskTypes.add((task['colony_id'], task['task_type']))) {
+        throw const FormatException('备份中有无效或重复的蚁群待办。');
+      }
     }
     final memorials = _rows(
       data,
@@ -99,6 +112,11 @@ class BackupData {
               (value < 0 || value > 1000000)) {
             throw const FormatException('工蚁死亡数量请输入 0～1000000 的整数。');
           }
+          if (const {'feeding_food', 'feeding_amount'}.contains(field.key) &&
+              value is String &&
+              value.length > 80) {
+            throw FormatException('字段 ${field.key} 过长。');
+          }
           if (const {
                 'archived',
                 'show_specialized',
@@ -106,6 +124,9 @@ class BackupData {
                 'record_type',
                 'feeder_type',
                 'expiry_type',
+                'task_type',
+                'feeding_response',
+                'feeding_leftovers',
               }.contains(field.key) &&
               value != model[field.key]) {
             throw FormatException('字段 ${field.key} 的取值无效。');
