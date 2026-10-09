@@ -275,6 +275,67 @@ void main() {
   }
 
   testWidgets(
+    'death diary shows population after each death, not later totals',
+    (tester) async {
+      final day = DateTime(2026, 10, 8);
+      final colony = Colony(
+        id: 'death-balance',
+        name: '死亡后数量',
+        createdAt: day,
+        updatedAt: day,
+        queenCount: 1,
+        initialWorkerCount: 10,
+        initialEggCount: 2,
+        initialLarvaCount: 3,
+        initialCocoonCount: 4,
+      );
+      tables['colonies']!.add(colony.toMap());
+      for (final (id, hour, deaths) in [('first', 8, 1), ('second', 9, 2)]) {
+        tables['care_records']!.add(
+          CareRecord(
+            id: id,
+            colonyId: colony.id,
+            type: CareRecordType.mortality,
+            occurredAt: day.add(Duration(hours: hour)),
+            createdAt: day.add(Duration(hours: hour)),
+            workerMortalityCount: deaths,
+          ).toMap(),
+        );
+      }
+      tables['care_records']!.add(
+        CareRecord(
+          id: 'later',
+          colonyId: colony.id,
+          type: CareRecordType.observation,
+          occurredAt: day.add(const Duration(days: 1)),
+          createdAt: day.add(const Duration(days: 1)),
+          workerCount: 20,
+          eggCount: 10,
+        ).toMap(),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(home: ColonyDetailPage(colonyId: 'death-balance')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('工蚁死亡 1 · 剩余 蚁后 1 · 工蚁 9 · 卵幼茧子 9'),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.textContaining('工蚁死亡 2 · 剩余 蚁后 1 · 工蚁 7 · 卵幼茧子 9'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('工蚁死亡 2 · 剩余 蚁后 1 · 工蚁 7 · 卵幼茧子 9'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'quantity-only diary keeps a summary and presets do not change population',
     (tester) async {
       final now = DateTime.now();

@@ -2487,6 +2487,20 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               final card = _RecordCard(
                 record: record,
                 colony: colony,
+                remainingPopulation:
+                    record.type == CareRecordType.mortality &&
+                        record.workerMortalityCount != null
+                    ? colony.currentPopulation(
+                        detail.records.where(
+                          (candidate) =>
+                              CareRecord.comparePopulationOrder(
+                                candidate,
+                                record,
+                              ) <=
+                              0,
+                        ),
+                      )
+                    : null,
                 display: _display,
                 onShare: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -3438,6 +3452,7 @@ class _RecordCard extends StatefulWidget {
   const _RecordCard({
     required this.record,
     this.colony,
+    this.remainingPopulation,
     this.onShare,
     this.display = const DiaryDisplay(),
   });
@@ -3445,6 +3460,7 @@ class _RecordCard extends StatefulWidget {
   final VoidCallback? onShare;
   final CareRecord record;
   final Colony? colony;
+  final GrowthPopulation? remainingPopulation;
   @override
   State<_RecordCard> createState() => _RecordCardState();
 }
@@ -3493,6 +3509,13 @@ class _RecordCardState extends State<_RecordCard> {
         record.humidity != null &&
         colony?.targetHumidityLower != null &&
         record.humidity! < colony!.targetHumidityLower!;
+    final remaining = widget.remainingPopulation;
+    final brood =
+        remaining?.eggs != null &&
+            remaining?.larvae != null &&
+            remaining?.cocoons != null
+        ? remaining!.eggs! + remaining.larvae! + remaining.cocoons!
+        : null;
     final facts = <String>[
       if (display.environment && record.temperature != null)
         '${record.temperature}°C',
@@ -3505,6 +3528,11 @@ class _RecordCardState extends State<_RecordCard> {
         '工蚁 ${record.workerCount}',
       if (record.workerMortalityCount != null)
         '工蚁死亡 ${record.workerMortalityCount}',
+      if (remaining != null) ...[
+        '剩余 蚁后 ${colony?.queenCount ?? '未知'}',
+        '工蚁 ${remaining.workers ?? '未知'}',
+        '卵幼茧子 ${brood ?? '未知'}',
+      ],
     ];
     return Card(
       child: Padding(
