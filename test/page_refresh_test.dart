@@ -431,12 +431,37 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(tester.widget<CheckboxListTile>(specific).value, isFalse);
-      await revealSetting(tester, find.text('特化'));
-      await tester.tap(find.text('特化'));
+      final specialized = find.widgetWithText(SwitchListTile, '特化');
+      await revealSetting(tester, specialized);
+      await tester.tap(specialized);
       await tester.pumpAndSettle();
-      expect(find.byType(ColonyFormPage), findsOneWidget);
-      await tester.pageBack();
+      expect(find.byType(ColonyFormPage), findsNothing);
+      final count = find.widgetWithText(TextField, '特化数量');
+      await revealSetting(tester, count);
+      await tester.enterText(count, '3');
+      await tester.tap(find.byTooltip('保存特化数量'));
       await tester.pumpAndSettle();
+      final path = find.byType(DropdownButton<GrowthPath>);
+      await revealSetting(tester, path);
+      await tester.tap(path);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(GrowthPath.eggToWorker.label).last);
+      await tester.pumpAndSettle();
+      await revealSetting(tester, specialized);
+      await tester.tap(specialized);
+      await tester.pumpAndSettle();
+      expect(
+        (await AppDatabase.instance.findColony(colony.id))!.specializedCount,
+        3,
+      );
+      await tester.tap(specialized);
+      await tester.pumpAndSettle();
+      final saved = (await AppDatabase.instance.findColony(colony.id))!;
+      expect(saved.showSpecialized, isTrue);
+      expect(saved.specializedCount, 3);
+      expect(saved.developmentPath, GrowthPath.eggToWorker);
+      expect(saved.name, colony.name);
+      expect(find.byType(DiarySettingsPage), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('仅记录日期'), findsOneWidget);
@@ -778,7 +803,7 @@ void main() {
         if (!analysis) await openStatisticsSettings(tester);
         final setup = find.byKey(const ValueKey('population-forecast-setup'));
         await revealSetting(tester, setup);
-        await tester.tap(find.text('增长预测'));
+        await tester.tap(find.text(analysis ? '增长预测' : '自动扩充与增长预测'));
         await tester.pumpAndSettle();
         expect(find.byType(ColonyGrowthPage), findsOneWidget);
         await tester.pageBack();
@@ -800,6 +825,7 @@ void main() {
         final toggle = find.byKey(const ValueKey('population-forecast-toggle'));
         await tester.ensureVisible(toggle);
         expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+        if (!analysis) await revealSetting(tester, find.text('7 天'));
         expect(find.text('7 天'), findsOneWidget);
         if (!analysis) {
           await tester.pageBack();

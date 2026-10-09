@@ -2048,7 +2048,25 @@ Future<Colony?> _openDiarySettings(
       builder: (_) => DiarySettingsPage(
         preferences: themeController,
         colony: current,
-        onEditColony: colony.archived ? null : () => edit(false),
+        onSetSpecialized: colony.archived
+            ? null
+            : (enabled, count) async {
+                current = await AppDatabase.instance.updateColonyDiaryRules(
+                  colony.id,
+                  showSpecialized: enabled,
+                  specializedCount: count,
+                );
+                return current;
+              },
+        onSetDevelopmentPath: colony.archived
+            ? null
+            : (path) async {
+                current = await AppDatabase.instance.updateColonyDiaryRules(
+                  colony.id,
+                  developmentPath: path,
+                );
+                return current;
+              },
         onConfigureGrowth: colony.archived ? null : () => edit(true),
         recordIncremental: recordIncremental,
         onRecordIncrementalChanged: onRecordIncrementalChanged,
