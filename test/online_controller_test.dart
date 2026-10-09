@@ -12,11 +12,16 @@ import 'package:http/testing.dart';
 
 class MemoryOnlineStore implements OnlineStore {
   String? content;
+  String? seenAnnouncement;
 
   @override
   Future<String?> readContent() async => content;
   @override
   Future<void> writeContent(String value) async => content = value;
+  @override
+  Future<String?> readSeenAnnouncement() async => seenAnnouncement;
+  @override
+  Future<void> writeSeenAnnouncement(String id) async => seenAnnouncement = id;
 }
 
 String snapshot({int version = 1, String name = '糖水'}) => jsonEncode({
@@ -70,6 +75,59 @@ http.Response response(String body, int status) => http.Response.bytes(
 );
 
 void main() {
+  test(
+    'published announcement appears once per edit and can be withdrawn',
+    () async {
+      final payload = jsonDecode(snapshot()) as Map<String, dynamic>;
+      payload['texts'] = {
+        'app.announcement': {
+          'title': '停机通知',
+          'body': '今晚维护。',
+          'updatedAt': '2026-10-09T01:00:00Z',
+        },
+      };
+      var raw = jsonEncode(payload);
+      final store = MemoryOnlineStore();
+      final first = controller(store, (_) async => response(raw, 200));
+      await first.setEnabled(true);
+      expect(first.pendingAnnouncement?.title, '停机通知');
+    await first.acknowledgeAnnouncement(first.pendingAnnouncement!.id);
+    expect(first.pendingAnnouncement, isNull);
+    first.dispose();
+
+    final cachedOnly = MemoryOnlineStore()..content = raw;
+    final unavailable = controller(cachedOnly, (_) async => response('{}', 503));
+    await unavailable.setEnabled(true);
+    expect(unavailable.pendingAnnouncement, isNull);
+    await unavailable.setEnabled(false);
+    expect(unavailable.pendingAnnouncement, isNull);
+    unavailable.dispose();
+
+    final reopened = controller(store, (_) async => response(raw, 200));
+      await reopened.setEnabled(true);
+      expect(reopened.pendingAnnouncement, isNull);
+      payload['version'] = 2;
+      raw = jsonEncode(payload);
+      await reopened.refreshContent();
+      expect(reopened.pendingAnnouncement, isNull);
+      (payload['texts'] as Map<String, dynamic>)['app.announcement'] = {
+        'title': '恢复通知',
+        'body': '维护已结束。',
+        'updatedAt': '2026-10-09T02:00:00Z',
+      };
+      payload['version'] = 3;
+      raw = jsonEncode(payload);
+      await reopened.refreshContent();
+      expect(reopened.pendingAnnouncement?.title, '恢复通知');
+      payload['texts'] = <String, dynamic>{};
+      payload['version'] = 4;
+      raw = jsonEncode(payload);
+      await reopened.refreshContent();
+      expect(reopened.pendingAnnouncement, isNull);
+      reopened.dispose();
+    },
+  );
+
   test(
     'care notices use published texts, cached content and offline fallback',
     () async {

@@ -217,6 +217,62 @@ class AntKeepApp extends StatefulWidget {
 class _AntKeepAppState extends State<AntKeepApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
   int? _shownRequiredPolicy;
+  bool _updateDialogOpen = false;
+  bool _announcementDialogOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    onlineController.addListener(_showAnnouncementIfNeeded);
+  }
+
+  @override
+  void dispose() {
+    onlineController.removeListener(_showAnnouncementIfNeeded);
+    super.dispose();
+  }
+
+  void _showAnnouncementIfNeeded() {
+    final announcement = onlineController.pendingAnnouncement;
+    if (!mounted ||
+        !themeController.onboardingCompleted ||
+        _updateDialogOpen ||
+        _announcementDialogOpen ||
+        announcement == null) {
+      return;
+    }
+    _announcementDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final dialogContext = _navigatorKey.currentContext;
+      if (!mounted ||
+          dialogContext == null ||
+          onlineController.pendingAnnouncement?.id != announcement.id) {
+        _announcementDialogOpen = false;
+        return;
+      }
+      await showDialog<void>(
+        context: dialogContext,
+        builder: (context) => AlertDialog(
+          scrollable: true,
+          title: Text(announcement.title),
+          content: Text(announcement.body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('知道了'),
+            ),
+          ],
+        ),
+      );
+      try {
+        await onlineController.acknowledgeAnnouncement(announcement.id);
+      } catch (_) {
+        // A storage failure allows the announcement to appear next launch.
+      }
+      _announcementDialogOpen = false;
+      _showAnnouncementIfNeeded();
+    });
+  }
 
   void _showUpdatePromptIfNeeded() {
     final policy = appUpdateController.policy;
@@ -235,10 +291,14 @@ class _AntKeepAppState extends State<AntKeepApp> {
     if (required) {
       _shownRequiredPolicy = policy.version;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _updateDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final dialogContext = _navigatorKey.currentContext;
-      if (!mounted || dialogContext == null) return;
-      showDialog<void>(
+      if (!mounted || dialogContext == null) {
+        _updateDialogOpen = false;
+        return;
+      }
+      await showDialog<void>(
         context: dialogContext,
         barrierDismissible: !required,
         builder: (context) => AlertDialog(
@@ -289,6 +349,8 @@ class _AntKeepAppState extends State<AntKeepApp> {
           ],
         ),
       );
+      _updateDialogOpen = false;
+      _showAnnouncementIfNeeded();
     });
   }
 
@@ -297,6 +359,7 @@ class _AntKeepAppState extends State<AntKeepApp> {
     animation: Listenable.merge([themeController, appUpdateController]),
     builder: (context, _) {
       _showUpdatePromptIfNeeded();
+      _showAnnouncementIfNeeded();
       return MaterialApp(
         navigatorKey: _navigatorKey,
         title: '蚁记',

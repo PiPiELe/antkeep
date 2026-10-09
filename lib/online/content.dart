@@ -21,6 +21,15 @@ class HelpStep {
   final String id, title, body;
 }
 
+class AppAnnouncement {
+  const AppAnnouncement({
+    required this.id,
+    required this.title,
+    required this.body,
+  });
+  final String id, title, body;
+}
+
 class PublicContent {
   const PublicContent({
     required this.version,
@@ -29,12 +38,14 @@ class PublicContent {
     required this.summary,
     required this.steps,
     this.beginnerCareNotices = bundledBeginnerCareNotices,
+    this.announcement,
   });
   final int version;
   final List<ItemTemplate> templates;
   final String title, summary;
   final List<HelpStep> steps;
   final List<BeginnerCareNotice> beginnerCareNotices;
+  final AppAnnouncement? announcement;
 
   static const bundled = PublicContent(
     version: 0,
@@ -120,11 +131,24 @@ class PublicContent {
         .toList(growable: false);
     final notices = <BeginnerCareNotice>[];
     final texts = data['texts'];
+    AppAnnouncement? announcement;
     if (texts != null) {
       if (texts is! Map<String, dynamic> || texts.length > 200) {
         throw const FormatException('无效公共文案');
       }
       for (final entry in texts.entries) {
+        if (entry.key == 'app.announcement') {
+          if (entry.value is! Map<String, dynamic>) {
+            throw const FormatException('无效启动公告');
+          }
+          final value = entry.value as Map<String, dynamic>;
+          announcement = AppAnnouncement(
+            id: _text(value['updatedAt'], 64),
+            title: _text(value['title'], 200),
+            body: _text(value['body'], 4000),
+          );
+          continue;
+        }
         if (!entry.key.startsWith('beginner-care.')) continue;
         if (!RegExp(r'^beginner-care\.[a-z0-9][a-z0-9._-]*$')
                 .hasMatch(entry.key) ||
@@ -151,6 +175,7 @@ class PublicContent {
       beginnerCareNotices: notices.isEmpty
           ? bundledBeginnerCareNotices
           : List.unmodifiable(notices),
+      announcement: announcement,
     );
   }
 

@@ -37,6 +37,7 @@ class OnlineController extends ChangeNotifier {
   bool get hasSession => _token != null;
   PublicContent _cached = PublicContent.bundled;
   PublicContent get content => enabled ? _cached : PublicContent.bundled;
+  AppAnnouncement? pendingAnnouncement;
   int _generation = 0;
 
   Future<void> setEnabled(bool value) async {
@@ -48,6 +49,7 @@ class OnlineController extends ChangeNotifier {
     refreshing = false;
     user = null;
     checkin = null;
+    pendingAnnouncement = null;
     error = null;
     notifyListeners();
     if (!value) {
@@ -95,6 +97,19 @@ class OnlineController extends ChangeNotifier {
       if (!_current(generation)) return;
       _cached = candidate;
       contentNotice = '已更新至资料版本 ${candidate.version}';
+      final announcement = candidate.announcement;
+      String? seenAnnouncement;
+      try {
+        seenAnnouncement = await store.readSeenAnnouncement();
+      } catch (_) {
+        // Do not repeat a notice when its local read state is unavailable.
+        seenAnnouncement = announcement?.id;
+      }
+      if (!_current(generation)) return;
+      pendingAnnouncement = announcement != null &&
+              seenAnnouncement != announcement.id
+          ? announcement
+          : null;
     } catch (_) {
       if (_current(generation)) {
         contentNotice = _cached.version == 0
@@ -107,6 +122,13 @@ class OnlineController extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  Future<void> acknowledgeAnnouncement(String id) async {
+    if (pendingAnnouncement?.id != id) return;
+    pendingAnnouncement = null;
+    notifyListeners();
+    await store.writeSeenAnnouncement(id);
   }
 
   Future<void> login(

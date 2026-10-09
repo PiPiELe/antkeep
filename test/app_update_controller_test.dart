@@ -15,6 +15,10 @@ class _MemoryOnlineStore implements OnlineStore {
   Future<String?> readContent() async => null;
   @override
   Future<void> writeContent(String content) async {}
+  @override
+  Future<String?> readSeenAnnouncement() async => null;
+  @override
+  Future<void> writeSeenAnnouncement(String id) async {}
 }
 
 String policy({String latest = '1.1.0', String? minimum, int version = 1}) =>
