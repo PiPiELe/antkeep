@@ -3,9 +3,9 @@
 Actions → **Deliver Android APK to server**，在 `main` 上手动运行。
 
 - `operation=check` 是默认值，只验证 SSH 账号、主机密钥与目标目录，不构建、不上传。
-- `operation=upload` 需要已有不可变 tag；主线要求 tag 属于 `release`，渠道要求属于 `release-xiaomi` / `release-vivo`。缺分支会失败，不回退到开发分支。
-- 构建前执行 analyze/test，锁文件必须不变；使用仓库签名 Secrets，校验包名、版本、非 debug 和 APK 签名，再上传并通过 HTTPS 下载核对 SHA-256。
-- 主线名 `AntKeep-1.0.0-3.apk`，渠道名 `AntKeep-1.0.0-3-xiaomi.apk` / `...-vivo.apk`。同名文件拒绝覆盖；已上传但公网验证失败时先核查现有文件，不盲目重新发布。
+- `operation=upload` 需要已有不可变 tag；主线要求 tag 属于 `main`，渠道要求属于 `release-xiaomi` / `release-vivo`。缺分支会失败，不回退到开发分支。
+- 构建前执行 analyze/test，锁文件必须不变；使用仓库签名 Secrets 和混淆构建，检查 APK 内容、包名、版本、非 debug 和签名，再上传并通过 HTTPS 下载核对 SHA-256。
+- 文件名按构建版本生成，例如 `AntKeep-1.0.8-1000802.apk`，渠道包追加 `-xiaomi` / `-vivo`。同名文件拒绝覆盖；已上传但公网验证失败时先核查现有文件，不盲目重新发布。
 - 此工作流只上传版本化文件；不修改下载首页、后台更新策略或 GitHub latest，也不提交商店。
 
 Repository Actions Secrets：`SERVER_SSH_KEY`（专用 `antkeep-apk-ci` 私钥）、`SERVER_KNOWN_HOSTS`（经管理员可信 SSH 会话确认的主机公钥）。Android 另需已有发布证书的 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`、`ANDROID_KEYSTORE_PASSWORD`。勿生成另一套 Android 签名。

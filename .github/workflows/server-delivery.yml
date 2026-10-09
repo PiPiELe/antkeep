@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$RELEASE_TAG"
-          branch=release
+          branch=main
           if [ "$CHANNEL" != main ]; then branch="release-$CHANNEL"; fi
           sha=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
           git rev-parse --verify "refs/remotes/origin/$branch"
@@ -118,12 +118,13 @@ jobs:
           git diff --exit-code -- pubspec.lock
           flutter analyze
           flutter test
-          flutter build apk --release --dart-define="ANTKEEP_API_BASE_URL=$API_BASE_URL" --dart-define="ANTKEEP_ACCOUNT_BASE_URL=$ACCOUNT_BASE_URL"
+          flutter build apk --release --obfuscate --split-debug-info="$RUNNER_TEMP/release-symbols" --dart-define="ANTKEEP_API_BASE_URL=$API_BASE_URL" --dart-define="ANTKEEP_ACCOUNT_BASE_URL=$ACCOUNT_BASE_URL"
       - name: Inspect and upload immutable APK
         if: inputs.operation == 'upload'
         run: |
           set -euo pipefail
           apk=build/app/outputs/flutter-apk/app-release.apk
+          python3 tool/check_release_apk.py "$apk"
           build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           "$build_tools/apksigner" verify --verbose --print-certs "$apk"
           "$build_tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/apk-badging.txt"
@@ -133,7 +134,11 @@ jobs:
           text = Path(os.environ['RUNNER_TEMP'] + '/apk-badging.txt').read_text()
           package = re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", text)
           version = re.search(r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$', Path('pubspec.yaml').read_text(), re.M)
-          if not package or not version or package[1] != 'com.pipiele.antkeep' or package[2] != version[2] or package[3] != version[1] or 'application-debuggable' in text:
+          version_name = None
+          if version:
+              revision = int(version[2]) % 100
+              version_name = version[1] if revision == 0 else f'{version[1]}.{revision}'
+          if not package or not version or package[1] != 'com.pipiele.antkeep' or package[2] != version[2] or package[3] != version_name or 'application-debuggable' in text:
               raise SystemExit('APK identity/version/debuggable validation failed')
           suffix = '' if os.environ['CHANNEL'] == 'main' else '-' + os.environ['CHANNEL']
           name = f'AntKeep-{version[1]}-{version[2]}{suffix}.apk'
