@@ -124,6 +124,275 @@ void main() {
   );
 
   test(
+    'backdated mortality recalculates settled estimates in time order',
+    () async {
+      final colony = await seed('backdated-estimates');
+      final thirdDay = start.add(const Duration(days: 2));
+      await db.applyColonyGrowth(now: thirdDay, colonyId: colony.id);
+      var estimates = (await db.listRecords(colony.id))
+          .where((record) => record.id.startsWith('growth:'))
+          .toList();
+      expect(estimates.map((record) => record.workerCount).toList(), [22, 21]);
+
+      final death = CareRecord(
+        id: 'backdated-death',
+        colonyId: colony.id,
+        type: CareRecordType.mortality,
+        occurredAt: start.add(const Duration(hours: 1)),
+        createdAt: thirdDay.add(const Duration(hours: 1)),
+        workerMortalityCount: 5,
+      );
+      await db.saveRecord(death);
+      estimates = (await db.listRecords(colony.id))
+          .where((record) => record.id.startsWith('growth:'))
+          .toList();
+      expect(estimates.map((record) => record.workerCount).toList(), [17, 16]);
+      expect(colony.currentWorkerCount(await db.listRecords(colony.id)), 17);
+
+      await db.updateRecord(
+        CareRecord.fromMap({...death.toMap(), 'worker_mortality_count': 8}),
+      );
+      estimates = (await db.listRecords(colony.id))
+          .where((record) => record.id.startsWith('growth:'))
+          .toList();
+      expect(estimates.map((record) => record.workerCount).toList(), [14, 13]);
+
+      await db.deleteRecord(death);
+      estimates = (await db.listRecords(colony.id))
+          .where((record) => record.id.startsWith('growth:'))
+          .toList();
+      expect(estimates.map((record) => record.workerCount).toList(), [22, 21]);
+    },
+  );
+
+  test(
+    'manual worker total remains a correction point for later estimates',
+    () async {
+      final colony = await seed('manual-correction');
+      final secondDay = start.add(const Duration(days: 1));
+      final thirdDay = start.add(const Duration(days: 2));
+      await db.applyColonyGrowth(now: thirdDay, colonyId: colony.id);
+      await db.saveRecord(
+        CareRecord(
+          id: 'manual-total',
+          colonyId: colony.id,
+          type: CareRecordType.observation,
+          occurredAt: secondDay.add(const Duration(hours: 1)),
+          createdAt: thirdDay.add(const Duration(hours: 1)),
+          workerCount: 100,
+        ),
+      );
+      await db.saveRecord(
+        CareRecord(
+          id: 'death-before-manual',
+          colonyId: colony.id,
+          type: CareRecordType.mortality,
+          occurredAt: start.add(const Duration(hours: 1)),
+          createdAt: thirdDay.add(const Duration(hours: 2)),
+          workerMortalityCount: 5,
+        ),
+      );
+      final estimates = (await db.listRecords(colony.id))
+          .where((record) => record.id.startsWith('growth:'))
+          .toList();
+      expect(estimates.map((record) => record.workerCount).toList(), [101, 16]);
+      expect(colony.currentWorkerCount(await db.listRecords(colony.id)), 101);
+    },
+  );
+
+  test('backdated brood correction replays transfer limits', () async {
+    final colony = await seed('brood-shortage');
+    final thirdDay = start.add(const Duration(days: 2));
+    await db.applyColonyGrowth(now: thirdDay, colonyId: colony.id);
+    await db.saveRecord(
+      CareRecord(
+        id: 'brood-correction',
+        colonyId: colony.id,
+        type: CareRecordType.observation,
+        occurredAt: start.add(const Duration(hours: 1)),
+        createdAt: thirdDay.add(const Duration(hours: 1)),
+        larvaCount: 0,
+      ),
+    );
+    final estimates = (await db.listRecords(colony.id))
+        .where((record) => record.id.startsWith('growth:'))
+        .toList();
+    expect(estimates.map((record) => record.workerCount).toList(), [20, 20]);
+    expect(estimates.map((record) => record.larvaCount).toList(), [0, 0]);
+  });
+
+  test('an observation at cycle due time precedes that estimate', () async {
+    final colony = await seed('same-time-death');
+    final secondDay = start.add(const Duration(days: 1));
+    await db.applyColonyGrowth(now: secondDay, colonyId: colony.id);
+    await db.saveRecord(
+      CareRecord(
+        id: 'same-time-death-entry',
+        colonyId: colony.id,
+        type: CareRecordType.mortality,
+        occurredAt: secondDay,
+        createdAt: secondDay.add(const Duration(days: 1)),
+        workerMortalityCount: 5,
+      ),
+    );
+    final records = await db.listRecords(colony.id);
+    final estimate = records.singleWhere(
+      (record) => record.id.startsWith('growth:'),
+    );
+    expect(estimate.workerCount, 16);
+    expect(colony.currentWorkerCount(records), 16);
+  });
+
+  test('older than 30 days requires explicit global replay', () async {
+    final now = DateTime.now();
+    final oldStart = DateTime(now.year, now.month, now.day - 33, 12);
+    const id = 'old-global-replay';
+    await db.saveColony(
+      Colony(
+        id: id,
+        name: id,
+        createdAt: oldStart,
+        updatedAt: oldStart,
+        initialWorkerCount: 20,
+        initialLarvaCount: 100,
+      ),
+    );
+    await db.configureColonyGrowth(
+      id,
+      ColonyGrowth(
+        frequency: GrowthFrequency.daily,
+        path: GrowthPath.eggToWorker,
+        startedAt: oldStart,
+        workers: 1,
+      ),
+      now: oldStart,
+    );
+    await db.applyColonyGrowth(
+      now: oldStart.add(const Duration(days: 33)),
+      colonyId: id,
+    );
+    final death = CareRecord(
+      id: 'old-death',
+      colonyId: id,
+      type: CareRecordType.mortality,
+      occurredAt: oldStart.add(const Duration(hours: 1)),
+      createdAt: DateTime.now(),
+      workerMortalityCount: 5,
+    );
+    expect(
+      await db.needsGlobalGrowthRecalculation(id, [death.occurredAt]),
+      isTrue,
+    );
+    await expectLater(db.saveRecord(death), throwsStateError);
+    expect(
+      (await db.listRecords(id)).any((record) => record.id == death.id),
+      isFalse,
+    );
+    await db.saveRecord(death, recalculateAllGrowth: true);
+    final estimates = (await db.listRecords(id))
+        .where((record) => record.id.startsWith('growth:'))
+        .toList();
+    expect(estimates.last.workerCount, 16);
+    expect(estimates.first.workerCount, 48);
+  });
+
+  test('global replay preflight settles pending cycles', () async {
+    final now = DateTime.now();
+    final oldStart = DateTime(now.year, now.month, now.day - 32, 8);
+    const id = 'pending-boundary';
+    await db.saveColony(
+      Colony(
+        id: id,
+        name: id,
+        createdAt: oldStart,
+        updatedAt: oldStart,
+        initialWorkerCount: 20,
+        initialLarvaCount: 100,
+      ),
+    );
+    await db.configureColonyGrowth(
+      id,
+      ColonyGrowth(
+        frequency: GrowthFrequency.daily,
+        path: GrowthPath.eggToWorker,
+        startedAt: oldStart,
+        workers: 1,
+      ),
+      now: oldStart,
+    );
+    expect(await db.needsGlobalGrowthRecalculation(id, [oldStart]), isTrue);
+    final pending = ((await db.snapshot())['care_records'] as List).where(
+      (row) => (row as Map)['colony_id'] == id,
+    );
+    expect(pending, isEmpty);
+    expect(
+      (await db.listRecords(id)).where((r) => r.id.startsWith('growth:')),
+      isNotEmpty,
+    );
+  });
+
+  test(
+    'editing an estimate makes an explicit boundary for later cycles',
+    () async {
+      final colony = await seed('edited-estimate');
+      final thirdDay = start.add(const Duration(days: 2));
+      await db.applyColonyGrowth(now: thirdDay, colonyId: colony.id);
+      final estimates = (await db.listRecords(colony.id))
+          .where((record) => record.isAutomaticGrowthEstimate)
+          .toList();
+      final firstDay = estimates.last;
+      await db.updateRecord(
+        CareRecord.fromMap({...firstDay.toMap(), 'worker_count': 50}),
+      );
+      final after = await db.listRecords(colony.id);
+      final correction = after.singleWhere(
+        (record) => record.id == firstDay.id,
+      );
+      expect(correction.workerCount, 50);
+      expect(correction.growthRule, isNull);
+      expect(correction.note, startsWith('手动校正'));
+      expect(after.first.workerCount, 51);
+      expect(colony.currentWorkerCount(after), 51);
+    },
+  );
+
+  test(
+    'unknown historical rule aborts replay without partial changes',
+    () async {
+      final colony = await seed('unknown-old-rule');
+      final secondDay = start.add(const Duration(days: 1));
+      await db.applyColonyGrowth(now: secondDay, colonyId: colony.id);
+      final snapshot = await db.snapshot();
+      final rows = (snapshot['care_records'] as List)
+          .map((row) => Map<String, Object?>.from(row as Map))
+          .toList();
+      final legacy = rows.singleWhere((row) => row['colony_id'] == colony.id);
+      legacy.remove('auto_growth_rule_json');
+      snapshot['care_records'] = rows;
+      final colonyRows = (snapshot['colonies'] as List)
+          .map((row) => Map<String, Object?>.from(row as Map))
+          .toList();
+      colonyRows.singleWhere(
+        (row) => row['id'] == colony.id,
+      )['auto_growth_json'] = null;
+      snapshot['colonies'] = colonyRows;
+      await db.replaceAll(snapshot);
+      final death = CareRecord(
+        id: 'unknown-rule-death',
+        colonyId: colony.id,
+        type: CareRecordType.mortality,
+        occurredAt: start.add(const Duration(hours: 1)),
+        createdAt: secondDay.add(const Duration(hours: 1)),
+        workerMortalityCount: 5,
+      );
+      await expectLater(db.saveRecord(death), throwsStateError);
+      final after = await db.listRecords(colony.id);
+      expect(after, hasLength(1));
+      expect(after.single.workerCount, 21);
+    },
+  );
+
+  test(
     'actual observations override counts before later automatic cycles',
     () async {
       await seed('observed');

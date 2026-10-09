@@ -53,6 +53,8 @@ void main() {
       path,
       version: 18,
       onCreate: (db, _) async {
+        // Version 20 adds a column to this pre-existing diary table.
+        await db.execute('CREATE TABLE care_records (id TEXT PRIMARY KEY)');
         await db.execute('''CREATE TABLE colonies (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, archived INTEGER NOT NULL,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -107,7 +109,7 @@ void main() {
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
     );
     try {
-      expect(await database.getVersion(), 19);
+      expect(await database.getVersion(), 20);
       expect(await database.query('memorials'), hasLength(4));
       expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       await expectLater(

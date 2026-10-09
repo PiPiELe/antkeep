@@ -2208,12 +2208,16 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   }
 
   Future<void> _deleteRecord(CareRecord record) async {
+    final globalUpdate = await AppDatabase.instance
+        .needsGlobalGrowthRecalculation(record.colonyId, [record.occurredAt]);
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除日记？'),
         content: Text(
-          '确定删除 ${_dateTime(record.occurredAt)} 的${record.type.label}记录吗？此操作无法撤销。',
+          '确定删除 ${_dateTime(record.occurredAt)} 的${record.type.label}记录吗？此操作无法撤销。'
+          '${globalUpdate ? '\n\n这条记录早于 30 天界碑，确认后将全局重算相关自动扩充日记，可能需要一些时间。' : ''}',
         ),
         actions: [
           TextButton(
@@ -2233,7 +2237,15 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
     );
     if (confirmed != true || !mounted) return;
     try {
-      await AppDatabase.instance.deleteRecord(record);
+      Future<void> action() => AppDatabase.instance.deleteRecord(
+        record,
+        recalculateAllGrowth: globalUpdate,
+      );
+      if (globalUpdate) {
+        await _runBusyTask(context, action, message: '正在全局更新日记与种群数量，请稍候…');
+      } else {
+        await action();
+      }
       if (mounted) setState(_reload);
     } catch (error) {
       if (mounted) _showError(context, error);
@@ -2401,6 +2413,9 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       }
                     },
               onOpenSettings: () => _settings(colony),
+              onAdjustBoundary: colony.archived
+                  ? null
+                  : (record) => _editRecord(colony, record),
               onExpandedChanged: (value) =>
                   _updateDisplay(_display.copyWith(populationExpanded: value)),
             ),
@@ -2773,6 +2788,7 @@ class _PopulationTimeline extends StatelessWidget {
     required this.showForecast,
     required this.onOpenSettings,
     required this.forecastHorizon,
+    this.onAdjustBoundary,
     this.onConfigureGrowth,
   });
   final Colony colony;
@@ -2783,11 +2799,24 @@ class _PopulationTimeline extends StatelessWidget {
   final bool showForecast;
   final ForecastHorizon forecastHorizon;
   final VoidCallback? onConfigureGrowth;
+  final ValueChanged<CareRecord>? onAdjustBoundary;
   final ValueChanged<bool> onExpandedChanged;
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final boundaryCandidates =
+        records
+            .where(
+              (record) =>
+                  record.id.startsWith('growth:') &&
+                  record.occurredAt.isBefore(
+                    AppDatabase.growthReplayBoundary(now),
+                  ),
+            )
+            .toList()
+          ..sort(CareRecord.comparePopulationOrder);
+    final boundary = boundaryCandidates.lastOrNull;
     final points = colonyPopulationTotal(
       colony,
       showForecast && colony.growth != null
@@ -2847,6 +2876,24 @@ class _PopulationTimeline extends StatelessWidget {
             if (expanded) ...[
               const SizedBox(height: 4),
               Text(description, style: Theme.of(context).textTheme.bodySmall),
+              if (boundary != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '30 天界碑 ${_date(boundary.occurredAt)} · 工蚁 ${boundary.workerCount?.toString() ?? '未知'}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    if (onAdjustBoundary != null)
+                      TextButton(
+                        onPressed: () => onAdjustBoundary!(boundary),
+                        child: const Text('调整界碑'),
+                      ),
+                  ],
+                ),
+              ],
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -3121,38 +3168,79 @@ class _RecordFormPageState extends State<RecordFormPage> {
     }
     setState(() => _saving = true);
     try {
-      final photos = <String>[...?widget.record?.photos];
-      for (final photo in _photos) {
-        photos.add(await LocalMediaStore.instance.copyImage(photo));
-      }
-      final record = CareRecord(
-        id: widget.record?.id ?? const Uuid().v4(),
-        colonyId: _colony.id,
-        type: _type,
-        occurredAt: _occurredAt,
-        note: _textOrNull(_note.text),
-        temperature: double.tryParse(_temperature.text),
-        humidity: double.tryParse(_humidity.text),
-        eggCount: int.tryParse(_eggs.text),
-        larvaCount: int.tryParse(_larvae.text),
-        pupaCount:
-            _incremental && _colony.developmentPath == GrowthPath.eggToWorker
-            ? null
-            : int.tryParse(_pupae.text),
-        workerCount: int.tryParse(_workers.text),
-        workerMortalityCount: _type == CareRecordType.mortality
-            ? int.tryParse(_workerMortality.text.trim())
-            : null,
-        photos: photos,
-        createdAt: widget.record?.createdAt ?? DateTime.now(),
-      );
-      if (widget.record == null) {
-        await AppDatabase.instance.saveRecord(
-          record,
-          incremental: _incremental,
+      final globalUpdate = await AppDatabase.instance
+          .needsGlobalGrowthRecalculation(_colony.id, [
+            _occurredAt,
+            if (widget.record case final existing?) existing.occurredAt,
+          ]);
+      if (!mounted) return;
+      if (globalUpdate) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('需要全局更新'),
+            content: const Text(
+              '这条日记的时间早于 30 天界碑。保存后将从更早的记录重新计算自动扩充数量，并更新界碑及后续日记；人工填写的总数仍作为校正点。处理可能需要一些时间。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('确认并更新'),
+              ),
+            ],
+          ),
         );
+        if (confirmed != true || !mounted) return;
+      }
+      Future<void> saveRecord() async {
+        final photos = <String>[...?widget.record?.photos];
+        for (final photo in _photos) {
+          photos.add(await LocalMediaStore.instance.copyImage(photo));
+        }
+        final record = CareRecord(
+          id: widget.record?.id ?? const Uuid().v4(),
+          colonyId: _colony.id,
+          type: _type,
+          occurredAt: _occurredAt,
+          note: _textOrNull(_note.text),
+          temperature: double.tryParse(_temperature.text),
+          humidity: double.tryParse(_humidity.text),
+          eggCount: int.tryParse(_eggs.text),
+          larvaCount: int.tryParse(_larvae.text),
+          pupaCount:
+              _incremental && _colony.developmentPath == GrowthPath.eggToWorker
+              ? null
+              : int.tryParse(_pupae.text),
+          workerCount: int.tryParse(_workers.text),
+          workerMortalityCount: _type == CareRecordType.mortality
+              ? int.tryParse(_workerMortality.text.trim())
+              : null,
+          photos: photos,
+          createdAt: widget.record?.createdAt ?? DateTime.now(),
+        );
+        if (widget.record == null) {
+          await AppDatabase.instance.saveRecord(
+            record,
+            incremental: _incremental,
+            recalculateAllGrowth: globalUpdate,
+          );
+        } else {
+          await AppDatabase.instance.updateRecord(
+            record,
+            recalculateAllGrowth: globalUpdate,
+          );
+        }
+      }
+
+      if (!mounted) return;
+      if (globalUpdate) {
+        await _runBusyTask(context, saveRecord, message: '正在全局更新日记与种群数量，请稍候…');
       } else {
-        await AppDatabase.instance.updateRecord(record);
+        await saveRecord();
       }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -5705,22 +5793,23 @@ String _dateTime(DateTime value) => value.hour == 0 && value.minute == 0
     : '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 String _timeOfDay(int minuteOfDay) =>
     '${(minuteOfDay ~/ 60).toString().padLeft(2, '0')}:${(minuteOfDay % 60).toString().padLeft(2, '0')}';
-Future<T> _runBackupTask<T>(
+Future<T> _runBusyTask<T>(
   BuildContext context,
-  Future<T> Function() action,
-) async {
+  Future<T> Function() action, {
+  required String message,
+}) async {
   final navigator = Navigator.of(context, rootNavigator: true);
   final route = DialogRoute<void>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const PopScope(
+    builder: (_) => PopScope(
       canPop: false,
       child: AlertDialog(
         content: Row(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Expanded(child: Text('正在处理备份，请稍候…')),
+            const CircularProgressIndicator(),
+            const SizedBox(width: 20),
+            Expanded(child: Text(message)),
           ],
         ),
       ),
@@ -5733,6 +5822,11 @@ Future<T> _runBackupTask<T>(
     if (route.isActive) navigator.removeRoute(route);
   }
 }
+
+Future<T> _runBackupTask<T>(
+  BuildContext context,
+  Future<T> Function() action,
+) => _runBusyTask(context, action, message: '正在处理备份，请稍候…');
 
 void _showError(BuildContext context, Object error) =>
     ScaffoldMessenger.of(context)

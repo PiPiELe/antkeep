@@ -191,6 +191,7 @@ class CareRecord {
     this.pupaCount,
     this.workerCount,
     this.workerMortalityCount,
+    this.growthRule,
     this.photos = const [],
   });
 
@@ -206,6 +207,9 @@ class CareRecord {
   final int? pupaCount;
   final int? workerCount;
   final int? workerMortalityCount;
+
+  /// Rule used for an automatic estimate; null means a user-entered snapshot.
+  final ColonyGrowth? growthRule;
   final List<String> photos;
   final DateTime createdAt;
 
@@ -213,9 +217,19 @@ class CareRecord {
   static int comparePopulationOrder(CareRecord a, CareRecord b) {
     final time = a.occurredAt.compareTo(b.occurredAt);
     if (time != 0) return time;
+    // A cycle settles after all observations made at its due time. This also
+    // applies when an observation is entered later with the same event time.
+    final aEstimate = a.isAutomaticGrowthEstimate;
+    final bEstimate = b.isAutomaticGrowthEstimate;
+    if (aEstimate != bEstimate) return aEstimate ? 1 : -1;
     final created = a.createdAt.compareTo(b.createdAt);
     return created != 0 ? created : a.id.compareTo(b.id);
   }
+
+  bool get isAutomaticGrowthEstimate =>
+      id.startsWith('growth:') &&
+      type == CareRecordType.observation &&
+      (note?.startsWith('自动扩充（估算）') ?? false);
 
   int get workerDeaths =>
       type == CareRecordType.mortality && (workerMortalityCount ?? 0) > 0
@@ -243,6 +257,7 @@ class CareRecord {
     pupaCount: map['pupa_count'] as int?,
     workerCount: map['worker_count'] as int?,
     workerMortalityCount: map['worker_mortality_count'] as int?,
+    growthRule: ColonyGrowth.decode(map['auto_growth_rule_json']),
     photos: _stringList(map['photos_json']),
     createdAt: DateTime.parse(map['created_at']! as String),
   );
@@ -260,6 +275,7 @@ class CareRecord {
     'pupa_count': pupaCount,
     'worker_count': workerCount,
     'worker_mortality_count': workerMortalityCount,
+    'auto_growth_rule_json': growthRule?.encode(),
     'photos_json': jsonEncode(photos),
     'created_at': createdAt.toIso8601String(),
   };

@@ -37,7 +37,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 19,
+      version: 20,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -65,6 +65,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL,
       egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER,
       worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000),
+      auto_growth_rule_json TEXT,
       photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL,
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
     )''');
@@ -82,6 +83,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 20) {
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN auto_growth_rule_json TEXT',
+      );
+    }
     if (oldVersion < 18) await _createMemorialTable(database);
     if (oldVersion == 18) {
       // Rebuild the CHECK constraint while retaining all existing memorials.
@@ -524,6 +530,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
             larvaCount: population.larvae,
             pupaCount: population.cocoons,
             workerCount: population.workers,
+            growthRule: growth,
           ).toMap(),
         );
       }
@@ -568,74 +575,309 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   @override
-  Future<void> saveRecord(CareRecord record, {bool incremental = false}) =>
-      _db.transaction((transaction) async {
-        await _applyGrowth(transaction, DateTime.now(), record.colonyId);
-        var resolved = record;
-        if (incremental) {
-          final rows = await transaction.query(
-            'colonies',
-            where: 'id = ?',
-            whereArgs: [record.colonyId],
-          );
-          if (rows.isEmpty) throw StateError('蚁群已不存在');
-          final history = await transaction.query(
-            'care_records',
-            where: 'colony_id = ?',
-            whereArgs: [record.colonyId],
-          );
-          resolved = resolveRecordIncrement(
-            Colony.fromMap(rows.single),
-            history.map(CareRecord.fromMap),
-            record,
-          );
-        }
-        await transaction.insert('care_records', resolved.toMap());
-        await transaction.update(
-          'colonies',
-          {'updated_at': DateTime.now().toIso8601String()},
-          where: 'id = ?',
-          whereArgs: [record.colonyId],
-        );
-      });
+  Future<void> saveRecord(
+    CareRecord record, {
+    bool incremental = false,
+    bool recalculateAllGrowth = false,
+  }) => _db.transaction((transaction) async {
+    await _applyGrowth(transaction, DateTime.now(), record.colonyId);
+    final before = await _growthReplayRecords(transaction, record.colonyId);
+    _requireGrowthConfirmation(before, [
+      record.occurredAt,
+    ], recalculateAllGrowth);
+    var resolved = record;
+    if (incremental) {
+      final rows = await transaction.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [record.colonyId],
+      );
+      if (rows.isEmpty) throw StateError('蚁群已不存在');
+      final history = await transaction.query(
+        'care_records',
+        where: 'colony_id = ?',
+        whereArgs: [record.colonyId],
+      );
+      resolved = resolveRecordIncrement(
+        Colony.fromMap(rows.single),
+        history.map(CareRecord.fromMap),
+        record,
+      );
+    }
+    await transaction.insert('care_records', resolved.toMap());
+    await _recalculateGrowthEstimates(
+      transaction,
+      record.colonyId,
+      before,
+      recalculateAll: recalculateAllGrowth,
+    );
+    await transaction.update(
+      'colonies',
+      {'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [record.colonyId],
+    );
+  });
 
   @override
-  Future<void> updateRecord(CareRecord record) =>
-      _db.transaction((transaction) async {
-        final values = record.toMap()
-          ..remove('id')
-          ..remove('colony_id')
-          ..remove('created_at');
-        final count = await transaction.update(
+  Future<void> updateRecord(
+    CareRecord record, {
+    bool recalculateAllGrowth = false,
+  }) => _db.transaction((transaction) async {
+    await _applyGrowth(transaction, DateTime.now(), record.colonyId);
+    final before = await _growthReplayRecords(transaction, record.colonyId);
+    final original = before.where((item) => item.id == record.id).firstOrNull;
+    _requireGrowthConfirmation(before, [
+      if (original != null) original.occurredAt,
+      record.occurredAt,
+    ], recalculateAllGrowth);
+    final values = record.toMap()
+      ..remove('id')
+      ..remove('colony_id')
+      ..remove('created_at');
+    if (original != null && _isGeneratedGrowth(original)) {
+      // Editing an estimate turns it into an explicit correction. Keep its ID
+      // and timestamp, but do not silently recalculate the user's new total.
+      values['auto_growth_rule_json'] = null;
+      if ((values['note'] as String?)?.startsWith('自动扩充（估算）') ?? false) {
+        values['note'] = '手动校正 · ${values['note']}';
+      }
+    }
+    final count = await transaction.update(
+      'care_records',
+      values,
+      where: 'id = ? AND colony_id = ?',
+      whereArgs: [record.id, record.colonyId],
+    );
+    if (count != 1) throw StateError('日记已不存在，请返回刷新');
+    await _recalculateGrowthEstimates(
+      transaction,
+      record.colonyId,
+      before,
+      recalculateAll: recalculateAllGrowth,
+      correctedId: record.id,
+    );
+    await transaction.update(
+      'colonies',
+      {'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [record.colonyId],
+    );
+  });
+
+  @override
+  Future<void> deleteRecord(
+    CareRecord record, {
+    bool recalculateAllGrowth = false,
+  }) => _db.transaction((transaction) async {
+    await _applyGrowth(transaction, DateTime.now(), record.colonyId);
+    final before = await _growthReplayRecords(transaction, record.colonyId);
+    _requireGrowthConfirmation(before, [
+      record.occurredAt,
+    ], recalculateAllGrowth);
+    await transaction.delete(
+      'care_records',
+      where: 'id = ? AND colony_id = ?',
+      whereArgs: [record.id, record.colonyId],
+    );
+    await _recalculateGrowthEstimates(
+      transaction,
+      record.colonyId,
+      before,
+      recalculateAll: recalculateAllGrowth,
+    );
+    await transaction.update(
+      'colonies',
+      {'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [record.colonyId],
+    );
+  });
+
+  /// Local calendar boundary for the routinely replayed growth estimates.
+  static DateTime growthReplayBoundary([DateTime? now]) {
+    final date = now ?? DateTime.now();
+    return DateTime(date.year, date.month, date.day - 30);
+  }
+
+  Future<bool> needsGlobalGrowthRecalculation(
+    String colonyId,
+    Iterable<DateTime> changedDates,
+  ) async {
+    final changed = changedDates.toList();
+    if (!changed.any((date) => date.isBefore(growthReplayBoundary()))) {
+      return false;
+    }
+    final records = await _growthReplayRecords(_db, colonyId);
+    if (_needsGlobalGrowthRecalculation(records, changed)) return true;
+    // Inspect unsettled cycles without writing. The expensive settlement and
+    // replay then run under the progress dialog after confirmation.
+    final colonyRows = await _db.query(
+      'colonies',
+      where: 'id = ?',
+      whereArgs: [colonyId],
+    );
+    final colony = colonyRows.isEmpty ? null : Colony.fromMap(colonyRows.single);
+    final growth = colony?.archived == false ? colony?.growth : null;
+    if (growth == null) return false;
+    final nextDue = growth.dueAt(growth.completedCycles + 1);
+    return !nextDue.isAfter(DateTime.now());
+  }
+
+  Future<List<CareRecord>> _growthReplayRecords(
+    DatabaseExecutor db,
+    String colonyId,
+  ) async => (await db.query(
+    'care_records',
+    where: 'colony_id = ?',
+    whereArgs: [colonyId],
+    orderBy: 'occurred_at ASC, created_at ASC, id ASC',
+  )).map(CareRecord.fromMap).toList();
+
+  bool _needsGlobalGrowthRecalculation(
+    List<CareRecord> records,
+    Iterable<DateTime> changedDates,
+  ) {
+    final changed = changedDates.toList();
+    if (changed.isEmpty ||
+        !changed.any((date) => date.isBefore(growthReplayBoundary()))) {
+      return false;
+    }
+    return records.any(
+      (record) =>
+          record.id.startsWith('growth:') &&
+          changed.any((date) => !record.occurredAt.isBefore(date)),
+    );
+  }
+
+  void _requireGrowthConfirmation(
+    List<CareRecord> records,
+    Iterable<DateTime> changedDates,
+    bool confirmed,
+  ) {
+    if (!confirmed && _needsGlobalGrowthRecalculation(records, changedDates)) {
+      throw StateError('这条日记早于 30 天界碑，请确认全局更新后重试。');
+    }
+  }
+
+  Future<void> _recalculateGrowthEstimates(
+    Transaction transaction,
+    String colonyId,
+    List<CareRecord> before, {
+    required bool recalculateAll,
+    String? correctedId,
+  }) async {
+    if (!before.any((record) => record.id.startsWith('growth:'))) return;
+    final colonyRows = await transaction.query(
+      'colonies',
+      where: 'id = ?',
+      whereArgs: [colonyId],
+    );
+    if (colonyRows.isEmpty) return;
+    final colony = Colony.fromMap(colonyRows.single);
+    final after = await _growthReplayRecords(transaction, colonyId);
+    before.sort(CareRecord.comparePopulationOrder);
+    after.sort(CareRecord.comparePopulationOrder);
+    final boundary = recalculateAll
+        ? null
+        : before
+              .where(
+                (record) =>
+                    record.id.startsWith('growth:') &&
+                    record.occurredAt.isBefore(growthReplayBoundary()),
+              )
+              .lastOrNull;
+    final initial = boundary == null
+        ? GrowthPopulation(
+            eggs: colony.initialEggCount,
+            larvae: colony.initialLarvaCount,
+            cocoons: colony.initialCocoonCount,
+            workers: colony.initialWorkerCount,
+          )
+        : GrowthPopulation(
+            eggs: boundary.eggCount,
+            larvae: boundary.larvaCount,
+            cocoons: boundary.pupaCount,
+            workers: boundary.workerCount,
+          );
+    bool afterBoundary(CareRecord record) =>
+        boundary == null ||
+        CareRecord.comparePopulationOrder(record, boundary) > 0;
+    final oldRecords = before.where(afterBoundary);
+    final newRecords = after.where(afterBoundary);
+    final oldBefore = <String, GrowthPopulation>{};
+    var oldPopulation = initial;
+    for (final record in oldRecords) {
+      oldBefore[record.id] = oldPopulation;
+      oldPopulation = _applyPopulationRecord(oldPopulation, record);
+    }
+    var population = initial;
+    for (final record in newRecords) {
+      if (record.id != correctedId && _isGeneratedGrowth(record)) {
+        final rule = _growthRuleFor(record, colony);
+        if (rule == null) {
+          final previous = oldBefore[record.id];
+          if (previous != null && !_samePopulation(population, previous)) {
+            throw StateError(
+              '旧自动扩充日记缺少当时的增长规则，无法可靠重算。请先手动校正 ${record.occurredAt.year}-${record.occurredAt.month}-${record.occurredAt.day} 的界碑数量，再重试。',
+            );
+          }
+          population = _applyPopulationRecord(population, record);
+          continue;
+        }
+        final recalculated = rule.advance(population);
+        final values = {
+          'egg_count': recalculated.eggs,
+          'larva_count': recalculated.larvae,
+          'pupa_count': recalculated.cocoons,
+          'worker_count': recalculated.workers,
+          'auto_growth_rule_json': rule.encode(),
+        };
+        await transaction.update(
           'care_records',
           values,
-          where: 'id = ? AND colony_id = ?',
-          whereArgs: [record.id, record.colonyId],
-        );
-        if (count != 1) throw StateError('日记已不存在，请返回刷新');
-        await transaction.update(
-          'colonies',
-          {'updated_at': DateTime.now().toIso8601String()},
           where: 'id = ?',
-          whereArgs: [record.colonyId],
+          whereArgs: [record.id],
         );
-      });
+        population = recalculated;
+      } else {
+        population = _applyPopulationRecord(population, record);
+      }
+    }
+  }
 
-  @override
-  Future<void> deleteRecord(CareRecord record) =>
-      _db.transaction((transaction) async {
-        await transaction.delete(
-          'care_records',
-          where: 'id = ? AND colony_id = ?',
-          whereArgs: [record.id, record.colonyId],
-        );
-        await transaction.update(
-          'colonies',
-          {'updated_at': DateTime.now().toIso8601String()},
-          where: 'id = ?',
-          whereArgs: [record.colonyId],
-        );
-      });
+  bool _isGeneratedGrowth(CareRecord record) =>
+      record.isAutomaticGrowthEstimate;
+
+  ColonyGrowth? _growthRuleFor(CareRecord record, Colony colony) {
+    if (record.growthRule case final stored?) return stored;
+    final current = colony.growth;
+    if (current == null ||
+        !record.id.startsWith(
+          'growth:${colony.id}:${current.startedAt.toIso8601String()}:',
+        ) ||
+        record.note !=
+            '自动扩充（估算） · ${current.frequency.label} · ${current.path.label}') {
+      return null;
+    }
+    return current;
+  }
+
+  bool _samePopulation(GrowthPopulation a, GrowthPopulation b) =>
+      a.eggs == b.eggs &&
+      a.larvae == b.larvae &&
+      a.cocoons == b.cocoons &&
+      a.workers == b.workers;
+
+  GrowthPopulation _applyPopulationRecord(
+    GrowthPopulation population,
+    CareRecord record,
+  ) => GrowthPopulation(
+    eggs: record.eggCount ?? population.eggs,
+    larvae: record.larvaCount ?? population.larvae,
+    cocoons: record.pupaCount ?? population.cocoons,
+    workers: record.workerCountAfter(population.workers),
+  );
 
   @override
   Future<Map<String, String>> readSettings() async => {

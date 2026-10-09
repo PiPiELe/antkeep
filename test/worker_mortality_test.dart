@@ -53,7 +53,9 @@ void main() {
     await legacy.insert('colonies', colony.toMap());
     await legacy.insert(
       'care_records',
-      record(null).toMap()..remove('worker_mortality_count'),
+      record(null).toMap()
+        ..remove('worker_mortality_count')
+        ..remove('auto_growth_rule_json'),
     );
     await legacy.close();
     await db.open();

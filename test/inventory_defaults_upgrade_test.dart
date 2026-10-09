@@ -48,6 +48,8 @@ void main() {
         path,
         version: 17,
         onCreate: (db, _) async {
+          // Version 20 adds a column to this pre-existing diary table.
+          await db.execute('CREATE TABLE care_records (id TEXT PRIMARY KEY)');
           await db.execute('''CREATE TABLE inventory_items (
           id TEXT PRIMARY KEY, name TEXT NOT NULL, group_name TEXT,
           purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
