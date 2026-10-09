@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 
 import 'app_preferences.dart';
 import 'diary_preferences.dart';
+import 'domain/colony_growth.dart';
 import 'domain/models.dart';
-import 'population_forecast_controls.dart';
+import 'domain/population_forecast.dart';
 
-/// All diary controls live here. Colony rules keep their existing editors.
+/// Display preferences and the current colony's diary rules.
 class DiarySettingsPage extends StatefulWidget {
   const DiarySettingsPage({
     super.key,
     required this.preferences,
     required this.colony,
-    this.onEditColony,
+    this.onSetSpecialized,
+    this.onSetDevelopmentPath,
     this.onConfigureGrowth,
     this.recordIncremental,
     this.onRecordIncrementalChanged,
@@ -21,7 +23,9 @@ class DiarySettingsPage extends StatefulWidget {
   });
   final AppPreferences preferences;
   final Colony colony;
-  final Future<Colony?> Function()? onEditColony, onConfigureGrowth;
+  final Future<Colony?> Function(bool enabled, int? count)? onSetSpecialized;
+  final Future<Colony?> Function(GrowthPath path)? onSetDevelopmentPath;
+  final Future<Colony?> Function()? onConfigureGrowth;
   final bool? recordIncremental;
   final ValueChanged<bool>? onRecordIncrementalChanged;
   final bool editingRecord, specificTime;
@@ -33,9 +37,18 @@ class DiarySettingsPage extends StatefulWidget {
 
 class _DiarySettingsPageState extends State<DiarySettingsPage> {
   late Colony _colony = widget.colony;
+  late final TextEditingController _specializedCount = TextEditingController(
+    text: widget.colony.specializedCount?.toString() ?? '0',
+  );
   late bool _specificTime = widget.specificTime;
   late bool? _recordIncremental = widget.recordIncremental;
   bool _saving = false;
+
+  @override
+  void dispose() {
+    _specializedCount.dispose();
+    super.dispose();
+  }
 
   Future<void> _save(DiaryPreferences value, {bool? incremental}) async {
     if (_saving) return;
@@ -65,6 +78,52 @@ class _DiarySettingsPageState extends State<DiarySettingsPage> {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('读取蚁群设置失败，请返回后重试')));
       }
+    }
+  }
+
+  Future<void> _updateColony(Future<Colony?> Function() action) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final colony = await action();
+      if (mounted && colony != null) {
+        setState(() => _colony = colony);
+        _specializedCount.text = colony.specializedCount?.toString() ?? '0';
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('蚁群设置保存失败，请重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _setSpecialized(bool enabled) async {
+    final count = int.tryParse(_specializedCount.text.trim());
+    if (enabled && (count == null || count < 0 || count > 1000000)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('特化数量须为 0～1000000 的整数')));
+      return;
+    }
+    await _updateColony(
+      () => widget.onSetSpecialized!(
+        enabled,
+        enabled ? count! : _colony.specializedCount,
+      ),
+    );
+  }
+
+  Future<void> _configureGrowth() async {
+    final hadGrowth = _colony.growth != null;
+    await _edit(widget.onConfigureGrowth!);
+    if (mounted && !hadGrowth && _colony.growth != null) {
+      await _save(
+        widget.preferences.diary.customize(
+          widget.preferences.diary.display.copyWith(forecast: true),
+        ),
+      );
     }
   }
 
@@ -189,23 +248,70 @@ class _DiarySettingsPageState extends State<DiarySettingsPage> {
                 title: Text('记录具体时间'),
                 subtitle: Text('新增日记默认仅日期，可在录入时的日记设置中开启'),
               ),
-            ListTile(
+            SwitchListTile(
               title: const Text('特化'),
-              subtitle: Text(
-                '${_colony.showSpecialized ? '已开启 · ${_colony.specializedCount ?? '未知'} 只' : '未开启'} · 仅当前蚁群',
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _saving || widget.onEditColony == null
+              subtitle: const Text('仅当前蚁群'),
+              value: _colony.showSpecialized,
+              onChanged:
+                  _saving || widget.onSetSpecialized == null || _colony.archived
                   ? null
-                  : () => _edit(widget.onEditColony!),
+                  : _setSpecialized,
             ),
-            ListTile(
-              title: const Text('发育模式'),
-              subtitle: Text('${_colony.developmentPath.label} · 仅当前蚁群'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _saving || widget.onEditColony == null
-                  ? null
-                  : () => _edit(widget.onEditColony!),
+            if (_colony.showSpecialized)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _specializedCount,
+                  keyboardType: TextInputType.number,
+                  enabled:
+                      !_saving &&
+                      !_colony.archived &&
+                      widget.onSetSpecialized != null,
+                  decoration: InputDecoration(
+                    labelText: '特化数量',
+                    helperText: '修改数量后点保存',
+                    suffixIcon: IconButton(
+                      tooltip: '保存特化数量',
+                      onPressed:
+                          _saving ||
+                              _colony.archived ||
+                              widget.onSetSpecialized == null
+                          ? null
+                          : () => _setSpecialized(true),
+                      icon: const Icon(Icons.check),
+                    ),
+                  ),
+                  onSubmitted: (_) => _setSpecialized(true),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: InputDecorator(
+                decoration: const InputDecoration(labelText: '发育模式 · 仅当前蚁群'),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<GrowthPath>(
+                    isExpanded: true,
+                    value: _colony.developmentPath,
+                    items: [
+                      for (final path in GrowthPath.values)
+                        DropdownMenuItem(value: path, child: Text(path.label)),
+                    ],
+                    onChanged:
+                        _saving ||
+                            widget.onSetDevelopmentPath == null ||
+                            _colony.archived
+                        ? null
+                        : (path) {
+                            if (path != null &&
+                                path != _colony.developmentPath) {
+                              _updateColony(
+                                () => widget.onSetDevelopmentPath!(path),
+                              );
+                            }
+                          },
+                  ),
+                ),
+              ),
             ),
             _heading('统计展示 · 本机所有蚁群'),
             _toggle(
@@ -224,60 +330,72 @@ class _DiarySettingsPageState extends State<DiarySettingsPage> {
               (v) => display.copyWith(includeBrood: v),
               subtitle: '数量图包含卵、幼虫和茧',
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: PopulationForecastControls(
-                enabled: display.forecast,
-                horizon: display.horizon,
-                unavailableReason: _colony.growth == null
-                    ? '当前蚁群未设置增长规则，预测暂不可用'
-                    : null,
-                onEnabledChanged: (value) {
-                  if (!_saving) {
-                    _save(
-                      settings.customize(display.copyWith(forecast: value)),
-                    );
-                  }
-                },
-                onHorizonChanged: (value) {
-                  if (!_saving) {
-                    _save(settings.customize(display.copyWith(horizon: value)));
-                  }
-                },
-                onConfigureGrowth: widget.onConfigureGrowth == null
-                    ? null
-                    : () async {
-                        await _edit(widget.onConfigureGrowth!);
-                        if (mounted && _colony.growth != null) {
-                          await _save(
-                            widget.preferences.diary.customize(
-                              widget.preferences.diary.display.copyWith(
-                                forecast: true,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-              ),
-            ),
-            _heading('自动记录 · 仅当前蚁群'),
+            _heading('增长 · 仅当前蚁群'),
             ListTile(
-              title: const Text('群落自动扩充'),
+              key: _colony.growth == null
+                  ? const ValueKey('population-forecast-setup')
+                  : null,
+              title: const Text('自动扩充与增长预测'),
               subtitle: Text(
                 _colony.archived
                     ? '已归档，无法修改'
                     : _colony.growth == null
-                    ? '未开启 · 设置周期与数量'
-                    : '已开启 · 修改周期与数量',
+                    ? '未开启 · 设置周期与数量后可查看预测'
+                    : '自动扩充已开启 · ${_colony.growth!.frequency.label} · 修改规则',
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _saving || widget.onConfigureGrowth == null
+              trailing: TextButton(
+                onPressed:
+                    _saving ||
+                        widget.onConfigureGrowth == null ||
+                        _colony.archived
+                    ? null
+                    : _configureGrowth,
+                child: Text(_colony.growth == null ? '设置规则' : '修改规则'),
+              ),
+              onTap:
+                  _saving ||
+                      widget.onConfigureGrowth == null ||
+                      _colony.archived
                   ? null
-                  : () => _edit(widget.onConfigureGrowth!),
+                  : _configureGrowth,
             ),
+            if (_colony.growth != null) ...[
+              SwitchListTile(
+                key: const ValueKey('population-forecast-toggle'),
+                title: const Text('数量图显示增长预测'),
+                subtitle: const Text('按自动扩充规则绘制虚线，不额外写入记录'),
+                value: display.forecast,
+                onChanged: _saving
+                    ? null
+                    : (value) => _save(
+                        settings.customize(display.copyWith(forecast: value)),
+                      ),
+              ),
+              if (display.forecast)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final horizon in ForecastHorizon.values)
+                        ChoiceChip(
+                          label: Text(horizon.label),
+                          selected: display.horizon == horizon,
+                          onSelected: _saving
+                              ? null
+                              : (_) => _save(
+                                  settings.customize(
+                                    display.copyWith(horizon: horizon),
+                                  ),
+                                ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text('自动扩充会生成估算记录；展示模式不会替你启停。'),
+              child: Text('自动扩充会生成估算记录；关闭图表预测不会停止自动扩充。'),
             ),
           ],
         ),

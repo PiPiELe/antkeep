@@ -385,6 +385,43 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         }
       });
 
+  Future<Colony> updateColonyDiaryRules(
+    String id, {
+    bool? showSpecialized,
+    int? specializedCount,
+    GrowthPath? developmentPath,
+  }) async {
+    if (specializedCount != null &&
+        (specializedCount < 0 || specializedCount > 1000000)) {
+      throw const FormatException('特化数量须为 0～1000000 的整数');
+    }
+    final at = DateTime.now();
+    await _db.transaction((txn) async {
+      await _applyGrowth(txn, at, id);
+      final rows = await txn.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (rows.isEmpty) throw StateError('蚁群已不存在');
+      if ((rows.single['archived'] as int? ?? 0) == 1) {
+        throw StateError('已归档蚁群不能修改养殖规则');
+      }
+      final changes = <String, Object?>{'updated_at': at.toIso8601String()};
+      if (showSpecialized != null) {
+        changes['show_specialized'] = showSpecialized ? 1 : 0;
+      }
+      if (specializedCount != null) {
+        changes['specialized_count'] = specializedCount;
+      }
+      if (developmentPath != null) {
+        changes['development_path'] = developmentPath.name;
+      }
+      await txn.update('colonies', changes, where: 'id = ?', whereArgs: [id]);
+    });
+    return (await findColony(id))!;
+  }
+
   Future<void> configureColonyGrowth(
     String id,
     ColonyGrowth? growth, {

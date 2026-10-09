@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/diary_preferences.dart';
 import 'package:antkeep/diary_settings_page.dart';
+import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/domain/population_forecast.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +16,11 @@ Future<void> reveal(
   Finder finder, {
   double delta = 250,
 }) async {
-  await tester.scrollUntilVisible(finder, delta);
+  await tester.scrollUntilVisible(
+    finder,
+    delta,
+    scrollable: find.byType(Scrollable).first,
+  );
   await tester.pumpAndSettle();
   await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
   await tester.pumpAndSettle();
@@ -148,7 +153,7 @@ void main() {
       expect(preferences.diary.incremental, isTrue);
       expect(colony.specializedCount, 3);
       expect(colony.growth, isNull);
-      await reveal(tester, find.text('群落自动扩充'));
+      await reveal(tester, find.text('自动扩充与增长预测'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     },
@@ -172,14 +177,17 @@ void main() {
       expect(tester.widget<SwitchListTile>(increment).value, isFalse);
       expect(tester.widget<SwitchListTile>(increment).onChanged, isNull);
       expect(preferences.diary.incremental, isTrue);
-      await reveal(tester, find.text('特化'));
+      final specialized = find.widgetWithText(SwitchListTile, '特化');
+      await reveal(tester, specialized);
+      expect(tester.widget<SwitchListTile>(specialized).onChanged, isNull);
+      final path = find.byType(DropdownButton<GrowthPath>);
+      await reveal(tester, path);
+      expect(tester.widget<DropdownButton<GrowthPath>>(path).onChanged, isNull);
+      await reveal(tester, find.text('自动扩充与增长预测'));
       expect(
-        tester.widget<ListTile>(find.widgetWithText(ListTile, '特化')).onTap,
-        isNull,
-      );
-      await reveal(tester, find.text('群落自动扩充'));
-      expect(
-        tester.widget<ListTile>(find.widgetWithText(ListTile, '群落自动扩充')).onTap,
+        tester
+            .widget<ListTile>(find.widgetWithText(ListTile, '自动扩充与增长预测'))
+            .onTap,
         isNull,
       );
     },
@@ -209,5 +217,37 @@ void main() {
     expect(preferences.diary.incremental, isTrue);
     expect(tester.widget<SwitchListTile>(increment).value, isTrue);
     expect(find.text('设置保存失败，请重试'), findsOneWidget);
+  });
+
+  testWidgets('failed colony rule writes keep the visible values', (
+    tester,
+  ) async {
+    final preferences = AppPreferences(MemorySettings());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiarySettingsPage(
+          preferences: preferences,
+          colony: colony,
+          onSetSpecialized: (_, _) => throw StateError('write failed'),
+          onSetDevelopmentPath: (_) => throw StateError('write failed'),
+        ),
+      ),
+    );
+    final specialized = find.widgetWithText(SwitchListTile, '特化');
+    await reveal(tester, specialized);
+    await tester.tap(specialized);
+    await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(specialized).value, isTrue);
+    final path = find.byType(DropdownButton<GrowthPath>);
+    await reveal(tester, path);
+    await tester.tap(path);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(GrowthPath.eggToWorker.label).last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DropdownButton<GrowthPath>>(path).value,
+      GrowthPath.eggToCocoonToWorker,
+    );
+    expect(find.text('蚁群设置保存失败，请重试'), findsOneWidget);
   });
 }
