@@ -41,7 +41,7 @@ class OnlineSettings extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),
             title: Text(controller.user?.username ?? '游客 · 未登录'),
-            subtitle: const Text('账号用于签到和主动推送所选物品，其他本机数据不上传。'),
+            subtitle: const Text('账号用于签到、所选物品推送和蚁友比赛；比赛报名后才会上传所选蚁群快照。'),
             trailing: controller.user == null
                 ? TextButton(
                     onPressed: controller.busy
@@ -319,7 +319,7 @@ class _LoginPageState extends State<LoginPage> {
             key: _form,
             child: Column(
               children: [
-                const Text('登录后可签到，也可主动推送所选物品；蚁群、记录和照片不会上传。'),
+                const Text('登录后可签到、推送所选物品并参加比赛。只有确认报名或日更时，才上传所选蚁群的数据和图片。'),
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _username,

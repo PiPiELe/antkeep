@@ -106,8 +106,8 @@ class OnlineController extends ChangeNotifier {
         seenAnnouncement = announcement?.id;
       }
       if (!_current(generation)) return;
-      pendingAnnouncement = announcement != null &&
-              seenAnnouncement != announcement.id
+      pendingAnnouncement =
+          announcement != null && seenAnnouncement != announcement.id
           ? announcement
           : null;
     } catch (_) {
@@ -228,24 +228,97 @@ class OnlineController extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> inventoryPushStatus() =>
-      _inventoryRequest('/api/app/inventory-pushes/status');
+      _authenticatedRequest('/api/app/inventory-pushes/status');
 
   Future<Map<String, dynamic>> pushInventory(List<InventoryItem> items) {
     if (items.isEmpty || items.length > 200) {
       throw const ApiFailure('请选择 1–200 条物品数据。');
     }
-    return _inventoryRequest(
+    return _authenticatedRequest(
       '/api/app/inventory-pushes',
       body: {'items': items.map((item) => item.toMap()).toList()},
     );
   }
 
-  Future<Map<String, dynamic>> _inventoryRequest(
+  Future<List<Map<String, dynamic>>> competitions() async {
+    return (await _competitionRequest('/api/app/competitions') as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> competition(String id) async =>
+      await _competitionRequest('/api/app/competitions/$id')
+          as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> competitionDisclaimer() async =>
+      await _competitionRequest('/api/app/competitions/disclaimer')
+          as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> proposeCompetition(
+    Map<String, dynamic> proposal,
+  ) async => await _competitionRequest(
+    '/api/app/competitions/proposals',
+    body: proposal,
+  ) as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> enterCompetition(
+    String id,
+    Map<String, dynamic> snapshot,
+  ) async => await _competitionRequest(
+    '/api/app/competitions/$id/entries',
+    body: snapshot,
+  ) as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> updateCompetition(
+    String entryId,
+    Map<String, dynamic> snapshot,
+  ) async => await _competitionRequest(
+    '/api/app/competition-entries/$entryId/updates',
+    body: snapshot,
+  ) as Map<String, dynamic>;
+
+  Future<Object> _competitionRequest(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final sessionUser = user;
+    final token = _token;
+    if (!enabled || sessionUser == null || token == null) {
+      throw const ApiFailure('请切换在线版并登录后使用。');
+    }
+    final generation = _generation;
+    try {
+      final raw = await api.request(
+        path,
+        method: body == null ? 'GET' : 'POST',
+        token: token,
+        body: body,
+      );
+      if (!_current(generation) || user?.id != sessionUser.id) {
+        throw const ApiFailure('在线状态已改变，请重新登录后查看比赛。');
+      }
+      return jsonDecode(raw) as Object;
+    } catch (error) {
+      if (_current(generation) && error is ApiFailure && error.status == 401) {
+        await _failure(error);
+        notifyListeners();
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _authenticatedRequest(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async =>
+      jsonDecode(await _authenticatedRaw(path, body: body))
+          as Map<String, dynamic>;
+
+  Future<String> _authenticatedRaw(
     String path, {
     Map<String, dynamic>? body,
   }) async {
     if (!enabled || user == null || _token == null) {
-      throw const ApiFailure('请切换在线版并登录后推送。');
+      throw const ApiFailure('请切换在线版并登录后使用。');
     }
     if (busy) throw const ApiFailure('正在处理请求，请稍后再试。');
     final generation = _generation;
@@ -262,7 +335,7 @@ class OnlineController extends ChangeNotifier {
       if (!_current(generation)) {
         throw const ApiFailure('在线状态已改变，请重新登录后查询推送结果。');
       }
-      return jsonDecode(raw) as Map<String, dynamic>;
+      return raw;
     } catch (e) {
       if (_current(generation)) await _failure(e);
       rethrow;

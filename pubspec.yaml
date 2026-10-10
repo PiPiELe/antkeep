@@ -82,6 +82,7 @@ flutter:
     - docs/data/antden-species-import.json
     - assets/branding/antkeep-app-icon.png
     - assets/community/
+    - assets/competition/ants/
     - assets/memorial/
     - assets/images/default-ant-cover.png
 
