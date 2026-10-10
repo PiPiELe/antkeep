@@ -22,6 +22,7 @@ class CareTasksSection extends StatefulWidget {
 class _CareTasksSectionState extends State<CareTasksSection> {
   late Future<List<CareTask>> _tasks = _load();
   bool _busy = false;
+  bool _expanded = true;
 
   Future<List<CareTask>> _load() =>
       AppDatabase.instance.listCareTasks(colonyId: widget.colony.id);
@@ -183,7 +184,10 @@ class _CareTasksSectionState extends State<CareTasksSection> {
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: _expanded ? 14 : 0,
+      ),
       child: FutureBuilder<List<CareTask>>(
         future: _tasks,
         builder: (context, snapshot) {
@@ -208,9 +212,20 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                       icon: const Icon(Icons.add),
                       label: const Text('添加'),
                     ),
+                  IconButton(
+                    tooltip: _expanded ? '折叠养护待办' : '展开养护待办',
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                    icon: Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                    ),
+                  ),
                 ],
               ),
-              if (snapshot.hasError)
+              if (!_expanded)
+                const SizedBox.shrink()
+              else if (snapshot.hasError)
                 Text('读取待办失败：${snapshot.error}')
               else if (snapshot.connectionState != ConnectionState.done)
                 const LinearProgressIndicator()
