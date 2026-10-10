@@ -11,19 +11,20 @@ const memorialPosterSize = Size(400, 900);
 const _gold = Color(0xffc9ad79);
 final _memorialArtwork = <MemorialKind, Future<ui.Image>>{};
 
+String memorialArtworkAsset(MemorialKind kind) => switch (kind) {
+  MemorialKind.queen => 'assets/memorial/ant-monarch.png',
+  MemorialKind.worker => 'assets/memorial/ant-warrior.png',
+  MemorialKind.brood => 'assets/memorial/ant-brood-v3.png',
+  MemorialKind.colony => 'assets/memorial/ant-monument-v2.png',
+};
+
 /// Bundled memorial artwork is shared by preview and PNG.
 Future<ui.Image> loadMemorialArtwork(MemorialKind kind) =>
     _memorialArtwork.putIfAbsent(kind, () => _decodeMemorialArtwork(kind));
 
 Future<ui.Image> _decodeMemorialArtwork(MemorialKind kind) async {
   try {
-    final asset = switch (kind) {
-      MemorialKind.queen => 'ant-monarch.png',
-      MemorialKind.worker => 'ant-warrior.png',
-      MemorialKind.brood => 'ant-brood-v3.png',
-      MemorialKind.colony => 'ant-monument-v2.png',
-    };
-    final data = await rootBundle.load('assets/memorial/$asset');
+    final data = await rootBundle.load(memorialArtworkAsset(kind));
     final codec = await ui.instantiateImageCodec(
       data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
       targetWidth: 1200,
