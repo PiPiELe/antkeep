@@ -266,12 +266,17 @@ void main() {
         case '/api/public/content':
           return response(snapshot(), 200);
         case '/api/app/auth/register':
-          expect((jsonDecode(r.body) as Map).keys.toSet(), {
-            'username',
-            'password',
+          expect(jsonDecode(r.body), {
+            'username': 'alice',
+            'password': 'password',
+            'inviteCode': 'Invite_123',
           });
           return response(jsonEncode(user('alice')), 201);
         case '/api/app/auth/login':
+          expect(jsonDecode(r.body), {
+            'username': 'alice',
+            'password': 'password',
+          });
           return response(
             jsonEncode({'token': 'session-a', 'user': user('alice')}),
             200,
@@ -288,7 +293,7 @@ void main() {
       throw StateError(r.url.path);
     });
     await c.setEnabled(true);
-    await c.login('alice', 'password', register: true);
+    await c.login('alice', 'password', register: true, inviteCode: ' Invite_123 ');
     expect(c.hasSession, isTrue);
     expect(c.user?.id, 'alice');
     await c.refreshCheckin(submit: true);

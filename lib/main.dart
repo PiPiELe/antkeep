@@ -19,7 +19,6 @@ import 'share_content_page.dart';
 import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
-import 'account_controller.dart';
 import 'lottery_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
@@ -208,7 +207,6 @@ Future<void> main() async {
 }
 
 final themeController = AppPreferences(AppDatabase.instance);
-final accountController = AccountController(preferences: themeController);
 
 class AntKeepApp extends StatefulWidget {
   const AntKeepApp({super.key});
