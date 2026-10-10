@@ -1920,6 +1920,60 @@ void main() {
     );
   }
 
+  testWidgets('colony card fits a long name and keeps all tags on one row', (
+    tester,
+  ) async {
+    final date = DateTime(2026, 9, 1);
+    const name = '从新后养起的黑金弓背蚁蚁群';
+    await AppDatabase.instance.saveColony(
+      Colony(
+        id: 'compact-card',
+        name: name,
+        nestType: '试管巢',
+        queenCount: 1,
+        initialWorkerCount: 0,
+        createdAt: date,
+        updatedAt: date,
+      ),
+    );
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.text(name)).style?.fontSize, lessThan(18));
+    final tagTops = [
+      '新后群',
+      '小群',
+      '试管巢',
+    ].map((label) => tester.getTopLeft(find.text(label).last).dy).toList();
+    expect(tagTops.toSet(), hasLength(1));
+    expect(tester.widget<Text>(find.text('1 蚁后')).style?.fontSize, 13);
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(320, 800);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(1.3)),
+          child: child!,
+        ),
+        home: const ColoniesPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scaledTagTops = [
+      '新后群',
+      '小群',
+      '试管巢',
+    ].map((label) => tester.getTopLeft(find.text(label).last).dy).toList();
+    expect(scaledTagTops.toSet(), hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('specialized counts are shown only after opting in and persist', (
     tester,
   ) async {

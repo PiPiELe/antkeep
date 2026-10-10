@@ -929,14 +929,34 @@ class _ColonyCard extends StatelessWidget {
                   ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                colony.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final baseStyle = theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  );
+                  var fontSize = 18.0;
+                  while (fontSize > 14) {
+                    final painter = TextPainter(
+                      text: TextSpan(
+                        text: colony.name,
+                        style: baseStyle?.copyWith(fontSize: fontSize),
+                      ),
+                      maxLines: 1,
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                    )..layout(maxWidth: constraints.maxWidth);
+                    final fits = !painter.didExceedMaxLines;
+                    painter.dispose();
+                    if (fits) break;
+                    fontSize -= 1;
+                  }
+                  return Text(
+                    colony.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: baseStyle?.copyWith(fontSize: fontSize),
+                  );
+                },
               ),
             ),
           ],
@@ -952,10 +972,6 @@ class _ColonyCard extends StatelessWidget {
               height: 1.4,
             ),
           ),
-        ],
-        if (colony.isNewQueenColony || workers != null) ...[
-          const SizedBox(height: 6),
-          _ColonyTags(colony: colony, workers: workers),
         ],
       ],
     );
@@ -1009,6 +1025,12 @@ class _ColonyCard extends StatelessWidget {
                   );
                 },
               ),
+              if (colony.isNewQueenColony ||
+                  workers != null ||
+                  colony.nestType?.isNotEmpty == true) ...[
+                const SizedBox(height: 6),
+                _ColonyTags(colony: colony, workers: workers),
+              ],
               const SizedBox(height: 10),
               if (dueTasks.isNotEmpty) ...[
                 Text(
@@ -1040,6 +1062,7 @@ class _ColonyCard extends StatelessWidget {
                             detail,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 13,
                             ),
                           ),
                       ],
@@ -1094,20 +1117,25 @@ class _ColonyTags extends StatelessWidget {
           ],
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall
                 ?.copyWith(color: color, fontWeight: FontWeight.w700),
           ),
         ],
       ),
     );
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
+    return Row(
       children: [
         if (colony.isNewQueenColony) badge('新后群', scheme.primary, crown: true),
+        if (colony.isNewQueenColony &&
+            (scale != null || colony.nestType?.isNotEmpty == true))
+          const SizedBox(width: 8),
         if (scale != null) badge(scale.label, color),
+        if (scale != null && colony.nestType?.isNotEmpty == true)
+          const SizedBox(width: 8),
         if (colony.nestType?.isNotEmpty == true)
-          badge(colony.nestType!, scheme.onSurfaceVariant),
+          Flexible(child: badge(colony.nestType!, scheme.onSurfaceVariant)),
       ],
     );
   }
