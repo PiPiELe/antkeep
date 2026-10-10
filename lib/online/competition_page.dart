@@ -27,50 +27,117 @@ class _CompetitionPageState extends State<CompetitionPage> {
   String? _selectedColonyId, _message;
   Uint8List? _photo;
   bool _loading = false, _submitting = false;
+  OnlineUser? _account;
+  int _revision = 0, _photoTargetRevision = 0;
 
   @override
   void initState() {
     super.initState();
+    _account = widget.controller.user;
+    widget.controller.addListener(_onAccountChanged);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _reload(openId: widget.initialId),
     );
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onAccountChanged);
+    super.dispose();
+  }
+
+  void _onAccountChanged() {
+    final account = widget.controller.user;
+    if (identical(account, _account) && widget.controller.enabled) return;
+    _account = account;
+    ++_revision;
+    ++_photoTargetRevision;
+    setState(() {
+      _competitions = [];
+      _colonies = [];
+      _detail = null;
+      _selectedColonyId = null;
+      _photo = null;
+      _message = null;
+      _loading = false;
+      _submitting = false;
+    });
+    if (account != null && widget.controller.enabled) {
+      _reload(openId: widget.initialId);
+    }
   }
 
   String _error(Object error) =>
       error is ApiFailure ? error.message : '读取比赛失败，请检查网络后重试。';
 
   Future<void> _reload({String? openId}) async {
-    if (_loading || !mounted || widget.controller.user == null) return;
+    if (!mounted || widget.controller.user == null) return;
+    final account = widget.controller.user;
+    final revision = ++_revision;
+    final selected = openId ?? _detail?['id'] as String?;
+    final changingCompetition = openId != null && openId != _detail?['id'];
+    if (changingCompetition) ++_photoTargetRevision;
     setState(() {
       _loading = true;
       _message = null;
+      if (changingCompetition) {
+        _detail = null;
+        _photo = null;
+        _submitting = false;
+      }
     });
+    bool current() =>
+        mounted &&
+        revision == _revision &&
+        identical(account, widget.controller.user);
+    var readingDetail = false;
     try {
       final contests = await widget.controller.competitions();
+      if (!current()) return;
       final colonies = (await AppDatabase.instance.listColonies())
           .where((c) => c.isNewQueenColony)
           .toList();
-      final selected = openId ?? _detail?['id'] as String?;
-      final detail = selected == null
-          ? null
-          : await widget.controller.competition(selected);
-      if (!mounted) return;
+      if (!current()) return;
       setState(() {
         _competitions = contests;
         _colonies = colonies;
-        _detail = detail;
         if (!_colonies.any((c) => c.id == _selectedColonyId)) {
-          _selectedColonyId = _colonies.isEmpty ? null : _colonies.first.id;
+          final nextColonyId = _colonies.isEmpty ? null : _colonies.first.id;
+          if (nextColonyId != _selectedColonyId) {
+            _selectedColonyId = nextColonyId;
+            _photo = null;
+            ++_photoTargetRevision;
+            _submitting = false;
+          }
         }
       });
+      readingDetail = selected != null;
+      final detail = selected == null
+          ? null
+          : await widget.controller.competition(selected);
+      if (!current()) return;
+      setState(() {
+        _detail = detail;
+      });
     } catch (error) {
-      if (mounted) setState(() => _message = _error(error));
+      if (current()) {
+        setState(() {
+          if (readingDetail) {
+            _detail = null;
+            _photo = null;
+            ++_photoTargetRevision;
+          }
+          _message = _error(error);
+        });
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (current()) setState(() => _loading = false);
     }
   }
 
   Future<void> _pickPhoto() async {
+    final account = widget.controller.user;
+    final targetRevision = _photoTargetRevision;
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -94,20 +161,32 @@ class _CompetitionPageState extends State<CompetitionPage> {
       if ((!jpeg && !png) || bytes.length > 160 * 1024) {
         throw const ApiFailure('请选择 JPEG/PNG 图片，压缩后需小于 160 KiB。');
       }
-      if (mounted) {
+      if (mounted &&
+          identical(account, widget.controller.user) &&
+          targetRevision == _photoTargetRevision) {
         setState(() {
           _photo = bytes;
           _message = null;
         });
       }
     } catch (error) {
-      if (mounted) setState(() => _message = _error(error));
+      if (mounted &&
+          identical(account, widget.controller.user) &&
+          targetRevision == _photoTargetRevision) {
+        setState(() => _message = _error(error));
+      }
     }
   }
 
   Future<void> _submit() async {
     final detail = _detail;
     if (detail == null || _submitting) return;
+    final account = widget.controller.user;
+    final targetRevision = _photoTargetRevision;
+    bool current() =>
+        mounted &&
+        identical(account, widget.controller.user) &&
+        targetRevision == _photoTargetRevision;
     final mine = detail['myEntry'] as Map<String, dynamic>?;
     final registering = mine == null;
     final id = registering ? _selectedColonyId : mine['colonyId'] as String?;
@@ -125,6 +204,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
     setState(() => _submitting = true);
     try {
       final records = await AppDatabase.instance.listRecords(colony.id);
+      if (!current()) return;
       final counts = colony.currentPopulation(records);
       if (counts.workers == null ||
           counts.eggs == null ||
@@ -137,7 +217,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
       bool? confirmed;
       if (registering) {
         disclaimer = await widget.controller.competitionDisclaimer();
-        if (!mounted) return;
+        if (!mounted || !current()) return;
         var agreed = false;
         confirmed = await showDialog<bool>(
           context: context,
@@ -195,7 +275,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
           ),
         );
       }
-      if (confirmed != true || !mounted) return;
+      if (confirmed != true || !current()) return;
       final snapshot = <String, dynamic>{
         'queenCount': colony.queenCount,
         'eggCount': counts.eggs,
@@ -223,21 +303,22 @@ class _CompetitionPageState extends State<CompetitionPage> {
           snapshot,
         );
       }
-      if (!mounted) return;
+      if (!current()) return;
       setState(() => _photo = null);
       await _reload(openId: detail['id'] as String);
-      if (mounted) {
+      if (current()) {
         setState(() => _message = registering ? '报名成功，今日数据已上传。' : '今日比赛数据已上传。');
       }
     } catch (error) {
+      if (!current()) return;
       // Read server state after an uncertain response; a timeout may follow a
       // successful write, and the unique daily key is authoritative.
       try {
         await _reload(openId: detail['id'] as String);
       } catch (_) {}
-      if (mounted) setState(() => _message = _error(error));
+      if (current()) setState(() => _message = _error(error));
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (current()) setState(() => _submitting = false);
     }
   }
 
@@ -294,7 +375,6 @@ class _CompetitionPageState extends State<CompetitionPage> {
                                 LoginPage(controller: widget.controller),
                           ),
                         );
-                        if (mounted) await _reload(openId: widget.initialId);
                       },
                       child: const Text('登录 / 注册'),
                     ),
@@ -368,7 +448,14 @@ class _CompetitionPageState extends State<CompetitionPage> {
         .cast<Map<String, dynamic>>();
     return [
       TextButton.icon(
-        onPressed: () => setState(() => _detail = null),
+        onPressed: () => setState(() {
+          _detail = null;
+          _photo = null;
+          ++_photoTargetRevision;
+          ++_revision;
+          _loading = false;
+          _submitting = false;
+        }),
         icon: const Icon(Icons.arrow_back),
         label: const Text('全部比赛'),
       ),
@@ -416,7 +503,14 @@ class _CompetitionPageState extends State<CompetitionPage> {
           items: _colonies
               .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
               .toList(),
-          onChanged: (value) => setState(() => _selectedColonyId = value),
+          onChanged: (value) => setState(() {
+            if (value != _selectedColonyId) {
+              _selectedColonyId = value;
+              _photo = null;
+              ++_photoTargetRevision;
+              _submitting = false;
+            }
+          }),
         ),
         if (_colonies.isEmpty) const Text('本机暂无初始工蚁数为 0 的在养新后群。'),
       ],
