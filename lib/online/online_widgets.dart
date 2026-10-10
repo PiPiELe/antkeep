@@ -284,13 +284,17 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _username = TextEditingController(),
-      _password = TextEditingController();
+      _password = TextEditingController(),
+      _inviteCode = TextEditingController();
   final _form = GlobalKey<FormState>();
   bool _register = false;
+  bool? _inviteCodeRequired;
+  int _policyGeneration = 0;
   @override
   void dispose() {
     _username.dispose();
     _password.dispose();
+    _inviteCode.dispose();
     super.dispose();
   }
 
@@ -300,10 +304,24 @@ class _LoginPageState extends State<LoginPage> {
       _username.text,
       _password.text,
       register: _register,
+      inviteCode: _register ? _inviteCode.text : null,
     );
     if (!mounted) return;
     _password.clear();
+    if (widget.controller.user != null) _inviteCode.clear();
     if (widget.controller.user != null) Navigator.of(context).pop();
+  }
+
+  Future<void> _loadRegistrationPolicy() async {
+    final generation = ++_policyGeneration;
+    try {
+      final required = await widget.controller.registrationInviteRequired();
+      if (mounted && _register && generation == _policyGeneration) {
+        setState(() => _inviteCodeRequired = required);
+      }
+    } catch (_) {
+      // The server remains authoritative when the policy endpoint is unavailable.
+    }
   }
 
   @override
@@ -349,6 +367,32 @@ class _LoginPageState extends State<LoginPage> {
                       ? null
                       : '密码需为 8–64 位',
                 ),
+                if (_register) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _inviteCode,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    maxLength: 64,
+                    decoration: InputDecoration(
+                      labelText: switch (_inviteCodeRequired) {
+                        true => '邀请码（必填）',
+                        false => '邀请码（选填）',
+                        null => '邀请码',
+                      },
+                      helperText: '6–64 位字母、数字、下划线或连字符',
+                    ),
+                    validator: (value) {
+                      final code = (value ?? '').trim();
+                      if (code.isEmpty) {
+                        return _inviteCodeRequired == true ? '请输入邀请码' : null;
+                      }
+                      return RegExp(r'^[a-zA-Z0-9_-]{6,64}$').hasMatch(code)
+                          ? null
+                          : '请检查邀请码格式';
+                    },
+                  ),
+                ],
                 if (controller.error != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -375,7 +419,13 @@ class _LoginPageState extends State<LoginPage> {
                 TextButton(
                   onPressed: controller.busy
                       ? null
-                      : () => setState(() => _register = !_register),
+                      : () {
+                          setState(() {
+                            _register = !_register;
+                            _inviteCodeRequired = null;
+                          });
+                          if (_register) _loadRegistrationPolicy();
+                        },
                   child: Text(_register ? '已有账号，去登录' : '没有账号，去注册'),
                 ),
               ],

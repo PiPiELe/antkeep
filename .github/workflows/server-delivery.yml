@@ -20,9 +20,6 @@ on:
       api_base_url:
         description: Public API HTTPS origin; empty keeps unconfigured features offline
         type: string
-      account_base_url:
-        description: Account API HTTPS origin; does not enable disabled account features
-        type: string
 permissions:
   contents: read
 concurrency:
@@ -37,7 +34,6 @@ jobs:
       RELEASE_TAG: ${{ inputs.tag }}
       CHANNEL: ${{ inputs.channel }}
       API_BASE_URL: ${{ inputs.api_base_url }}
-      ACCOUNT_BASE_URL: ${{ inputs.account_base_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,11 +76,10 @@ jobs:
           echo "SOURCE_SHA=$sha" >> "$GITHUB_ENV"
           python3 - <<'PY'
           import os, urllib.parse
-          for name in ('API_BASE_URL', 'ACCOUNT_BASE_URL'):
-              value = os.environ[name]
-              parsed = urllib.parse.urlsplit(value)
-              if value and (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password):
-                  raise SystemExit(f'{name} must be an HTTPS URL without credentials')
+          value = os.environ['API_BASE_URL']
+          parsed = urllib.parse.urlsplit(value)
+          if value and (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password):
+              raise SystemExit('API_BASE_URL must be an HTTPS URL without credentials')
           PY
       - uses: actions/setup-java@v4
         if: inputs.operation == 'upload'
@@ -118,7 +113,7 @@ jobs:
           git diff --exit-code -- pubspec.lock
           flutter analyze
           flutter test
-          flutter build apk --release --obfuscate --split-debug-info="$RUNNER_TEMP/release-symbols" --dart-define="ANTKEEP_API_BASE_URL=$API_BASE_URL" --dart-define="ANTKEEP_ACCOUNT_BASE_URL=$ACCOUNT_BASE_URL"
+          flutter build apk --release --obfuscate --split-debug-info="$RUNNER_TEMP/release-symbols" --dart-define="ANTKEEP_API_BASE_URL=$API_BASE_URL"
       - name: Inspect and upload immutable APK
         if: inputs.operation == 'upload'
         run: |

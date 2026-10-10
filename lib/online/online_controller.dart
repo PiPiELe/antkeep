@@ -106,8 +106,8 @@ class OnlineController extends ChangeNotifier {
         seenAnnouncement = announcement?.id;
       }
       if (!_current(generation)) return;
-      pendingAnnouncement = announcement != null &&
-              seenAnnouncement != announcement.id
+      pendingAnnouncement =
+          announcement != null && seenAnnouncement != announcement.id
           ? announcement
           : null;
     } catch (_) {
@@ -135,6 +135,7 @@ class OnlineController extends ChangeNotifier {
     String username,
     String password, {
     bool register = false,
+    String? inviteCode,
   }) async {
     if (!enabled || busy) return;
     final generation = _generation;
@@ -144,10 +145,14 @@ class OnlineController extends ChangeNotifier {
     try {
       final credentials = {'username': username, 'password': password};
       if (register) {
+        final code = inviteCode?.trim();
         await api.request(
           '/api/app/auth/register',
           method: 'POST',
-          body: credentials,
+          body: {
+            ...credentials,
+            if (code != null && code.isNotEmpty) 'inviteCode': code,
+          },
         );
         if (!_current(generation)) return;
       }
@@ -175,6 +180,13 @@ class OnlineController extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  Future<bool> registrationInviteRequired() async {
+    final payload = jsonDecode(
+      await api.request('/api/public/registration-policy'),
+    ) as Map<String, dynamic>;
+    return payload['inviteCodeRequired'] as bool;
   }
 
   Future<void> logout() async {
