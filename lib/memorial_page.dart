@@ -985,6 +985,7 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
           ],
         );
         final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
+        final isQueen = item.kind == MemorialKind.queen;
         return Stack(
           children: [
             Positioned.fill(
@@ -993,13 +994,20 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Opacity(
-                        opacity: 0.45,
-                        child: Image.asset(
-                          memorialArtworkAsset(item.kind),
-                          fit: BoxFit.cover,
-                          alignment: Alignment.bottomCenter,
-                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ClipRect(
+                        child: FractionalTranslation(
+                          translation: isQueen
+                              ? const Offset(0, 0.22)
+                              : Offset.zero,
+                          child: Opacity(
+                            opacity: 0.45,
+                            child: Image.asset(
+                              memorialArtworkAsset(item.kind),
+                              fit: BoxFit.cover,
+                              alignment: Alignment.bottomCenter,
+                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                            ),
+                          ),
                         ),
                       ),
                       DecoratedBox(
@@ -1007,12 +1015,21 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [
-                              backgroundColor,
-                              backgroundColor.withValues(alpha: 0.94),
-                              backgroundColor.withValues(alpha: 0.15),
-                            ],
-                            stops: const [0, 0.55, 1],
+                            colors: isQueen
+                                ? [
+                                    backgroundColor,
+                                    backgroundColor.withValues(alpha: 0.96),
+                                    backgroundColor.withValues(alpha: 0.15),
+                                    backgroundColor.withValues(alpha: 0.24),
+                                  ]
+                                : [
+                                    backgroundColor,
+                                    backgroundColor.withValues(alpha: 0.94),
+                                    backgroundColor.withValues(alpha: 0.15),
+                                  ],
+                            stops: isQueen
+                                ? const [0, 0.45, 0.7, 1]
+                                : const [0, 0.55, 1],
                           ),
                         ),
                       ),
