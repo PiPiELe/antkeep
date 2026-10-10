@@ -7,6 +7,7 @@ import 'package:antkeep/diary_settings_page.dart';
 import 'package:antkeep/population_analysis_page.dart';
 import 'package:antkeep/colony_growth_page.dart';
 import 'package:antkeep/domain/colony_growth.dart';
+import 'package:antkeep/domain/care_task.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/domain/memorial.dart';
 import 'package:antkeep/domain/share_card_data.dart';
@@ -1015,6 +1016,56 @@ void main() {
     expect(
       find.text('${arrival.year}.${arrival.month}.${arrival.day}'),
       findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('colony card enlarges days only when right side is free', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(393, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    for (final id in ['short', 'busy', 'crowded']) {
+      tables['colonies']!.add(
+        Colony(
+          id: id,
+          name: id == 'short' ? '空余较多' : '内容较多 $id',
+          nestType: switch (id) {
+            'short' => '试管巢',
+            'busy' => '石膏巢',
+            _ => '横置石膏巢和外接活动区',
+          },
+          queenCount: 1,
+          initialWorkerCount: id == 'short' ? 0 : 3000,
+          acquiredOn: DateTime(now.year, now.month, now.day - 38),
+          createdAt: now,
+          updatedAt: now,
+        ).toMap(),
+      );
+      for (final type
+          in id == 'short' ? [CareTaskType.cleaning] : CareTaskType.values) {
+        tables['care_tasks']!.add(
+          CareTask(
+            id: '$id-${type.storageValue}',
+            colonyId: id,
+            type: type,
+            intervalDays: 1,
+            nextDueOn: now,
+          ).toMap(),
+        );
+      }
+    }
+
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widgetList<HusbandryDuration>(find.byType(HusbandryDuration))
+          .map((duration) => duration.tall),
+      [true, true, false],
     );
     expect(tester.takeException(), isNull);
   });

@@ -904,6 +904,30 @@ class _ColonyCard extends StatelessWidget {
       colony.species,
       colony.nestType,
     ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
+    final hasTags =
+        colony.isNewQueenColony ||
+        workers != null ||
+        colony.nestType?.isNotEmpty == true;
+    final dueText = dueTasks.isEmpty
+        ? null
+        : '今日待办：${dueTasks.map((task) => task.type.label).join('、')}';
+    final lowerMetadata = <Widget>[
+      if (hasTags) ...[
+        const SizedBox(height: 6),
+        _ColonyTags(colony: colony, workers: workers),
+      ],
+      const SizedBox(height: 10),
+      if (dueText != null) ...[
+        Text(
+          dueText,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.error,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    ];
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -989,10 +1013,70 @@ class _ColonyCard extends StatelessWidget {
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
+                  final durationWidth = (constraints.maxWidth * .43).clamp(
+                    120.0,
+                    160.0,
+                  );
+                  final tallDurationWidth = (constraints.maxWidth * .39).clamp(
+                    120.0,
+                    150.0,
+                  );
+                  final leftWidth =
+                      constraints.maxWidth - tallDurationWidth - 21;
+                  double textWidth(String value, TextStyle? style) {
+                    final painter = TextPainter(
+                      text: TextSpan(text: value, style: style),
+                      maxLines: 1,
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                    )..layout();
+                    final width = painter.width;
+                    painter.dispose();
+                    return width;
+                  }
+
+                  final scale = ColonyScale.fromWorkerCount(workers);
+                  final tagLabels = <String>[
+                    if (colony.isNewQueenColony) '新后群',
+                    if (scale != null) scale.label,
+                    if (colony.nestType?.isNotEmpty == true) colony.nestType!,
+                  ];
+                  final tagWidth =
+                      tagLabels.fold<double>(
+                        0,
+                        (width, label) =>
+                            width +
+                            textWidth(
+                              label,
+                              theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ) +
+                            16,
+                      ) +
+                      (colony.isNewQueenColony ? 20 : 0) +
+                      (tagLabels.isEmpty ? 0 : tagLabels.length - 1) * 8;
+                  final canFillSpace =
+                      constraints.maxWidth >= 280 &&
+                      MediaQuery.textScalerOf(context).scale(12) <= 18 &&
+                      colony.acquiredOn != null &&
+                      dueText != null &&
+                      (hasTags || description.isNotEmpty) &&
+                      tagWidth <= leftWidth &&
+                      textWidth(
+                            dueText,
+                            theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ) <=
+                          leftWidth;
                   final duration = InkWell(
                     onTap: colony.acquiredOn == null ? onDurationTap : null,
                     borderRadius: BorderRadius.circular(8),
-                    child: HusbandryDuration(colony: colony),
+                    child: HusbandryDuration(
+                      colony: colony,
+                      tall: canFillSpace,
+                    ),
                   );
                   if (constraints.maxWidth < 280 ||
                       MediaQuery.textScalerOf(context).scale(12) > 18) {
@@ -1002,46 +1086,56 @@ class _ColonyCard extends StatelessWidget {
                         identity,
                         const SizedBox(height: 10),
                         duration,
+                        ...lowerMetadata,
                       ],
                     );
                   }
-                  return Row(
-                    children: [
-                      Expanded(child: identity),
-                      const SizedBox(width: 10),
-                      Container(
-                        width: 1,
-                        height: 62,
-                        color: theme.colorScheme.outlineVariant.withValues(
-                          alpha: .3,
+                  if (canFillSpace) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [identity, ...lowerMetadata],
+                          ),
                         ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 1,
+                          height: 62,
+                          color: theme.colorScheme.outlineVariant.withValues(
+                            alpha: .3,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        SizedBox(width: tallDurationWidth, child: duration),
+                      ],
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: identity),
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 1,
+                            height: 62,
+                            color: theme.colorScheme.outlineVariant.withValues(
+                              alpha: .3,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          SizedBox(width: durationWidth, child: duration),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      SizedBox(
-                        width: (constraints.maxWidth * .43).clamp(120.0, 160.0),
-                        child: duration,
-                      ),
+                      ...lowerMetadata,
                     ],
                   );
                 },
               ),
-              if (colony.isNewQueenColony ||
-                  workers != null ||
-                  colony.nestType?.isNotEmpty == true) ...[
-                const SizedBox(height: 6),
-                _ColonyTags(colony: colony, workers: workers),
-              ],
-              const SizedBox(height: 10),
-              if (dueTasks.isNotEmpty) ...[
-                Text(
-                  '今日待办：${dueTasks.map((task) => task.type.label).join('、')}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
               Divider(
                 height: 1,
                 color: theme.colorScheme.outlineVariant.withValues(alpha: .3),
