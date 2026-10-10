@@ -432,7 +432,8 @@ class _HomePageState extends State<HomePage>
       return;
     }
     final userId = onlineController.user!.id;
-    final today = DateTime.now();
+    // Match the service's Beijing calendar day regardless of device timezone.
+    final today = DateTime.now().toUtc().add(const Duration(hours: 8));
     final key = '$userId:${today.year}-${today.month}-${today.day}';
     if (_competitionPromptChecked == key) return;
     _competitionPromptBusy = true;
@@ -523,7 +524,6 @@ class _HomePageState extends State<HomePage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(onlineController.refreshCheckin());
-      _competitionPromptChecked = null;
       _checkCompetitionUpdates();
     }
   }
