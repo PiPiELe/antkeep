@@ -27,6 +27,7 @@ import 'population_forecast_controls.dart';
 import 'domain/population_forecast.dart';
 import 'online/runtime.dart';
 import 'online/inventory_push_page.dart';
+import 'online/competition_page.dart';
 import 'online/app_update.dart';
 import 'online/online_widgets.dart';
 import 'online/update_release_notes.dart';
@@ -419,6 +420,71 @@ class _HomePageState extends State<HomePage>
   late final TabController _colonyTabs;
   late BeginnerCareNotice _beginnerCareNotice;
   late List<BeginnerCareNotice> _careNotices;
+  bool _competitionPromptBusy = false;
+  String? _competitionPromptChecked;
+
+  void _checkCompetitionUpdates() {
+    if (!mounted ||
+        _competitionPromptBusy ||
+        !onlineController.enabled ||
+        onlineController.user == null ||
+        onlineController.busy) {
+      return;
+    }
+    final userId = onlineController.user!.id;
+    final today = DateTime.now();
+    final key = '$userId:${today.year}-${today.month}-${today.day}';
+    if (_competitionPromptChecked == key) return;
+    _competitionPromptBusy = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (!mounted || onlineController.user?.id != userId) return;
+        final competitions = await onlineController.competitions();
+        if (!mounted || onlineController.user?.id != userId) return;
+        final missing = competitions
+            .where(
+              (c) =>
+                  c['state'] == 'ACTIVE' &&
+                  c['myEntryId'] != null &&
+                  c['myLastUpdateDate'] != c['today'],
+            )
+            .toList();
+        _competitionPromptChecked = key;
+        if (missing.isEmpty) return;
+        final upload = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('今日比赛数据待更新'),
+            content: Text('你参加的 ${missing.length} 场比赛今天还未上传蚁群数据。现在更新吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('稍后'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('去上传'),
+              ),
+            ],
+          ),
+        );
+        if (upload == true && mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => CompetitionPage(
+                controller: onlineController,
+                initialId: missing.first['id'] as String,
+              ),
+            ),
+          );
+        }
+      } catch (_) {
+        // A failed status request must not interrupt local app use. Retry on resume.
+      } finally {
+        _competitionPromptBusy = false;
+      }
+    });
+  }
 
   void _updateCareNotices() {
     final notices = onlineController.content.beginnerCareNotices;
@@ -439,13 +505,16 @@ class _HomePageState extends State<HomePage>
     _careNotices = onlineController.content.beginnerCareNotices;
     _beginnerCareNotice = randomBeginnerCareNotice(notices: _careNotices);
     onlineController.addListener(_updateCareNotices);
+    onlineController.addListener(_checkCompetitionUpdates);
     WidgetsBinding.instance.addObserver(this);
+    _checkCompetitionUpdates();
   }
 
   @override
   void dispose() {
     _colonyTabs.dispose();
     onlineController.removeListener(_updateCareNotices);
+    onlineController.removeListener(_checkCompetitionUpdates);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -454,6 +523,8 @@ class _HomePageState extends State<HomePage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(onlineController.refreshCheckin());
+      _competitionPromptChecked = null;
+      _checkCompetitionUpdates();
     }
   }
 
@@ -4148,32 +4219,41 @@ class DiscoverPage extends StatelessWidget {
           ).push(MaterialPageRoute<void>(builder: (_) => const LotteryPage())),
         ),
       ),
-      for (final entry in const [
-        (
-          icon: Icons.emoji_events_outlined,
-          title: '蚁友比赛',
-          subtitle: '分享养殖成果，参与主题挑战',
-        ),
-        (icon: Icons.handyman_outlined, title: '养殖工具', subtitle: '让日常养护更方便'),
-      ])
-        Card(
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            leading: Icon(
-              entry.icon,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            title: Text(entry.title),
-            subtitle: Text(entry.subtitle),
-            trailing: Text(
-              '敬请期待',
-              style: Theme.of(context).textTheme.labelSmall,
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Icon(
+            Icons.emoji_events_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('蚁友比赛'),
+          subtitle: const Text('在线报名新后发育赛，上传每日进展'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => CompetitionPage(controller: onlineController),
             ),
           ),
         ),
+      ),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Icon(
+            Icons.handyman_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('养殖工具'),
+          subtitle: const Text('让日常养护更方便'),
+          trailing: Text('敬请期待', style: Theme.of(context).textTheme.labelSmall),
+        ),
+      ),
     ],
   );
 }
