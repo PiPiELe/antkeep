@@ -986,6 +986,10 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
         );
         final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
         final isQueen = item.kind == MemorialKind.queen;
+        final artworkHeightFactor = switch (item.kind) {
+          MemorialKind.worker || MemorialKind.colony => 0.8,
+          _ => 1.0,
+        };
         return Stack(
           children: [
             Positioned.fill(
@@ -1001,11 +1005,19 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
                               : Offset.zero,
                           child: Opacity(
                             opacity: 0.45,
-                            child: Image.asset(
-                              memorialArtworkAsset(item.kind),
-                              fit: BoxFit.cover,
+                            child: Align(
                               alignment: Alignment.bottomCenter,
-                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                              child: FractionallySizedBox(
+                                widthFactor: 1,
+                                heightFactor: artworkHeightFactor,
+                                child: Image.asset(
+                                  memorialArtworkAsset(item.kind),
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment.bottomCenter,
+                                  errorBuilder: (_, _, _) =>
+                                      const SizedBox.shrink(),
+                                ),
+                              ),
                             ),
                           ),
                         ),
