@@ -227,7 +227,7 @@ void main() {
           path,
           options: factory.options,
         );
-        expect(await upgraded.getVersion(), 21);
+        expect(await upgraded.getVersion(), 22);
         expect(await upgraded.rawQuery('PRAGMA foreign_key_check'), isEmpty);
         expect(
           (await upgraded.rawQuery('PRAGMA integrity_check'))
@@ -263,7 +263,9 @@ void main() {
           expect(record['feeding_leftovers'], isNull);
         }
         final oldFeeding = CareRecord.fromMap(
-          after['care_records']!.singleWhere((row) => row['id'] == 'record-active'),
+          after['care_records']!.singleWhere(
+            (row) => row['id'] == 'record-active',
+          ),
         );
         expect(oldFeeding.type, CareRecordType.feeding);
         expect(oldFeeding.note, '历史投喂：果蝇，已吃完');
@@ -365,7 +367,7 @@ void main() {
         path,
         options: factory.options,
       );
-      expect(await retry.getVersion(), 21);
+      expect(await retry.getVersion(), 22);
       expect((await retry.query('care_records')).length, 2);
       await retry.close();
     },

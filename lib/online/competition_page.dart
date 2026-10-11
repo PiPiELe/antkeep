@@ -277,7 +277,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
       }
       if (confirmed != true || !current()) return;
       final snapshot = <String, dynamic>{
-        'queenCount': colony.queenCount,
+        'queenCount': colony.currentQueenCount(records),
         'eggCount': counts.eggs,
         'larvaCount': counts.larvae,
         'cocoonCount': counts.cocoons,

@@ -38,7 +38,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 21,
+      version: 22,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -66,6 +66,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       occurred_at TEXT NOT NULL, note TEXT, temperature REAL, humidity REAL,
       egg_count INTEGER, larva_count INTEGER, pupa_count INTEGER, worker_count INTEGER,
       worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000),
+      queen_mortality_count INTEGER CHECK (queen_mortality_count BETWEEN 0 AND 1000000),
       auto_growth_rule_json TEXT,
       feeding_food TEXT, feeding_amount TEXT, feeding_response TEXT,
       feeding_leftovers INTEGER CHECK (feeding_leftovers IN (0, 1)),
@@ -87,6 +88,12 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 22) {
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN queen_mortality_count INTEGER '
+        'CHECK (queen_mortality_count BETWEEN 0 AND 1000000)',
+      );
+    }
     if (oldVersion < 21) {
       await database.execute(
         'ALTER TABLE care_records ADD COLUMN feeding_food TEXT',
@@ -247,6 +254,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     'memorials',
     orderBy: 'COALESCE(died_on, created_at) DESC, created_at DESC',
   )).map(Memorial.fromMap).toList();
+
+  Future<Map<String, String>> memorialColonyNames() async => {
+    for (final row in await _db.query('colonies', columns: ['id', 'name']))
+      row['id']! as String: row['name']! as String,
+  };
 
   Future<void> saveMemorial(Memorial memorial) async {
     memorial.validate();

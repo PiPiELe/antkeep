@@ -102,6 +102,17 @@ class Colony {
   int? currentWorkerCount(Iterable<CareRecord> records) =>
       currentPopulation(records).workers;
 
+  int? currentQueenCount(Iterable<CareRecord> records) {
+    if (queenCount == null || queenCount! < 0) return null;
+    var remaining = queenCount!;
+    for (final record in records.where((r) => r.colonyId == id)) {
+      remaining = record.queenDeaths > remaining
+          ? 0
+          : remaining - record.queenDeaths;
+    }
+    return remaining;
+  }
+
   factory Colony.fromMap(Map<String, Object?> map) => Colony(
     id: map['id']! as String,
     name: map['name']! as String,
@@ -191,6 +202,7 @@ class CareRecord {
     this.pupaCount,
     this.workerCount,
     this.workerMortalityCount,
+    this.queenMortalityCount,
     this.feedingFood,
     this.feedingAmount,
     this.feedingResponse,
@@ -211,6 +223,7 @@ class CareRecord {
   final int? pupaCount;
   final int? workerCount;
   final int? workerMortalityCount;
+  final int? queenMortalityCount;
   final String? feedingFood;
   final String? feedingAmount;
   final FeedingResponse? feedingResponse;
@@ -244,6 +257,11 @@ class CareRecord {
       ? workerMortalityCount!
       : 0;
 
+  int get queenDeaths =>
+      type == CareRecordType.mortality && (queenMortalityCount ?? 0) > 0
+      ? queenMortalityCount!
+      : 0;
+
   /// Explicit totals already include deaths; otherwise replay the death event.
   /// Unknown populations stay unknown and historical overcounts stop at zero.
   int? workerCountAfter(int? previous) {
@@ -265,6 +283,7 @@ class CareRecord {
     pupaCount: map['pupa_count'] as int?,
     workerCount: map['worker_count'] as int?,
     workerMortalityCount: map['worker_mortality_count'] as int?,
+    queenMortalityCount: map['queen_mortality_count'] as int?,
     feedingFood: map['feeding_food'] as String?,
     feedingAmount: map['feeding_amount'] as String?,
     feedingResponse: map['feeding_response'] == null
@@ -294,6 +313,7 @@ class CareRecord {
     'pupa_count': pupaCount,
     'worker_count': workerCount,
     'worker_mortality_count': workerMortalityCount,
+    'queen_mortality_count': queenMortalityCount,
     'feeding_food': feedingFood,
     'feeding_amount': feedingAmount,
     'feeding_response': feedingResponse?.storageValue,

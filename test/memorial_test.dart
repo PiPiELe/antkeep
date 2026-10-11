@@ -639,4 +639,64 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('memorials can be folded by colony and the choice persists', (
+    tester,
+  ) async {
+    final other = Colony.fromMap({
+      ...colony.toMap(),
+      'id': 'other-colony',
+      'name': '第二窝',
+    });
+    final preferences = AppPreferences(db);
+    await tester.runAsync(() async {
+      await db.saveColony(other);
+      await db.saveMemorial(
+        memorial('first', MemorialKind.queen, colonyId: colony.id),
+      );
+      await db.saveMemorial(
+        memorial('second', MemorialKind.worker, colonyId: colony.id),
+      );
+      await db.saveMemorial(
+        memorial('third', MemorialKind.queen, colonyId: other.id),
+      );
+      await db.saveMemorial(memorial('loose', MemorialKind.worker));
+      await preferences.setMemorialGrouped(false);
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MemorialPage(
+            preferences: preferences,
+            onOpenColony: (_, _) async {},
+          ),
+        ),
+      ),
+    );
+    await settle(tester);
+    expect(find.text('纪念 first'), findsOneWidget);
+    await tester.tap(find.byType(Switch));
+    await settle(tester);
+    expect(find.text('小小王国'), findsOneWidget);
+    expect(find.text('第二窝'), findsOneWidget);
+    expect(find.text('未关联蚁群'), findsOneWidget);
+    expect(find.text('纪念 first'), findsNothing);
+    await tester.tap(find.text('小小王国'));
+    await tester.pumpAndSettle();
+    expect(find.text('纪念 first'), findsOneWidget);
+    expect(find.text('纪念 second'), findsOneWidget);
+    await tester.tap(find.byTooltip('折叠小小王国'));
+    await tester.pumpAndSettle();
+    expect(find.text('纪念 first'), findsNothing);
+    await tester.tap(find.text('未关联蚁群'));
+    await tester.pumpAndSettle();
+    expect(find.text('纪念 loose'), findsOneWidget);
+    final restarted = AppPreferences(db);
+    await tester.runAsync(restarted.load);
+    expect(restarted.memorialGrouped, isTrue);
+    await tester.tap(find.byType(Switch));
+    await settle(tester);
+    expect(find.text('纪念 first'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

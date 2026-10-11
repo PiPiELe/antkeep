@@ -62,6 +62,13 @@ ShareSnapshot shareSnapshot(
           return created != 0 ? created : a.id.compareTo(b.id);
         });
   for (final record in sorted) {
+    final queens = values['蚁后']!.value;
+    if (queens != null && record.queenDeaths > 0) {
+      values['蚁后'] = ShareQuantity(
+        record.queenDeaths > queens ? 0 : queens - record.queenDeaths,
+        recordedAt: record.occurredAt,
+      );
+    }
     final entries = {
       '工蚁': record.workerCount,
       '卵': record.eggCount,

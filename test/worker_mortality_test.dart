@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/domain/memorial.dart';
 import 'package:antkeep/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +56,7 @@ void main() {
       'care_records',
       record(null).toMap()
         ..remove('worker_mortality_count')
+        ..remove('queen_mortality_count')
         ..remove('auto_growth_rule_json')
         ..remove('feeding_food')
         ..remove('feeding_amount')
@@ -157,6 +159,45 @@ void main() {
     await db.deleteColony(known.id);
   });
 
+  test('queen deaths survive upgrade, edit, backup and deletion', () async {
+    final multi = Colony.fromMap({
+      ...colony.toMap(),
+      'id': 'multi-queen',
+      'queen_count': 3,
+    });
+    await db.saveColony(multi);
+    CareRecord event(String id, int deaths) => CareRecord.fromMap({
+      ...record(null).toMap(),
+      'id': id,
+      'colony_id': multi.id,
+      'queen_mortality_count': deaths,
+    });
+    await db.saveRecord(event('queen-1', 1));
+    await db.saveRecord(event('queen-2', 1));
+    expect(multi.currentQueenCount(await db.listRecords(multi.id)), 1);
+    await db.updateRecord(event('queen-1', 2));
+    expect(multi.currentQueenCount(await db.listRecords(multi.id)), 0);
+    final snapshot = await db.snapshot();
+    BackupData.validate(snapshot);
+    await db.replaceAll(snapshot);
+    expect(multi.currentQueenCount(await db.listRecords(multi.id)), 0);
+    for (final invalid in [-1, 1000001, 1.5, '2']) {
+      final broken = await db.snapshot();
+      final rows = broken['care_records'] as List;
+      broken['care_records'] = [
+        for (final row in rows)
+          if ((row as Map)['id'] == 'queen-1')
+            Map<String, Object?>.from(row)..['queen_mortality_count'] = invalid
+          else
+            row,
+      ];
+      expect(() => BackupData.validate(broken), throwsFormatException);
+    }
+    await db.deleteRecord(event('queen-1', 2));
+    expect(multi.currentQueenCount(await db.listRecords(multi.id)), 2);
+    await db.deleteColony(multi.id);
+  });
+
   Future<void> settle(WidgetTester tester) async {
     for (var frame = 0; frame < 20; frame++) {
       await tester.pump(const Duration(milliseconds: 50));
@@ -172,6 +213,7 @@ void main() {
   }
 
   final deaths = find.widgetWithText(TextField, '工蚁死亡数量');
+  final queenDeaths = find.widgetWithText(TextField, '蚁后死亡数量');
 
   testWidgets('new diary defaults to date only and keeps top save fixed', (
     tester,
@@ -202,15 +244,23 @@ void main() {
     await tester.runAsync(() => db.deleteRecord(record(null)));
     await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
     expect(deaths, findsNothing);
+    expect(queenDeaths, findsNothing);
     await tester.tap(find.widgetWithText(ChoiceChip, '死亡'));
     await tester.pumpAndSettle();
     expect(deaths, findsOneWidget);
+    expect(queenDeaths, findsOneWidget);
     await tester.enterText(deaths, '-1');
     await save(tester);
     expect(find.textContaining('数量请输入 0～1000000 的整数'), findsOneWidget);
     expect(await tester.runAsync(() => db.listRecords(colony.id)), isEmpty);
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      queenDeaths,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(queenDeaths, '1');
     await tester.scrollUntilVisible(
       deaths,
       -250,
@@ -220,8 +270,11 @@ void main() {
     await save(tester);
     final saved = await tester.runAsync(() => db.listRecords(colony.id));
     expect(saved!.single.workerMortalityCount, 3);
+    expect(saved.single.queenMortalityCount, 1);
+    expect(colony.currentQueenCount(saved), 0);
     expect(colony.currentWorkerCount(saved), 97);
     expect(saved.single.type, CareRecordType.mortality);
+    expect(await tester.runAsync(db.listMemorials), isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -231,7 +284,9 @@ void main() {
     await tester.runAsync(() async {
       await db.deleteColony(colony.id);
       await db.saveColony(colony);
-      await db.saveRecord(record(3));
+      await db.saveRecord(
+        CareRecord.fromMap({...record(3).toMap(), 'queen_mortality_count': 1}),
+      );
     });
     final saved = (await tester.runAsync(() => db.listRecords(colony.id)))!
         .single;
@@ -241,6 +296,7 @@ void main() {
       ),
     );
     expect(tester.widget<TextField>(deaths).controller!.text, '3');
+    expect(tester.widget<TextField>(queenDeaths).controller!.text, '1');
     await tester.enterText(deaths, '5');
     await save(tester);
     expect(
@@ -260,11 +316,109 @@ void main() {
     await tester.tap(find.widgetWithText(ChoiceChip, '观察'));
     await tester.pumpAndSettle();
     expect(deaths, findsNothing);
+    expect(queenDeaths, findsNothing);
     await save(tester);
     final changed = (await tester.runAsync(() => db.listRecords(colony.id)))!
         .single;
     expect(changed.type, CareRecordType.observation);
     expect(changed.workerMortalityCount, isNull);
+    expect(changed.queenMortalityCount, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('death diary can open a prefilled queen memorial', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await db.deleteColony(colony.id);
+      await db.saveColony(colony);
+    });
+    await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
+    await tester.tap(find.widgetWithText(ChoiceChip, '死亡'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      queenDeaths,
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(queenDeaths, '1');
+    await tester.pumpAndSettle();
+    final choice = find.widgetWithText(CheckboxListTile, '保存后添加蚁后纪念到英灵殿');
+    await tester.scrollUntilVisible(
+      choice,
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(choice);
+    await save(tester);
+    expect(find.text('飞升英灵殿'), findsOneWidget);
+    expect(find.text('蚁后死亡'), findsWidgets);
+    expect(find.widgetWithText(TextFormField, '纪念名称 *'), findsOneWidget);
+    await tester.tap(find.text('保存纪念'));
+    await settle(tester);
+    final records = await tester.runAsync(() => db.listRecords(colony.id));
+    final memorials = await tester.runAsync(db.listMemorials);
+    expect(records!.single.queenMortalityCount, 1);
+    expect(memorials, hasLength(1));
+    expect(memorials!.single.id, 'death:${records.single.id}:queen');
+    expect(memorials.single.kind, MemorialKind.queen);
+    expect(memorials.single.colonyId, colony.id);
+    expect(
+      memorials.single.diedOn,
+      DateUtils.dateOnly(records.single.occurredAt),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('queen and worker deaths can create separate memorials', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => db.replaceAll({
+        'colonies': [colony.toMap()],
+        'care_records': [],
+      }),
+    );
+    await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
+    await tester.tap(find.widgetWithText(ChoiceChip, '死亡'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      queenDeaths,
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(queenDeaths, '1');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      deaths,
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(deaths, '2');
+    await tester.pumpAndSettle();
+    for (final label in ['保存后添加蚁后纪念到英灵殿', '保存后添加工蚁纪念到英灵殿']) {
+      final choice = find.widgetWithText(CheckboxListTile, label);
+      await tester.scrollUntilVisible(
+        choice,
+        -250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+    }
+    await save(tester);
+    expect(find.text('飞升英灵殿'), findsOneWidget);
+    await tester.tap(find.text('保存纪念'));
+    await settle(tester);
+    expect(find.text('飞升英灵殿'), findsOneWidget);
+    await tester.tap(find.text('保存纪念'));
+    await settle(tester);
+    final saved = await tester.runAsync(db.listMemorials);
+    expect(saved, hasLength(2));
+    expect(saved!.map((item) => item.kind).toSet(), {
+      MemorialKind.queen,
+      MemorialKind.worker,
+    });
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

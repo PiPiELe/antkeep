@@ -76,11 +76,15 @@ List<PopulationPoint> colonyPopulationForecast(
   var eggs = valid(colony.initialEggCount);
   var cocoons = valid(colony.initialCocoonCount);
   var workers = valid(colony.initialWorkerCount);
+  var queens = valid(colony.queenCount);
   var larvae = valid(colony.initialLarvaCount);
   for (final record in known) {
     eggs = valid(record.eggCount) ?? eggs;
     cocoons = valid(record.pupaCount) ?? cocoons;
     workers = record.workerCountAfter(workers);
+    if (queens != null) {
+      queens = record.queenDeaths > queens ? 0 : queens - record.queenDeaths;
+    }
     larvae = valid(record.larvaCount) ?? larvae;
   }
   var population = GrowthPopulation(
@@ -100,7 +104,7 @@ List<PopulationPoint> colonyPopulationForecast(
       };
     }
     final values = [
-      valid(colony.queenCount),
+      queens,
       if (colony.showSpecialized) valid(colony.specializedCount),
       population.workers,
       if (includeBrood) ...[

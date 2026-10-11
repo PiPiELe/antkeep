@@ -3,6 +3,7 @@ import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/domain/population_analysis.dart';
 import 'package:antkeep/domain/population_forecast.dart';
 import 'package:antkeep/domain/record_increment.dart';
+import 'package:antkeep/domain/share_card_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -43,6 +44,42 @@ void main() {
         records,
         includeBrood: brood,
       ).map((p) => p.count).toList();
+
+  test('queen deaths update remaining queens, totals and share snapshots', () {
+    final multi = Colony.fromMap({...colony.toMap(), 'queen_count': 3});
+    CareRecord queenDeath(String id, int day, int deaths) => CareRecord.fromMap(
+      {...record(id, day).toMap(), 'queen_mortality_count': deaths},
+    );
+    final first = queenDeath('first', 1, 1);
+    final second = queenDeath('second', 2, 2);
+    expect(multi.currentQueenCount([second, first]), 0);
+    expect(
+      colonyPopulationTotal(multi, [
+        second,
+        first,
+      ], includeBrood: false).map((p) => p.count),
+      [103, 102, 100],
+    );
+    expect(
+      shareSnapshot(multi, [
+        second,
+        first,
+      ], start.add(const Duration(days: 2))).quantities['蚁后']!.value,
+      0,
+    );
+    expect(multi.currentQueenCount([second]), 1);
+    expect(multi.currentQueenCount([first]), 2);
+    expect(
+      multi.currentQueenCount([
+        CareRecord.fromMap({
+          ...first.toMap(),
+          'record_type': CareRecordType.observation.storageValue,
+        }),
+        second,
+      ]),
+      1,
+    );
+  });
 
   test('death-only events reduce current workers and both quantity charts', () {
     final records = [

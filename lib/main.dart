@@ -37,6 +37,7 @@ import 'data/local_media_store.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
 import 'domain/care_task.dart';
+import 'domain/memorial.dart';
 import 'domain/mortality_analysis.dart';
 import 'domain/colony_growth.dart';
 import 'domain/population_analysis.dart';
@@ -542,6 +543,7 @@ class _HomePageState extends State<HomePage>
         children: [
           const ColoniesPage(),
           MemorialPage(
+            preferences: themeController,
             onOpenColony: (context, id) async {
               await Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -728,6 +730,7 @@ class ColoniesPage extends StatefulWidget {
 typedef _ColonyListEntry = ({
   Colony colony,
   GrowthPopulation population,
+  int? queens,
   int? workers,
   List<CareTask> dueTasks,
 });
@@ -788,6 +791,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
         return (
           colony: colony,
           population: population,
+          queens: colony.currentQueenCount(records),
           workers: population.workers,
           dueTasks: tasks
               .where(
@@ -906,6 +910,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
                       child: _ColonyCard(
                         colony: colonies[index].colony,
                         population: colonies[index].population,
+                        queens: colonies[index].queens,
                         workers: colonies[index].workers,
                         dueTasks: colonies[index].dueTasks,
                         onDurationTap: () =>
@@ -935,6 +940,7 @@ class _ColonyCard extends StatelessWidget {
   const _ColonyCard({
     required this.colony,
     required this.population,
+    required this.queens,
     required this.workers,
     required this.dueTasks,
     required this.onTap,
@@ -942,6 +948,7 @@ class _ColonyCard extends StatelessWidget {
   });
   final Colony colony;
   final GrowthPopulation population;
+  final int? queens;
   final int? workers;
   final List<CareTask> dueTasks;
   final VoidCallback onTap;
@@ -961,7 +968,7 @@ class _ColonyCard extends StatelessWidget {
       ],
     );
     final details = <InlineSpan>[
-      if (colony.queenCount != null) quantity(colony.queenCount!, '蚁后'),
+      if (queens != null) quantity(queens!, '蚁后'),
       if (colony.showSpecialized && colony.specializedCount != null)
         quantity(colony.specializedCount!, '特化'),
       if (workers != null) quantity(workers!, '工蚁'),
@@ -1734,7 +1741,11 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       controller: _queens,
                       validator: _validateRequiredCount,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '蚁后 *'),
+                      decoration: const InputDecoration(
+                        labelText: '蚁后 *',
+                        helperText: '档案起始数量，日记中的死亡数量会从此扣减',
+                        helperMaxLines: 2,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2807,23 +2818,20 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ),
               ),
             ...detail.records.map((record) {
+              final priorRecords = detail.records.where(
+                (candidate) =>
+                    CareRecord.comparePopulationOrder(candidate, record) <= 0,
+              );
               final card = _RecordCard(
                 record: record,
                 colony: colony,
                 remainingPopulation:
                     record.type == CareRecordType.mortality &&
-                        record.workerMortalityCount != null
-                    ? colony.currentPopulation(
-                        detail.records.where(
-                          (candidate) =>
-                              CareRecord.comparePopulationOrder(
-                                candidate,
-                                record,
-                              ) <=
-                              0,
-                        ),
-                      )
+                        (record.workerMortalityCount != null ||
+                            record.queenMortalityCount != null)
+                    ? colony.currentPopulation(priorRecords)
                     : null,
+                remainingQueenCount: colony.currentQueenCount(priorRecords),
                 display: _display,
                 onShare: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -2882,7 +2890,7 @@ class _ColonyProfileSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final population = colony.currentPopulation(records);
     final quantities = <String>[
-      if (colony.queenCount != null) '${colony.queenCount} 蚁后',
+      if (colony.currentQueenCount(records) case final queens?) '$queens 蚁后',
       if (colony.showSpecialized && colony.specializedCount != null)
         '${colony.specializedCount} 特化',
       if (workers != null) '$workers 工蚁',
@@ -3381,9 +3389,12 @@ class _RecordFormPageState extends State<RecordFormPage> {
   final _pupae = TextEditingController();
   final _workers = TextEditingController();
   final _workerMortality = TextEditingController();
+  final _queenMortality = TextEditingController();
   final _feedingFood = TextEditingController();
   final _feedingAmount = TextEditingController();
   final _photos = <XFile>[];
+  var _addQueenMemorial = false;
+  var _addWorkerMemorial = false;
   var _type = CareRecordType.observation;
   FeedingResponse? _feedingResponse;
   bool? _feedingLeftovers;
@@ -3432,6 +3443,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
     _pupae.text = record.pupaCount?.toString() ?? '';
     _workers.text = record.workerCount?.toString() ?? '';
     _workerMortality.text = record.workerMortalityCount?.toString() ?? '';
+    _queenMortality.text = record.queenMortalityCount?.toString() ?? '';
     _feedingFood.text = record.feedingFood ?? '';
     _feedingAmount.text = record.feedingAmount ?? '';
     _feedingResponse = record.feedingResponse;
@@ -3451,6 +3463,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
       _pupae,
       _workers,
       _workerMortality,
+      _queenMortality,
       _feedingFood,
       _feedingAmount,
     ]) {
@@ -3473,6 +3486,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
       _pupae,
       _workers,
       if (_type == CareRecordType.mortality) _workerMortality,
+      if (_type == CareRecordType.mortality) _queenMortality,
     ]) {
       final text = controller.text.trim();
       final n = int.tryParse(text);
@@ -3511,13 +3525,25 @@ class _RecordFormPageState extends State<RecordFormPage> {
         );
         if (confirmed != true || !mounted) return;
       }
+      final recordId = widget.record?.id ?? const Uuid().v4();
+      final selectedMemorial =
+          _type == CareRecordType.mortality &&
+          ((_addQueenMemorial &&
+                  (int.tryParse(_queenMortality.text.trim()) ?? 0) > 0) ||
+              (_addWorkerMemorial &&
+                  (int.tryParse(_workerMortality.text.trim()) ?? 0) > 0));
+      final existingMemorials = selectedMemorial
+          ? await AppDatabase.instance.listMemorials()
+          : <Memorial>[];
+      if (!mounted) return;
+      late CareRecord savedRecord;
       Future<void> saveRecord() async {
         final photos = <String>[...?widget.record?.photos];
         for (final photo in _photos) {
           photos.add(await LocalMediaStore.instance.copyImage(photo));
         }
         final record = CareRecord(
-          id: widget.record?.id ?? const Uuid().v4(),
+          id: recordId,
           colonyId: _colony.id,
           type: _type,
           occurredAt: _occurredAt,
@@ -3534,6 +3560,9 @@ class _RecordFormPageState extends State<RecordFormPage> {
           workerMortalityCount: _type == CareRecordType.mortality
               ? int.tryParse(_workerMortality.text.trim())
               : null,
+          queenMortalityCount: _type == CareRecordType.mortality
+              ? int.tryParse(_queenMortality.text.trim())
+              : null,
           feedingFood: _type == CareRecordType.feeding
               ? _textOrNull(_feedingFood.text)
               : null,
@@ -3549,6 +3578,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
           photos: photos,
           createdAt: widget.record?.createdAt ?? DateTime.now(),
         );
+        savedRecord = record;
         if (widget.record == null) {
           await AppDatabase.instance.saveRecord(
             record,
@@ -3569,6 +3599,37 @@ class _RecordFormPageState extends State<RecordFormPage> {
         await _runBusyTask(context, saveRecord, message: '正在全局更新日记与种群数量，请稍候…');
       } else {
         await saveRecord();
+      }
+      if (!mounted) return;
+      final memorialKinds = <MemorialKind>[
+        if (_type == CareRecordType.mortality &&
+            (savedRecord.queenMortalityCount ?? 0) > 0 &&
+            _addQueenMemorial)
+          MemorialKind.queen,
+        if (_type == CareRecordType.mortality &&
+            (savedRecord.workerMortalityCount ?? 0) > 0 &&
+            _addWorkerMemorial)
+          MemorialKind.worker,
+      ];
+      for (final kind in memorialKinds) {
+        final id = 'death:${savedRecord.id}:${kind.name}';
+        final existing = existingMemorials
+            .where((item) => item.id == id)
+            .firstOrNull;
+        if (!mounted) return;
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => MemorialFormPage(
+              colony: _colony,
+              memorial: existing,
+              initialId: id,
+              initialKind: kind,
+              initialDiedOn: DateUtils.dateOnly(savedRecord.occurredAt),
+              lockKind: true,
+            ),
+          ),
+        );
+        if (!mounted) return;
       }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -3731,8 +3792,19 @@ class _RecordFormPageState extends State<RecordFormPage> {
         if (_type == CareRecordType.mortality) ...[
           const SizedBox(height: 16),
           TextField(
+            controller: _queenMortality,
+            keyboardType: TextInputType.number,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: '蚁后死亡数量',
+              helperText: '从档案蚁后数量扣减，最低为 0；数量未知时仅记录死亡数',
+              helperMaxLines: 2,
+            ),
+          ),
+          TextField(
             controller: _workerMortality,
             keyboardType: TextInputType.number,
+            onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: '工蚁死亡数量',
               helperMaxLines: 3,
@@ -3741,6 +3813,24 @@ class _RecordFormPageState extends State<RecordFormPage> {
                   : '工蚁总数留空时自动扣减，最低为 0；填写总数则以总数为准，未知时仅记录死亡数',
             ),
           ),
+          if ((int.tryParse(_queenMortality.text.trim()) ?? 0) > 0)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('保存后添加蚁后纪念到英灵殿'),
+              subtitle: const Text('将打开纪念表单填写名称，取消表单不会撤销日记'),
+              value: _addQueenMemorial,
+              onChanged: (value) =>
+                  setState(() => _addQueenMemorial = value ?? false),
+            ),
+          if ((int.tryParse(_workerMortality.text.trim()) ?? 0) > 0)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('保存后添加工蚁纪念到英灵殿'),
+              subtitle: const Text('将打开纪念表单填写名称，取消表单不会撤销日记'),
+              value: _addWorkerMemorial,
+              onChanged: (value) =>
+                  setState(() => _addWorkerMemorial = value ?? false),
+            ),
         ],
         const SizedBox(height: 16),
         OutlinedButton.icon(
@@ -3942,6 +4032,7 @@ class _RecordCard extends StatefulWidget {
     required this.record,
     this.colony,
     this.remainingPopulation,
+    this.remainingQueenCount,
     this.onShare,
     this.display = const DiaryDisplay(),
   });
@@ -3950,6 +4041,7 @@ class _RecordCard extends StatefulWidget {
   final CareRecord record;
   final Colony? colony;
   final GrowthPopulation? remainingPopulation;
+  final int? remainingQueenCount;
   @override
   State<_RecordCard> createState() => _RecordCardState();
 }
@@ -4027,8 +4119,10 @@ class _RecordCardState extends State<_RecordCard> {
         '工蚁 ${record.workerCount}',
       if (record.workerMortalityCount != null)
         '工蚁死亡 ${record.workerMortalityCount}',
+      if (record.queenMortalityCount != null)
+        '蚁后死亡 ${record.queenMortalityCount}',
       if (remaining != null) ...[
-        '剩余 蚁后 ${colony?.queenCount ?? '未知'}',
+        '剩余 蚁后 ${widget.remainingQueenCount ?? '未知'}',
         '工蚁 ${remaining.workers ?? '未知'}',
         '卵幼茧子 ${brood ?? '未知'}',
       ],

@@ -87,7 +87,7 @@ List<PopulationPoint> colonyPopulationTotal(
 }) {
   int? valid(int? value) => value != null && value >= 0 ? value : null;
 
-  final queen = valid(colony.queenCount);
+  var queen = valid(colony.queenCount);
   final specialized = colony.showSpecialized
       ? valid(colony.specializedCount)
       : null;
@@ -120,6 +120,10 @@ List<PopulationPoint> colonyPopulationTotal(
     ..sort(CareRecord.comparePopulationOrder);
   for (final record in ordered) {
     var changed = false;
+    if (queen != null && record.queenDeaths > 0) {
+      queen = record.queenDeaths > queen ? 0 : queen - record.queenDeaths;
+      changed = true;
+    }
     final worker = record.workerCountAfter(workers);
     if (worker != null &&
         (valid(record.workerCount) != null || record.workerDeaths > 0)) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import 'app_preferences.dart';
 import 'data/app_database.dart';
 import 'date_display.dart';
 import 'memorial_share_page.dart';
@@ -13,20 +14,26 @@ import 'widgets/tombstone_icon.dart';
 typedef OpenMemorialColony = Future<void> Function(BuildContext, String);
 
 class MemorialPage extends StatefulWidget {
-  const MemorialPage({super.key, required this.onOpenColony});
+  const MemorialPage({super.key, required this.onOpenColony, this.preferences});
   final OpenMemorialColony onOpenColony;
+  final AppPreferences? preferences;
 
   @override
   State<MemorialPage> createState() => _MemorialPageState();
 }
 
 class _MemorialPageState extends State<MemorialPage> {
-  late Future<List<Memorial>> _items;
+  late Future<({List<Memorial> memorials, Map<String, String> colonyNames})>
+  _items;
   StreamSubscription<void>? _changes;
+  final _expandedGroups = <String>{};
+  bool _grouped = false;
+  bool _savingGrouping = false;
 
   @override
   void initState() {
     super.initState();
+    _grouped = widget.preferences?.memorialGrouped ?? false;
     _reload();
     _changes = AppDatabase.instance.memorialChanges.listen((_) {
       if (mounted) setState(_reload);
@@ -34,7 +41,89 @@ class _MemorialPageState extends State<MemorialPage> {
   }
 
   void _reload() {
-    _items = AppDatabase.instance.listMemorials();
+    _items = _loadItems();
+  }
+
+  Future<({List<Memorial> memorials, Map<String, String> colonyNames})>
+  _loadItems() async => (
+    memorials: await AppDatabase.instance.listMemorials(),
+    colonyNames: await AppDatabase.instance.memorialColonyNames(),
+  );
+
+  Future<void> _setGrouped(bool value) async {
+    if (_savingGrouping) return;
+    setState(() => _savingGrouping = true);
+    try {
+      await widget.preferences?.setMemorialGrouped(value);
+      if (mounted) setState(() => _grouped = value);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('保存展示方式失败，请重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _savingGrouping = false);
+    }
+  }
+
+  Widget _memorialCard(Memorial item, {bool grouped = false}) {
+    final tile = ListTile(
+      contentPadding: const EdgeInsets.all(16),
+      leading: const TombstoneIcon(size: 44),
+      title: Text(item.name),
+      subtitle: Text(
+        '${item.kind.epitaph}\n${item.species ?? item.kind.label} · ${item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!)}',
+      ),
+      isThreeLine: true,
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => MemorialDetailPage(
+            memorialId: item.id,
+            onOpenColony: widget.onOpenColony,
+          ),
+        ),
+      ),
+    );
+    return grouped ? tile : Card(child: tile);
+  }
+
+  Widget _groupCard(
+    MapEntry<String, List<Memorial>> group,
+    Map<String, String> colonyNames,
+  ) {
+    final title = group.key.isEmpty
+        ? '未关联蚁群'
+        : colonyNames[group.key] ?? '已删除的蚁群';
+    final expanded = _expandedGroups.contains(group.key);
+    void toggle() => setState(() {
+      if (expanded) {
+        _expandedGroups.remove(group.key);
+      } else {
+        _expandedGroups.add(group.key);
+      }
+    });
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(title),
+            subtitle: Text('${group.value.length} 条纪念'),
+            trailing: IconButton(
+              tooltip: '${expanded ? '折叠' : '展开'}$title',
+              onPressed: toggle,
+              icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
+            ),
+            onTap: toggle,
+          ),
+          if (expanded)
+            for (final item in group.value) ...[
+              const Divider(height: 1),
+              _memorialCard(item, grouped: true),
+            ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -76,74 +165,90 @@ class _MemorialPageState extends State<MemorialPage> {
         child: const TombstoneIcon(size: 28),
       ),
     ),
-    body: FutureBuilder<List<Memorial>>(
-      future: _items,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: TextButton(
-              onPressed: () => setState(_reload),
-              child: const Text('加载失败，点击重试'),
-            ),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final items = snapshot.data!;
-        if (items.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+    body:
+        FutureBuilder<
+          ({List<Memorial> memorials, Map<String, String> colonyNames})
+        >(
+          future: _items,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: TextButton(
+                  onPressed: () => setState(_reload),
+                  child: const Text('加载失败，点击重试'),
+                ),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final data = snapshot.data!;
+            final items = data.memorials;
+            final groupingControl = Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 16, 0),
+              child: Row(
                 children: [
-                  TombstoneIcon(size: 64),
-                  SizedBox(height: 16),
-                  Text('为逝去的小生命留一份纪念'),
-                  SizedBox(height: 8),
-                  Text(
-                    '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
-                    '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
-                    '纪念每一个尚未羽化、便早早沉睡的小小生命，\n'
-                    '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
-                    '它们无声地来过，却曾竭尽全力地活着。',
-                    textAlign: TextAlign.center,
+                  const Text('按蚁群折叠'),
+                  const Spacer(),
+                  Switch.adaptive(
+                    value: _grouped,
+                    onChanged: _savingGrouping ? null : _setGrouped,
                   ),
                 ],
               ),
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return Card(
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: const TombstoneIcon(size: 44),
-                title: Text(item.name),
-                subtitle: Text(
-                  '${item.kind.epitaph}\n${item.species ?? item.kind.label} · ${item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!)}',
-                ),
-                isThreeLine: true,
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MemorialDetailPage(
-                      memorialId: item.id,
-                      onOpenColony: widget.onOpenColony,
+            );
+            if (items.isEmpty) {
+              return Column(
+                children: [
+                  groupingControl,
+                  const Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TombstoneIcon(size: 64),
+                            SizedBox(height: 16),
+                            Text('为逝去的小生命留一份纪念'),
+                            SizedBox(height: 8),
+                            Text(
+                              '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
+                              '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
+                              '纪念每一个尚未羽化、便早早沉睡的小小生命，\n'
+                              '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
+                              '它们无声地来过，却曾竭尽全力地活着。',
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
+                ],
+              );
+            }
+            final groups = <String, List<Memorial>>{};
+            for (final item in items) {
+              groups.putIfAbsent(item.colonyId ?? '', () => []).add(item);
+            }
+            final grouped = groups.entries.toList();
+            return Column(
+              children: [
+                groupingControl,
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+                    itemCount: _grouped ? grouped.length : items.length,
+                    itemBuilder: (context, index) => _grouped
+                        ? _groupCard(grouped[index], data.colonyNames)
+                        : _memorialCard(items[index]),
+                  ),
                 ),
-              ),
+              ],
             );
           },
-        );
-      },
-    ),
+        ),
   );
 }
 
@@ -153,10 +258,18 @@ class MemorialFormPage extends StatefulWidget {
     this.wholeColony = false,
     this.colony,
     this.memorial,
+    this.initialId,
+    this.initialKind,
+    this.initialDiedOn,
+    this.lockKind = false,
   });
   final bool wholeColony;
   final Colony? colony;
   final Memorial? memorial;
+  final String? initialId;
+  final MemorialKind? initialKind;
+  final DateTime? initialDiedOn;
+  final bool lockKind;
 
   @override
   State<MemorialFormPage> createState() => _MemorialFormPageState();
@@ -177,17 +290,19 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
   bool _loading = true;
   bool _saving = false;
   String? _error;
-  final _id = const Uuid().v4();
+  late final String _id;
 
   @override
   void initState() {
     super.initState();
     final item = widget.memorial;
+    _id = widget.initialId ?? const Uuid().v4();
     _kind =
         item?.kind ??
+        widget.initialKind ??
         (widget.wholeColony ? MemorialKind.colony : MemorialKind.queen);
     _colonyId = item?.colonyId ?? widget.colony?.id;
-    _diedOn = item?.diedOn;
+    _diedOn = item?.diedOn ?? widget.initialDiedOn;
     _name = TextEditingController(text: item?.name ?? widget.colony?.name);
     _species = TextEditingController(
       text: item?.species ?? widget.colony?.species,
@@ -532,7 +647,7 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
                         ])
                           (kind, kind.label),
                       ],
-                      onChanged: widget.memorial != null
+                      onChanged: widget.memorial != null || widget.lockKind
                           ? null
                           : (kind) => setState(() => _kind = kind!),
                     ),
