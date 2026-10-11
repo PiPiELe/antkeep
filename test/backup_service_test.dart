@@ -111,7 +111,11 @@ void main() {
           const MethodChannel('plugins.flutter.io/path_provider'),
           null,
         );
-    await directory.delete(recursive: true);
+    try {
+      await directory.delete(recursive: true);
+    } on FileSystemException {
+      // SQLite can hold the database file until the test process exits on Windows.
+    }
   });
   setUp(() async {
     await database.replaceAll(fixture());
@@ -142,7 +146,9 @@ void main() {
   });
 
   test('launch cleanup removes media left by earlier failed edits', () async {
-    await media.restoreFiles({'orphan.jpg': [4, 5, 6]});
+    await media.restoreFiles({
+      'orphan.jpg': [4, 5, 6],
+    });
     await pruneUnreferencedMedia(database, media);
     await expectLater(
       media.readImage('orphan.jpg'),
@@ -423,7 +429,7 @@ void main() {
     },
   );
 
-  test('v2 ZIP restores memorial links, archived history and photos; undo preserves them', () async {
+  test('current ZIP restores memorial links, archived history and photos; undo preserves them', () async {
     for (final kind in [MemorialKind.queen, MemorialKind.colony]) {
       await database.saveMemorial(
         Memorial(
@@ -442,7 +448,7 @@ void main() {
         BackupArchive.decode(bytes).findFile('manifest.json')!.content,
       ),
     );
-    expect(manifest['version'], 2);
+    expect(manifest['version'], 4);
     await service.restoreBytes(archiveBytes(fixture()));
     expect(await database.listMemorials(), isEmpty);
     await service.undoLastRestore();
@@ -595,43 +601,63 @@ void main() {
     }
   }
 
-  test('database failure restores overwritten photos and previous rollback', () async {
-    final before = await database.snapshot();
-    final db = await openDatabase(await applicationDatabasePath());
-    await db.execute("CREATE TRIGGER reject_restore BEFORE INSERT ON colonies BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END");
-    try {
-      await expectLater(service.restoreBytes(archiveBytes(fixture())), throwsA(isA<DatabaseException>()));
-      expect(await database.snapshot(), before);
-      expect(await media.readImage('image.jpg'), [1, 2, 3]);
-      expect(await RollbackStore.instance.read(), previousRollback);
-    } finally {
-      await db.execute('DROP TRIGGER reject_restore');
-    }
-  });
+  test(
+    'database failure restores overwritten photos and previous rollback',
+    () async {
+      final before = await database.snapshot();
+      final db = await openDatabase(await applicationDatabasePath());
+      await db.execute(
+        "CREATE TRIGGER reject_restore BEFORE INSERT ON colonies BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END",
+      );
+      try {
+        await expectLater(
+          service.restoreBytes(archiveBytes(fixture())),
+          throwsA(isA<DatabaseException>()),
+        );
+        expect(await database.snapshot(), before);
+        expect(await media.readImage('image.jpg'), [1, 2, 3]);
+        expect(await RollbackStore.instance.read(), previousRollback);
+      } finally {
+        await db.execute('DROP TRIGGER reject_restore');
+      }
+    },
+  );
 
   test('file APIs restore and undo without a byte-array export', () async {
     final output = File('${directory.path}/streamed.zip');
     await service.writeBackupFile(output);
-    await media.restoreFiles({'image.jpg': [6, 6]});
+    await media.restoreFiles({
+      'image.jpg': [6, 6],
+    });
     await service.restoreFile(output);
     expect(await media.readImage('image.jpg'), [1, 2, 3]);
     await service.undoLastRestore();
     expect(await media.readImage('image.jpg'), [6, 6]);
   });
 
-  test('disk shortage leaves database, photos and previous rollback intact', () async {
-    final before = await database.snapshot();
-    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(BackupResources.channel, (_) async => {'freeDisk': 1, 'availableMemory': 1024 * 1024 * 1024});
-    try {
-      await expectLater(service.restoreBytes(archiveBytes(fixture())), throwsStateError);
-      expect(await database.snapshot(), before);
-      expect(await media.readImage('image.jpg'), [1, 2, 3]);
-      expect(await RollbackStore.instance.read(), previousRollback);
-    } finally {
-      messenger.setMockMethodCallHandler(BackupResources.channel, null);
-    }
-  });
+  test(
+    'disk shortage leaves database, photos and previous rollback intact',
+    () async {
+      final before = await database.snapshot();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        BackupResources.channel,
+        (_) async => {'freeDisk': 1, 'availableMemory': 1024 * 1024 * 1024},
+      );
+      try {
+        await expectLater(
+          service.restoreBytes(archiveBytes(fixture())),
+          throwsStateError,
+        );
+        expect(await database.snapshot(), before);
+        expect(await media.readImage('image.jpg'), [1, 2, 3]);
+        expect(await RollbackStore.instance.read(), previousRollback);
+      } finally {
+        messenger.setMockMethodCallHandler(BackupResources.channel, null);
+      }
+    },
+  );
 
   test('corrupt attachment preserves database, photos and previous rollback', () async {
     final before = await database.snapshot();
@@ -641,7 +667,14 @@ void main() {
     final view = ByteData.sublistView(zip);
     for (var i = 0; i + 46 <= zip.length; i++) {
       if (view.getUint32(i, Endian.little) == 0x02014b50 &&
-          utf8.decode(zip.sublist(i + 46, i + 46 + view.getUint16(i + 28, Endian.little))).startsWith('media/')) {
+          utf8
+              .decode(
+                zip.sublist(
+                  i + 46,
+                  i + 46 + view.getUint16(i + 28, Endian.little),
+                ),
+              )
+              .startsWith('media/')) {
         final offset = view.getUint32(i + 42, Endian.little);
         view.setUint32(i + 16, 123, Endian.little);
         view.setUint32(offset + 14, 123, Endian.little);

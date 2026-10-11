@@ -10,13 +10,18 @@ import 'backup_data.dart';
 
 enum BackupRestoreMode { incremental, overwrite }
 
-const backupVersion = 2;
+const backupVersion = 4;
 
 mixin BackupLogic {
   AppDatabase get database;
 
   Uint8List encodeManifest(Map<String, dynamic> data, Iterable<String> media) {
     BackupData.validate(data);
+    if (data['nest_entries'] is! List ||
+        data['winter_cycles'] is! List ||
+        data['flight_observations'] is! List) {
+      throw const FormatException('当前备份缺少巢体、越冬或婚飞记录表。');
+    }
     if (media.length + 1 > BackupArchive.maxEntries) {
       throw FormatException(
         '备份最多支持 ${BackupArchive.maxEntries - 1} 张照片，当前照片数量超出上限。',
@@ -97,6 +102,11 @@ mixin BackupLogic {
         for (final row in existing)
           if (table == 'care_tasks') (row['colony_id'], row['task_type']),
       };
+      final activeWinterColonies = {
+        for (final row in existing)
+          if (table == 'winter_cycles' && row['ended_on'] == null)
+            row['colony_id'],
+      };
       final additions = <Map<String, Object?>>[];
       for (final entry in incoming[table] as List? ?? const []) {
         final row = Map<String, Object?>.from(entry as Map);
@@ -107,6 +117,11 @@ mixin BackupLogic {
         }
         if (table == 'care_tasks' &&
             !taskTypes.add((row['colony_id'], row['task_type']))) {
+          continue;
+        }
+        if (table == 'winter_cycles' &&
+            row['ended_on'] == null &&
+            !activeWinterColonies.add(row['colony_id'])) {
           continue;
         }
         if (table == 'memorials' &&
@@ -155,11 +170,17 @@ mixin BackupLogic {
   void validateManifestMap(Map<String, dynamic> manifest) {
     final data = manifest['data'];
     if (manifest['format'] != 'antkeep' ||
-        (manifest['version'] != 1 && manifest['version'] != backupVersion) ||
+        (manifest['version'] != 1 &&
+            manifest['version'] != 2 &&
+            manifest['version'] != 3 &&
+            manifest['version'] != backupVersion) ||
         data is! Map<String, dynamic> ||
         data['colonies'] is! List ||
         data['care_records'] is! List ||
-        (manifest['version'] == 2 && data['memorials'] is! List) ||
+        (manifest['version'] >= 2 && data['memorials'] is! List) ||
+        (manifest['version'] >= 3 && data['nest_entries'] is! List) ||
+        (manifest['version'] >= 4 && data['winter_cycles'] is! List) ||
+        (manifest['version'] >= 4 && data['flight_observations'] is! List) ||
         (data['feeder_records'] != null && data['feeder_records'] is! List) ||
         (data['care_tasks'] != null && data['care_tasks'] is! List) ||
         (data['inventory_items'] != null && data['inventory_items'] is! List) ||

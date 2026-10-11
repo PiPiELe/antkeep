@@ -60,6 +60,7 @@ void main() {
     await db.saveColony(colony);
   });
   tearDownAll(() async {
+    await db.close();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('plugins.flutter.io/path_provider'),

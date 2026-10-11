@@ -23,6 +23,7 @@ void main() {
   });
 
   tearDownAll(() async {
+    await AppDatabase.instance.close();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('plugins.flutter.io/path_provider'),

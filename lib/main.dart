@@ -12,6 +12,7 @@ import 'diary_preferences.dart';
 import 'diary_settings_page.dart';
 import 'colony_growth_page.dart';
 import 'care_tasks_section.dart';
+import 'batch_care_page.dart';
 import 'memorial_page.dart';
 import 'widgets/skull_icon.dart';
 import 'share_cards_page.dart';
@@ -20,6 +21,9 @@ import 'community_groups_page.dart';
 import 'date_display.dart';
 import 'husbandry_duration.dart';
 import 'lottery_page.dart';
+import 'nest_history_page.dart';
+import 'winter_cycle_page.dart';
+import 'flight_observation_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'population_forecast_controls.dart';
@@ -855,6 +859,20 @@ class _ColoniesPageState extends State<ColoniesPage> {
     if (saved == true && mounted) setState(_reload);
   }
 
+  Future<void> _batchCare(List<_ColonyListEntry> entries) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BatchCarePage(
+          colonies: [
+            for (final entry in entries)
+              if (!entry.colony.archived) entry.colony,
+          ],
+        ),
+      ),
+    );
+    if (saved == true && mounted) setState(_reload);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     floatingActionButton: FloatingActionButton.extended(
@@ -889,15 +907,28 @@ class _ColoniesPageState extends State<ColoniesPage> {
             child: ReorderableListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               buildDefaultDragHandles: false,
-              header: colonies.length > 1
-                  ? Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Text(
+              header: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (colonies
+                            .where((entry) => !entry.colony.archived)
+                            .length >
+                        1)
+                      OutlinedButton.icon(
+                        onPressed: () => _batchCare(colonies),
+                        icon: const Icon(Icons.playlist_add_check),
+                        label: const Text('批量养护记录'),
+                      ),
+                    if (colonies.length > 1)
+                      Text(
                         '长按蚁群卡片可上下拖动排序',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                    )
-                  : null,
+                  ],
+                ),
+              ),
               itemCount: colonies.length,
               onReorderStart: (_) => _dragging = true,
               onReorderEnd: (_) => _dragging = false,
@@ -2699,6 +2730,39 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   ? null
                   : () => _editAcquiredOn(colony),
             ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.home_work_outlined),
+                title: const Text('巢体履历'),
+                subtitle: Text(
+                  colony.nestType == null
+                      ? '查看和记录使用过的巢体'
+                      : '当前：${colony.nestType} · 查看使用历史',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => NestHistoryPage(colony: colony),
+                    ),
+                  );
+                  if (mounted) setState(_reload);
+                },
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.ac_unit),
+                title: const Text('越冬周期'),
+                subtitle: const Text('记录开始、计划结束与实际结束日期'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => WinterCyclePage(colony: colony),
+                  ),
+                ),
+              ),
+            ),
             if (colony.targetTemperatureLower != null ||
                 colony.targetTemperature != null ||
                 colony.targetHumidityLower != null ||
@@ -4279,6 +4343,26 @@ class DiscoverPage extends StatelessWidget {
         style: Theme.of(context).textTheme.bodyMedium,
       ),
       const SizedBox(height: 24),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Icon(
+            Icons.travel_explore_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('婚飞观察与天气'),
+          subtitle: const Text('本地记录观察，手动查询城市天气'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const FlightObservationPage(),
+            ),
+          ),
+        ),
+      ),
       Card(
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(

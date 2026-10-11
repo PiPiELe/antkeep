@@ -33,6 +33,11 @@ class RollbackStore {
 
   Future<bool> exists() async => (await file()).exists();
 
+  Future<void> clear() async {
+    final backup = await file();
+    if (await backup.exists()) await backup.delete();
+  }
+
   Future<File> file() async {
     final root = await getApplicationSupportDirectory();
     final directory = Directory(path.join(root.path, 'antkeep'));

@@ -33,6 +33,15 @@ Future<void> revealSetting(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> revealDetail(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    250,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> openStatisticsSettings(WidgetTester tester) async {
   await tester.ensureVisible(find.text('统计设置'));
   await tester.pumpAndSettle();
@@ -50,6 +59,9 @@ void main() {
     'care_tasks': [],
     'inventory_items': [],
     'memorials': [],
+    'nest_entries': [],
+    'winter_cycles': [],
+    'flight_observations': [],
   };
   final records = tables['feeder_records']!;
   late Directory directory;
@@ -80,6 +92,11 @@ void main() {
               if (sql == 'PRAGMA user_version') {
                 return [
                   {'user_version': 8},
+                ];
+              }
+              if (sql == 'PRAGMA table_info(colonies)') {
+                return [
+                  {'name': 'nest_type'},
                 ];
               }
               final arguments =
@@ -791,6 +808,7 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(find.text('蚁群 · 设置预测').last);
         } else {
+          await revealDetail(tester, find.text('种群数量'));
           final populationCard = find.ancestor(
             of: find.text('种群数量'),
             matching: find.byType(Card),
@@ -838,6 +856,10 @@ void main() {
         if (!analysis) {
           await tester.pageBack();
           await tester.pumpAndSettle();
+          await revealDetail(
+            tester,
+            find.byKey(const ValueKey('population-forecast-summary')),
+          );
         }
         expect(
           find.byKey(const ValueKey('population-forecast-summary')),
@@ -877,6 +899,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final toggle = find.byKey(const ValueKey('population-forecast-toggle'));
+      await revealDetail(tester, find.byTooltip('展开种群数量'));
       await tester.ensureVisible(find.byTooltip('展开种群数量'));
       await tester.tap(find.byTooltip('展开种群数量'));
       await tester.pumpAndSettle();
@@ -891,6 +914,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       final summary = find.byKey(const ValueKey('population-forecast-summary'));
+      await revealDetail(tester, summary);
       await tester.ensureVisible(summary);
       expect(find.textContaining('28 只（估算）'), findsOneWidget);
       await openStatisticsSettings(tester);
@@ -900,6 +924,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
+      await revealDetail(tester, summary);
       expect(find.textContaining('126 只（估算）'), findsOneWidget);
       expect(tables['care_records'], isEmpty);
       await openStatisticsSettings(tester);
@@ -1162,6 +1187,7 @@ void main() {
           greaterThan(tester.getRect(cover).bottom),
         );
         expect(find.text('网购-蚂蚁牧场'), findsOneWidget);
+        await revealDetail(tester, find.text('布局验收日记'));
         final recordCard = find.ancestor(
           of: find.text('布局验收日记'),
           matching: find.byType(Card),
@@ -1215,6 +1241,7 @@ void main() {
       await tester.tap(find.text('简化测试'));
       await tester.pumpAndSettle();
       expect(find.text('自动扩充'), findsNothing);
+      await revealDetail(tester, find.text('种群数量'));
       expect(find.text('种群数量'), findsOneWidget);
       expect(find.text('百科'), findsNothing);
       await tester.scrollUntilVisible(
@@ -1238,6 +1265,7 @@ void main() {
       themeController.simpleMode = false;
       await tester.tap(find.text('简化测试'));
       await tester.pumpAndSettle();
+      await revealDetail(tester, find.text('种群数量'));
       expect(find.text('自动扩充'), findsOneWidget);
       expect(find.text('种群数量'), findsOneWidget);
       expect(tables['colonies'], hasLength(1));
@@ -2158,10 +2186,12 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('种群数量'), findsOneWidget);
+    await revealDetail(tester, find.text('5 卵'));
     expect(find.text('5 卵'), findsOneWidget);
     expect(find.text('2 茧'), findsOneWidget);
     expect(find.textContaining('幼虫'), findsNothing);
+    await revealDetail(tester, find.text('种群数量'));
+    expect(find.text('种群数量'), findsOneWidget);
     expect(find.byKey(const ValueKey('colony-population-chart')), findsNothing);
     expect(find.byTooltip('展开种群数量'), findsOneWidget);
     final collapsedPopulation = find.ancestor(
@@ -2183,6 +2213,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await revealDetail(
+      tester,
+      find.byKey(const ValueKey('colony-population-chart')),
+    );
     expect(
       find.byKey(const ValueKey('colony-population-chart')),
       findsOneWidget,

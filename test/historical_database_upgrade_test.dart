@@ -66,6 +66,7 @@ void main() {
           const MethodChannel('plugins.flutter.io/path_provider'),
           null,
         );
+    await app.close();
     await root.delete(recursive: true);
   });
 
@@ -227,7 +228,7 @@ void main() {
           path,
           options: factory.options,
         );
-        expect(await upgraded.getVersion(), 22);
+        expect(await upgraded.getVersion(), 24);
         expect(await upgraded.rawQuery('PRAGMA foreign_key_check'), isEmpty);
         expect(
           (await upgraded.rawQuery('PRAGMA integrity_check'))
@@ -367,7 +368,7 @@ void main() {
         path,
         options: factory.options,
       );
-      expect(await retry.getVersion(), 22);
+      expect(await retry.getVersion(), 24);
       expect((await retry.query('care_records')).length, 2);
       await retry.close();
     },

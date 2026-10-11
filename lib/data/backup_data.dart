@@ -1,6 +1,9 @@
 import '../domain/models.dart';
 import '../domain/care_task.dart';
 import '../domain/memorial.dart';
+import '../domain/nest_entry.dart';
+import '../domain/winter_cycle.dart';
+import '../domain/flight_observation.dart';
 
 /// Validate before touching either the live data or the previous rollback copy.
 /// Model readers check field types and dates; the remaining checks mirror the
@@ -33,6 +36,36 @@ class BackupData {
       (row) => InventoryItem.fromMap(row).toMap(),
     );
     final colonyIds = colonies.map((row) => row['id']).toSet();
+    final cycles = _rows(
+      data,
+      'winter_cycles',
+      (row) => WinterCycle.fromMap(row).toMap(),
+    );
+    final activeCycles = <Object?>{};
+    for (final cycle in cycles) {
+      if (!colonyIds.contains(cycle['colony_id']) ||
+          (cycle['ended_on'] == null &&
+              !activeCycles.add(cycle['colony_id']))) {
+        throw const FormatException('备份中有无效或重复的进行中越冬周期。');
+      }
+    }
+    _rows(
+      data,
+      'flight_observations',
+      (row) => FlightObservation.fromMap(row).toMap(),
+    );
+    final nests = _rows(
+      data,
+      'nest_entries',
+      (row) => NestEntry.fromMap(row).toMap(),
+    );
+    final currentNests = <Object?>{};
+    for (final nest in nests) {
+      if (!colonyIds.contains(nest['colony_id']) ||
+          (nest['is_current'] == 1 && !currentNests.add(nest['colony_id']))) {
+        throw const FormatException('备份中有无效或重复的当前巢体。');
+      }
+    }
     if (records.any((row) => !colonyIds.contains(row['colony_id']))) {
       throw const FormatException('备份中有记录引用了不存在的蚁群。');
     }
@@ -130,6 +163,7 @@ class BackupData {
                 'task_type',
                 'feeding_response',
                 'feeding_leftovers',
+                'is_current',
               }.contains(field.key) &&
               value != model[field.key]) {
             throw FormatException('字段 ${field.key} 的取值无效。');

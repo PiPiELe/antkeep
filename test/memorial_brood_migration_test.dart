@@ -23,6 +23,7 @@ void main() {
         const MethodChannel('plugins.flutter.io/path_provider'),
         null,
       );
+      await AppDatabase.instance.close();
       await directory.delete(recursive: true);
     });
     sqfliteFfiInit();
@@ -109,7 +110,7 @@ void main() {
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
     );
     try {
-      expect(await database.getVersion(), 22);
+      expect(await database.getVersion(), 24);
       expect(await database.query('memorials'), hasLength(4));
       expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       await expectLater(

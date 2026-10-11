@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:async';
 
 import '../domain/memorial.dart';
+import '../domain/nest_entry.dart';
+import '../domain/winter_cycle.dart';
+import '../domain/flight_observation.dart';
 
 import 'package:sqflite/sqflite.dart';
 
@@ -13,6 +16,8 @@ import '../domain/spending_analysis.dart';
 import '../app_preferences.dart';
 import 'database_factory.dart';
 import 'database_path.dart';
+
+import 'package:uuid/uuid.dart';
 
 abstract class AntKeepRepository {
   Future<List<Colony>> listColonies();
@@ -38,12 +43,17 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 22,
+      version: 24,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
     );
     await _seedInventory();
+  }
+
+  Future<void> close() async {
+    await _database?.close();
+    _database = null;
   }
 
   Database get _db =>
@@ -77,6 +87,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       'CREATE INDEX records_by_colony_time ON care_records(colony_id, occurred_at DESC)',
     );
     await _createMemorialTable(database);
+    await _createNestEntriesTable(database);
+    await _createWinterAndFlightTables(database);
     await _createCareTasksTable(database);
     await _createSettingsTable(database);
     await _createInventoryTable(database);
@@ -88,6 +100,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 24) await _createWinterAndFlightTables(database);
+    if (oldVersion < 23) {
+      await _createNestEntriesTable(database);
+      await _seedLegacyNests(database);
+    }
     if (oldVersion < 22) {
       await database.execute(
         'ALTER TABLE care_records ADD COLUMN queen_mortality_count INTEGER '
@@ -250,6 +267,226 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     );
   }
 
+  static Future<void> _createNestEntriesTable(DatabaseExecutor db) async {
+    await db.execute('''CREATE TABLE nest_entries (
+      id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, nest_type TEXT NOT NULL,
+      name TEXT, started_on TEXT, note TEXT,
+      is_current INTEGER NOT NULL DEFAULT 0 CHECK (is_current IN (0, 1)),
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
+    )''');
+    await db.execute(
+      'CREATE INDEX nest_entries_by_colony ON nest_entries(colony_id, created_at DESC)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX nest_entries_current ON nest_entries(colony_id) WHERE is_current = 1',
+    );
+  }
+
+  static Future<void> _createWinterAndFlightTables(DatabaseExecutor db) async {
+    await db.execute('''CREATE TABLE winter_cycles (
+      id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, started_on TEXT NOT NULL,
+      planned_end_on TEXT, ended_on TEXT, note TEXT, created_at TEXT NOT NULL,
+      FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
+    )''');
+    await db.execute(
+      'CREATE INDEX winter_cycles_by_colony ON winter_cycles(colony_id, started_on DESC)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX winter_cycles_active ON winter_cycles(colony_id) WHERE ended_on IS NULL',
+    );
+    await db.execute('''CREATE TABLE flight_observations (
+      id TEXT PRIMARY KEY, observed_at TEXT NOT NULL, place TEXT NOT NULL,
+      species TEXT, count INTEGER CHECK (count BETWEEN 0 AND 1000000),
+      note TEXT, created_at TEXT NOT NULL
+    )''');
+    await db.execute(
+      'CREATE INDEX flight_observations_by_time ON flight_observations(observed_at DESC)',
+    );
+  }
+
+  Future<List<WinterCycle>> listWinterCycles(String colonyId) async =>
+      (await _db.query(
+        'winter_cycles',
+        where: 'colony_id = ?',
+        whereArgs: [colonyId],
+        orderBy: 'started_on DESC, created_at DESC',
+      )).map(WinterCycle.fromMap).toList();
+
+  Future<void> saveWinterCycle(WinterCycle cycle) async {
+    cycle.validate();
+    await _db.transaction((txn) async {
+      final colony = await txn.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [cycle.colonyId],
+      );
+      if (colony.isEmpty) throw StateError('蚁群已不存在');
+      if (colony.single['archived'] == 1) throw StateError('已归档蚁群不能修改越冬周期');
+      final existing = await txn.query(
+        'winter_cycles',
+        where: 'id = ?',
+        whereArgs: [cycle.id],
+      );
+      if (existing.isNotEmpty &&
+          existing.single['colony_id'] != cycle.colonyId) {
+        throw const FormatException('越冬周期不能转移到其他蚁群。');
+      }
+      if (existing.isEmpty) {
+        await txn.insert('winter_cycles', cycle.toMap());
+      } else {
+        await txn.update(
+          'winter_cycles',
+          cycle.toMap()..remove('created_at'),
+          where: 'id = ?',
+          whereArgs: [cycle.id],
+        );
+      }
+    });
+  }
+
+  Future<void> deleteWinterCycle(WinterCycle cycle) async {
+    final colony = await findColony(cycle.colonyId);
+    if (colony == null || colony.archived) {
+      throw StateError('已归档或不存在的蚁群不能修改越冬周期');
+    }
+    await _db.delete(
+      'winter_cycles',
+      where: 'id = ? AND colony_id = ?',
+      whereArgs: [cycle.id, cycle.colonyId],
+    );
+  }
+
+  Future<List<FlightObservation>> listFlightObservations() async =>
+      (await _db.query(
+        'flight_observations',
+        orderBy: 'observed_at DESC, created_at DESC',
+      )).map(FlightObservation.fromMap).toList();
+
+  Future<void> saveFlightObservation(FlightObservation entry) async {
+    entry.validate();
+    await _db.insert(
+      'flight_observations',
+      entry.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteFlightObservation(String id) async =>
+      _db.delete('flight_observations', where: 'id = ?', whereArgs: [id]);
+
+  static Future<void> _seedLegacyNests(DatabaseExecutor db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(colonies)');
+    if (!columns.any((column) => column['name'] == 'nest_type')) return;
+    final colonies = await db.query(
+      'colonies',
+      columns: ['id', 'nest_type', 'created_at'],
+    );
+    for (final colony in colonies) {
+      final type = colony['nest_type'] as String?;
+      if (type == null || type.trim().isEmpty) continue;
+      await db.insert(
+        'nest_entries',
+        NestEntry(
+          id: const Uuid().v4(),
+          colonyId: colony['id']! as String,
+          nestType: type,
+          createdAt: DateTime.parse(colony['created_at']! as String),
+          isCurrent: true,
+        ).toMap(),
+      );
+    }
+  }
+
+  Future<List<NestEntry>> listNestEntries(String colonyId) async =>
+      (await _db.query(
+        'nest_entries',
+        where: 'colony_id = ?',
+        whereArgs: [colonyId],
+        orderBy: 'created_at DESC',
+      )).map(NestEntry.fromMap).toList();
+
+  Future<void> saveNestEntry(NestEntry entry) async {
+    entry.validate();
+    await _db.transaction((txn) async {
+      final colony = await txn.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [entry.colonyId],
+      );
+      if (colony.isEmpty) throw StateError('蚁群已不存在');
+      if (colony.single['archived'] == 1) throw StateError('已归档蚁群不能修改巢体履历');
+      final existing = await txn.query(
+        'nest_entries',
+        where: 'id = ?',
+        whereArgs: [entry.id],
+      );
+      if (existing.isNotEmpty &&
+          existing.single['colony_id'] != entry.colonyId) {
+        throw const FormatException('巢体记录不能转移到其他蚁群。');
+      }
+      if (entry.isCurrent) {
+        await txn.update(
+          'nest_entries',
+          {'is_current': 0},
+          where: 'colony_id = ? AND is_current = 1',
+          whereArgs: [entry.colonyId],
+        );
+      }
+      if (existing.isEmpty) {
+        await txn.insert('nest_entries', entry.toMap());
+      } else {
+        await txn.update(
+          'nest_entries',
+          entry.toMap()..remove('created_at'),
+          where: 'id = ?',
+          whereArgs: [entry.id],
+        );
+      }
+      if (entry.isCurrent ||
+          (existing.isNotEmpty && existing.single['is_current'] == 1)) {
+        await txn.update(
+          'colonies',
+          {
+            'nest_type': entry.isCurrent ? entry.nestType : null,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [entry.colonyId],
+        );
+      }
+    });
+  }
+
+  Future<void> deleteNestEntry(NestEntry entry) async {
+    await _db.transaction((txn) async {
+      final colony = await txn.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [entry.colonyId],
+      );
+      if (colony.isEmpty) throw StateError('蚁群已不存在');
+      if (colony.single['archived'] == 1) throw StateError('已归档蚁群不能修改巢体履历');
+      final existing = await txn.query(
+        'nest_entries',
+        where: 'id = ?',
+        whereArgs: [entry.id],
+      );
+      if (existing.isEmpty || existing.single['colony_id'] != entry.colonyId) {
+        return;
+      }
+      await txn.delete('nest_entries', where: 'id = ?', whereArgs: [entry.id]);
+      if (existing.single['is_current'] == 1) {
+        await txn.update(
+          'colonies',
+          {'nest_type': null, 'updated_at': DateTime.now().toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [entry.colonyId],
+        );
+      }
+    });
+  }
+
   Future<List<Memorial>> listMemorials() async => (await _db.query(
     'memorials',
     orderBy: 'COALESCE(died_on, created_at) DESC, created_at DESC',
@@ -408,19 +645,46 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   @override
-  Future<void> saveColony(Colony colony) =>
-      _db.transaction((transaction) async {
-        await _applyGrowth(transaction, DateTime.now(), colony.id);
-        final updated = await transaction.update(
-          'colonies',
-          colony.toMap()..remove('auto_growth_json'),
-          where: 'id = ?',
-          whereArgs: [colony.id],
+  Future<void> saveColony(Colony colony) => _db.transaction((
+    transaction,
+  ) async {
+    await _applyGrowth(transaction, DateTime.now(), colony.id);
+    final previous = await transaction.query(
+      'colonies',
+      columns: ['nest_type'],
+      where: 'id = ?',
+      whereArgs: [colony.id],
+    );
+    final updated = await transaction.update(
+      'colonies',
+      colony.toMap()..remove('auto_growth_json'),
+      where: 'id = ?',
+      whereArgs: [colony.id],
+    );
+    if (updated == 0) {
+      await transaction.insert('colonies', colony.toMap());
+    }
+    if (previous.isEmpty || previous.single['nest_type'] != colony.nestType) {
+      await transaction.update(
+        'nest_entries',
+        {'is_current': 0},
+        where: 'colony_id = ? AND is_current = 1',
+        whereArgs: [colony.id],
+      );
+      if (colony.nestType?.trim().isNotEmpty == true) {
+        await transaction.insert(
+          'nest_entries',
+          NestEntry(
+            id: const Uuid().v4(),
+            colonyId: colony.id,
+            nestType: colony.nestType!,
+            createdAt: DateTime.now(),
+            isCurrent: true,
+          ).toMap(),
         );
-        if (updated == 0) {
-          await transaction.insert('colonies', colony.toMap());
-        }
-      });
+      }
+    }
+  });
 
   Future<Colony> updateColonyDiaryRules(
     String id, {
@@ -738,6 +1002,50 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       whereArgs: [record.colonyId],
     );
   });
+
+  /// Save one confirmed care event per colony as a single local operation.
+  /// A missing colony or failed insert rolls back every record in the batch.
+  Future<void> saveRecordsBatch(
+    List<CareRecord> records, {
+    bool recalculateAllGrowth = false,
+  }) async {
+    if (records.isEmpty) throw ArgumentError('请至少选择一窝蚁群');
+    if (records.map((record) => record.colonyId).toSet().length !=
+        records.length) {
+      throw ArgumentError('同一蚁群不能在一批中重复记录');
+    }
+    await _db.transaction((transaction) async {
+      final now = DateTime.now();
+      for (final record in records) {
+        final colonies = await transaction.query(
+          'colonies',
+          where: 'id = ?',
+          whereArgs: [record.colonyId],
+        );
+        if (colonies.isEmpty || Colony.fromMap(colonies.single).archived) {
+          throw StateError('蚁群已不存在或已归档，请返回刷新');
+        }
+        await _applyGrowth(transaction, now, record.colonyId);
+        final before = await _growthReplayRecords(transaction, record.colonyId);
+        _requireGrowthConfirmation(before, [
+          record.occurredAt,
+        ], recalculateAllGrowth);
+        await transaction.insert('care_records', record.toMap());
+        await _recalculateGrowthEstimates(
+          transaction,
+          record.colonyId,
+          before,
+          recalculateAll: recalculateAllGrowth,
+        );
+        await transaction.update(
+          'colonies',
+          {'updated_at': now.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [record.colonyId],
+        );
+      }
+    });
+  }
 
   @override
   Future<void> updateRecord(
@@ -1262,6 +1570,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     (txn) async => {
       'memorials': await txn.query('memorials'),
       'colonies': await txn.query('colonies'),
+      'nest_entries': await txn.query('nest_entries'),
+      'winter_cycles': await txn.query('winter_cycles'),
+      'flight_observations': await txn.query('flight_observations'),
       'care_records': await txn.query('care_records'),
       'care_tasks': await txn.query('care_tasks'),
       'feeder_records': await txn.query('feeder_records'),
@@ -1291,6 +1602,16 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     final records = (snapshot['care_records'] as List)
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
+    final nestEntries = (snapshot['nest_entries'] as List? ?? const [])
+        .map((row) => Map<String, Object?>.from(row as Map))
+        .toList();
+    final winterCycles = (snapshot['winter_cycles'] as List? ?? const [])
+        .map((row) => Map<String, Object?>.from(row as Map))
+        .toList();
+    final flightObservations =
+        (snapshot['flight_observations'] as List? ?? const [])
+            .map((row) => Map<String, Object?>.from(row as Map))
+            .toList();
     final feederRecords = (snapshot['feeder_records'] as List? ?? const [])
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
@@ -1305,10 +1626,20 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       await transaction.delete('feeder_records');
       await transaction.delete('memorials');
       await transaction.delete('care_records');
+      await transaction.delete('nest_entries');
+      await transaction.delete('winter_cycles');
+      await transaction.delete('flight_observations');
       await transaction.delete('care_tasks');
       await transaction.delete('colonies');
       for (final colony in colonies) {
         await transaction.insert('colonies', colony);
+      }
+      if (snapshot.containsKey('nest_entries')) {
+        for (final entry in nestEntries) {
+          await transaction.insert('nest_entries', entry);
+        }
+      } else {
+        await _seedLegacyNests(transaction);
       }
       for (final row in snapshot['memorials'] as List? ?? const []) {
         await transaction.insert(
@@ -1318,6 +1649,12 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       }
       for (final record in records) {
         await transaction.insert('care_records', record);
+      }
+      for (final cycle in winterCycles) {
+        await transaction.insert('winter_cycles', cycle);
+      }
+      for (final entry in flightObservations) {
+        await transaction.insert('flight_observations', entry);
       }
       for (final task in careTasks) {
         await transaction.insert('care_tasks', task);
