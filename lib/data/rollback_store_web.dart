@@ -18,4 +18,8 @@ class RollbackStore {
   }
 
   Future<bool> exists() async => web.window.localStorage.getItem(_key) != null;
+
+  Future<void> clear() async {
+    web.window.localStorage.removeItem(_key);
+  }
 }

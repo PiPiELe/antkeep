@@ -12,6 +12,7 @@ import 'backup_logic.dart';
 import 'backup_resources.dart';
 import 'backup_zip_io.dart';
 import 'local_media_store.dart';
+import 'media_cleanup.dart';
 import 'rollback_store.dart';
 
 class BackupService with BackupLogic {
@@ -212,6 +213,9 @@ class BackupService with BackupLogic {
       });
       await merged.delete();
     }
+    final oldMedia = mode == BackupRestoreMode.overwrite
+        ? database.photoPaths(await database.snapshot())
+        : <String>{};
     final rollback = await _snapshot(temporary, 'rollback.zip');
     final rollbackStore = RollbackStore.instance;
     final destination = await rollbackStore.file();
@@ -264,5 +268,6 @@ class BackupService with BackupLogic {
       if (recoveryError != null) throw BackupRecoveryFailure(temporary.path);
       rethrow;
     }
+    await removeUnreferencedMedia(database, _mediaStore, oldMedia);
   }
 }

@@ -34,6 +34,29 @@ class LocalMediaStore {
     for (final path in relativePaths) path: base64Decode(_read(path)),
   };
 
+  Future<void> pruneUnreferenced(Set<String> referenced) async {
+    final storage = web.window.localStorage;
+    final unused = <String>[];
+    for (var index = 0; index < storage.length; index++) {
+      final key = storage.key(index);
+      if (key != null &&
+          key.startsWith(_prefix) &&
+          !referenced.contains(key.substring(_prefix.length))) {
+        unused.add(key);
+      }
+    }
+    for (final key in unused) {
+      storage.removeItem(key);
+    }
+  }
+
+  Future<void> deleteFiles(Iterable<String> names) async {
+    for (final name in names) {
+      _validate(name);
+      web.window.localStorage.removeItem('$_prefix$name');
+    }
+  }
+
   Future<void> restoreFiles(Map<String, List<int>> files) async {
     for (final entry in files.entries) {
       _validate(entry.key);

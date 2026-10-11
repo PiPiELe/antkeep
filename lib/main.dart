@@ -34,6 +34,7 @@ import 'onboarding.dart';
 import 'data/app_database.dart';
 import 'data/backup_service.dart';
 import 'data/local_media_store.dart';
+import 'data/media_cleanup.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
 import 'domain/care_task.dart';
@@ -180,6 +181,10 @@ Future<void> main() async {
   try {
     await LocalMediaStore.instance.initialize();
     await AppDatabase.instance.open();
+    await pruneUnreferencedMedia(
+      AppDatabase.instance,
+      LocalMediaStore.instance,
+    );
     await themeController.load();
     AppEdition? appliedEdition;
     void updateOnlineMode() {
@@ -1480,6 +1485,13 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           updatedAt: now,
         ),
       );
+      if (_cover != null && widget.colony?.coverPhotoPath != null) {
+        await removeUnreferencedMedia(
+          AppDatabase.instance,
+          LocalMediaStore.instance,
+          [widget.colony!.coverPhotoPath!],
+        );
+      }
       if (widget.colony == null && !themeController.simpleMode && mounted) {
         final colony = await AppDatabase.instance.findColony(colonyId);
         if (colony != null && mounted) {
@@ -2464,7 +2476,17 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         ),
       );
       if (confirmed != true || !mounted) return;
+      final records = await AppDatabase.instance.listRecords(colony.id);
+      final oldMedia = <String>{
+        if (colony.coverPhotoPath != null) colony.coverPhotoPath!,
+        for (final record in records) ...record.photos,
+      };
       await AppDatabase.instance.deleteColony(colony.id);
+      await removeUnreferencedMedia(
+        AppDatabase.instance,
+        LocalMediaStore.instance,
+        oldMedia,
+      );
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
       if (mounted) _showError(context, error);
@@ -2534,6 +2556,11 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
       } else {
         await action();
       }
+      await removeUnreferencedMedia(
+        AppDatabase.instance,
+        LocalMediaStore.instance,
+        record.photos,
+      );
       if (mounted) setState(_reload);
     } catch (error) {
       if (mounted) _showError(context, error);

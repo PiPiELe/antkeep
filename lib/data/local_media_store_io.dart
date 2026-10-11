@@ -67,6 +67,21 @@ class LocalMediaStore {
     return files;
   }
 
+  Future<void> pruneUnreferenced(Set<String> referenced) async {
+    await for (final entity in _mediaDirectory.list(followLinks: false)) {
+      if (entity is File && !referenced.contains(path.basename(entity.path))) {
+        await entity.delete();
+      }
+    }
+  }
+
+  Future<void> deleteFiles(Iterable<String> names) async {
+    for (final name in names) {
+      final file = await _fileFor(name);
+      if (await file.exists()) await file.delete();
+    }
+  }
+
   Future<int> overwrittenBytes(Iterable<String> names) async {
     var size = 0;
     for (final name in names) {

@@ -9,6 +9,7 @@ import 'backup_archive.dart';
 import 'backup_data.dart';
 import 'backup_logic.dart';
 import 'local_media_store.dart';
+import 'media_cleanup.dart';
 import 'rollback_store.dart';
 
 class BackupService with BackupLogic {
@@ -136,14 +137,29 @@ class BackupService with BackupLogic {
       );
       _encodeBackup(data, {...combinedMedia, ...media});
     }
+    final oldMedia = mode == BackupRestoreMode.overwrite
+        ? _database.photoPaths(await _database.snapshot())
+        : <String>{};
     final rollbackBytes = await createBackupBytes();
-    await RollbackStore.instance.save(rollbackBytes);
-    final mediaRestore = await _mediaStore.replaceFilesWithRollback(media);
+    final rollbackStore = RollbackStore.instance;
+    final previousRollback = await rollbackStore.read();
+    await rollbackStore.save(rollbackBytes);
+    MediaRestore? mediaRestore;
     try {
+      mediaRestore = await _mediaStore.replaceFilesWithRollback(media);
       await _database.replaceAll(data);
     } catch (_) {
-      await mediaRestore.rollback();
+      try {
+        await mediaRestore?.rollback();
+      } finally {
+        if (previousRollback == null) {
+          await rollbackStore.clear();
+        } else {
+          await rollbackStore.save(previousRollback);
+        }
+      }
       rethrow;
     }
+    await removeUnreferencedMedia(_database, _mediaStore, oldMedia);
   }
 }

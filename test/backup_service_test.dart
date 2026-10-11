@@ -8,6 +8,7 @@ import 'package:antkeep/data/backup_archive.dart';
 import 'package:antkeep/data/backup_resources.dart';
 import 'package:antkeep/data/backup_service.dart';
 import 'package:antkeep/data/local_media_store.dart';
+import 'package:antkeep/data/media_cleanup.dart';
 import 'package:antkeep/data/rollback_store.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/domain/care_task.dart';
@@ -119,6 +120,47 @@ void main() {
     });
     previousRollback = await service.createBackupBytes();
     await RollbackStore.instance.save(previousRollback);
+  });
+
+  test('keeps shared media until its last reference is deleted', () async {
+    final data = fixture();
+    data['care_records'].add({
+      ...data['care_records'].single as Map<String, Object?>,
+      'id': 'second-record',
+    });
+    await database.replaceAll(data);
+    final records = await database.listRecords('c');
+    await database.deleteRecord(records.first);
+    await removeUnreferencedMedia(database, media, records.first.photos);
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    await database.deleteRecord(records.last);
+    await removeUnreferencedMedia(database, media, records.last.photos);
+    await expectLater(
+      media.readImage('image.jpg'),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
+
+  test('launch cleanup removes media left by earlier failed edits', () async {
+    await media.restoreFiles({'orphan.jpg': [4, 5, 6]});
+    await pruneUnreferencedMedia(database, media);
+    await expectLater(
+      media.readImage('orphan.jpg'),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
+  });
+
+  test('overwrite removes old media and undo restores it', () async {
+    final incoming = fixture();
+    incoming['care_records'] = <Map<String, Object?>>[];
+    await service.restoreBytes(archiveBytes(incoming, media: {}));
+    await expectLater(
+      media.readImage('image.jpg'),
+      throwsA(isA<FileSystemException>()),
+    );
+    await service.undoLastRestore();
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
   });
 
   test(
