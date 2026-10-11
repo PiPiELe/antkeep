@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/backup_data.dart';
+import 'package:antkeep/data/backup_logic.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/domain/nest_entry.dart';
 import 'package:flutter/services.dart';
@@ -142,4 +143,90 @@ void main() {
       expect(() => BackupData.validate(invalid), throwsFormatException);
     },
   );
+
+  test(
+    'incremental restore keeps the local current nest and imports history',
+    () async {
+      final current = await database.snapshot();
+      final local = (current['nest_entries'] as List).single as Map;
+      final incoming = Map<String, dynamic>.from(current);
+      incoming['colonies'] = [
+        Colony(
+          id: 'colony',
+          name: '测试蚁群',
+          nestType: '石膏巢',
+          createdAt: now,
+          updatedAt: now,
+        ).toMap(),
+      ];
+      incoming['nest_entries'] = [
+        NestEntry(
+          id: 'imported-current',
+          colonyId: 'colony',
+          nestType: '石膏巢',
+          createdAt: now,
+          isCurrent: true,
+        ).toMap(),
+      ];
+      final probe = _BackupProbe();
+      final (merged, _) = probe.mergeMissing<Object>(current, incoming, {});
+      BackupData.validate(merged);
+      await database.replaceAll(merged);
+      final entries = await database.listNestEntries('colony');
+      expect(entries, hasLength(2));
+      expect(entries.singleWhere((entry) => entry.isCurrent).id, local['id']);
+      expect(
+        entries
+            .singleWhere((entry) => entry.id == 'imported-current')
+            .isCurrent,
+        isFalse,
+      );
+      expect((await database.findColony('colony'))!.nestType, '试管巢');
+
+      final (again, _) = probe.mergeMissing<Object>(merged, incoming, {});
+      expect(again['nest_entries'], hasLength(2));
+    },
+  );
+
+  test(
+    'incremental restore preserves the current nest of a new colony',
+    () async {
+      final current = await database.snapshot();
+      final incoming = Map<String, dynamic>.from(current);
+      incoming['colonies'] = [
+        Colony(
+          id: 'imported-colony',
+          name: '导入蚁群',
+          nestType: '石膏巢',
+          createdAt: now,
+          updatedAt: now,
+        ).toMap(),
+      ];
+      incoming['nest_entries'] = [
+        NestEntry(
+          id: 'imported-current',
+          colonyId: 'imported-colony',
+          nestType: '石膏巢',
+          createdAt: now,
+          isCurrent: true,
+        ).toMap(),
+      ];
+      final (merged, _) = _BackupProbe().mergeMissing<Object>(
+        current,
+        incoming,
+        {},
+      );
+      BackupData.validate(merged);
+      await database.replaceAll(merged);
+      expect(
+        (await database.listNestEntries('imported-colony')).single.isCurrent,
+        isTrue,
+      );
+    },
+  );
+}
+
+class _BackupProbe with BackupLogic {
+  @override
+  AppDatabase get database => AppDatabase.instance;
 }

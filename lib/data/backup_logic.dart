@@ -124,6 +124,13 @@ mixin BackupLogic {
             !activeWinterColonies.add(row['colony_id'])) {
           continue;
         }
+        if (table == 'nest_entries' &&
+            row['is_current'] == 1 &&
+            localColonies.containsKey(row['colony_id'])) {
+          // The local colony profile decides which nest is current. Keep the
+          // imported entry as history, even when it has a different ID.
+          row['is_current'] = 0;
+        }
         if (table == 'memorials' &&
             row['kind'] == 'colony' &&
             row['colony_id'] != null) {
