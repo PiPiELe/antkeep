@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../domain/models.dart';
 import 'online_api.dart';
@@ -23,12 +24,20 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
   final Set<String> _selected = {};
   Map<String, dynamic>? _status;
   String? _statusUser, _message;
+  final _code = TextEditingController();
+  String? _pendingOperationId, _pendingPayload;
   bool _loading = true, _submitting = false;
 
   @override
   void initState() {
     super.initState();
     _reload();
+  }
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
   }
 
   Future<void> _reload() async {
@@ -65,6 +74,11 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
 
   Future<void> _submit() async {
     if (_submitting || _selected.isEmpty) return;
+    final code = _code.text.trim();
+    if (code.isEmpty) {
+      setState(() => _message = '请输入可用于上传的码值。');
+      return;
+    }
     final userId = widget.controller.user?.id;
     final items = _items.where((item) => _selected.contains(item.id)).toList();
     setState(() => _submitting = true);
@@ -74,7 +88,7 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
         builder: (context) => AlertDialog(
           title: const Text('确认推送物品数据'),
           content: Text(
-            '将向 B 端推送所选的 ${items.length} 条物品数据，包括名称、分组、购买状态、数量、购入价和日期、有效期信息。成功后今天不能再次推送。',
+            '将向 B 端推送所选的 ${items.length} 条物品数据，包括名称、分组、购买状态、数量、购入价和日期、有效期信息。成功后今天不能再次推送，并消耗码值一次使用次数。',
           ),
           actions: [
             TextButton(
@@ -90,7 +104,17 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
       );
       if (confirmed != true || !mounted) return;
       if (widget.controller.user?.id != userId) return;
-      final receipt = await widget.controller.pushInventory(items);
+      final payload =
+          '$userId|$code|${items.map((item) => item.toMap()).toList()}';
+      if (_pendingPayload != payload) {
+        _pendingPayload = payload;
+        _pendingOperationId = const Uuid().v4();
+      }
+      final receipt = await widget.controller.pushInventory(
+        items,
+        code: code,
+        operationId: _pendingOperationId!,
+      );
       if (!mounted) return;
       setState(() {
         _status = {
@@ -100,6 +124,8 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
         };
         _statusUser = userId;
         _message = '推送成功，B 端已收到 ${receipt['itemCount']} 条物品数据。';
+        _pendingOperationId = null;
+        _pendingPayload = null;
       });
     } catch (error) {
       // A timeout can happen after the server commits. Read back the status
@@ -185,6 +211,15 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
                         const SizedBox(height: 8),
                         const Text(
                           '勾选需要推送的物品，单次最多 200 条。由服务端按北京时间限制每天成功推送一次，零点后可再次推送。',
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _code,
+                          enabled: !locked && !pushed,
+                          decoration: const InputDecoration(
+                            labelText: '上传码值',
+                            hintText: '输入可用于上传的码值',
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
