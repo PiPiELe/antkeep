@@ -242,13 +242,21 @@ class OnlineController extends ChangeNotifier {
   Future<Map<String, dynamic>> inventoryPushStatus() =>
       _authenticatedRequest('/api/app/inventory-pushes/status');
 
-  Future<Map<String, dynamic>> pushInventory(List<InventoryItem> items) {
+  Future<Map<String, dynamic>> pushInventory(
+    List<InventoryItem> items, {
+    required String code,
+    required String operationId,
+  }) {
     if (items.isEmpty || items.length > 200) {
       throw const ApiFailure('请选择 1–200 条物品数据。');
     }
     return _authenticatedRequest(
       '/api/app/inventory-pushes',
-      body: {'items': items.map((item) => item.toMap()).toList()},
+      body: {
+        'items': items.map((item) => item.toMap()).toList(),
+        'code': code,
+        'operationId': operationId,
+      },
     );
   }
 

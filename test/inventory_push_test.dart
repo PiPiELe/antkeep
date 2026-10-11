@@ -8,6 +8,7 @@ import 'package:antkeep/online/online_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 
 import 'online_controller_test.dart'
     show MemoryOnlineStore, controller, response, snapshot, summary, user;
@@ -126,17 +127,27 @@ Future<void> settle(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<Map<String, dynamic>> push(
+  OnlineController live,
+  List<InventoryItem> selected,
+) => live.pushInventory(
+  selected,
+  code: 'UPLOAD01',
+  operationId: const Uuid().v4(),
+);
+
 void main() {
   test('only selected inventory is sent with authenticated identity', () async {
     final h = Harness();
     addTearDown(h.live.dispose);
     await h.login();
-    await h.live.pushInventory([items.first]);
+    await push(h.live, [items.first]);
     final upload = h.uploads.single;
     expect(upload.headers['Authorization'], 'Bearer secret-session');
-    expect(jsonDecode(upload.body), {
-      'items': [items.first.toMap()],
-    });
+    final body = jsonDecode(upload.body) as Map<String, dynamic>;
+    expect(body['items'], [items.first.toMap()]);
+    expect(body['code'], 'UPLOAD01');
+    expect(body['operationId'], isA<String>());
     expect((await h.live.inventoryPushStatus())['pushedToday'], true);
   });
 
@@ -145,23 +156,14 @@ void main() {
     () async {
       final h = Harness();
       addTearDown(h.live.dispose);
-      await expectLater(
-        h.live.pushInventory(items),
-        throwsA(isA<ApiFailure>()),
-      );
+      await expectLater(push(h.live, items), throwsA(isA<ApiFailure>()));
       await h.live.setEnabled(true);
-      await expectLater(
-        h.live.pushInventory(items),
-        throwsA(isA<ApiFailure>()),
-      );
+      await expectLater(push(h.live, items), throwsA(isA<ApiFailure>()));
       await h.live.login('keeper', 'password123');
-      expect(() => h.live.pushInventory([]), throwsA(isA<ApiFailure>()));
+      expect(() => push(h.live, []), throwsA(isA<ApiFailure>()));
       h.pending = Completer<void>();
-      final first = h.live.pushInventory([items.first]);
-      await expectLater(
-        h.live.pushInventory([items.last]),
-        throwsA(isA<ApiFailure>()),
-      );
+      final first = push(h.live, [items.first]);
+      await expectLater(push(h.live, [items.last]), throwsA(isA<ApiFailure>()));
       h.pending!.complete();
       await first;
       expect(h.uploads.length, 1);
@@ -176,7 +178,7 @@ void main() {
       await h.login();
       h.pushed = true;
       await expectLater(
-        h.live.pushInventory(items),
+        push(h.live, items),
         throwsA(isA<ApiFailure>().having((e) => e.status, 'status', 409)),
       );
       h.invalidSession = true;
@@ -194,7 +196,7 @@ void main() {
     addTearDown(h.live.dispose);
     await h.login();
     h.pending = Completer<void>();
-    final upload = h.live.pushInventory([items.first]);
+    final upload = push(h.live, [items.first]);
     final rejected = expectLater(upload, throwsA(isA<ApiFailure>()));
     await h.live.setEnabled(false);
     h.pending!.complete();
@@ -213,6 +215,8 @@ void main() {
         ),
       ),
     );
+    await settle(tester);
+    await tester.enterText(find.byType(TextField), 'UPLOAD01');
     await settle(tester);
   }
 
