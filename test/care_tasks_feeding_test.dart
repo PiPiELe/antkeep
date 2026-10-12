@@ -224,6 +224,9 @@ void main() {
         ),
       );
       await settleDatabase(tester);
+      expect(find.byTooltip('展开养护待办'), findsOneWidget);
+      await tester.tap(find.byTooltip('展开养护待办'));
+      await settleDatabase(tester);
       await tester.tap(find.text('添加'));
       await tester.pumpAndSettle();
       await tester.enterText(find.widgetWithText(TextFormField, '每隔几天'), '2');
@@ -292,6 +295,8 @@ void main() {
     );
     await settleDatabase(tester);
 
+    await tester.tap(find.byTooltip('展开养护待办'));
+    await settleDatabase(tester);
     await tester.tap(find.text('快速完成'));
     await settleDatabase(tester);
 

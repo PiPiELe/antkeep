@@ -22,7 +22,7 @@ class CareTasksSection extends StatefulWidget {
 class _CareTasksSectionState extends State<CareTasksSection> {
   late Future<List<CareTask>> _tasks = _load();
   bool _busy = false;
-  bool _expanded = true;
+  bool _expanded = false;
 
   Future<List<CareTask>> _load() =>
       AppDatabase.instance.listCareTasks(colonyId: widget.colony.id);

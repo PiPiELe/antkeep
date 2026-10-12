@@ -1172,6 +1172,15 @@ void main() {
         await tester.pumpAndSettle();
         await tester.drag(find.byType(ListView).first, const Offset(0, 1500));
         await tester.pumpAndSettle();
+        final shortcutLabels = [
+          find.text('巢体履历'),
+          find.text('越冬周期'),
+          find.text('里程碑'),
+        ];
+        expect(
+          shortcutLabels.map((label) => tester.getTopLeft(label).dy).toSet(),
+          hasLength(1),
+        );
         final cover = find.byWidgetPredicate(
           (widget) => widget is Image && widget.semanticLabel == '默认蚂蚁封面',
         );

@@ -2751,6 +2751,13 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         if (mounted) setState(_reload);
       }
 
+      final shortcutStyle = OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        minimumSize: const Size(0, 48),
+        textStyle: const TextStyle(fontSize: 13),
+        iconSize: 18,
+      );
+
       return Scaffold(
         appBar: AppBar(
           title: Text(colony.name),
@@ -2857,51 +2864,62 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   ? null
                   : () => _editAcquiredOn(colony),
             ),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.home_work_outlined),
-                title: const Text('巢体履历'),
-                subtitle: Text(
-                  colony.nestType == null
-                      ? '查看和记录使用过的巢体'
-                      : '当前：${colony.nestType} · 查看使用历史',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  await Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => NestHistoryPage(colony: colony),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: shortcutStyle,
+                    icon: const Icon(Icons.home_work_outlined),
+                    label: const Text(
+                      '巢体履历',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  );
-                  if (mounted) setState(_reload);
-                },
-              ),
-            ),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.ac_unit),
-                title: const Text('越冬周期'),
-                subtitle: const Text('记录开始、计划结束与实际结束日期'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => WinterCyclePage(colony: colony),
+                    onPressed: () async {
+                      await Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => NestHistoryPage(colony: colony),
+                        ),
+                      );
+                      if (mounted) setState(_reload);
+                    },
                   ),
                 ),
-              ),
-            ),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.flag_outlined),
-                title: const Text('里程碑'),
-                subtitle: const Text('记录重大事件，不参与日记统计'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MilestonePage(colony: colony),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: shortcutStyle,
+                    icon: const Icon(Icons.ac_unit),
+                    label: const Text(
+                      '越冬周期',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => WinterCyclePage(colony: colony),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: shortcutStyle,
+                    icon: const Icon(Icons.flag_outlined),
+                    label: const Text(
+                      '里程碑',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => MilestonePage(colony: colony),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             if (colony.targetTemperatureLower != null ||
                 colony.targetTemperature != null ||
