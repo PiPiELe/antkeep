@@ -4798,26 +4798,6 @@ class DiscoverPage extends StatelessWidget {
             vertical: 8,
           ),
           leading: Icon(
-            Icons.travel_explore_outlined,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          title: const Text('婚飞观察与天气'),
-          subtitle: const Text('本地记录观察，手动查询城市天气'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const FlightObservationPage(),
-            ),
-          ),
-        ),
-      ),
-      Card(
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          leading: Icon(
             Icons.notifications_active_outlined,
             color: Theme.of(context).colorScheme.primary,
           ),
@@ -4903,6 +4883,26 @@ class DiscoverPage extends StatelessWidget {
           title: const Text('养殖工具'),
           subtitle: const Text('让日常养护更方便'),
           trailing: Text('敬请期待', style: Theme.of(context).textTheme.labelSmall),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Icon(
+            Icons.travel_explore_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('婚飞观察与天气'),
+          subtitle: const Text('本地记录观察，手动查询城市天气'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const FlightObservationPage(),
+            ),
+          ),
         ),
       ),
     ],
