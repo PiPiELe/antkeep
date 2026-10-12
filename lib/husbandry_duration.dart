@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -12,6 +13,7 @@ class HusbandryDuration extends StatefulWidget {
     required this.colony,
     this.expanded = false,
     this.compact = false,
+    this.rightVerticalLabel = false,
     this.tall = false,
     this.showAcquiredDate = false,
     this.labelWidth,
@@ -21,6 +23,7 @@ class HusbandryDuration extends StatefulWidget {
   final Colony colony;
   final bool expanded;
   final bool compact;
+  final bool rightVerticalLabel;
   final bool tall;
   final bool showAcquiredDate;
   final double? labelWidth;
@@ -131,6 +134,116 @@ class _HusbandryDurationState extends State<HusbandryDuration>
               ),
             ),
           ],
+        );
+      }
+      if (widget.rightVerticalLabel) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final height = constraints.hasBoundedHeight
+                ? constraints.maxHeight
+                : 92.0;
+            final numberStyle = TextStyle(
+              fontSize: 160,
+              height: .9,
+              letterSpacing: -2,
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.primary,
+            );
+            final labelStyle = theme.textTheme.bodySmall?.copyWith(
+              fontSize: 14,
+              height: 1,
+              color: theme.colorScheme.onSurfaceVariant,
+            );
+            final unitStyle = theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            );
+            TextPainter measure(String text, TextStyle? style) => TextPainter(
+              text: TextSpan(text: text, style: style),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout();
+            final numberSize = measure('$days', numberStyle);
+            final labelSize = measure('已\n养\n殖', labelStyle);
+            final unitSize = measure('天', unitStyle);
+            final sideWidth = math.max(labelSize.width, unitSize.width);
+            final numberWidth = math.max(
+              1.0,
+              constraints.maxWidth - 20 - sideWidth,
+            );
+            final numberScale = math.min(
+              1.0,
+              math.min(
+                numberWidth / numberSize.width,
+                height / numberSize.height,
+              ),
+            );
+            final numberHeight = numberSize.height * numberScale;
+            final numberTop = (height - numberHeight) / 2;
+            final unitTop = numberTop + numberHeight - unitSize.height - 10;
+            final labelTop = math.max(
+              0.0,
+              math.min(numberTop + 12, unitTop - labelSize.height - 10),
+            );
+            final labelSpace = math.max(1.0, unitTop - labelTop - 10);
+            numberSize.dispose();
+            labelSize.dispose();
+            unitSize.dispose();
+            return SizedBox(
+              height: height,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text('$days', style: numberStyle),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: sideWidth,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: labelTop,
+                          left: 0,
+                          right: 0,
+                          height: labelSpace,
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '已\n养\n殖',
+                                key: const ValueKey('duration-right-label'),
+                                semanticsLabel: '已养殖',
+                                textAlign: TextAlign.center,
+                                style: labelStyle,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: unitTop,
+                          left: 0,
+                          right: 0,
+                          child: Text(
+                            '天',
+                            textAlign: TextAlign.center,
+                            style: unitStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       }
       Widget duration = FittedBox(

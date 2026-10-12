@@ -1287,10 +1287,12 @@ class _ColonyTags extends StatelessWidget {
     required this.colony,
     required this.workers,
     this.scrollable = false,
+    this.singleLine = false,
   });
   final Colony colony;
   final int? workers;
   final bool scrollable;
+  final bool singleLine;
 
   @override
   Widget build(BuildContext context) {
@@ -1337,7 +1339,7 @@ class _ColonyTags extends StatelessWidget {
         if (scale != null && colony.nestType?.isNotEmpty == true)
           const SizedBox(width: 8),
         if (colony.nestType?.isNotEmpty == true)
-          if (scrollable)
+          if (scrollable || singleLine)
             badge(colony.nestType!, scheme.onSurfaceVariant)
           else
             Flexible(child: badge(colony.nestType!, scheme.onSurfaceVariant)),
@@ -1353,6 +1355,66 @@ class _ColonyTags extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: tags,
+      ),
+    );
+  }
+}
+
+class _FadingHorizontalScroll extends StatefulWidget {
+  const _FadingHorizontalScroll({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_FadingHorizontalScroll> createState() =>
+      _FadingHorizontalScrollState();
+}
+
+class _FadingHorizontalScrollState extends State<_FadingHorizontalScroll> {
+  final _controller = ScrollController();
+  bool _hasMoreRight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_updateFade);
+  }
+
+  void _updateFade() {
+    if (!mounted || !_controller.hasClients) return;
+    final position = _controller.position;
+    final hasMoreRight = position.maxScrollExtent > position.pixels + .5;
+    if (hasMoreRight != _hasMoreRight) {
+      setState(() => _hasMoreRight = hasMoreRight);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFade());
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) {
+        final fadeStart = (1 - 28 / bounds.width).clamp(0.0, 1.0);
+        return LinearGradient(
+          colors: [
+            Colors.white,
+            Colors.white,
+            _hasMoreRight ? Colors.transparent : Colors.white,
+          ],
+          stops: [0, fadeStart, 1],
+        ).createShader(bounds);
+      },
+      child: SingleChildScrollView(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        child: widget.child,
       ),
     );
   }
@@ -3300,6 +3362,7 @@ class _ColonyProfileSummary extends StatelessWidget {
       String value, {
       VoidCallback? onTap,
       TextStyle? valueStyle,
+      bool singleLine = false,
     }) {
       final row = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3310,7 +3373,18 @@ class _ColonyProfileSummary extends StatelessWidget {
             style: metadataStyle,
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(value, style: valueStyle ?? metadataStyle)),
+          Expanded(
+            child: singleLine
+                ? _FadingHorizontalScroll(
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: valueStyle ?? metadataStyle,
+                    ),
+                  )
+                : Text(value, style: valueStyle ?? metadataStyle),
+          ),
         ],
       );
       return onTap == null
@@ -3341,13 +3415,58 @@ class _ColonyProfileSummary extends StatelessWidget {
             borderRadius: 8,
             fallback: defaultCover,
           );
-    final duration = colony.archived
+    Widget duration({bool rightVerticalLabel = false}) => colony.archived
         ? const Text('遗失的文明 · 养殖已结束')
         : InkWell(
             onTap: onDurationTap,
             borderRadius: BorderRadius.circular(8),
-            child: HusbandryDuration(colony: colony, compact: true),
+            child: HusbandryDuration(
+              colony: colony,
+              compact: true,
+              rightVerticalLabel: rightVerticalLabel,
+            ),
           );
+    List<Widget> profileDetails({required bool singleLine}) => [
+      if (colony.isNewQueenColony ||
+          workers != null ||
+          colony.nestType?.isNotEmpty == true) ...[
+        const SizedBox(height: 10),
+        if (singleLine)
+          _FadingHorizontalScroll(
+            child: _ColonyTags(
+              colony: colony,
+              workers: workers,
+              singleLine: true,
+            ),
+          )
+        else
+          _ColonyTags(colony: colony, workers: workers),
+      ],
+      if (colony.acquiredOn != null ||
+          colony.source?.trim().isNotEmpty == true ||
+          colony.purchasePriceCents != null) ...[
+        const SizedBox(height: 10),
+        if (colony.acquiredOn != null)
+          metadataRow(
+            '入手日期',
+            dottedDate(colony.acquiredOn!),
+            onTap: onDurationTap,
+            singleLine: singleLine,
+          ),
+        if (colony.source?.trim().isNotEmpty == true) ...[
+          const SizedBox(height: 4),
+          metadataRow('来源', _sourceLabel, singleLine: singleLine),
+        ],
+        if (colony.purchasePriceCents != null) ...[
+          const SizedBox(height: 4),
+          metadataRow(
+            '购入价',
+            '¥${colony.purchasePriceText}',
+            singleLine: singleLine,
+          ),
+        ],
+      ],
+    ];
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -3395,44 +3514,41 @@ class _ColonyProfileSummary extends StatelessWidget {
                     MediaQuery.textScalerOf(context).scale(12) > 18) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [cover, const SizedBox(height: 8), duration],
+                    children: [
+                      cover,
+                      const SizedBox(height: 8),
+                      duration(),
+                      ...profileDetails(singleLine: false),
+                    ],
                   );
                 }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(flex: 4, child: cover),
-                    const SizedBox(width: 12),
-                    Expanded(flex: 5, child: duration),
-                  ],
+                final leftWidth = (constraints.maxWidth - 12) / 2;
+                return SizedBox(
+                  width: constraints.maxWidth,
+                  child: Stack(
+                    children: [
+                      SizedBox(
+                        width: leftWidth,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            cover,
+                            ...profileDetails(singleLine: true),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: leftWidth,
+                        child: duration(rightVerticalLabel: true),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
-            if (colony.isNewQueenColony ||
-                workers != null ||
-                colony.nestType?.isNotEmpty == true) ...[
-              const SizedBox(height: 10),
-              _ColonyTags(colony: colony, workers: workers),
-            ],
-            if (colony.acquiredOn != null ||
-                colony.source?.trim().isNotEmpty == true ||
-                colony.purchasePriceCents != null) ...[
-              const SizedBox(height: 10),
-              if (colony.acquiredOn != null)
-                metadataRow(
-                  '入手日期',
-                  dottedDate(colony.acquiredOn!),
-                  onTap: onDurationTap,
-                ),
-              if (colony.source?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 4),
-                metadataRow('来源', _sourceLabel),
-              ],
-              if (colony.purchasePriceCents != null) ...[
-                const SizedBox(height: 4),
-                metadataRow('购入价', '¥${colony.purchasePriceText}'),
-              ],
-            ],
             const SizedBox(height: 10),
             Divider(
               height: 1,

@@ -1038,7 +1038,8 @@ void main() {
     expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
     await tester.tap(find.text('到家计时'));
     await tester.pumpAndSettle();
-    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
+    expect(find.byKey(const ValueKey('duration-right-label')), findsOneWidget);
+    expect(find.text('36'), findsOneWidget);
     expect(
       find.text('${arrival.year}.${arrival.month}.${arrival.day}'),
       findsOneWidget,
@@ -1140,7 +1141,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final now = DateTime.now();
-    final arrival = DateTime(now.year, now.month, now.day - 36);
+    final arrival = DateTime(now.year, now.month, now.day - 136);
     tables['colonies']!.add(
       Colony(
         id: 'narrow-duration',
@@ -1159,11 +1160,60 @@ void main() {
 
     final date = find.text('${arrival.year}.${arrival.month}.${arrival.day}');
     final source = find.text('本地合成测试数据（非真实饲养记录）');
-    final days = find.text('已养殖 36 天', findRichText: true);
+    final label = find.byKey(const ValueKey('duration-right-label'));
+    final days = find.text('136');
+    final unit = find.text('天');
+    expect(label, findsOneWidget);
+    expect(
+      tester.getRect(unit).right,
+      closeTo(tester.getRect(find.byType(HusbandryDuration)).right, 1),
+    );
+    expect(
+      tester.getRect(label).top,
+      lessThanOrEqualTo(tester.getRect(days).top + 12),
+    );
+    expect(tester.getRect(label).height, lessThan(50));
+    expect(
+      (tester.getRect(unit).center.dx - tester.getRect(label).center.dx).abs(),
+      lessThan(2),
+    );
+    final labelArea = find.ancestor(of: label, matching: find.byType(Align));
+    expect(
+      tester.getRect(unit).top - tester.getRect(labelArea).bottom,
+      greaterThanOrEqualTo(8),
+    );
+    expect(
+      tester.getRect(unit).bottom,
+      closeTo(tester.getRect(days).bottom - 10, 8),
+    );
+    expect(tester.getRect(unit).left, greaterThan(tester.getRect(days).right));
     expect(tester.getTopLeft(days).dy, lessThan(tester.getTopLeft(date).dy));
     expect(tester.getTopLeft(date).dy, lessThan(tester.getTopLeft(source).dy));
-    expect(tester.getSize(source).width, greaterThan(180));
-    expect(tester.getSize(days).height, lessThan(64));
+    expect(tester.getSize(source).height, lessThan(24));
+    expect(
+      tester.getSize(find.byType(HusbandryDuration)).height,
+      greaterThan(92),
+    );
+    final sourceScroll = find.ancestor(
+      of: source,
+      matching: find.byType(SingleChildScrollView),
+    );
+    expect(sourceScroll, findsOneWidget);
+    expect(
+      tester.getRect(sourceScroll).right,
+      lessThanOrEqualTo(tester.getRect(find.byType(HusbandryDuration)).left),
+    );
+    final controller = tester
+        .widget<SingleChildScrollView>(sourceScroll)
+        .controller!;
+    expect(controller.position.maxScrollExtent, greaterThan(0));
+    expect(
+      find.ancestor(of: source, matching: find.byType(ShaderMask)),
+      findsOneWidget,
+    );
+    await tester.drag(sourceScroll, const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    expect(controller.offset, closeTo(controller.position.maxScrollExtent, .5));
     expect(tester.takeException(), isNull);
   });
 
@@ -1869,10 +1919,18 @@ void main() {
           'acquired_on': selectedDate.toIso8601String(),
           'updated_at': saved.updatedAt.toIso8601String(),
         });
-        expect(
-          find.text('已养殖 5 天', findRichText: true).hitTestable(),
-          findsOneWidget,
-        );
+        if (fromList) {
+          expect(
+            find.text('已养殖 5 天', findRichText: true).hitTestable(),
+            findsOneWidget,
+          );
+        } else {
+          expect(
+            find.byKey(const ValueKey('duration-right-label')),
+            findsOneWidget,
+          );
+          expect(find.text('5'), findsOneWidget);
+        }
         expect(hint, findsNothing);
         if (!fromList) {
           await tester.pageBack();
@@ -1881,9 +1939,10 @@ void main() {
         await tester.tap(find.text(colony.name));
         await tester.pumpAndSettle();
         expect(
-          find.text('已养殖 5 天', findRichText: true).hitTestable(),
+          find.byKey(const ValueKey('duration-right-label')),
           findsOneWidget,
         );
+        expect(find.text('5'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },
