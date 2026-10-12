@@ -1169,6 +1169,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await tester.drag(find.byType(ListView).first, const Offset(0, 1500));
+        await tester.pumpAndSettle();
         final cover = find.byWidgetPredicate(
           (widget) => widget is Image && widget.semanticLabel == '默认蚂蚁封面',
         );

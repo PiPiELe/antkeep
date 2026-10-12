@@ -24,6 +24,7 @@ import 'lottery_page.dart';
 import 'nest_history_page.dart';
 import 'winter_cycle_page.dart';
 import 'flight_observation_page.dart';
+import 'milestone_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'population_forecast_controls.dart';
@@ -43,6 +44,7 @@ import 'data/local_notification_service.dart';
 import 'domain/models.dart';
 import 'domain/care_task.dart';
 import 'domain/memorial.dart';
+import 'domain/milestone.dart';
 import 'domain/mortality_analysis.dart';
 import 'domain/colony_growth.dart';
 import 'domain/population_analysis.dart';
@@ -2532,7 +2534,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('删除蚁群？'),
-          content: Text('确定删除「${colony.name}」吗？该蚁群及全部养护记录将被删除，此操作无法撤销。'),
+          content: Text('确定删除「${colony.name}」吗？该蚁群的日记、里程碑及其他记录将被删除，此操作无法撤销。'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -2802,6 +2804,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => WinterCyclePage(colony: colony),
+                  ),
+                ),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.flag_outlined),
+                title: const Text('里程碑'),
+                subtitle: const Text('记录重大事件，不参与日记统计'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MilestonePage(colony: colony),
                   ),
                 ),
               ),
@@ -3516,6 +3531,7 @@ class RecordFormPage extends StatefulWidget {
 
 class _RecordFormPageState extends State<RecordFormPage> {
   final _note = TextEditingController();
+  final _milestoneTitle = TextEditingController();
   final _temperature = TextEditingController();
   final _humidity = TextEditingController();
   final _eggs = TextEditingController();
@@ -3529,6 +3545,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   final _photos = <XFile>[];
   var _addQueenMemorial = false;
   var _addWorkerMemorial = false;
+  var _addMilestone = false;
   var _type = CareRecordType.observation;
   FeedingResponse? _feedingResponse;
   bool? _feedingLeftovers;
@@ -3590,6 +3607,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   void dispose() {
     for (final c in [
       _note,
+      _milestoneTitle,
       _temperature,
       _humidity,
       _eggs,
@@ -3608,6 +3626,12 @@ class _RecordFormPageState extends State<RecordFormPage> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (widget.record == null &&
+        _addMilestone &&
+        _milestoneTitle.text.trim().isEmpty) {
+      _showError(context, '请填写里程碑事件标题');
+      return;
+    }
     if (_type == CareRecordType.feeding &&
         (_feedingFood.text.trim().length > 80 ||
             _feedingAmount.text.trim().length > 80)) {
@@ -3719,6 +3743,16 @@ class _RecordFormPageState extends State<RecordFormPage> {
             incremental: _incremental,
             recalculateAllGrowth: globalUpdate,
             completingTaskId: widget.task?.id,
+            milestone: _addMilestone
+                ? Milestone(
+                    id: 'diary:$recordId',
+                    colonyId: _colony.id,
+                    title: _milestoneTitle.text.trim(),
+                    note: _textOrNull(_note.text),
+                    occurredAt: _occurredAt,
+                    createdAt: record.createdAt,
+                  )
+                : null,
           );
         } else {
           await AppDatabase.instance.updateRecord(
@@ -3995,6 +4029,27 @@ class _RecordFormPageState extends State<RecordFormPage> {
             hintText: '例如：喂了半只面包虫，进食积极',
           ),
         ),
+        if (widget.record == null) ...[
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('同步记录为里程碑事件'),
+            subtitle: const Text('保存时创建独立里程碑，不参与日记统计'),
+            value: _addMilestone,
+            onChanged: _saving
+                ? null
+                : (value) => setState(() => _addMilestone = value ?? false),
+          ),
+          if (_addMilestone)
+            TextField(
+              controller: _milestoneTitle,
+              maxLength: 80,
+              decoration: const InputDecoration(
+                labelText: '里程碑事件标题',
+                helperText: '日期和备注将从这篇日记同步；之后可单独编辑里程碑',
+                helperMaxLines: 2,
+              ),
+            ),
+        ],
         const SizedBox(height: 16),
         Text('环境与数量（不清楚可留空）', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),

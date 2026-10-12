@@ -4,6 +4,7 @@ import '../domain/memorial.dart';
 import '../domain/nest_entry.dart';
 import '../domain/winter_cycle.dart';
 import '../domain/flight_observation.dart';
+import '../domain/milestone.dart';
 
 /// Validate before touching either the live data or the previous rollback copy.
 /// Model readers check field types and dates; the remaining checks mirror the
@@ -36,6 +37,14 @@ class BackupData {
       (row) => InventoryItem.fromMap(row).toMap(),
     );
     final colonyIds = colonies.map((row) => row['id']).toSet();
+    final milestones = _rows(
+      data,
+      'milestones',
+      (row) => Milestone.fromMap(row).toMap(),
+    );
+    if (milestones.any((row) => !colonyIds.contains(row['colony_id']))) {
+      throw const FormatException('里程碑引用了不存在的蚁群。');
+    }
     final cycles = _rows(
       data,
       'winter_cycles',

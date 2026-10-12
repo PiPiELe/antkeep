@@ -5,6 +5,7 @@ import '../domain/memorial.dart';
 import '../domain/nest_entry.dart';
 import '../domain/winter_cycle.dart';
 import '../domain/flight_observation.dart';
+import '../domain/milestone.dart';
 
 import 'package:sqflite/sqflite.dart';
 
@@ -43,7 +44,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 24,
+      version: 25,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -89,6 +90,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await _createMemorialTable(database);
     await _createNestEntriesTable(database);
     await _createWinterAndFlightTables(database);
+    await _createMilestonesTable(database);
     await _createCareTasksTable(database);
     await _createSettingsTable(database);
     await _createInventoryTable(database);
@@ -100,6 +102,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 25) await _createMilestonesTable(database);
     if (oldVersion < 24) await _createWinterAndFlightTables(database);
     if (oldVersion < 23) {
       await _createNestEntriesTable(database);
@@ -264,6 +267,67 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     )""");
     await db.execute(
       "CREATE UNIQUE INDEX memorial_colony_end ON memorials(colony_id) WHERE kind = 'colony'",
+    );
+  }
+
+  static Future<void> _createMilestonesTable(DatabaseExecutor db) async {
+    await db.execute('''CREATE TABLE milestones (
+      id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, title TEXT NOT NULL,
+      occurred_at TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL,
+      FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
+    )''');
+    await db.execute(
+      'CREATE INDEX milestones_by_colony_time ON milestones(colony_id, occurred_at DESC)',
+    );
+  }
+
+  Future<List<Milestone>> listMilestones(String colonyId) async =>
+      (await _db.query(
+        'milestones',
+        where: 'colony_id = ?',
+        whereArgs: [colonyId],
+        orderBy: 'occurred_at DESC, created_at DESC',
+      )).map(Milestone.fromMap).toList();
+
+  Future<void> saveMilestone(Milestone milestone) async {
+    milestone.validate();
+    await _db.transaction((txn) async {
+      final colony = await txn.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [milestone.colonyId],
+      );
+      if (colony.isEmpty || colony.single['archived'] == 1) {
+        throw StateError('蚁群已归档或不存在');
+      }
+      final existing = await txn.query(
+        'milestones',
+        where: 'id = ?',
+        whereArgs: [milestone.id],
+      );
+      if (existing.isEmpty) {
+        await txn.insert('milestones', milestone.toMap());
+      } else {
+        if (existing.single['colony_id'] != milestone.colonyId) {
+          throw StateError('不能改变里程碑所属蚁群');
+        }
+        await txn.update(
+          'milestones',
+          milestone.toMap(),
+          where: 'id = ?',
+          whereArgs: [milestone.id],
+        );
+      }
+    });
+  }
+
+  Future<void> deleteMilestone(Milestone milestone) async {
+    final colony = await findColony(milestone.colonyId);
+    if (colony == null || colony.archived) throw StateError('蚁群已归档或不存在');
+    await _db.delete(
+      'milestones',
+      where: 'id = ? AND colony_id = ?',
+      whereArgs: [milestone.id, milestone.colonyId],
     );
   }
 
@@ -938,7 +1002,15 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     bool incremental = false,
     bool recalculateAllGrowth = false,
     String? completingTaskId,
+    Milestone? milestone,
   }) => _db.transaction((transaction) async {
+    if (milestone != null) {
+      milestone.validate();
+      if (milestone.colonyId != record.colonyId ||
+          milestone.occurredAt != record.occurredAt) {
+        throw StateError('里程碑与日记的蚁群或时间不一致');
+      }
+    }
     await _applyGrowth(transaction, DateTime.now(), record.colonyId);
     final before = await _growthReplayRecords(transaction, record.colonyId);
     _requireGrowthConfirmation(before, [
@@ -964,6 +1036,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       );
     }
     await transaction.insert('care_records', resolved.toMap());
+    if (milestone != null) {
+      await transaction.insert('milestones', milestone.toMap());
+    }
     if (completingTaskId != null) {
       final tasks = await transaction.query(
         'care_tasks',
@@ -1574,6 +1649,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       'winter_cycles': await txn.query('winter_cycles'),
       'flight_observations': await txn.query('flight_observations'),
       'care_records': await txn.query('care_records'),
+      'milestones': await txn.query('milestones'),
       'care_tasks': await txn.query('care_tasks'),
       'feeder_records': await txn.query('feeder_records'),
       'inventory_items': await txn.query('inventory_items'),
@@ -1602,6 +1678,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     final records = (snapshot['care_records'] as List)
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
+    final milestones = (snapshot['milestones'] as List? ?? const [])
+        .map((row) => Map<String, Object?>.from(row as Map))
+        .toList();
     final nestEntries = (snapshot['nest_entries'] as List? ?? const [])
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
@@ -1626,6 +1705,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       await transaction.delete('feeder_records');
       await transaction.delete('memorials');
       await transaction.delete('care_records');
+      await transaction.delete('milestones');
       await transaction.delete('nest_entries');
       await transaction.delete('winter_cycles');
       await transaction.delete('flight_observations');
@@ -1649,6 +1729,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       }
       for (final record in records) {
         await transaction.insert('care_records', record);
+      }
+      for (final milestone in milestones) {
+        await transaction.insert('milestones', milestone);
       }
       for (final cycle in winterCycles) {
         await transaction.insert('winter_cycles', cycle);

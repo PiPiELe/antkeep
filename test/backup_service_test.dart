@@ -14,6 +14,7 @@ import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/domain/care_task.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/memorial.dart';
+import 'package:antkeep/domain/milestone.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -202,6 +203,31 @@ void main() {
       expect(await database.snapshot(), expected);
     },
   );
+
+  test('milestones survive ZIP restore and incremental import', () async {
+    final date = DateTime(2026, 10, 12);
+    await database.saveMilestone(
+      Milestone(
+        id: 'first-workers',
+        colonyId: 'c',
+        title: '首批工蚁羽化',
+        occurredAt: date,
+        createdAt: date,
+      ),
+    );
+    final bytes = await service.createBackupBytes();
+    await database.replaceAll(fixture());
+    expect(await database.listMilestones('c'), isEmpty);
+    await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+    expect((await database.listMilestones('c')).single.title, '首批工蚁羽化');
+    await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+    expect(await database.listMilestones('c'), hasLength(1));
+
+    final old = await database.snapshot()
+      ..remove('milestones');
+    await service.restoreBytes(archiveBytes(old, version: 4));
+    expect(await database.listMilestones('c'), isEmpty);
+  });
 
   test('incremental restore keeps the local plan for the same type', () async {
     final date = DateTime(2026, 10, 9);
@@ -448,7 +474,7 @@ void main() {
         BackupArchive.decode(bytes).findFile('manifest.json')!.content,
       ),
     );
-    expect(manifest['version'], 4);
+    expect(manifest['version'], 5);
     await service.restoreBytes(archiveBytes(fixture()));
     expect(await database.listMemorials(), isEmpty);
     await service.undoLastRestore();

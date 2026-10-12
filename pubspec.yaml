@@ -84,6 +84,7 @@ flutter:
     - assets/community/
     - assets/competition/ants/
     - assets/memorial/
+    - assets/milestone/
     - assets/images/default-ant-cover.png
 
   # To add assets to your application, add an assets section, like this:
