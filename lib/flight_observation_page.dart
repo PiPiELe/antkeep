@@ -111,7 +111,9 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('婚飞观察与天气')),
+    appBar: AppBar(
+      title: Text('婚飞观察与天气', style: Theme.of(context).textTheme.titleMedium),
+    ),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: () => _edit(),
       icon: const Icon(Icons.add),
@@ -126,9 +128,12 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('天气提示', style: Theme.of(context).textTheme.titleMedium),
+                Text('天气提示', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
-                const Text('手动搜索城市后获取七日预报。城市搜索词和所选坐标会发送给天气服务；观察记录只保存在本机。'),
+                Text(
+                  '手动搜索城市后获取七日预报。城市搜索词和所选坐标会发送给天气服务；观察记录只保存在本机。',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -136,6 +141,7 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
                       child: TextField(
                         controller: _city,
                         onSubmitted: (_) => _loading ? null : _search(),
+                        style: Theme.of(context).textTheme.bodyMedium,
                         decoration: const InputDecoration(
                           labelText: '城市或地区',
                           hintText: '例如：北京',
@@ -165,10 +171,23 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
                     padding: EdgeInsets.only(top: 8),
                     child: Text('没有找到城市，请尝试更具体的地名。'),
                   ),
-                for (final place in _places ?? const <WeatherPlace>[])
-                  ListTile(
-                    title: Text(place.label),
-                    onTap: () => _loadForecast(place),
+                if (_places?.isNotEmpty == true)
+                  SizedBox(
+                    height: 220,
+                    child: ListView.builder(
+                      itemCount: _places!.length,
+                      itemBuilder: (context, index) {
+                        final place = _places![index];
+                        return ListTile(
+                          dense: true,
+                          title: Text(
+                            place.label,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          onTap: () => _loadForecast(place),
+                        );
+                      },
+                    ),
                   ),
                 if (_selected != null && _forecast != null) ...[
                   const SizedBox(height: 12),
@@ -176,26 +195,44 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
                     _selected!.label,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  const Text(
+                  Text(
                     '“可留意”仅按气温≥20°C、降水概率≥40%、最大风速≤20公里/小时标记天气；不代表蚂蚁一定婚飞，蚁种和当地环境也会影响时机。',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  for (final day in _forecast!)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        '${chineseDate(day.date)}${day.worthWatching ? ' · 可留意' : ''}',
-                      ),
-                      subtitle: Text(
-                        '最高温 ${day.maxTemp?.toStringAsFixed(1) ?? '—'}°C · 降水概率 ${day.rainChance?.toString() ?? '—'}% · 最大风速 ${day.windMax?.toStringAsFixed(1) ?? '—'} km/h',
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 220,
+                    child: Scrollbar(
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          for (final day in _forecast!)
+                            ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                '${chineseDate(day.date)}${day.worthWatching ? ' · 可留意' : ''}',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              subtitle: Text(
+                                '最高温 ${day.maxTemp?.toStringAsFixed(1) ?? '—'}°C · 降水概率 ${day.rainChance?.toString() ?? '—'}% · 最大风速 ${day.windMax?.toStringAsFixed(1) ?? '—'} km/h',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          Text(
+                            '天气数据：Open-Meteo（CC BY 4.0）。预报会变化，请出行前刷新。',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          TextButton(
+                            onPressed: () => launchUrl(
+                              Uri.parse('https://open-meteo.com/'),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                            child: const Text('查看 Open-Meteo 数据来源与许可'),
+                          ),
+                        ],
                       ),
                     ),
-                  const Text('天气数据：Open-Meteo（CC BY 4.0）。预报会变化，请出行前刷新。'),
-                  TextButton(
-                    onPressed: () => launchUrl(
-                      Uri.parse('https://open-meteo.com/'),
-                      mode: LaunchMode.externalApplication,
-                    ),
-                    child: const Text('查看 Open-Meteo 数据来源与许可'),
                   ),
                 ],
               ],
@@ -203,7 +240,7 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
           ),
         ),
         const SizedBox(height: 16),
-        Text('本地观察记录', style: Theme.of(context).textTheme.titleMedium),
+        Text('本地观察记录', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         FutureBuilder<List<FlightObservation>>(
           future: _observations,
