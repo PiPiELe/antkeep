@@ -2466,6 +2466,9 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   late Future<_Detail> _detail;
   bool _deleting = false;
   bool _editingAcquiredOn = false;
+  String _diaryTypeFilter = '';
+  _DiaryTimeFilter _diaryTimeFilter = _DiaryTimeFilter.all;
+  DateTimeRange? _diaryDateRange;
   DiaryDisplay get _display => themeController.diary.display;
   bool get _includeBrood => _display.includeBrood;
   bool get _populationExpanded => _display.populationExpanded;
@@ -2519,6 +2522,62 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
 
   void _reload() {
     _detail = _load();
+  }
+
+  bool _matchesDiaryTime(DateTime occurredAt, DateTime today) {
+    final date = DateUtils.dateOnly(occurredAt);
+    switch (_diaryTimeFilter) {
+      case _DiaryTimeFilter.all:
+        return true;
+      case _DiaryTimeFilter.last7Days:
+        return !date.isBefore(
+              DateTime(today.year, today.month, today.day - 6),
+            ) &&
+            !date.isAfter(today);
+      case _DiaryTimeFilter.last30Days:
+        return !date.isBefore(
+              DateTime(today.year, today.month, today.day - 29),
+            ) &&
+            !date.isAfter(today);
+      case _DiaryTimeFilter.thisMonth:
+        return date.year == today.year && date.month == today.month;
+      case _DiaryTimeFilter.custom:
+        final range = _diaryDateRange;
+        return range != null &&
+            !date.isBefore(range.start) &&
+            !date.isAfter(range.end);
+    }
+  }
+
+  String get _diaryTimeLabel {
+    final range = _diaryDateRange;
+    if (_diaryTimeFilter != _DiaryTimeFilter.custom || range == null) {
+      return _diaryTimeFilter.label;
+    }
+    final start = '${range.start.year}/${range.start.month}/${range.start.day}';
+    final end = range.start.year == range.end.year
+        ? '${range.end.month}/${range.end.day}'
+        : '${range.end.year}/${range.end.month}/${range.end.day}';
+    return '$start–$end';
+  }
+
+  Future<void> _selectDiaryTime(_DiaryTimeFilter filter) async {
+    if (filter == _DiaryTimeFilter.custom) {
+      final range = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(1900),
+        lastDate: DateTime(2100),
+        initialDateRange: _diaryDateRange,
+        helpText: '选择日记时间范围',
+      );
+      if (range == null || !mounted) return;
+      setState(() {
+        _diaryDateRange = range;
+        _diaryTimeFilter = filter;
+      });
+    } else {
+      setState(() => _diaryTimeFilter = filter);
+    }
   }
 
   Future<_Detail> _load() async => _Detail(
@@ -2661,6 +2720,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         );
       }
       final colony = detail!.colony!;
+      final today = DateUtils.dateOnly(DateTime.now());
+      final visibleDiaryRecords = detail.records
+          .where(
+            (record) =>
+                (_diaryTypeFilter.isEmpty ||
+                    record.type.storageValue == _diaryTypeFilter) &&
+                _matchesDiaryTime(record.occurredAt, today),
+          )
+          .toList();
+      final diaryCount =
+          _diaryTypeFilter.isEmpty && _diaryTimeFilter == _DiaryTimeFilter.all
+          ? '${detail.records.length}'
+          : '${visibleDiaryRecords.length} / ${detail.records.length}';
       final compactAppBar = MediaQuery.sizeOf(context).width < 400;
       Future<void> addRecord() async {
         await Navigator.of(context).push<bool>(
@@ -2946,12 +3018,63 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   if (detail.records.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      colony.archived
-                          ? '${detail.records.length} 条记录'
-                          : '${detail.records.length} 条记录 · 轻点编辑 · 左滑删除',
+                      '$diaryCount 条记录'
+                      '${colony.archived ? '' : ' · 轻点编辑 · 左滑删除'}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        PopupMenuButton<String>(
+                          key: const ValueKey('diary-type-filter'),
+                          tooltip: '按日记类别筛选',
+                          onSelected: (value) =>
+                              setState(() => _diaryTypeFilter = value),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: '', child: Text('全部类别')),
+                            for (final type in CareRecordType.values)
+                              PopupMenuItem(
+                                value: type.storageValue,
+                                child: Text(type.label),
+                              ),
+                          ],
+                          child: Chip(
+                            label: Text(
+                              _diaryTypeFilter.isEmpty
+                                  ? '全部类别'
+                                  : CareRecordType.fromStorage(_diaryTypeFilter)
+                                        .label,
+                            ),
+                            avatar: const Icon(
+                              Icons.category_outlined,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                        PopupMenuButton<_DiaryTimeFilter>(
+                          key: const ValueKey('diary-time-filter'),
+                          tooltip: '按时间筛选',
+                          onSelected: _selectDiaryTime,
+                          itemBuilder: (context) => [
+                            for (final filter in _DiaryTimeFilter.values)
+                              PopupMenuItem(
+                                value: filter,
+                                child: Text(filter.label),
+                              ),
+                          ],
+                          child: Chip(
+                            label: Text(_diaryTimeLabel),
+                            avatar: const Icon(
+                              Icons.date_range_outlined,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -2966,7 +3089,16 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   message: '从一次投喂或观察开始。',
                 ),
               ),
-            ...detail.records.map((record) {
+            if (detail.records.isNotEmpty && visibleDiaryRecords.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: _EmptyState(
+                  icon: Icons.filter_alt_off_outlined,
+                  title: '没有符合条件的日记',
+                  message: '调整类别或时间筛选后再试。',
+                ),
+              ),
+            ...visibleDiaryRecords.map((record) {
               final priorRecords = detail.records.where(
                 (candidate) =>
                     CareRecord.comparePopulationOrder(candidate, record) <= 0,
@@ -3006,6 +3138,17 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
       );
     },
   );
+}
+
+enum _DiaryTimeFilter {
+  all('全部时间'),
+  last7Days('近 7 天'),
+  last30Days('近 30 天'),
+  thisMonth('本月'),
+  custom('自定义日期');
+
+  const _DiaryTimeFilter(this.label);
+  final String label;
 }
 
 class _Detail {

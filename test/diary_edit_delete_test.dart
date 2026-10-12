@@ -167,6 +167,73 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('diary category and time filters combine and can be cleared', (
+    tester,
+  ) async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    Future<void> add(String id, CareRecordType type, DateTime date) async {
+      await db.saveRecord(
+        CareRecord.fromMap({
+          ...record(id: id).toMap(),
+          'record_type': type.storageValue,
+          'occurred_at': date.toIso8601String(),
+          'note': id,
+        }),
+      );
+    }
+
+    await tester.runAsync(() async {
+      await add('今日投喂', CareRecordType.feeding, today);
+      await add(
+        '八天前投喂',
+        CareRecordType.feeding,
+        DateTime(today.year, today.month, today.day - 8),
+      );
+      await add('今日观察', CareRecordType.observation, today);
+    });
+    await tester.pumpWidget(
+      MaterialApp(home: ColonyDetailPage(colonyId: colony.id)),
+    );
+    await settleDatabase(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('diary-type-filter')),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('diary-type-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(PopupMenuItem<String>, '投喂'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2 / 3 条记录'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('diary-time-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('近 7 天').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 / 3 条记录'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('今日投喂'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('今日投喂'), findsOneWidget);
+    expect(find.text('八天前投喂'), findsNothing);
+    expect(find.text('今日观察'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('diary-type-filter')),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('diary-type-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(PopupMenuItem<String>, '全部类别'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2 / 3 条记录'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'tap edits existing values and preserves counts and photos on save',
     (tester) async {
