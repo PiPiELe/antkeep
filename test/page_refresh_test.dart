@@ -1046,7 +1046,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('colony card enlarges days only when right side is free', (
+  testWidgets('colony card scrolls tags before the duration divider', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(393, 800);
@@ -1091,7 +1091,43 @@ void main() {
       tester
           .widgetList<HusbandryDuration>(find.byType(HusbandryDuration))
           .map((duration) => duration.tall),
-      [true, true, false],
+      [true, true, true],
+    );
+    final crowdedCard = find.ancestor(
+      of: find.text('内容较多 crowded'),
+      matching: find.byType(Card),
+    );
+    final tagScroll = find.descendant(
+      of: crowdedCard,
+      matching: find.byType(SingleChildScrollView),
+    );
+    final duration = find.descendant(
+      of: crowdedCard,
+      matching: find.byType(HusbandryDuration),
+    );
+    expect(
+      tester.getRect(tagScroll).right,
+      lessThan(tester.getRect(duration).left),
+    );
+    final nestTag = find.descendant(
+      of: tagScroll,
+      matching: find.text('横置石膏巢和外接活动区'),
+    );
+    final beforeDrag = tester.getTopLeft(nestTag).dx;
+    await tester.drag(tagScroll, const Offset(-80, 0));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(nestTag).dx, lessThan(beforeDrag));
+    final durationLabel = find.descendant(
+      of: crowdedCard,
+      matching: find.text('已养殖'),
+    );
+    final durationNumber = find.descendant(
+      of: crowdedCard,
+      matching: find.text('38 天', findRichText: true),
+    );
+    expect(
+      tester.getRect(durationNumber).top - tester.getRect(durationLabel).bottom,
+      lessThan(8),
     );
     expect(tester.takeException(), isNull);
   });

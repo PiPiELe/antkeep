@@ -1026,10 +1026,17 @@ class _ColonyCard extends StatelessWidget {
     final dueText = dueTasks.isEmpty
         ? null
         : '今日待办：${dueTasks.map((task) => task.type.label).join('、')}';
-    final lowerMetadata = <Widget>[
+    List<Widget> lowerMetadata({double? tagWidth}) => <Widget>[
       if (hasTags) ...[
         const SizedBox(height: 6),
-        _ColonyTags(colony: colony, workers: workers),
+        SizedBox(
+          width: tagWidth,
+          child: _ColonyTags(
+            colony: colony,
+            workers: workers,
+            scrollable: true,
+          ),
+        ),
       ],
       const SizedBox(height: 10),
       if (dueText != null) ...[
@@ -1150,34 +1157,12 @@ class _ColonyCard extends StatelessWidget {
                     return width;
                   }
 
-                  final scale = ColonyScale.fromWorkerCount(workers);
-                  final tagLabels = <String>[
-                    if (colony.isNewQueenColony) '新后群',
-                    if (scale != null) scale.label,
-                    if (colony.nestType?.isNotEmpty == true) colony.nestType!,
-                  ];
-                  final tagWidth =
-                      tagLabels.fold<double>(
-                        0,
-                        (width, label) =>
-                            width +
-                            textWidth(
-                              label,
-                              theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ) +
-                            16,
-                      ) +
-                      (colony.isNewQueenColony ? 20 : 0) +
-                      (tagLabels.isEmpty ? 0 : tagLabels.length - 1) * 8;
                   final canFillSpace =
                       constraints.maxWidth >= 280 &&
                       MediaQuery.textScalerOf(context).scale(12) <= 18 &&
                       colony.acquiredOn != null &&
                       dueText != null &&
                       (hasTags || description.isNotEmpty) &&
-                      tagWidth <= leftWidth &&
                       textWidth(
                             dueText,
                             theme.textTheme.bodySmall?.copyWith(
@@ -1201,7 +1186,7 @@ class _ColonyCard extends StatelessWidget {
                         identity,
                         const SizedBox(height: 10),
                         duration,
-                        ...lowerMetadata,
+                        ...lowerMetadata(),
                       ],
                     );
                   }
@@ -1212,7 +1197,7 @@ class _ColonyCard extends StatelessWidget {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [identity, ...lowerMetadata],
+                            children: [identity, ...lowerMetadata()],
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1246,7 +1231,9 @@ class _ColonyCard extends StatelessWidget {
                           SizedBox(width: durationWidth, child: duration),
                         ],
                       ),
-                      ...lowerMetadata,
+                      ...lowerMetadata(
+                        tagWidth: constraints.maxWidth - durationWidth - 21,
+                      ),
                     ],
                   );
                 },
@@ -1296,9 +1283,14 @@ class _ColonyCard extends StatelessWidget {
 }
 
 class _ColonyTags extends StatelessWidget {
-  const _ColonyTags({required this.colony, required this.workers});
+  const _ColonyTags({
+    required this.colony,
+    required this.workers,
+    this.scrollable = false,
+  });
   final Colony colony;
   final int? workers;
+  final bool scrollable;
 
   @override
   Widget build(BuildContext context) {
@@ -1334,7 +1326,8 @@ class _ColonyTags extends StatelessWidget {
         ],
       ),
     );
-    return Row(
+    final tags = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (colony.isNewQueenColony) badge('新后群', scheme.primary, crown: true),
         if (colony.isNewQueenColony &&
@@ -1344,8 +1337,23 @@ class _ColonyTags extends StatelessWidget {
         if (scale != null && colony.nestType?.isNotEmpty == true)
           const SizedBox(width: 8),
         if (colony.nestType?.isNotEmpty == true)
-          Flexible(child: badge(colony.nestType!, scheme.onSurfaceVariant)),
+          if (scrollable)
+            badge(colony.nestType!, scheme.onSurfaceVariant)
+          else
+            Flexible(child: badge(colony.nestType!, scheme.onSurfaceVariant)),
       ],
+    );
+    if (!scrollable) return tags;
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Colors.white, Colors.white, Colors.transparent],
+        stops: [0, .88, 1],
+      ).createShader(bounds),
+      blendMode: BlendMode.dstIn,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: tags,
+      ),
     );
   }
 }
