@@ -215,4 +215,74 @@ void main() {
     expect(find.text('卵幼铺底'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'diary filter shows milestones without counting them as diaries',
+    (tester) async {
+      final today = DateUtils.dateOnly(DateTime.now());
+      await tester.runAsync(() async {
+        await db.deleteColony(colony.id);
+        await db.saveColony(colony);
+        await db.saveRecord(
+          CareRecord(
+            id: 'filtered-diary',
+            colonyId: colony.id,
+            type: CareRecordType.observation,
+            occurredAt: today,
+            createdAt: today,
+            note: '普通日记',
+          ),
+        );
+        for (final (id, title, occurredAt) in [
+          ('recent', '近期里程碑', today),
+          ('old', '历史里程碑', DateTime(today.year, today.month, today.day - 8)),
+        ]) {
+          await db.saveMilestone(
+            Milestone(
+              id: id,
+              colonyId: colony.id,
+              title: title,
+              occurredAt: occurredAt,
+              createdAt: today,
+            ),
+          );
+        }
+      });
+      await tester.pumpWidget(
+        MaterialApp(home: ColonyDetailPage(colonyId: colony.id)),
+      );
+      for (var frame = 0; frame < 20; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      final typeFilter = find.byKey(const ValueKey('diary-type-filter'));
+      await tester.scrollUntilVisible(
+        typeFilter,
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.textContaining('1 条记录'), findsOneWidget);
+      await tester.tap(typeFilter);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(PopupMenuItem<String>, '里程碑'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('2 / 2 条里程碑'), findsOneWidget);
+      expect(find.text('普通日记'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('diary-time-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('近 7 天').last);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('1 / 2 条里程碑'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('近期里程碑'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('历史里程碑'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

@@ -59,6 +59,7 @@ void main() {
     'care_tasks': [],
     'inventory_items': [],
     'memorials': [],
+    'milestones': [],
     'nest_entries': [],
     'winter_cycles': [],
     'flight_observations': [],

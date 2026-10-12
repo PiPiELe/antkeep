@@ -25,6 +25,7 @@ import 'nest_history_page.dart';
 import 'winter_cycle_page.dart';
 import 'flight_observation_page.dart';
 import 'milestone_page.dart';
+import 'milestone_share_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
 import 'population_forecast_controls.dart';
@@ -2583,6 +2584,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   Future<_Detail> _load() async => _Detail(
     await AppDatabase.instance.findColony(widget.colonyId),
     await AppDatabase.instance.listRecords(widget.colonyId),
+    await AppDatabase.instance.listMilestones(widget.colonyId),
   );
 
   Future<void> _deleteColony(Colony colony) async {
@@ -2721,18 +2723,26 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
       }
       final colony = detail!.colony!;
       final today = DateUtils.dateOnly(DateTime.now());
+      final showingMilestones = _diaryTypeFilter == 'milestone';
       final visibleDiaryRecords = detail.records
           .where(
             (record) =>
+                !showingMilestones &&
                 (_diaryTypeFilter.isEmpty ||
                     record.type.storageValue == _diaryTypeFilter) &&
                 _matchesDiaryTime(record.occurredAt, today),
           )
           .toList();
-      final diaryCount =
-          _diaryTypeFilter.isEmpty && _diaryTimeFilter == _DiaryTimeFilter.all
-          ? '${detail.records.length}'
-          : '${visibleDiaryRecords.length} / ${detail.records.length}';
+      final visibleMilestones = showingMilestones
+          ? detail.milestones
+                .where((item) => _matchesDiaryTime(item.occurredAt, today))
+                .toList()
+          : <Milestone>[];
+      final diaryCountLabel = showingMilestones
+          ? '${visibleMilestones.length} / ${detail.milestones.length} 条里程碑'
+          : _diaryTypeFilter.isEmpty && _diaryTimeFilter == _DiaryTimeFilter.all
+          ? '${detail.records.length} 条记录'
+          : '${visibleDiaryRecords.length} / ${detail.records.length} 条记录';
       final compactAppBar = MediaQuery.sizeOf(context).width < 400;
       Future<void> addRecord() async {
         await Navigator.of(context).push<bool>(
@@ -3015,11 +3025,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       ),
                     ],
                   ),
-                  if (detail.records.isNotEmpty) ...[
+                  if (detail.records.isNotEmpty ||
+                      detail.milestones.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '$diaryCount 条记录'
-                      '${colony.archived ? '' : ' · 轻点编辑 · 左滑删除'}',
+                      '$diaryCountLabel'
+                      '${colony.archived || showingMilestones ? '' : ' · 轻点编辑 · 左滑删除'}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -3041,10 +3052,16 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                                 value: type.storageValue,
                                 child: Text(type.label),
                               ),
+                            const PopupMenuItem(
+                              value: 'milestone',
+                              child: Text('里程碑'),
+                            ),
                           ],
                           child: Chip(
                             label: Text(
-                              _diaryTypeFilter.isEmpty
+                              showingMilestones
+                                  ? '里程碑'
+                                  : _diaryTypeFilter.isEmpty
                                   ? '全部类别'
                                   : CareRecordType.fromStorage(_diaryTypeFilter)
                                         .label,
@@ -3080,7 +3097,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ],
               ),
             ),
-            if (detail.records.isEmpty)
+            if (!showingMilestones && detail.records.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
                 child: _EmptyState(
@@ -3089,12 +3106,15 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   message: '从一次投喂或观察开始。',
                 ),
               ),
-            if (detail.records.isNotEmpty && visibleDiaryRecords.isEmpty)
-              const Padding(
+            if ((showingMilestones && visibleMilestones.isEmpty) ||
+                (!showingMilestones &&
+                    detail.records.isNotEmpty &&
+                    visibleDiaryRecords.isEmpty))
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
                 child: _EmptyState(
                   icon: Icons.filter_alt_off_outlined,
-                  title: '没有符合条件的日记',
+                  title: showingMilestones ? '没有符合条件的里程碑' : '没有符合条件的日记',
                   message: '调整类别或时间筛选后再试。',
                 ),
               ),
@@ -3133,6 +3153,50 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       child: card,
                     );
             }),
+            for (final milestone in visibleMilestones)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: Text(milestone.title),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_dateTime(milestone.occurredAt)),
+                      if (milestone.note?.isNotEmpty == true)
+                        Text(
+                          milestone.note!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                  onTap: colony.archived
+                      ? null
+                      : () async {
+                          final saved = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) => MilestoneFormPage(
+                                colony: colony,
+                                milestone: milestone,
+                              ),
+                            ),
+                          );
+                          if (saved == true && mounted) setState(_reload);
+                        },
+                  trailing: IconButton(
+                    tooltip: '分享里程碑',
+                    icon: const Icon(Icons.share_outlined),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => MilestoneSharePage(
+                          colony: colony,
+                          milestone: milestone,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       );
@@ -3152,9 +3216,10 @@ enum _DiaryTimeFilter {
 }
 
 class _Detail {
-  const _Detail(this.colony, this.records);
+  const _Detail(this.colony, this.records, this.milestones);
   final Colony? colony;
   final List<CareRecord> records;
+  final List<Milestone> milestones;
 }
 
 class _ColonyProfileSummary extends StatelessWidget {
