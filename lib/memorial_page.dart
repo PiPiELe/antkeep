@@ -1027,6 +1027,16 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
             if (colony != null) ...[
               const SizedBox(height: 20),
               Card(
+                elevation: 0,
+                color: Theme.of(context).scaffoldBackgroundColor
+                    .withValues(alpha: 0.65),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant
+                        .withValues(alpha: 0.7),
+                  ),
+                ),
                 child: ListTile(
                   title: Text('关联蚁群 · ${colony.name}'),
                   subtitle: Text(colony.archived ? '整群已结束 · 档案与日记保留' : '仍在饲养中'),
