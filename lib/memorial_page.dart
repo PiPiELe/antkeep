@@ -1027,14 +1027,15 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
             if (colony != null) ...[
               const SizedBox(height: 20),
               Card(
+                margin: EdgeInsets.zero,
                 elevation: 0,
-                color: Theme.of(context).scaffoldBackgroundColor
-                    .withValues(alpha: 0.65),
+                color: Colors.transparent,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(24),
                   side: BorderSide(
-                    color: Theme.of(context).colorScheme.outlineVariant
-                        .withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outline.withValues(alpha: 0.55),
                   ),
                 ),
                 child: ListTile(
@@ -1105,10 +1106,6 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
         );
         final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
         final isQueen = item.kind == MemorialKind.queen;
-        final artworkHeightFactor = switch (item.kind) {
-          MemorialKind.worker || MemorialKind.colony => 0.8,
-          _ => 1.0,
-        };
         return Stack(
           children: [
             Positioned.fill(
@@ -1128,7 +1125,7 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
                               alignment: Alignment.bottomCenter,
                               child: FractionallySizedBox(
                                 widthFactor: 1,
-                                heightFactor: artworkHeightFactor,
+                                heightFactor: 1,
                                 child: Image.asset(
                                   memorialArtworkAsset(item.kind),
                                   fit: BoxFit.cover,
@@ -1155,12 +1152,13 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
                                   ]
                                 : [
                                     backgroundColor,
-                                    backgroundColor.withValues(alpha: 0.94),
+                                    backgroundColor.withValues(alpha: 0.9),
+                                    backgroundColor.withValues(alpha: 0.45),
                                     backgroundColor.withValues(alpha: 0.15),
                                   ],
                             stops: isQueen
                                 ? const [0, 0.45, 0.7, 1]
-                                : const [0, 0.55, 1],
+                                : const [0, 0.28, 0.7, 1],
                           ),
                         ),
                       ),
