@@ -267,41 +267,69 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                               ),
                       ),
                       if (!widget.colony.archived)
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            FilledButton.tonalIcon(
-                              onPressed: _busy
-                                  ? null
-                                  : () => _change(
-                                      () => AppDatabase.instance
-                                          .completeCareTask(task.id),
-                                    ),
-                              icon: const Icon(Icons.check),
-                              label: const Text('快速完成'),
-                            ),
-                            FilledButton.tonalIcon(
-                              onPressed: _busy
-                                  ? null
-                                  : () async {
-                                      if (await widget.onRecord(task) &&
-                                          mounted) {
-                                        _reload();
-                                      }
-                                    },
-                              icon: const Icon(Icons.check),
-                              label: const Text('完成并记日记'),
-                            ),
-                            TextButton(
-                              onPressed: _busy || !task.isDue(DateTime.now())
-                                  ? null
-                                  : () => _change(
-                                      () => AppDatabase.instance
-                                          .postponeCareTask(task),
-                                    ),
-                              child: const Text('顺延至明天'),
-                            ),
-                          ],
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  textStyle: const TextStyle(fontSize: 12),
+                                  iconSize: 16,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                onPressed: _busy
+                                    ? null
+                                    : () => _change(
+                                        () => AppDatabase.instance
+                                            .completeCareTask(task.id),
+                                      ),
+                                icon: const Icon(Icons.check),
+                                label: const Text('快速完成'),
+                              ),
+                              const SizedBox(width: 4),
+                              FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  textStyle: const TextStyle(fontSize: 12),
+                                  iconSize: 16,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                onPressed: _busy
+                                    ? null
+                                    : () async {
+                                        if (await widget.onRecord(task) &&
+                                            mounted) {
+                                          _reload();
+                                        }
+                                      },
+                                icon: const Icon(Icons.check),
+                                label: const Text('完成并记日记'),
+                              ),
+                              const SizedBox(width: 4),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  textStyle: const TextStyle(fontSize: 12),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                onPressed: _busy || !task.isDue(DateTime.now())
+                                    ? null
+                                    : () => _change(
+                                        () => AppDatabase.instance
+                                            .postponeCareTask(task),
+                                      ),
+                                child: const Text('顺延至明天'),
+                              ),
+                            ],
+                          ),
                         ),
                     ],
                   ),

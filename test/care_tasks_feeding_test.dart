@@ -259,7 +259,7 @@ void main() {
   );
 
   testWidgets('quick completion works from the care task card', (tester) async {
-    tester.view.physicalSize = const Size(360, 640);
+    tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -297,6 +297,25 @@ void main() {
 
     await tester.tap(find.byTooltip('展开养护待办'));
     await settleDatabase(tester);
+    final quickButton = find.text('快速完成');
+    final journalButton = find.text('完成并记日记');
+    final postponeButton = find.text('顺延至明天');
+    expect(
+      tester.getTopLeft(quickButton).dy,
+      tester.getTopLeft(journalButton).dy,
+    );
+    expect(
+      tester.getTopLeft(journalButton).dy,
+      tester.getTopLeft(postponeButton).dy,
+    );
+    final actionViewport = find.descendant(
+      of: find.byType(Card),
+      matching: find.byType(SingleChildScrollView),
+    );
+    expect(
+      tester.getBottomRight(postponeButton).dx,
+      lessThanOrEqualTo(tester.getRect(actionViewport).right),
+    );
     await tester.tap(find.text('快速完成'));
     await settleDatabase(tester);
 
