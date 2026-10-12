@@ -273,6 +273,16 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                             FilledButton.tonalIcon(
                               onPressed: _busy
                                   ? null
+                                  : () => _change(
+                                      () => AppDatabase.instance
+                                          .completeCareTask(task.id),
+                                    ),
+                              icon: const Icon(Icons.check),
+                              label: const Text('快速完成'),
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: _busy
+                                  ? null
                                   : () async {
                                       if (await widget.onRecord(task) &&
                                           mounted) {

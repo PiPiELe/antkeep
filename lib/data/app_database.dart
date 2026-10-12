@@ -975,6 +975,48 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     );
   }
 
+  Future<void> completeCareTask(String id) async =>
+      _db.transaction((transaction) async {
+        final tasks = await transaction.query(
+          'care_tasks',
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        if (tasks.isEmpty) throw StateError('待办已不存在');
+        final task = CareTask.fromMap(tasks.single);
+        final colonies = await transaction.query(
+          'colonies',
+          columns: ['archived'],
+          where: 'id = ?',
+          whereArgs: [task.colonyId],
+        );
+        if (colonies.isEmpty || colonies.single['archived'] == 1) {
+          throw StateError('蚁群已归档或不存在');
+        }
+        await _advanceCareTask(transaction, task, DateTime.now());
+      });
+
+  static Future<void> _advanceCareTask(
+    DatabaseExecutor database,
+    CareTask task,
+    DateTime now,
+  ) async {
+    final done = DateTime(now.year, now.month, now.day);
+    await database.update(
+      'care_tasks',
+      {
+        'last_completed_on': done.toIso8601String(),
+        'next_due_on': DateTime(
+          done.year,
+          done.month,
+          done.day + task.intervalDays,
+        ).toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [task.id],
+    );
+  }
+
   @override
   Future<List<CareRecord>> listRecords(String colonyId) async {
     await applyColonyGrowth(colonyId: colonyId);
@@ -1048,21 +1090,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       if (tasks.isEmpty) throw StateError('待办已不存在');
       final task = CareTask.fromMap(tasks.single);
       if (task.type.recordType != record.type) throw StateError('待办类型与日记不一致');
-      final today = DateTime.now();
-      final done = DateTime(today.year, today.month, today.day);
-      await transaction.update(
-        'care_tasks',
-        {
-          'last_completed_on': done.toIso8601String(),
-          'next_due_on': DateTime(
-            done.year,
-            done.month,
-            done.day + task.intervalDays,
-          ).toIso8601String(),
-        },
-        where: 'id = ?',
-        whereArgs: [task.id],
-      );
+      await _advanceCareTask(transaction, task, DateTime.now());
     }
     await _recalculateGrowthEstimates(
       transaction,

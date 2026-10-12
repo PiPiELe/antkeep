@@ -119,6 +119,30 @@ void main() {
     },
   );
 
+  test(
+    'quick completion advances the task without creating a journal',
+    () async {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      await database.saveCareTask(
+        CareTask(
+          id: 'quick',
+          colonyId: 'colony',
+          type: CareTaskType.cleaning,
+          intervalDays: 7,
+          nextDueOn: today,
+        ),
+      );
+
+      await database.completeCareTask('quick');
+
+      final completed = (await database.listCareTasks()).single;
+      expect(completed.lastCompletedOn, today);
+      expect(completed.nextDueOn, DateTime(now.year, now.month, now.day + 7));
+      expect(await database.listRecords('colony'), isEmpty);
+    },
+  );
+
   test('mismatched task and journal roll back together', () async {
     await database.saveCareTask(
       CareTask(
@@ -230,4 +254,58 @@ void main() {
       );
     },
   );
+
+  testWidgets('quick completion works from the care task card', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final colony = Colony(
+      id: 'colony',
+      name: '测试蚁群',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await tester.runAsync(
+      () => database.saveCareTask(
+        CareTask(
+          id: 'quick',
+          colonyId: colony.id,
+          type: CareTaskType.cleaning,
+          intervalDays: 7,
+          nextDueOn: DateTime(now.year, now.month, now.day),
+        ),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: CareTasksSection(
+              colony: colony,
+              onRecord: (_) async => false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await settleDatabase(tester);
+
+    await tester.tap(find.text('快速完成'));
+    await settleDatabase(tester);
+
+    expect(find.textContaining('下次'), findsOneWidget);
+    expect(
+      (await tester.runAsync(() => database.listCareTasks()))!
+          .single
+          .lastCompletedOn,
+      DateTime(now.year, now.month, now.day),
+    );
+    expect(
+      await tester.runAsync(() => database.listRecords('colony')),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
