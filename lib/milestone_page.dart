@@ -93,7 +93,7 @@ class _MilestonePageState extends State<MilestonePage> {
         }
         final milestones = snapshot.data!;
         if (milestones.isEmpty) {
-          return const Center(child: Text('还没有里程碑，记录一次值得纪念的事件吧。'));
+          return const Center(child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。'));
         }
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -277,7 +277,7 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
         TextField(
           controller: _title,
           maxLength: 80,
-          decoration: const InputDecoration(labelText: '事件标题'),
+          decoration: const InputDecoration(labelText: '里程碑标题'),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
@@ -304,10 +304,10 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           controller: _note,
           maxLength: 2000,
           maxLines: 5,
-          decoration: const InputDecoration(labelText: '事件说明（可选）'),
+          decoration: const InputDecoration(labelText: '里程碑说明（可选）'),
         ),
         const SizedBox(height: 24),
-        const Text('里程碑仅用于记录重大事件，不参与日记和数量统计。'),
+        const Text('里程碑独立保存，不参与日记和数量统计。'),
       ],
     ),
   );

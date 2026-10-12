@@ -1178,6 +1178,7 @@ class _ColonyCard extends StatelessWidget {
                     child: HusbandryDuration(
                       colony: colony,
                       tall: canFillSpace,
+                      stackedLabel: true,
                     ),
                   );
                   if (constraints.maxWidth < 280 ||
@@ -3981,7 +3982,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
     if (widget.record == null &&
         _addMilestone &&
         _milestoneTitle.text.trim().isEmpty) {
-      _showError(context, '请填写里程碑事件标题');
+      _showError(context, '请填写里程碑标题');
       return;
     }
     if (_type == CareRecordType.feeding &&
@@ -4216,7 +4217,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(widget.record == null ? '记录 ${_colony.name}' : '编辑日记'),
+      title: Text(widget.record == null ? '新增日记' : '编辑日记'),
       actions: [
         IconButton(
           tooltip: '日记设置',
@@ -4236,336 +4237,592 @@ class _RecordFormPageState extends State<RecordFormPage> {
         ),
       ],
     ),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('记录类型', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: CareRecordType.values
-              .map(
-                (type) => ChoiceChip(
-                  label: Text(type.label),
-                  selected: _type == type,
-                  onSelected: widget.task == null
-                      ? (_) => setState(() => _type = type)
-                      : null,
-                ),
-              )
-              .toList(),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
         ),
-        if (_type == CareRecordType.feeding) ...[
-          const SizedBox(height: 16),
-          Text('投喂结果（可选）', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _feedingFood,
-            maxLength: 80,
-            decoration: const InputDecoration(
-              labelText: '食物',
-              hintText: '例如：面包虫',
+        child: FilledButton.icon(
+          onPressed: _saving ? null : _save,
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.check),
+          label: Text(_saving ? '保存中…' : '保存日记'),
+        ),
+      ),
+    ),
+    body: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _DiaryFormIntro(
+              colonyName: _colony.name,
+              editing: widget.record != null,
             ),
-          ),
-          TextField(
-            controller: _feedingAmount,
-            maxLength: 80,
-            decoration: const InputDecoration(
-              labelText: '投喂量',
-              hintText: '例如：半只',
+            const SizedBox(height: 16),
+            _DiaryFormSection(
+              icon: Icons.category_outlined,
+              title: '记录类型',
+              subtitle: '选择养护内容',
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: CareRecordType.values
+                      .map(
+                        (type) => ChoiceChip(
+                          label: Text(type.label),
+                          selected: _type == type,
+                          onSelected: widget.task == null
+                              ? (_) => setState(() => _type = type)
+                              : null,
+                        ),
+                      )
+                      .toList(),
+                ),
+                if (_type == CareRecordType.feeding) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    '投喂结果（可选）',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _feedingFood,
+                    maxLength: 80,
+                    decoration: const InputDecoration(
+                      labelText: '食物',
+                      hintText: '例如：面包虫',
+                    ),
+                  ),
+                  TextField(
+                    controller: _feedingAmount,
+                    maxLength: 80,
+                    decoration: const InputDecoration(
+                      labelText: '投喂量',
+                      hintText: '例如：半只',
+                    ),
+                  ),
+                  DropdownButtonFormField<FeedingResponse>(
+                    initialValue: _feedingResponse,
+                    decoration: const InputDecoration(labelText: '进食情况'),
+                    items: [
+                      for (final response in FeedingResponse.values)
+                        DropdownMenuItem(
+                          value: response,
+                          child: Text(response.label),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => _feedingResponse = value),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text('是否有剩余食物'),
+                      for (final option in <(bool?, String)>[
+                        (null, '未知'),
+                        (false, '无'),
+                        (true, '有'),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: ChoiceChip(
+                            label: Text(option.$2),
+                            selected: _feedingLeftovers == option.$1,
+                            onSelected: (_) =>
+                                setState(() => _feedingLeftovers = option.$1),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                if (_type == CareRecordType.mortality) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _queenMortality,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: '蚁后死亡数量',
+                      helperText: '从档案蚁后数量扣减，最低为 0；数量未知时仅记录死亡数',
+                      helperMaxLines: 2,
+                    ),
+                  ),
+                  TextField(
+                    controller: _workerMortality,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: '工蚁死亡数量',
+                      helperMaxLines: 3,
+                      helperText: _incremental
+                          ? '自动扣减工蚁数量，最低为 0；数量未知时仅记录死亡数'
+                          : '工蚁总数留空时自动扣减，最低为 0；填写总数则以总数为准，未知时仅记录死亡数',
+                    ),
+                  ),
+                  if ((int.tryParse(_queenMortality.text.trim()) ?? 0) > 0)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('保存后添加蚁后纪念到英灵殿'),
+                      subtitle: const Text('将打开纪念表单填写名称，取消表单不会撤销日记'),
+                      value: _addQueenMemorial,
+                      onChanged: (value) =>
+                          setState(() => _addQueenMemorial = value ?? false),
+                    ),
+                  if ((int.tryParse(_workerMortality.text.trim()) ?? 0) > 0)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('保存后添加工蚁纪念到英灵殿'),
+                      subtitle: const Text('将打开纪念表单填写名称，取消表单不会撤销日记'),
+                      value: _addWorkerMemorial,
+                      onChanged: (value) =>
+                          setState(() => _addWorkerMemorial = value ?? false),
+                    ),
+                ],
+              ],
             ),
-          ),
-          DropdownButtonFormField<FeedingResponse>(
-            initialValue: _feedingResponse,
-            decoration: const InputDecoration(labelText: '进食情况'),
-            items: [
-              for (final response in FeedingResponse.values)
-                DropdownMenuItem(value: response, child: Text(response.label)),
-            ],
-            onChanged: (value) => setState(() => _feedingResponse = value),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              const Text('是否有剩余食物'),
-              for (final option in <(bool?, String)>[
-                (null, '未知'),
-                (false, '无'),
-                (true, '有'),
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: ChoiceChip(
-                    label: Text(option.$2),
-                    selected: _feedingLeftovers == option.$1,
-                    onSelected: (_) =>
-                        setState(() => _feedingLeftovers = option.$1),
+            const SizedBox(height: 12),
+            _DiaryFormSection(
+              icon: Icons.calendar_month_outlined,
+              title: '记录时间',
+              subtitle: '支持补记过去',
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _saving ? null : _pickDate,
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    label: Text('发生日期：${_date(_occurredAt)}'),
                   ),
                 ),
-            ],
-          ),
-        ],
-        if (_type == CareRecordType.mortality) ...[
-          const SizedBox(height: 16),
-          TextField(
-            controller: _queenMortality,
-            keyboardType: TextInputType.number,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: '蚁后死亡数量',
-              helperText: '从档案蚁后数量扣减，最低为 0；数量未知时仅记录死亡数',
-              helperMaxLines: 2,
-            ),
-          ),
-          TextField(
-            controller: _workerMortality,
-            keyboardType: TextInputType.number,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: '工蚁死亡数量',
-              helperMaxLines: 3,
-              helperText: _incremental
-                  ? '自动扣减工蚁数量，最低为 0；数量未知时仅记录死亡数'
-                  : '工蚁总数留空时自动扣减，最低为 0；填写总数则以总数为准，未知时仅记录死亡数',
-            ),
-          ),
-          if ((int.tryParse(_queenMortality.text.trim()) ?? 0) > 0)
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('保存后添加蚁后纪念到英灵殿'),
-              subtitle: const Text('将打开纪念表单填写名称，取消表单不会撤销日记'),
-              value: _addQueenMemorial,
-              onChanged: (value) =>
-                  setState(() => _addQueenMemorial = value ?? false),
-            ),
-          if ((int.tryParse(_workerMortality.text.trim()) ?? 0) > 0)
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('保存后添加工蚁纪念到英灵殿'),
-              subtitle: const Text('将打开纪念表单填写名称，取消表单不会撤销日记'),
-              value: _addWorkerMemorial,
-              onChanged: (value) =>
-                  setState(() => _addWorkerMemorial = value ?? false),
-            ),
-        ],
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: _pickDate,
-          icon: const Icon(Icons.calendar_today_outlined),
-          label: Text('发生日期：${_date(_occurredAt)}'),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(_hasSpecificTime ? '已记录具体时间' : '仅记录日期'),
-          trailing: const Icon(Icons.tune, size: 18),
-          onTap: _saving ? null : _settings,
-        ),
-        if (_hasSpecificTime)
-          OutlinedButton.icon(
-            onPressed: _saving ? null : _changeSpecificTime,
-            icon: const Icon(Icons.schedule),
-            label: Text(
-              '具体时间：${_timeOfDay(_occurredAt.hour * 60 + _occurredAt.minute)}',
-            ),
-          ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _note,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: '备注',
-            hintText: '例如：喂了半只面包虫，进食积极',
-          ),
-        ),
-        if (widget.record == null) ...[
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('同步记录为里程碑事件'),
-            subtitle: const Text('保存时创建独立里程碑，不参与日记统计'),
-            value: _addMilestone,
-            onChanged: _saving
-                ? null
-                : (value) => setState(() => _addMilestone = value ?? false),
-          ),
-          if (_addMilestone)
-            TextField(
-              controller: _milestoneTitle,
-              maxLength: 80,
-              decoration: const InputDecoration(
-                labelText: '里程碑事件标题',
-                helperText: '日期和备注将从这篇日记同步；之后可单独编辑里程碑',
-                helperMaxLines: 2,
-              ),
-            ),
-        ],
-        const SizedBox(height: 16),
-        Text('环境与数量（不清楚可留空）', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _temperature,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                _DiaryFormToggle(
+                  title: '记录具体时间',
+                  detail: _hasSpecificTime ? '已记录具体时间' : '仅记录日期',
+                  value: _hasSpecificTime,
+                  onChanged: _saving
+                      ? null
+                      : (value) => _setSpecificTime(value ?? false),
                 ),
-                decoration: const InputDecoration(labelText: '温度 °C'),
-              ),
+                if (_hasSpecificTime)
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _changeSpecificTime,
+                    icon: const Icon(Icons.schedule),
+                    label: Text(
+                      '具体时间：${_timeOfDay(_occurredAt.hour * 60 + _occurredAt.minute)}',
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _humidity,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+            const SizedBox(height: 12),
+            _DiaryFormSection(
+              icon: Icons.edit_note_outlined,
+              title: '记录内容',
+              subtitle: '写下观察与变化',
+              children: [
+                TextField(
+                  controller: _note,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: '备注',
+                    hintText: '今天观察到了什么？',
+                    alignLabelWithHint: true,
+                  ),
                 ),
-                decoration: const InputDecoration(labelText: '湿度 %'),
-              ),
+                if (widget.record == null) ...[
+                  const SizedBox(height: 14),
+                  Material(
+                    color: Theme.of(context).colorScheme.primaryContainer
+                        .withValues(alpha: .35),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Column(
+                      children: [
+                        _DiaryFormToggle(
+                          title: '设为里程碑',
+                          detail: '独立保存，与日记统计分开',
+                          value: _addMilestone,
+                          onChanged: _saving
+                              ? null
+                              : (value) => setState(
+                                  () => _addMilestone = value ?? false,
+                                ),
+                        ),
+                        if (_addMilestone)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                            child: TextField(
+                              controller: _milestoneTitle,
+                              maxLength: 80,
+                              decoration: const InputDecoration(
+                                labelText: '里程碑标题',
+                                hintText: '例如：首批工蚁羽化',
+                                helperText: '日期与备注同步保存，之后可单独编辑',
+                                helperMaxLines: 2,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
+            const SizedBox(height: 12),
+            _DiaryFormSection(
+              icon: Icons.monitor_heart_outlined,
+              title: '环境与数量',
+              subtitle: '数值不清楚可留空',
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _temperature,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(labelText: '温度 °C'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _humidity,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(labelText: '湿度 %'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '数量录入',
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : _settings,
+                      icon: const Icon(Icons.tune, size: 18),
+                      label: Text(
+                        widget.record != null || !_incremental
+                            ? '总数设置'
+                            : '增量设置',
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  widget.record != null
+                      ? '填写该次记录的总数，留空表示未知。'
+                      : _incremental
+                      ? '填写增加值，自动换算各阶段；未知数量请切换总数。'
+                      : '填写当前总数，留空不修改。',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _eggs,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '卵数'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _larvae,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '幼虫数'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _pupae,
+                        enabled:
+                            !_incremental ||
+                            _colony.developmentPath ==
+                                GrowthPath.eggToCocoonToWorker,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '茧数'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _workers,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '工蚁数量（可估计）',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _DiaryFormSection(
+              icon: Icons.photo_library_outlined,
+              title: '照片',
+              subtitle: '留下现场画面',
+              children: [
+                if (widget.record?.photos.isNotEmpty == true) ...[
+                  const Text('已有照片'),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 80,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: widget.record!.photos.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) => _StoredImage(
+                        relativePath: widget.record!.photos[index],
+                        width: 80,
+                        height: 80,
+                        borderRadius: 8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: Text(
+                    _photos.isEmpty ? '添加照片（可选）' : '已选择 ${_photos.length} 张照片',
+                  ),
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          final images = await ImagePicker().pickMultiImage(
+                            imageQuality: 86,
+                          );
+                          if (images.isNotEmpty && mounted) {
+                            setState(() => _photos.addAll(images));
+                          }
+                        },
+                ),
+                if (_photos.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 80,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _photos.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) => ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: FutureBuilder<Uint8List>(
+                          future: _photos[index].readAsBytes(),
+                          builder: (context, snapshot) => snapshot.hasData
+                              ? Image.memory(
+                                  snapshot.data!,
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                )
+                              : const SizedBox(width: 80, height: 80),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 24),
           ],
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            widget.record != null
-                ? '编辑记录 · 总数'
-                : _incremental
-                ? '数量录入 · 增量'
-                : '数量录入 · 总数',
-          ),
-          subtitle: Text(
-            widget.record != null
-                ? '填写该次记录的数量总数，留空表示该项未知。'
-                : _incremental
-                ? '填写增加值，自动扣减上一阶段；${_colony.developmentPath.label}。未知数量请先改为总数。'
-                : '填写当前总数，留空不修改',
-          ),
-          trailing: const Icon(Icons.tune, size: 18),
-          onTap: _saving ? null : _settings,
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _eggs,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: '卵数',
-                  helperText: _incremental ? '增加数量' : '当前总数',
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _larvae,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: '幼虫数',
-                  helperText: _incremental ? '增加数量' : '当前总数',
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _pupae,
-                enabled:
-                    !_incremental ||
-                    _colony.developmentPath == GrowthPath.eggToCocoonToWorker,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: '茧数',
-                  helperText: _incremental ? '增加数量' : '当前总数',
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _workers,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: '工蚁数量（可估计）',
-                  helperText: _incremental ? '增加数量' : '当前总数',
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (widget.record?.photos.isNotEmpty == true) ...[
-          const Text('已有照片'),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 80,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: widget.record!.photos.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) => _StoredImage(
-                relativePath: widget.record!.photos[index],
-                width: 80,
-                height: 80,
-                borderRadius: 8,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        OutlinedButton.icon(
-          icon: const Icon(Icons.add_photo_alternate_outlined),
-          label: Text(
-            _photos.isEmpty ? '添加照片（可选）' : '已选择 ${_photos.length} 张照片',
-          ),
-          onPressed: _saving
-              ? null
-              : () async {
-                  final images = await ImagePicker().pickMultiImage(
-                    imageQuality: 86,
-                  );
-                  if (images.isNotEmpty && mounted) {
-                    setState(() => _photos.addAll(images));
-                  }
-                },
-        ),
-        if (_photos.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 80,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _photos.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) => ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: FutureBuilder<Uint8List>(
-                  future: _photos[index].readAsBytes(),
-                  builder: (context, snapshot) => snapshot.hasData
-                      ? Image.memory(
-                          snapshot.data!,
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        )
-                      : const SizedBox(width: 80, height: 80),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
+      ),
     ),
   );
+}
+
+class _DiaryFormIntro extends StatelessWidget {
+  const _DiaryFormIntro({required this.colonyName, required this.editing});
+
+  final String colonyName;
+  final bool editing;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.auto_stories_outlined,
+            color: colors.onPrimaryContainer,
+            size: 30,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    colonyName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    editing ? '修改日记' : '记录养殖日常',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: colors.onPrimaryContainer),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiaryFormSection extends StatelessWidget {
+  const _DiaryFormSection({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Material(
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .65)),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: colors.primary, size: 21),
+                const SizedBox(width: 9),
+                Text(
+                  title,
+                  maxLines: 1,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiaryFormToggle extends StatelessWidget {
+  const _DiaryFormToggle({
+    required this.title,
+    required this.detail,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String detail;
+  final bool value;
+  final ValueChanged<bool?>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return CheckboxListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.only(left: 14, right: 6),
+      controlAffinity: ListTileControlAffinity.trailing,
+      title: Row(
+        children: [
+          Text(title, style: theme.textTheme.titleSmall),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              detail,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
 }
 
 class _RecordCard extends StatefulWidget {

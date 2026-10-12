@@ -1035,7 +1035,8 @@ void main() {
     );
     await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
     await tester.pumpAndSettle();
-    expect(find.text('已养殖 36 天', findRichText: true), findsOneWidget);
+    expect(find.text('已养殖'), findsOneWidget);
+    expect(find.text('36 天', findRichText: true), findsOneWidget);
     await tester.tap(find.text('到家计时'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('duration-right-label')), findsOneWidget);
@@ -1046,6 +1047,74 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final width in [320.0, 360.0, 440.0]) {
+    testWidgets(
+      'colony card keeps the duration label above days at ${width.toInt()}px',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final now = DateTime.now();
+        for (final id in ['quiet', 'due']) {
+          tables['colonies']!.add(
+            Colony(
+              id: id,
+              name: id,
+              nestType: '试管巢',
+              queenCount: 1,
+              initialWorkerCount: 12,
+              acquiredOn: DateTime(now.year, now.month, now.day - 41),
+              createdAt: now,
+              updatedAt: now,
+            ).toMap(),
+          );
+        }
+        tables['care_tasks']!.add(
+          CareTask(
+            id: 'due-cleaning',
+            colonyId: 'due',
+            type: CareTaskType.cleaning,
+            intervalDays: 1,
+            nextDueOn: now,
+          ).toMap(),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+        await tester.pumpAndSettle();
+        for (final id in ['quiet', 'due']) {
+          final card = find.ancestor(
+            of: find.text(id),
+            matching: find.byType(Card),
+          );
+          await tester.ensureVisible(card);
+          await tester.pumpAndSettle();
+          final duration = find.descendant(
+            of: card,
+            matching: find.byType(HusbandryDuration),
+          );
+          final label = find.descendant(
+            of: duration,
+            matching: find.text('已养殖'),
+          );
+          final days = find.descendant(
+            of: duration,
+            matching: find.text('41 天', findRichText: true),
+          );
+          expect(
+            tester.widget<HusbandryDuration>(duration).stackedLabel,
+            isTrue,
+          );
+          expect(
+            tester.getRect(label).bottom,
+            lessThan(tester.getRect(days).top),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('colony card scrolls tags before the duration divider', (
     tester,
@@ -1920,8 +1989,9 @@ void main() {
           'updated_at': saved.updatedAt.toIso8601String(),
         });
         if (fromList) {
+          expect(find.text('已养殖').hitTestable(), findsOneWidget);
           expect(
-            find.text('已养殖 5 天', findRichText: true).hitTestable(),
+            find.text('5 天', findRichText: true).hitTestable(),
             findsOneWidget,
           );
         } else {
@@ -2650,6 +2720,45 @@ void main() {
     expect(find.text('4 幼虫'), findsOneWidget);
     expect(find.text('3 茧'), findsOneWidget);
   });
+
+  testWidgets(
+    'quantity mode stays compact and opens settings on a narrow phone',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final now = DateTime.now();
+      final colony = Colony(
+        id: 'quantity-layout',
+        name: '数量布局',
+        createdAt: now,
+        updatedAt: now,
+      );
+      tables['colonies']!.add(colony.toMap());
+      await tester.pumpWidget(
+        MaterialApp(home: RecordFormPage(colony: colony)),
+      );
+      await tester.pumpAndSettle();
+
+      final mode = find.widgetWithText(OutlinedButton, '增量设置');
+      await tester.scrollUntilVisible(
+        mode,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('数量录入'), findsOneWidget);
+      expect(find.text('增加数量'), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(mode);
+      await tester.pumpAndSettle();
+      expect(find.byType(DiarySettingsPage), findsOneWidget);
+    },
+  );
 
   testWidgets('new care records immediately refresh the colony detail', (
     tester,

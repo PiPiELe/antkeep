@@ -143,7 +143,7 @@ void main() {
       await db.saveColony(colony);
     });
     await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
-    final option = find.widgetWithText(CheckboxListTile, '同步记录为里程碑事件');
+    final option = find.widgetWithText(CheckboxListTile, '设为里程碑');
     await tester.scrollUntilVisible(
       option,
       250,
@@ -151,7 +151,7 @@ void main() {
     );
     await tester.tap(option);
     await tester.pumpAndSettle();
-    final title = find.widgetWithText(TextField, '里程碑事件标题');
+    final title = find.widgetWithText(TextField, '里程碑标题');
     await tester.scrollUntilVisible(
       title,
       250,
@@ -176,7 +176,59 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('standalone milestone page adds and edits an event', (
+  testWidgets('diary form sections fit a narrow screen', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    for (final width in [320.0, 360.0, 440.0]) {
+      tester.view.physicalSize = Size(width, 720);
+      await tester.pumpWidget(
+        MaterialApp(home: RecordFormPage(colony: colony)),
+      );
+      expect(find.text('记录类型'), findsOneWidget);
+      expect(find.text('保存日记'), findsOneWidget);
+      for (final (title, subtitle) in [
+        ('记录类型', '选择养护内容'),
+        ('记录时间', '支持补记过去'),
+        ('记录内容', '写下观察与变化'),
+      ]) {
+        expect(
+          (tester.getCenter(find.text(title)).dy -
+                  tester.getCenter(find.text(subtitle)).dy)
+              .abs(),
+          lessThan(8),
+        );
+      }
+      expect(
+        (tester.getCenter(find.text(colony.name)).dy -
+                tester.getCenter(find.text('记录养殖日常')).dy)
+            .abs(),
+        lessThan(8),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+    tester.view.physicalSize = const Size(360, 720);
+    await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
+    final timeOption = find.widgetWithText(CheckboxListTile, '记录具体时间');
+    final option = find.widgetWithText(CheckboxListTile, '设为里程碑');
+    expect(timeOption, findsOneWidget);
+    expect(option, findsOneWidget);
+    expect(find.byType(SwitchListTile), findsNothing);
+    expect(tester.widget<CheckboxListTile>(timeOption).dense, isTrue);
+    expect(tester.widget<CheckboxListTile>(option).dense, isTrue);
+    await tester.ensureVisible(option);
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '里程碑标题'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('standalone milestone page adds and edits a milestone', (
     tester,
   ) async {
     await tester.runAsync(() async {
@@ -196,14 +248,14 @@ void main() {
     await settle();
     await tester.tap(find.text('添加里程碑'));
     await settle();
-    await tester.enterText(find.widgetWithText(TextField, '事件标题'), '首批工蚁羽化');
+    await tester.enterText(find.widgetWithText(TextField, '里程碑标题'), '首批工蚁羽化');
     await tester.tap(find.text('保存里程碑'));
     await settle();
     expect(find.text('首批工蚁羽化'), findsOneWidget);
 
     await tester.tap(find.text('首批工蚁羽化'));
     await settle();
-    await tester.enterText(find.widgetWithText(TextField, '事件标题'), '首次羽化');
+    await tester.enterText(find.widgetWithText(TextField, '里程碑标题'), '首次羽化');
     await tester.tap(find.text('保存里程碑'));
     await settle();
     expect(find.text('首次羽化'), findsOneWidget);
@@ -227,6 +279,8 @@ void main() {
         updatedAt: date,
       );
       await tester.runAsync(() async {
+        await db.deleteColony(colony.id);
+        await db.saveColony(colony);
         await db.saveColony(secondColony);
         await db.saveMilestone(
           Milestone(
@@ -315,6 +369,8 @@ void main() {
         250,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(typeFilter);
+      await tester.pumpAndSettle();
       expect(find.textContaining('1 条记录'), findsOneWidget);
       await tester.tap(typeFilter);
       await tester.pumpAndSettle();

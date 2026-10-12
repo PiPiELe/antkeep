@@ -15,6 +15,7 @@ class HusbandryDuration extends StatefulWidget {
     this.compact = false,
     this.rightVerticalLabel = false,
     this.tall = false,
+    this.stackedLabel = false,
     this.showAcquiredDate = false,
     this.labelWidth,
     this.onTap,
@@ -25,6 +26,7 @@ class HusbandryDuration extends StatefulWidget {
   final bool compact;
   final bool rightVerticalLabel;
   final bool tall;
+  final bool stackedLabel;
   final bool showAcquiredDate;
   final double? labelWidth;
   final VoidCallback? onTap;
@@ -97,7 +99,7 @@ class _HusbandryDurationState extends State<HusbandryDuration>
           ],
         );
       }
-      if (widget.tall) {
+      if (widget.tall || widget.stackedLabel) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -118,7 +120,11 @@ class _HusbandryDurationState extends State<HusbandryDuration>
                     TextSpan(
                       text: '$days',
                       style: TextStyle(
-                        fontSize: 100,
+                        fontSize: widget.tall
+                            ? 100
+                            : widget.compact
+                            ? 42
+                            : 72,
                         height: 1,
                         letterSpacing: -3,
                         fontWeight: FontWeight.w700,
