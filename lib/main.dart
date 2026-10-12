@@ -25,6 +25,7 @@ import 'nest_history_page.dart';
 import 'winter_cycle_page.dart';
 import 'flight_observation_page.dart';
 import 'milestone_page.dart';
+import 'milestones_overview_page.dart';
 import 'milestone_share_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
@@ -513,7 +514,7 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
-    _colonyTabs = TabController(length: 2, vsync: this);
+    _colonyTabs = TabController(length: ColonyTab.values.length, vsync: this);
     _careNotices = onlineController.content.beginnerCareNotices;
     _beginnerCareNotice = randomBeginnerCareNotice(notices: _careNotices);
     onlineController.addListener(_updateCareNotices);
@@ -564,6 +565,7 @@ class _HomePageState extends State<HomePage>
               );
             },
           ),
+          MilestonesOverviewPage(active: _colonyTabs.index == 2),
         ],
       ),
       const InventoryPage(),

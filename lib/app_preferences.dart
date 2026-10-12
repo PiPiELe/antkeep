@@ -54,7 +54,8 @@ enum AppEdition {
 
 enum ColonyTab {
   colonies('我的蚁群', 'colonies_tab_name'),
-  memorial('英灵殿', 'memorial_tab_name');
+  memorial('英灵殿', 'memorial_tab_name'),
+  milestones('里程碑', 'milestones_tab_name');
 
   const ColonyTab(this.defaultName, this.settingKey);
   final String defaultName;

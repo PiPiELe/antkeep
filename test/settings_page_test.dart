@@ -351,6 +351,7 @@ void main() {
     for (final entry in {
       ColonyTab.colonies: '蚂蚁之家',
       ColonyTab.memorial: '星光纪念馆',
+      ColonyTab.milestones: '成长大事记',
     }.entries) {
       await tester.longPress(find.text(entry.key.defaultName));
       await tester.pumpAndSettle();
@@ -364,6 +365,7 @@ void main() {
     await restarted.load();
     expect(restarted.colonyTabName(ColonyTab.colonies), '蚂蚁之家');
     expect(restarted.colonyTabName(ColonyTab.memorial), '星光纪念馆');
+    expect(restarted.colonyTabName(ColonyTab.milestones), '成长大事记');
     await tester.tap(find.text('星光纪念馆'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('添加纪念'), findsOneWidget);
@@ -386,6 +388,14 @@ void main() {
     expect(restarted.colonyTabName(ColonyTab.memorial), '英灵殿');
     expect(restarted.colonyTabName(ColonyTab.colonies), '蚂蚁之家');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('milestone tab opens the overview', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('里程碑'));
+    await tester.pumpAndSettle();
+    expect(find.text('还没有里程碑，可在蚁群详情中添加。'), findsOneWidget);
   });
 
   testWidgets(

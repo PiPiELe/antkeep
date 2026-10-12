@@ -289,6 +289,22 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         orderBy: 'occurred_at DESC, created_at DESC',
       )).map(Milestone.fromMap).toList();
 
+  Future<List<({Milestone milestone, String colonyName})>>
+  listAllMilestones() async =>
+      (await _db.rawQuery('''
+        SELECT m.*, c.name AS colony_name
+        FROM milestones AS m
+        JOIN colonies AS c ON c.id = m.colony_id
+        ORDER BY m.occurred_at DESC, m.created_at DESC
+      '''))
+          .map(
+            (row) => (
+              milestone: Milestone.fromMap(row),
+              colonyName: row['colony_name'] as String,
+            ),
+          )
+          .toList();
+
   Future<void> saveMilestone(Milestone milestone) async {
     milestone.validate();
     await _db.transaction((txn) async {

@@ -6,6 +6,7 @@ import 'package:antkeep/domain/milestone.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/milestone_page.dart';
+import 'package:antkeep/milestones_overview_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -215,6 +216,57 @@ void main() {
     expect(find.text('卵幼铺底'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'overview shows milestones from multiple colonies and opens detail',
+    (tester) async {
+      final secondColony = Colony(
+        id: 'overview-second',
+        name: '第二蚁群',
+        createdAt: date,
+        updatedAt: date,
+      );
+      await tester.runAsync(() async {
+        await db.saveColony(secondColony);
+        await db.saveMilestone(
+          Milestone(
+            id: 'overview-second-milestone',
+            colonyId: secondColony.id,
+            title: '第二蚁群搬家',
+            occurredAt: date.add(const Duration(days: 1)),
+            createdAt: date,
+          ),
+        );
+      });
+      final all = await tester.runAsync(() => db.listAllMilestones());
+      expect(all!.first.milestone.title, '第二蚁群搬家');
+      expect(all.first.colonyName, '第二蚁群');
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: MilestonesOverviewPage(active: true)),
+        ),
+      );
+      for (var frame = 0; frame < 20; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      expect(find.text('第二蚁群搬家'), findsOneWidget);
+      expect(find.textContaining('第二蚁群 ·'), findsOneWidget);
+      await tester.tap(find.text('第二蚁群搬家'));
+      for (var frame = 0; frame < 20; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      expect(find.text('第二蚁群 · 里程碑'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(() => db.deleteColony(secondColony.id));
+    },
+  );
 
   testWidgets(
     'diary filter shows milestones without counting them as diaries',
