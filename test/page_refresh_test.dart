@@ -1354,15 +1354,25 @@ void main() {
     await fillRequiredColonyCounts(tester);
     final temperatureLower = find.widgetWithText(TextFormField, '温度下限 °C');
     final temperatureUpper = find.widgetWithText(TextFormField, '温度上限 °C');
+    final alertSection = find.text('环境预警（可选）');
     await tester.scrollUntilVisible(
-      temperatureLower,
+      alertSection,
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    expect(temperatureLower, findsNothing);
+    await tester.tap(alertSection);
+    await tester.pumpAndSettle();
+    expect(temperatureLower, findsOneWidget);
     await tester.enterText(temperatureLower, '30');
     await tester.enterText(temperatureUpper, '20');
+    await tester.ensureVisible(alertSection);
+    await tester.tap(alertSection);
+    await tester.pumpAndSettle();
+    expect(temperatureLower, findsNothing);
     await tapSave(tester, '保存蚁群');
     expect(tables['colonies'], isEmpty);
+    expect(temperatureLower, findsOneWidget);
     expect(find.text('下限不能高于上限'), findsOneWidget);
 
     await tester.ensureVisible(temperatureLower);

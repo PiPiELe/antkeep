@@ -1374,6 +1374,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   final _targetTemperature = TextEditingController();
   final _targetHumidityLower = TextEditingController();
   final _targetHumidity = TextEditingController();
+  final _environmentExpansion = ExpansibleController();
   String? _speciesFamily;
   String? _selectedSpecies;
   String? _selectedNest;
@@ -1437,6 +1438,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
 
   @override
   void dispose() {
+    _environmentExpansion.dispose();
     for (final controller in [
       _name,
       _source,
@@ -1482,7 +1484,35 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      if (_validateAlertLimit(
+                _targetTemperatureLower.text,
+                _targetTemperature,
+                isLower: true,
+              ) !=
+              null ||
+          _validateAlertLimit(
+                _targetTemperature.text,
+                _targetTemperatureLower,
+                isLower: false,
+              ) !=
+              null ||
+          _validateAlertLimit(
+                _targetHumidityLower.text,
+                _targetHumidity,
+                isLower: true,
+              ) !=
+              null ||
+          _validateAlertLimit(
+                _targetHumidity.text,
+                _targetHumidityLower,
+                isLower: false,
+              ) !=
+              null) {
+        _environmentExpansion.expand();
+      }
+      return;
+    }
     setState(() => _saving = true);
     try {
       final now = DateTime.now();
@@ -1892,108 +1922,121 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _section(
-            icon: Icons.thermostat_outlined,
-            title: '环境预警（可选）',
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _targetTemperatureLower,
-                      validator: (value) => _validateAlertLimit(
-                        value,
-                        _targetTemperature,
-                        isLower: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: '温度下限 °C',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _targetTemperature,
-                      validator: (value) => _validateAlertLimit(
-                        value,
-                        _targetTemperatureLower,
-                        isLower: false,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: '温度上限 °C',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              controller: _environmentExpansion,
+              initiallyExpanded: widget.colony != null,
+              maintainState: true,
+              leading: Icon(
+                Icons.thermostat_outlined,
+                color: Theme.of(context).colorScheme.primary,
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _targetHumidityLower,
-                      validator: (value) => _validateAlertLimit(
-                        value,
-                        _targetHumidity,
-                        isLower: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: '湿度下限 %',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _targetHumidity,
-                      validator: (value) => _validateAlertLimit(
-                        value,
-                        _targetHumidityLower,
-                        isLower: false,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: '湿度上限 %',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              title: Text(
+                '环境预警（可选）',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 8),
-              Text('超出范围时提醒', style: Theme.of(context).textTheme.bodySmall),
-            ],
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _targetTemperatureLower,
+                        validator: (value) => _validateAlertLimit(
+                          value,
+                          _targetTemperature,
+                          isLower: true,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: '温度下限 °C',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _targetTemperature,
+                        validator: (value) => _validateAlertLimit(
+                          value,
+                          _targetTemperatureLower,
+                          isLower: false,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: '温度上限 °C',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _targetHumidityLower,
+                        validator: (value) => _validateAlertLimit(
+                          value,
+                          _targetHumidity,
+                          isLower: true,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: '湿度下限 %',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _targetHumidity,
+                        validator: (value) => _validateAlertLimit(
+                          value,
+                          _targetHumidityLower,
+                          isLower: false,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: '湿度上限 %',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('超出范围时提醒', style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           _section(
