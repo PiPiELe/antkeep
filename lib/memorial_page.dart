@@ -184,18 +184,12 @@ class _MemorialPageState extends State<MemorialPage> {
             }
             final data = snapshot.data!;
             final items = data.memorials;
-            final groupingControl = Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 16, 0),
-              child: Row(
-                children: [
-                  const Text('按蚁群折叠'),
-                  const Spacer(),
-                  Switch.adaptive(
-                    value: _grouped,
-                    onChanged: _savingGrouping ? null : _setGrouped,
-                  ),
-                ],
-              ),
+            final groupingControl = SwitchListTile(
+              title: const Text('按蚁群折叠'),
+              value: _grouped,
+              onChanged: _savingGrouping ? null : _setGrouped,
+              dense: true,
+              contentPadding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
             );
             if (items.isEmpty) {
               return Column(
