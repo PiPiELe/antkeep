@@ -15,6 +15,7 @@ import 'package:antkeep/domain/care_task.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/memorial.dart';
 import 'package:antkeep/domain/milestone.dart';
+import 'package:antkeep/domain/wild_catch_record.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -228,6 +229,49 @@ void main() {
     await service.restoreBytes(archiveBytes(old, version: 4));
     expect(await database.listMilestones('c'), isEmpty);
   });
+
+  test(
+    'wild catch records survive ZIP restore and incremental import',
+    () async {
+      final date = DateTime(2026, 10, 13);
+      await database.saveWildCatchRecord(
+        WildCatchRecord(
+          id: 'wild-catch',
+          caughtAt: date,
+          place: '山脚',
+          species: const [
+            WildCatchSpecies(
+              name: '弓背蚁',
+              colonies: [
+                WildCatchColony(queenCount: 2, workerCount: 0),
+                WildCatchColony(queenCount: 1),
+              ],
+            ),
+            WildCatchSpecies(
+              name: '收获蚁',
+              colonies: [WildCatchColony(queenCount: 1)],
+            ),
+          ],
+          createdAt: date,
+        ),
+      );
+      final bytes = await service.createBackupBytes();
+      await database.replaceAll(fixture());
+      expect(await database.listWildCatchRecords(), isEmpty);
+      await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+      expect(
+        (await database.listWildCatchRecords()).single.species.first.colonies,
+        hasLength(2),
+      );
+      await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+      expect(await database.listWildCatchRecords(), hasLength(1));
+
+      final old = await database.snapshot()
+        ..remove('wild_catch_records');
+      await service.restoreBytes(archiveBytes(old, version: 5));
+      expect(await database.listWildCatchRecords(), isEmpty);
+    },
+  );
 
   test('incremental restore keeps the local plan for the same type', () async {
     final date = DateTime(2026, 10, 9);
@@ -474,7 +518,7 @@ void main() {
         BackupArchive.decode(bytes).findFile('manifest.json')!.content,
       ),
     );
-    expect(manifest['version'], 5);
+    expect(manifest['version'], 6);
     await service.restoreBytes(archiveBytes(fixture()));
     expect(await database.listMemorials(), isEmpty);
     await service.undoLastRestore();

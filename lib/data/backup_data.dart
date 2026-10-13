@@ -4,6 +4,7 @@ import '../domain/memorial.dart';
 import '../domain/nest_entry.dart';
 import '../domain/winter_cycle.dart';
 import '../domain/flight_observation.dart';
+import '../domain/wild_catch_record.dart';
 import '../domain/milestone.dart';
 
 /// Validate before touching either the live data or the previous rollback copy.
@@ -62,6 +63,11 @@ class BackupData {
       data,
       'flight_observations',
       (row) => FlightObservation.fromMap(row).toMap(),
+    );
+    _rows(
+      data,
+      'wild_catch_records',
+      (row) => WildCatchRecord.fromMap(row).toMap(),
     );
     final nests = _rows(
       data,
@@ -173,6 +179,7 @@ class BackupData {
                 'feeding_response',
                 'feeding_leftovers',
                 'is_current',
+                'has_specific_time',
               }.contains(field.key) &&
               value != model[field.key]) {
             throw FormatException('字段 ${field.key} 的取值无效。');
