@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../data/app_database.dart';
 import '../domain/models.dart';
+import '../widgets/photo_source_picker.dart';
 import 'competition_poster_page.dart';
 import 'online_api.dart';
 import 'online_controller.dart';
@@ -139,8 +140,10 @@ class _CompetitionPageState extends State<CompetitionPage> {
     final account = widget.controller.user;
     final targetRevision = _photoTargetRevision;
     try {
+      final source = await choosePhotoSource(context);
+      if (source == null || !mounted) return;
       final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 640,
         maxHeight: 640,
         imageQuality: 50,

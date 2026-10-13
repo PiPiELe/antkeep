@@ -7,6 +7,7 @@ import 'package:antkeep/online/competition_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'online_controller_test.dart'
@@ -17,6 +18,7 @@ void main() {
   late Directory directory;
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  MethodCall? pickerCall;
   final photo = base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
   );
@@ -31,7 +33,10 @@ void main() {
     );
     messenger.setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/image_picker'),
-      (_) async => '${directory.path}/photo.png',
+      (call) async {
+        pickerCall = call;
+        return '${directory.path}/photo.png';
+      },
     );
     await File('${directory.path}/photo.png').writeAsBytes(photo);
     sqfliteFfiInit();
@@ -181,6 +186,9 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.tap(find.text('选择报名图片（必选）'));
+      await tester.pumpAndSettle();
+      expect(find.text('拍照'), findsOneWidget);
+      await tester.tap(find.text('拍照'));
       for (var attempt = 0; attempt < 100; attempt++) {
         await tester.pump();
         if (find.text('已选图片 · 重新选择').evaluate().isNotEmpty) break;
@@ -189,6 +197,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.text('已选图片 · 重新选择'), findsOneWidget);
+    expect((pickerCall?.arguments as Map)['source'], ImageSource.camera.index);
 
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
@@ -197,7 +206,10 @@ void main() {
     expect(find.text('选择报名图片（必选）'), findsOneWidget);
 
     await tester.tap(find.text('选择报名图片（必选）'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('从图库选择'));
     await until(tester, find.text('已选图片 · 重新选择'));
+    expect((pickerCall?.arguments as Map)['source'], ImageSource.gallery.index);
     await tester.tap(find.text('全部比赛'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('contest-2'));

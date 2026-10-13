@@ -221,13 +221,18 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
           child: Column(
             children: [
               const Padding(padding: EdgeInsets.all(16), child: Text('选择图片')),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
                 children: [
+                  TextButton.icon(
+                    onPressed: () => Navigator.pop(context, ':camera'),
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('拍照'),
+                  ),
                   TextButton.icon(
                     onPressed: () => Navigator.pop(context, ':gallery'),
                     icon: const Icon(Icons.photo_library_outlined),
-                    label: const Text('从相册选择'),
+                    label: const Text('从图库选择'),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context, ':none'),
@@ -237,7 +242,7 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
               ),
               Expanded(
                 child: candidates.isEmpty
-                    ? const Center(child: Text('这里还没有记录照片，可从相册选择'))
+                    ? const Center(child: Text('这里还没有记录照片，可拍照或从图库选择'))
                     : GridView.builder(
                         padding: const EdgeInsets.all(12),
                         gridDelegate:
@@ -260,10 +265,12 @@ class _ShareCardsPageState extends State<ShareCardsPage> {
       ),
     );
     if (selected == null || !mounted) return;
-    if (selected == ':gallery') {
+    if (selected == ':gallery' || selected == ':camera') {
       try {
         final picked = await ImagePicker().pickImage(
-          source: ImageSource.gallery,
+          source: selected == ':camera'
+              ? ImageSource.camera
+              : ImageSource.gallery,
           maxWidth: 1800,
           maxHeight: 1800,
         );
