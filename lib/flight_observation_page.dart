@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'data/app_database.dart';
-import 'data/flight_weather_service.dart';
 import 'date_display.dart';
 import 'domain/flight_observation.dart';
 
@@ -14,62 +12,12 @@ class FlightObservationPage extends StatefulWidget {
 }
 
 class _FlightObservationPageState extends State<FlightObservationPage> {
-  final _weather = FlightWeatherService();
-  final _city = TextEditingController();
   late Future<List<FlightObservation>> _observations = AppDatabase.instance
       .listFlightObservations();
-  List<WeatherPlace>? _places;
-  WeatherPlace? _selected;
-  List<FlightWeatherDay>? _forecast;
-  String? _weatherError;
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _weather.dispose();
-    _city.dispose();
-    super.dispose();
-  }
 
   void _refresh() => setState(
     () => _observations = AppDatabase.instance.listFlightObservations(),
   );
-
-  Future<void> _search() async {
-    setState(() {
-      _loading = true;
-      _weatherError = null;
-      _places = null;
-      _selected = null;
-      _forecast = null;
-    });
-    try {
-      final places = await _weather.search(_city.text);
-      if (mounted) setState(() => _places = places);
-    } catch (error) {
-      if (mounted) setState(() => _weatherError = '$error');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadForecast(WeatherPlace place) async {
-    setState(() {
-      _selected = place;
-      _places = null;
-      _forecast = null;
-      _weatherError = null;
-      _loading = true;
-    });
-    try {
-      final days = await _weather.forecast(place);
-      if (mounted) setState(() => _forecast = days);
-    } catch (error) {
-      if (mounted) setState(() => _weatherError = '$error');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
 
   Future<void> _edit([FlightObservation? observation]) async {
     final saved = await Navigator.push<bool>(
@@ -112,7 +60,7 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text('婚飞观察与天气', style: Theme.of(context).textTheme.titleMedium),
+      title: Text('婚飞观察', style: Theme.of(context).textTheme.titleMedium),
     ),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: () => _edit(),
@@ -122,124 +70,6 @@ class _FlightObservationPageState extends State<FlightObservationPage> {
     body: ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('天气提示', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
-                Text(
-                  '手动搜索城市后获取七日预报。城市搜索词和所选坐标会发送给天气服务；观察记录只保存在本机。',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _city,
-                        onSubmitted: (_) => _loading ? null : _search(),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        decoration: const InputDecoration(
-                          labelText: '城市或地区',
-                          hintText: '例如：北京',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _loading ? null : _search,
-                      child: const Text('搜索'),
-                    ),
-                  ],
-                ),
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: LinearProgressIndicator(),
-                  ),
-                if (_weatherError != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text('获取失败：$_weatherError'),
-                  ),
-                if (_places != null && _places!.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text('没有找到城市，请尝试更具体的地名。'),
-                  ),
-                if (_places?.isNotEmpty == true)
-                  SizedBox(
-                    height: 220,
-                    child: ListView.builder(
-                      itemCount: _places!.length,
-                      itemBuilder: (context, index) {
-                        final place = _places![index];
-                        return ListTile(
-                          dense: true,
-                          title: Text(
-                            place.label,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          onTap: () => _loadForecast(place),
-                        );
-                      },
-                    ),
-                  ),
-                if (_selected != null && _forecast != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _selected!.label,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  Text(
-                    '“可留意”仅按气温≥20°C、降水概率≥40%、最大风速≤20公里/小时标记天气；不代表蚂蚁一定婚飞，蚁种和当地环境也会影响时机。',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 220,
-                    child: Scrollbar(
-                      child: ListView(
-                        padding: EdgeInsets.zero,
-                        children: [
-                          for (final day in _forecast!)
-                            ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                '${chineseDate(day.date)}${day.worthWatching ? ' · 可留意' : ''}',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              subtitle: Text(
-                                '最高温 ${day.maxTemp?.toStringAsFixed(1) ?? '—'}°C · 降水概率 ${day.rainChance?.toString() ?? '—'}% · 最大风速 ${day.windMax?.toStringAsFixed(1) ?? '—'} km/h',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                          Text(
-                            '天气数据：Open-Meteo（CC BY 4.0）。预报会变化，请出行前刷新。',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          TextButton(
-                            onPressed: () => launchUrl(
-                              Uri.parse('https://open-meteo.com/'),
-                              mode: LaunchMode.externalApplication,
-                            ),
-                            child: const Text('查看 Open-Meteo 数据来源与许可'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
         Text('本地观察记录', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         FutureBuilder<List<FlightObservation>>(

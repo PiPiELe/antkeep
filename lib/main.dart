@@ -5154,8 +5154,8 @@ class DiscoverPage extends StatelessWidget {
             Icons.travel_explore_outlined,
             color: Theme.of(context).colorScheme.primary,
           ),
-          title: const Text('婚飞观察与天气'),
-          subtitle: const Text('本地记录观察，手动查询城市天气'),
+          title: const Text('婚飞观察'),
+          subtitle: const Text('记录婚飞日期、地点与蚁种'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
