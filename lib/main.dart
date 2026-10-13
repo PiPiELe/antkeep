@@ -56,6 +56,7 @@ import 'domain/species_profile.dart';
 import 'domain/imported_species_catalog.dart';
 import 'widgets/diary_record_actions.dart';
 import 'widgets/justified_label.dart';
+import 'widgets/photo_source_picker.dart';
 
 const _builtInSpeciesOptions = <String, List<String>>{
   '收获蚁': [
@@ -2209,8 +2210,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
 
   Future<void> _pickCover() async {
     try {
+      final source = await choosePhotoSource(context);
+      if (source == null || !mounted) return;
       final image = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 86,
       );
       if (image == null || !mounted) return;
@@ -4625,11 +4628,26 @@ class _RecordFormPageState extends State<RecordFormPage> {
                   onPressed: _saving
                       ? null
                       : () async {
-                          final images = await ImagePicker().pickMultiImage(
-                            imageQuality: 86,
-                          );
-                          if (images.isNotEmpty && mounted) {
-                            setState(() => _photos.addAll(images));
+                          final source = await choosePhotoSource(context);
+                          if (source == null || !mounted) return;
+                          try {
+                            final List<XFile> images;
+                            if (source == ImageSource.camera) {
+                              final image = await ImagePicker().pickImage(
+                                source: source,
+                                imageQuality: 86,
+                              );
+                              images = image == null ? [] : [image];
+                            } else {
+                              images = await ImagePicker().pickMultiImage(
+                                imageQuality: 86,
+                              );
+                            }
+                            if (images.isNotEmpty && mounted) {
+                              setState(() => _photos.addAll(images));
+                            }
+                          } catch (error) {
+                            if (context.mounted) _showError(context, error);
                           }
                         },
                 ),

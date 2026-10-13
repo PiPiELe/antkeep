@@ -7,12 +7,14 @@ import 'package:antkeep/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   late File pickedImage;
   String? pickerResult;
+  MethodCall? pickerCall;
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final bytes = base64Decode(
@@ -34,7 +36,10 @@ void main() {
     await LocalMediaStore.instance.restoreFiles({'existing.png': bytes});
     messenger.setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/image_picker'),
-      (_) async => pickerResult,
+      (call) async {
+        pickerCall = call;
+        return pickerResult;
+      },
     );
   });
 
@@ -50,7 +55,11 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  Future<void> pick(WidgetTester tester, String label) async {
+  Future<void> pick(
+    WidgetTester tester,
+    String label, {
+    ImageSource source = ImageSource.gallery,
+  }) async {
     await tester.scrollUntilVisible(
       find.text(label),
       400,
@@ -60,6 +69,12 @@ void main() {
     // File I/O runs outside the widget test's fake clock.
     await tester.runAsync(() async {
       await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(find.text('拍照'), findsOneWidget);
+      expect(find.text('从图库选择'), findsOneWidget);
+      await tester.tap(
+        find.text(source == ImageSource.camera ? '拍照' : '从图库选择'),
+      );
       for (var attempt = 0; attempt < 100; attempt++) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
         await tester.pump();
@@ -75,7 +90,9 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
     expect(preview, findsNothing);
     pickerResult = pickedImage.path;
-    await pick(tester, '添加封面照片（可选）');
+    await pick(tester, '添加封面照片（可选）', source: ImageSource.camera);
+    expect(pickerCall?.method, 'pickImage');
+    expect((pickerCall?.arguments as Map)['source'], ImageSource.camera.index);
     await tester.ensureVisible(preview);
     await tester.pumpAndSettle();
     expect(preview, findsOneWidget);
@@ -91,6 +108,7 @@ void main() {
 
     pickerResult = null;
     await pick(tester, '已选择封面照片');
+    expect((pickerCall?.arguments as Map)['source'], ImageSource.gallery.index);
     expect(preview, findsOneWidget);
     expect((tester.widget<Image>(preview).image as MemoryImage).bytes, bytes);
     expect(tester.takeException(), isNull);

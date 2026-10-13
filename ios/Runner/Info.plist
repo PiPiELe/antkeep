@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>拍摄蚁群照片，用于封面、日记、分享图或比赛报名。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>将您生成的蚁群分享图片保存到相册。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
