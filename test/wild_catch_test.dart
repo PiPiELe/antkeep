@@ -182,7 +182,7 @@ void main() {
   });
 
   testWidgets(
-    'live catch persists actions, resumes, and records the end time',
+    'start, record events, resume, finish, and view wild catch data',
     (tester) async {
       final image = File('${directory.path}/live-catch.jpg');
       await tester.runAsync(() => image.writeAsBytes([1, 2, 3]));
@@ -198,23 +198,26 @@ void main() {
               null,
             ),
       );
+
       await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
       await _settleDatabase(tester);
-      await tester.tap(find.text('开始实时野采'));
+      await tester.tap(find.text('开始野采'));
+      await tester.pumpAndSettle();
+      expect(find.text('野采开始'), findsOneWidget);
+      expect(find.byTooltip('获取手机定位（可选）'), findsOneWidget);
+      expect(await tester.runAsync(db.listWildCatchRecords), isEmpty);
+      await tester.enterText(find.widgetWithText(TextField, '野采地点 *'), '溪边');
+      await tester.tap(find.text('确认地点并开始野采'));
       await _settleDatabase(tester);
       var record = (await tester.runAsync(db.listWildCatchRecords))!.single;
       expect(record.isActive, isTrue);
-      expect(record.events.map((event) => event.action), ['开始']);
-
-      await tester.enterText(find.widgetWithText(TextField, '野采地点 *'), '溪边');
-      await tester.tap(find.text('保存地点'));
-      await _settleDatabase(tester);
-      record = (await tester.runAsync(db.listWildCatchRecords))!.single;
       expect(record.place, '溪边');
-      expect(record.events.map((event) => event.action), ['开始', '地点']);
+      expect(record.events.map((event) => event.action), ['开始']);
+      expect(find.text('野采进行中'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '野采地点 *'), findsNothing);
+      expect(find.text('地点：溪边'), findsWidgets);
 
-      await tester.ensureVisible(find.text('拍照或添加照片'));
-      await tester.tap(find.text('拍照或添加照片'));
+      await tester.tap(find.text('拍照'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('从图库选择'));
       await _settleDatabase(tester);
@@ -222,37 +225,67 @@ void main() {
       expect(record.photos, hasLength(1));
       expect(record.events.last.photoPaths, record.photos);
 
+      await tester.tap(find.text('记战果'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, '蚁种名称 *'), '弓背蚁');
+      await tester.enterText(find.widgetWithText(TextField, '蚁后数量（可选）'), '1');
+      await tester.tap(find.text('记录').last);
+      await _settleDatabase(tester);
+      record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+      expect(record.species.single.name, '弓背蚁');
+      expect(record.events.last.action, '战果');
+
+      await tester.tap(find.text('记事件'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, '记录此刻发生的事'), '雨停了');
+      await tester.tap(find.text('记录').last);
+      await _settleDatabase(tester);
+      record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+      expect(record.events.last.detail, '雨停了');
+      expect(find.text('雨停了'), findsOneWidget);
+
+      await tester.tap(find.text('查看当前战果汇总'));
+      await tester.pumpAndSettle();
+      expect(find.text('野采战果汇总'), findsOneWidget);
+      expect(find.text('弓背蚁 · 1 群'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await tester.pageBack();
       await _settleDatabase(tester);
       await tester.tap(find.text('溪边'));
       await _settleDatabase(tester);
-      expect(find.textContaining('进行中 · 已用时'), findsOneWidget);
-      expect(find.text('结束野采'), findsOneWidget);
+      expect(find.text('野采进行中'), findsOneWidget);
+      expect(find.text('地点：溪边'), findsWidgets);
+
       await tester.tap(find.text('结束野采'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('结束野采').last);
       await _settleDatabase(tester);
       record = (await tester.runAsync(db.listWildCatchRecords))!.single;
       expect(record.endedAt, isNotNull);
-      expect(record.isActive, isFalse);
       expect(record.events.map((event) => event.action), [
         '开始',
-        '地点',
         '照片',
+        '战果',
+        '备注',
         '结束',
       ]);
-      expect(
-        record.startedAt!.isBefore(record.endedAt!) ||
-            record.startedAt == record.endedAt,
-        isTrue,
-      );
+      expect(find.text('野采结束'), findsOneWidget);
+      await tester.tap(find.text('查看本次野采数据'));
+      await tester.pumpAndSettle();
+      expect(find.text('野采数据'), findsOneWidget);
+      expect(find.text('记录时间线'), findsOneWidget);
+
       final snapshot = (await tester.runAsync(db.snapshot))!;
       BackupData.validate(snapshot);
       await tester.runAsync(() => db.replaceAll(snapshot));
       expect(
         (await tester.runAsync(db.listWildCatchRecords))!.single.events.length,
-        4,
+        5,
       );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await tester.pageBack();
       await _settleDatabase(tester);
       await tester.tap(find.byTooltip('编辑野采记录'));
@@ -316,6 +349,37 @@ void main() {
       (await tester.runAsync(db.listWildCatchRecords))!.single.latitude,
       isNull,
     );
+  });
+
+  testWidgets('live catch confirms optional location before the clock starts', (
+    tester,
+  ) async {
+    final original = GeolocatorPlatform.instance;
+    final location = _FakeGeolocator();
+    GeolocatorPlatform.instance = location;
+    addTearDown(() => GeolocatorPlatform.instance = original);
+
+    await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
+    await _settleDatabase(tester);
+    await tester.tap(find.text('开始野采'));
+    await tester.pumpAndSettle();
+    expect(await tester.runAsync(db.listWildCatchRecords), isEmpty);
+    await tester.enterText(find.widgetWithText(TextField, '野采地点 *'), '河岸');
+    await tester.tap(find.byTooltip('获取手机定位（可选）'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('确认当前位置'), findsOneWidget);
+    await tester.tap(find.text('使用此定位'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('已确认位置'), findsOneWidget);
+    await tester.tap(find.text('确认地点并开始野采'));
+    await _settleDatabase(tester);
+    final record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+    expect(record.place, '河岸');
+    expect(record.latitude, 31.23456);
+    expect(record.longitude, 121.45678);
+    expect(record.startedAt, isNotNull);
+    expect(find.widgetWithText(TextField, '野采地点 *'), findsNothing);
   });
 
   testWidgets('photos belong to the wild catch without a species', (
