@@ -5,6 +5,7 @@ import '../domain/memorial.dart';
 import '../domain/nest_entry.dart';
 import '../domain/winter_cycle.dart';
 import '../domain/flight_observation.dart';
+import '../domain/wild_catch_record.dart';
 import '../domain/milestone.dart';
 
 import 'package:sqflite/sqflite.dart';
@@ -44,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 25,
+      version: 26,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -90,6 +91,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await _createMemorialTable(database);
     await _createNestEntriesTable(database);
     await _createWinterAndFlightTables(database);
+    await _createWildCatchTable(database);
     await _createMilestonesTable(database);
     await _createCareTasksTable(database);
     await _createSettingsTable(database);
@@ -102,6 +104,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 26) await _createWildCatchTable(database);
     if (oldVersion < 25) await _createMilestonesTable(database);
     if (oldVersion < 24) await _createWinterAndFlightTables(database);
     if (oldVersion < 23) {
@@ -385,6 +388,18 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     );
   }
 
+  static Future<void> _createWildCatchTable(DatabaseExecutor db) async {
+    await db.execute('''CREATE TABLE wild_catch_records (
+      id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
+      has_specific_time INTEGER NOT NULL DEFAULT 0 CHECK (has_specific_time IN (0, 1)),
+      place TEXT NOT NULL, species_json TEXT NOT NULL DEFAULT '[]',
+      note TEXT, created_at TEXT NOT NULL
+    )''');
+    await db.execute(
+      'CREATE INDEX wild_catch_by_time ON wild_catch_records(caught_at DESC)',
+    );
+  }
+
   Future<List<WinterCycle>> listWinterCycles(String colonyId) async =>
       (await _db.query(
         'winter_cycles',
@@ -454,6 +469,24 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   Future<void> deleteFlightObservation(String id) async =>
       _db.delete('flight_observations', where: 'id = ?', whereArgs: [id]);
+
+  Future<List<WildCatchRecord>> listWildCatchRecords() async =>
+      (await _db.query(
+        'wild_catch_records',
+        orderBy: 'caught_at DESC, created_at DESC',
+      )).map(WildCatchRecord.fromMap).toList();
+
+  Future<void> saveWildCatchRecord(WildCatchRecord record) async {
+    record.validate();
+    await _db.insert(
+      'wild_catch_records',
+      record.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteWildCatchRecord(String id) async =>
+      _db.delete('wild_catch_records', where: 'id = ?', whereArgs: [id]);
 
   static Future<void> _seedLegacyNests(DatabaseExecutor db) async {
     final columns = await db.rawQuery('PRAGMA table_info(colonies)');
@@ -1692,6 +1725,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       'nest_entries': await txn.query('nest_entries'),
       'winter_cycles': await txn.query('winter_cycles'),
       'flight_observations': await txn.query('flight_observations'),
+      'wild_catch_records': await txn.query('wild_catch_records'),
       'care_records': await txn.query('care_records'),
       'milestones': await txn.query('milestones'),
       'care_tasks': await txn.query('care_tasks'),
@@ -1735,6 +1769,10 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         (snapshot['flight_observations'] as List? ?? const [])
             .map((row) => Map<String, Object?>.from(row as Map))
             .toList();
+    final wildCatchRecords =
+        (snapshot['wild_catch_records'] as List? ?? const [])
+            .map((row) => Map<String, Object?>.from(row as Map))
+            .toList();
     final feederRecords = (snapshot['feeder_records'] as List? ?? const [])
         .map((row) => Map<String, Object?>.from(row as Map))
         .toList();
@@ -1753,6 +1791,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       await transaction.delete('nest_entries');
       await transaction.delete('winter_cycles');
       await transaction.delete('flight_observations');
+      await transaction.delete('wild_catch_records');
       await transaction.delete('care_tasks');
       await transaction.delete('colonies');
       for (final colony in colonies) {
@@ -1782,6 +1821,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       }
       for (final entry in flightObservations) {
         await transaction.insert('flight_observations', entry);
+      }
+      for (final record in wildCatchRecords) {
+        await transaction.insert('wild_catch_records', record);
       }
       for (final task in careTasks) {
         await transaction.insert('care_tasks', task);

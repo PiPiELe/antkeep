@@ -10,7 +10,7 @@ import 'backup_data.dart';
 
 enum BackupRestoreMode { incremental, overwrite }
 
-const backupVersion = 5;
+const backupVersion = 6;
 
 mixin BackupLogic {
   AppDatabase get database;
@@ -20,8 +20,9 @@ mixin BackupLogic {
     if (data['nest_entries'] is! List ||
         data['winter_cycles'] is! List ||
         data['flight_observations'] is! List ||
+        data['wild_catch_records'] is! List ||
         data['milestones'] is! List) {
-      throw const FormatException('当前备份缺少巢体、越冬、婚飞或里程碑记录表。');
+      throw const FormatException('当前备份缺少巢体、越冬、婚飞、野采或里程碑记录表。');
     }
     if (media.length + 1 > BackupArchive.maxEntries) {
       throw FormatException(
@@ -182,6 +183,7 @@ mixin BackupLogic {
             manifest['version'] != 2 &&
             manifest['version'] != 3 &&
             manifest['version'] != 4 &&
+            manifest['version'] != 5 &&
             manifest['version'] != backupVersion) ||
         data is! Map<String, dynamic> ||
         data['colonies'] is! List ||
@@ -191,6 +193,7 @@ mixin BackupLogic {
         (manifest['version'] >= 4 && data['winter_cycles'] is! List) ||
         (manifest['version'] >= 4 && data['flight_observations'] is! List) ||
         (manifest['version'] >= 5 && data['milestones'] is! List) ||
+        (manifest['version'] >= 6 && data['wild_catch_records'] is! List) ||
         (data['feeder_records'] != null && data['feeder_records'] is! List) ||
         (data['care_tasks'] != null && data['care_tasks'] is! List) ||
         (data['inventory_items'] != null && data['inventory_items'] is! List) ||

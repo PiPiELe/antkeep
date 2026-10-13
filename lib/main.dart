@@ -24,6 +24,7 @@ import 'lottery_page.dart';
 import 'nest_history_page.dart';
 import 'winter_cycle_page.dart';
 import 'flight_observation_page.dart';
+import 'wild_catch_page.dart';
 import 'milestone_page.dart';
 import 'milestones_overview_page.dart';
 import 'milestone_share_page.dart';
@@ -5158,6 +5159,24 @@ class DiscoverPage extends StatelessWidget {
             MaterialPageRoute<void>(
               builder: (_) => const FlightObservationPage(),
             ),
+          ),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          leading: Icon(
+            Icons.hiking_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('蚂蚁野采记录'),
+          subtitle: const Text('记录地点、蚁种与野采战果'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const WildCatchPage()),
           ),
         ),
       ),
