@@ -6,6 +6,7 @@ import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/data/backup_logic.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/wild_catch_record.dart';
+import 'package:antkeep/live_wild_catch_page.dart';
 import 'package:antkeep/wild_catch_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -303,6 +304,65 @@ void main() {
       expect(revised.events.last.action, '修订');
     },
   );
+
+  testWidgets('live photo can be removed from preview after confirmation', (
+    tester,
+  ) async {
+    const photoPath = 'live-photo.png';
+    final started = DateTime.now().subtract(const Duration(minutes: 5));
+    final record = WildCatchRecord(
+      id: 'live-photo',
+      caughtAt: started,
+      hasSpecificTime: true,
+      place: '溪边',
+      species: const [],
+      photos: const [photoPath],
+      startedAt: started,
+      createdAt: started,
+      events: [
+        WildCatchEvent(at: started, action: '开始', detail: '地点：溪边'),
+        WildCatchEvent(
+          at: started.add(const Duration(minutes: 1)),
+          action: '照片',
+          detail: '添加 1 张野采照片',
+          photoPaths: const [photoPath],
+        ),
+      ],
+    );
+    await tester.runAsync(() async {
+      final bytes = await File('assets/images/default-ant-cover.png')
+          .readAsBytes();
+      await File('${directory.path}/antkeep/media/$photoPath')
+          .writeAsBytes(bytes);
+      await db.saveWildCatchRecord(record);
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(home: LiveWildCatchPage(initialRecord: record)),
+    );
+    await _settleDatabase(tester);
+    expect(find.byTooltip('移除野采照片'), findsNothing);
+    await tester.tap(find.byType(Image).first);
+    await tester.pumpAndSettle();
+    expect(find.text('野采照片'), findsOneWidget);
+    await tester.tap(find.text('删除照片'));
+    await tester.pumpAndSettle();
+    expect(find.text('删除这张照片？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect((await tester.runAsync(db.listWildCatchRecords))!.single.photos, [
+      photoPath,
+    ]);
+
+    await tester.tap(find.text('删除照片'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await _settleDatabase(tester);
+    expect(
+      (await tester.runAsync(db.listWildCatchRecords))!.single.photos,
+      isEmpty,
+    );
+  });
 
   testWidgets('phone location is optional and requires confirmation', (
     tester,
