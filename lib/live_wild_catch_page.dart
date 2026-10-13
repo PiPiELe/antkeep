@@ -782,7 +782,7 @@ class _WildCatchResultsPageState extends State<WildCatchResultsPage> {
   );
 }
 
-class _WildCatchTimeline extends StatelessWidget {
+class _WildCatchTimeline extends StatefulWidget {
   const _WildCatchTimeline({
     required this.record,
     this.controller,
@@ -794,40 +794,80 @@ class _WildCatchTimeline extends StatelessWidget {
   final bool shrinkWrap;
   final Future<void> Function(String path)? onRemovePhoto;
 
-  Widget _photoThumbnail(String path) => Stack(
-    children: [
-      ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: _WildCatchPhoto(path: path),
-      ),
-      if (onRemovePhoto != null)
-        Positioned(
-          right: 0,
-          top: 0,
-          child: IconButton(
-            tooltip: '移除野采照片',
-            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-            padding: EdgeInsets.zero,
-            icon: const Icon(Icons.cancel, size: 18),
-            onPressed: () => onRemovePhoto!(path),
-          ),
-        ),
-    ],
+  @override
+  State<_WildCatchTimeline> createState() => _WildCatchTimelineState();
+}
+
+class _WildCatchTimelineState extends State<_WildCatchTimeline> {
+  late final ScrollController _controller =
+      widget.controller ?? ScrollController();
+  bool _hasAbove = false;
+  bool _hasBelow = false;
+  bool _updateScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_scheduleEdgeUpdate);
+    _scheduleEdgeUpdate();
+  }
+
+  @override
+  void didUpdateWidget(covariant _WildCatchTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleEdgeUpdate();
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_scheduleEdgeUpdate);
+    if (widget.controller == null) _controller.dispose();
+    super.dispose();
+  }
+
+  void _scheduleEdgeUpdate() {
+    if (_updateScheduled) return;
+    _updateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateScheduled = false;
+      if (!mounted || widget.shrinkWrap || !_controller.hasClients) return;
+      final position = _controller.position;
+      if (!position.hasContentDimensions) return;
+      final hasAbove = position.extentBefore > 1;
+      final hasBelow = position.extentAfter > 1;
+      if (hasAbove != _hasAbove || hasBelow != _hasBelow) {
+        setState(() {
+          _hasAbove = hasAbove;
+          _hasBelow = hasBelow;
+        });
+      }
+    });
+  }
+
+  Widget _photoThumbnail(String path) => ClipRRect(
+    borderRadius: BorderRadius.circular(8),
+    child: _WildCatchPhoto(
+      key: ValueKey(path),
+      path: path,
+      onRemove: widget.onRemovePhoto == null
+          ? null
+          : () => widget.onRemovePhoto!(path),
+    ),
   );
 
   @override
   Widget build(BuildContext context) {
-    final events = record.events.reversed.toList();
-    return ListView.builder(
-      controller: controller,
-      shrinkWrap: shrinkWrap,
-      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+    final events = widget.record.events.reversed.toList();
+    final list = ListView.builder(
+      controller: _controller,
+      shrinkWrap: widget.shrinkWrap,
+      physics: widget.shrinkWrap ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.fromLTRB(12, 12, 16, 20),
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index];
         final visiblePhotos = event.photoPaths
-            .where(record.photos.contains)
+            .where(widget.record.photos.contains)
             .toList();
         final description = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -904,6 +944,32 @@ class _WildCatchTimeline extends StatelessWidget {
         );
       },
     );
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (_) {
+        _scheduleEdgeUpdate();
+        return false;
+      },
+      child: widget.shrinkWrap || (!_hasAbove && !_hasBelow)
+          ? list
+          : ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (bounds) {
+                final fade = (28 / bounds.height).clamp(0.0, 0.45);
+                return LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _hasAbove ? Colors.transparent : Colors.white,
+                    Colors.white,
+                    Colors.white,
+                    _hasBelow ? Colors.transparent : Colors.white,
+                  ],
+                  stops: [0, fade, 1 - fade, 1],
+                ).createShader(bounds);
+              },
+              child: list,
+            ),
+    );
   }
 }
 
@@ -942,8 +1008,9 @@ class _TimelineRailPainter extends CustomPainter {
 }
 
 class _WildCatchPhoto extends StatefulWidget {
-  const _WildCatchPhoto({required this.path});
+  const _WildCatchPhoto({super.key, required this.path, this.onRemove});
   final String path;
+  final Future<void> Function()? onRemove;
   @override
   State<_WildCatchPhoto> createState() => _WildCatchPhotoState();
 }
@@ -953,10 +1020,72 @@ class _WildCatchPhotoState extends State<_WildCatchPhoto> {
     widget.path,
   );
 
+  Future<void> _showPreview(Uint8List? bytes) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('野采照片'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 280, maxHeight: 400),
+        child: SizedBox(
+          width: MediaQuery.sizeOf(dialogContext).width * 0.65,
+          height: MediaQuery.sizeOf(dialogContext).height * 0.45,
+          child: bytes == null
+              ? const Center(child: Text('照片无法读取'))
+              : InteractiveViewer(
+                  child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+        ),
+      ),
+      actions: [
+        if (widget.onRemove != null)
+          TextButton.icon(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: dialogContext,
+                builder: (confirmContext) => AlertDialog(
+                  title: const Text('删除这张照片？'),
+                  content: const Text('照片会从本次野采记录中移除。'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(confirmContext, false),
+                      child: const Text('取消'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(confirmContext, true),
+                      child: const Text('确认删除'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true || !dialogContext.mounted) return;
+              Navigator.pop(dialogContext);
+              await widget.onRemove!();
+            },
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('删除照片'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('关闭'),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => FutureBuilder<Uint8List>(
     future: _bytes,
     builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return InkWell(
+          onTap: () => _showPreview(null),
+          child: const SizedBox(
+            width: 88,
+            height: 88,
+            child: Icon(Icons.broken_image_outlined),
+          ),
+        );
+      }
       if (!snapshot.hasData) {
         return const SizedBox(
           width: 88,
@@ -965,12 +1094,7 @@ class _WildCatchPhotoState extends State<_WildCatchPhoto> {
         );
       }
       return InkWell(
-        onTap: () => showDialog<void>(
-          context: context,
-          builder: (context) => Dialog(
-            child: InteractiveViewer(child: Image.memory(snapshot.data!)),
-          ),
-        ),
+        onTap: () => _showPreview(snapshot.data!),
         child: Image.memory(
           snapshot.data!,
           width: 88,
