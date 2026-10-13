@@ -1149,12 +1149,7 @@ class _ColonyCard extends StatelessWidget {
                     120.0,
                     160.0,
                   );
-                  final tallDurationWidth = (constraints.maxWidth * .39).clamp(
-                    120.0,
-                    150.0,
-                  );
-                  final leftWidth =
-                      constraints.maxWidth - tallDurationWidth - 21;
+                  final leftWidth = constraints.maxWidth - durationWidth - 21;
                   double textWidth(String value, TextStyle? style) {
                     final painter = TextPainter(
                       text: TextSpan(text: value, style: style),
@@ -1218,7 +1213,7 @@ class _ColonyCard extends StatelessWidget {
                           color: antKeepDividerColor(theme.colorScheme),
                         ),
                         const SizedBox(width: 10),
-                        SizedBox(width: tallDurationWidth, child: duration),
+                        SizedBox(width: durationWidth, child: duration),
                       ],
                     );
                   }

@@ -1066,7 +1066,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final width in [320.0, 360.0, 440.0]) {
+  for (final width in [320.0, 360.0, 375.0, 440.0]) {
     testWidgets(
       'colony card keeps the duration label above days at ${width.toInt()}px',
       (tester) async {
@@ -1089,18 +1089,22 @@ void main() {
             ).toMap(),
           );
         }
-        tables['care_tasks']!.add(
-          CareTask(
-            id: 'due-cleaning',
-            colonyId: 'due',
-            type: CareTaskType.cleaning,
-            intervalDays: 1,
-            nextDueOn: now,
-          ).toMap(),
-        );
+        for (final type in CareTaskType.values) {
+          tables['care_tasks']!.add(
+            CareTask(
+              id: 'due-${type.storageValue}',
+              colonyId: 'due',
+              type: type,
+              intervalDays: 1,
+              nextDueOn: now,
+            ).toMap(),
+          );
+        }
 
         await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
         await tester.pumpAndSettle();
+        final durationLefts = <double>[];
+        final tallDurations = <bool>[];
         for (final id in ['quiet', 'due']) {
           final card = find.ancestor(
             of: find.text(id),
@@ -1112,6 +1116,8 @@ void main() {
             of: card,
             matching: find.byType(HusbandryDuration),
           );
+          durationLefts.add(tester.getRect(duration).left);
+          tallDurations.add(tester.widget<HusbandryDuration>(duration).tall);
           final label = find.descendant(
             of: duration,
             matching: find.text('已养殖'),
@@ -1129,6 +1135,8 @@ void main() {
             lessThan(tester.getRect(days).top),
           );
         }
+        expect(durationLefts[0], closeTo(durationLefts[1], 1));
+        if (width == 440) expect(tallDurations, [false, true]);
         expect(tester.takeException(), isNull);
       },
     );
