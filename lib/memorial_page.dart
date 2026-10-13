@@ -9,6 +9,7 @@ import 'date_display.dart';
 import 'memorial_share_page.dart';
 import 'domain/memorial.dart';
 import 'domain/models.dart';
+import 'widgets/memorial_kind_icon.dart';
 import 'widgets/tombstone_icon.dart';
 
 typedef OpenMemorialColony = Future<void> Function(BuildContext, String);
@@ -184,12 +185,16 @@ class _MemorialPageState extends State<MemorialPage> {
             }
             final data = snapshot.data!;
             final items = data.memorials;
-            final groupingControl = SwitchListTile(
-              title: const Text('按蚁群折叠'),
-              value: _grouped,
-              onChanged: _savingGrouping ? null : _setGrouped,
-              dense: true,
-              contentPadding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
+            final groupingControl = Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilterChip(
+                  label: const Text('按蚁群折叠'),
+                  selected: _grouped,
+                  onSelected: _savingGrouping ? null : _setGrouped,
+                ),
+              ),
             );
             if (items.isEmpty) {
               return Column(
@@ -599,7 +604,9 @@ class _MemorialFormPageState extends State<MemorialFormPage> {
                 ),
                 child: Row(
                   children: [
-                    const TombstoneIcon(size: 40),
+                    _kind == MemorialKind.colony
+                        ? const TombstoneIcon(size: 40)
+                        : MemorialKindIcon(kind: _kind),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -1033,9 +1040,8 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                   side: BorderSide(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.outline.withValues(alpha: 0.55),
+                    color: Theme.of(context).colorScheme.outline
+                        .withValues(alpha: 0.55),
                   ),
                 ),
                 child: ListTile(

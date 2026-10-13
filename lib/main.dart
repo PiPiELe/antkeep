@@ -895,6 +895,8 @@ class _ColoniesPageState extends State<ColoniesPage> {
           return _ErrorState('读取蚁群失败：${snapshot.error}');
         }
         final colonies = snapshot.data!;
+        final canBatchCare =
+            colonies.where((entry) => !entry.colony.archived).length > 1;
         if (colonies.isEmpty) {
           return const _EmptyState(
             icon: Icons.hive_outlined,
@@ -914,22 +916,24 @@ class _ColoniesPageState extends State<ColoniesPage> {
               buildDefaultDragHandles: false,
               header: Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    if (colonies
-                            .where((entry) => !entry.colony.archived)
-                            .length >
-                        1)
+                    if (canBatchCare)
                       OutlinedButton.icon(
                         onPressed: () => _batchCare(colonies),
                         icon: const Icon(Icons.playlist_add_check),
                         label: const Text('批量养护记录'),
                       ),
                     if (colonies.length > 1)
-                      Text(
-                        '长按蚁群卡片可上下拖动排序',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(left: canBatchCare ? 8 : 0),
+                          child: Text(
+                            '长按蚁群卡片可上下拖动排序',
+                            textAlign: TextAlign.end,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -1126,7 +1130,10 @@ class _ColonyCard extends StatelessWidget {
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: antKeepCardBorder(theme.colorScheme),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -1207,9 +1214,7 @@ class _ColonyCard extends StatelessWidget {
                         Container(
                           width: 1,
                           height: 62,
-                          color: theme.colorScheme.outlineVariant.withValues(
-                            alpha: .3,
-                          ),
+                          color: antKeepDividerColor(theme.colorScheme),
                         ),
                         const SizedBox(width: 10),
                         SizedBox(width: tallDurationWidth, child: duration),
@@ -1226,9 +1231,7 @@ class _ColonyCard extends StatelessWidget {
                           Container(
                             width: 1,
                             height: 62,
-                            color: theme.colorScheme.outlineVariant.withValues(
-                              alpha: .3,
-                            ),
+                            color: antKeepDividerColor(theme.colorScheme),
                           ),
                           const SizedBox(width: 10),
                           SizedBox(width: durationWidth, child: duration),
@@ -1241,10 +1244,7 @@ class _ColonyCard extends StatelessWidget {
                   );
                 },
               ),
-              Divider(
-                height: 1,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: .3),
-              ),
+              Divider(height: 1, color: antKeepDividerColor(theme.colorScheme)),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -3553,10 +3553,7 @@ class _ColonyProfileSummary extends StatelessWidget {
               },
             ),
             const SizedBox(height: 10),
-            Divider(
-              height: 1,
-              color: scheme.outlineVariant.withValues(alpha: .3),
-            ),
+            Divider(height: 1, color: antKeepDividerColor(scheme)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 16,
@@ -6502,6 +6499,7 @@ class _SettingsPageState extends State<SettingsPage> {
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
+                side: antKeepCardBorder(Theme.of(context).colorScheme),
               ),
               clipBehavior: Clip.antiAlias,
               child: Padding(
@@ -6558,6 +6556,22 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _categorySection(
+    BuildContext context,
+    String title,
+    List<SettingsCategory> categories,
+  ) => _section(
+    context,
+    title,
+    ListTile.divideTiles(
+      context: context,
+      color: antKeepDividerColor(Theme.of(context).colorScheme),
+      tiles: [
+        for (final category in categories) _categoryTile(context, category),
+      ],
+    ).toList(),
+  );
+
   Widget _buildSettings(BuildContext context) {
     final category = widget.category;
     if (category != null) {
@@ -6567,21 +6581,15 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     }
     return _settingsList([
-      _section(context, '通用', [
-        for (final category in [
-          SettingsCategory.appearance,
-          SettingsCategory.online,
-          if (themeController.simpleMode) SettingsCategory.reminders,
-        ])
-          _categoryTile(context, category),
+      _categorySection(context, '通用', [
+        SettingsCategory.appearance,
+        SettingsCategory.online,
+        if (themeController.simpleMode) SettingsCategory.reminders,
       ]),
-      _section(context, '数据与支持', [
-        for (final category in [
-          SettingsCategory.data,
-          SettingsCategory.help,
-          SettingsCategory.about,
-        ])
-          _categoryTile(context, category),
+      _categorySection(context, '数据与支持', [
+        SettingsCategory.data,
+        SettingsCategory.help,
+        SettingsCategory.about,
       ]),
     ]);
   }

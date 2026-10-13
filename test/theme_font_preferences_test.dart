@@ -60,9 +60,28 @@ void main() {
     expect(white.colorScheme.onSurface, Colors.black);
     expect(white.colorScheme.onSurfaceVariant, Colors.black);
     expect(white.colorScheme.primary, Colors.black);
+    expect(white.cardColor, const Color(0xfff5f5f5));
     final dark = antKeepTheme(ThemeColor.white, dark: true);
     expect(dark.colorScheme.onSurface, Colors.white);
     expect(dark.brightness, Brightness.dark);
+    expect(dark.cardColor, const Color(0xff242424));
+    expect(dark.colorScheme.surfaceContainerLow, dark.cardColor);
+  });
+
+  test('cards have visible outlines across light and dark themes', () {
+    for (final color in ThemeColor.values) {
+      for (final dark in [false, true]) {
+        final theme = antKeepTheme(color, dark: dark);
+        final shape = theme.cardTheme.shape! as RoundedRectangleBorder;
+        expect(shape.side.width, 1);
+        expect(shape.side.color, antKeepCardBorder(theme.colorScheme).color);
+        expect(shape.side.color.a, greaterThan(0), reason: '$color/$dark');
+        expect(
+          theme.dividerTheme.color,
+          antKeepDividerColor(theme.colorScheme),
+        );
+      }
+    }
   });
 
   test('font changes text without changing accent or icon colors', () {

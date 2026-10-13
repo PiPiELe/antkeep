@@ -8,7 +8,7 @@ import 'package:antkeep/domain/memorial.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/memorial_page.dart';
-import 'package:antkeep/widgets/tombstone_icon.dart';
+import 'package:antkeep/widgets/memorial_kind_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -360,12 +360,19 @@ void main() {
       (tester) async {
         await tester.pumpWidget(const MaterialApp(home: MemorialFormPage()));
         await settle(tester);
-        expect(find.byType(TombstoneIcon), findsOneWidget);
+        expect(
+          tester.widget<MemorialKindIcon>(find.byType(MemorialKindIcon)).kind,
+          MemorialKind.queen,
+        );
         expect(find.text('君王死社稷'), findsOneWidget);
         await tester.tap(find.byType(DropdownButtonFormField<MemorialKind>));
         await tester.pumpAndSettle();
         await tester.tap(find.text(label).last);
         await tester.pumpAndSettle();
+        expect(
+          tester.widget<MemorialKindIcon>(find.byType(MemorialKindIcon)).kind,
+          kind,
+        );
         expect(find.text(epitaph), findsOneWidget);
         final name = find.widgetWithText(TextFormField, '纪念名称 *');
         await tester.ensureVisible(name);
@@ -675,7 +682,7 @@ void main() {
     );
     await settle(tester);
     expect(find.text('纪念 first'), findsOneWidget);
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.widgetWithText(FilterChip, '按蚁群折叠'));
     await settle(tester);
     expect(find.text('小小王国'), findsOneWidget);
     expect(find.text('第二窝'), findsOneWidget);
@@ -694,7 +701,7 @@ void main() {
     final restarted = AppPreferences(db);
     await tester.runAsync(restarted.load);
     expect(restarted.memorialGrouped, isTrue);
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.widgetWithText(FilterChip, '按蚁群折叠'));
     await settle(tester);
     expect(find.text('纪念 first'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());

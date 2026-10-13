@@ -250,6 +250,16 @@ class AppPreferences extends ChangeNotifier {
   }
 }
 
+BorderSide antKeepCardBorder(ColorScheme scheme) => BorderSide(
+  color: scheme.outline.withValues(
+    alpha: scheme.brightness == Brightness.dark ? 0.5 : 0.2,
+  ),
+);
+
+Color antKeepDividerColor(ColorScheme scheme) => scheme.outline.withValues(
+  alpha: scheme.brightness == Brightness.dark ? 0.28 : 0.16,
+);
+
 ThemeData antKeepTheme(
   ThemeColor color, {
   bool dark = false,
@@ -292,7 +302,7 @@ ThemeData antKeepTheme(
       surfaceDim: container,
       surfaceBright: background,
       surfaceContainerLowest: background,
-      surfaceContainerLow: background,
+      surfaceContainerLow: container,
       surfaceContainer: container,
       surfaceContainerHigh: container,
       surfaceContainerHighest: container,
@@ -321,10 +331,17 @@ ThemeData antKeepTheme(
         ? const AppBarTheme(backgroundColor: Color(0xff121512))
         : null,
     cardColor: monochrome
-        ? scheme.surface
+        ? scheme.surfaceContainerLow
         : dark
         ? const Color(0xff181c18)
         : null,
+    cardTheme: CardThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: antKeepCardBorder(scheme),
+      ),
+    ),
+    dividerTheme: DividerThemeData(color: antKeepDividerColor(scheme)),
     filledButtonTheme: color == ThemeColor.mistBlue
         ? FilledButtonThemeData(
             style: FilledButton.styleFrom(

@@ -658,6 +658,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('drag hint sits beside batch care at phone width', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await showSortableColonies(tester);
+    final button = tester.getRect(
+      find.widgetWithText(OutlinedButton, '批量养护记录'),
+    );
+    final hint = tester.getRect(find.text('长按蚁群卡片可上下拖动排序'));
+    expect(hint.left, greaterThanOrEqualTo(button.right));
+    expect(hint.top, lessThan(button.bottom));
+    expect(hint.bottom, greaterThan(button.top));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('long press sorts both ways and retains order after reload', (
     tester,
   ) async {
