@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
 import 'data/app_database.dart';
 import 'data/local_media_store.dart';
@@ -17,100 +18,41 @@ String wildCatchExactTime(DateTime time) {
   return '${chineseDate(time)} ${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
 }
 
-class LiveWildCatchPage extends StatefulWidget {
-  const LiveWildCatchPage({super.key, required this.initialRecord});
-
-  final WildCatchRecord initialRecord;
-
-  @override
-  State<LiveWildCatchPage> createState() => _LiveWildCatchPageState();
+String _elapsed(DateTime start, DateTime end) {
+  final duration = end.difference(start);
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${duration.inHours}:${two(duration.inMinutes.remainder(60))}:${two(duration.inSeconds.remainder(60))}';
 }
 
-class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
-  late WildCatchRecord _record = widget.initialRecord;
-  late final TextEditingController _place = TextEditingController(
-    text: _record.place,
-  );
-  late final TextEditingController _note = TextEditingController(
-    text: _record.note,
-  );
-  Timer? _timer;
+String _colonyLabel(WildCatchColony colony) => [
+  if (colony.queenCount != null) '蚁后 ${colony.queenCount}',
+  if (colony.workerCount != null) '工蚁 ${colony.workerCount}',
+  if (colony.note?.isNotEmpty == true) colony.note!,
+].join(' · ');
+
+class StartWildCatchPage extends StatefulWidget {
+  const StartWildCatchPage({super.key});
+
+  @override
+  State<StartWildCatchPage> createState() => _StartWildCatchPageState();
+}
+
+class _StartWildCatchPageState extends State<StartWildCatchPage> {
+  final _place = TextEditingController();
+  double? _latitude;
+  double? _longitude;
   bool _busy = false;
 
   @override
-  void initState() {
-    super.initState();
-    if (_record.isActive) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() {});
-      });
-    }
-  }
-
-  @override
   void dispose() {
-    _timer?.cancel();
     _place.dispose();
-    _note.dispose();
     super.dispose();
   }
 
-  void _error(String message) {
+  void _message(String text) {
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
     }
-  }
-
-  Future<void> _commit(
-    String action,
-    String detail,
-    WildCatchRecord Function(WildCatchEvent event) change,
-  ) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final event = WildCatchEvent(
-        at: DateTime.now(),
-        action: action,
-        detail: detail,
-      );
-      final updated = change(event);
-      await AppDatabase.instance.saveWildCatchRecord(updated);
-      if (mounted) setState(() => _record = updated);
-    } catch (error) {
-      _error('保存失败：$error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _savePlace() async {
-    final value = _place.text.trim();
-    if (value.isEmpty || value.length > 100) {
-      _error('请填写不超过 100 字的野采地点。');
-      return;
-    }
-    if (value == _record.place) return;
-    await _commit(
-      '地点',
-      value,
-      (event) => _record.withLiveChange(place: value, event: event),
-    );
-  }
-
-  Future<void> _saveNote() async {
-    final value = _note.text.trim();
-    if (value.length > 500) {
-      _error('备注最多 500 字。');
-      return;
-    }
-    if (value == (_record.note ?? '')) return;
-    await _commit(
-      '备注',
-      value.isEmpty ? '清空备注' : value,
-      (event) => _record.withLiveChange(note: value, event: event),
-    );
   }
 
   Future<void> _locate() async {
@@ -118,7 +60,7 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
     setState(() => _busy = true);
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        _error('手机定位服务未开启，可继续手动填写地点。');
+        _message('手机定位服务未开启，仍可手动填写地点。');
         return;
       }
       var permission = await Geolocator.checkPermission();
@@ -127,7 +69,7 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _error('未获得定位权限，可继续手动填写地点。');
+        _message('未获得定位权限，仍可手动填写地点。');
         return;
       }
       final position = await Geolocator.getCurrentPosition(
@@ -142,7 +84,8 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
         builder: (context) => AlertDialog(
           title: const Text('确认当前位置'),
           content: Text(
-            '纬度 ${position.latitude.toStringAsFixed(5)}，经度 ${position.longitude.toStringAsFixed(5)}\n定位精度约 ${position.accuracy.round()} 米。',
+            '纬度 ${position.latitude.toStringAsFixed(5)}，经度 ${position.longitude.toStringAsFixed(5)}\n'
+            '定位精度约 ${position.accuracy.round()} 米。地点名称仍需填写。',
           ),
           actions: [
             TextButton(
@@ -156,21 +99,156 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
           ],
         ),
       );
-      if (confirmed != true) return;
-      setState(() => _busy = false);
-      await _commit(
-        '定位',
-        '已确认当前位置',
-        (event) => _record.withLiveChange(
-          latitude: position.latitude,
-          longitude: position.longitude,
-          event: event,
-        ),
-      );
+      if (confirmed == true && mounted) {
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+        });
+      }
     } on TimeoutException {
-      _error('定位超时，可重试或手动填写地点。');
+      _message('定位超时，可重试或手动填写地点。');
     } catch (_) {
-      _error('暂时无法获取定位，可重试或手动填写地点。');
+      _message('暂时无法获取定位，可重试或手动填写地点。');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _start() async {
+    final place = _place.text.trim();
+    if (place.isEmpty || place.length > 100) {
+      _message('请先填写不超过 100 字的野采地点。');
+      return;
+    }
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final existing = (await AppDatabase.instance.listWildCatchRecords())
+          .where((record) => record.isActive)
+          .firstOrNull;
+      if (existing != null) {
+        if (mounted) Navigator.pop(context, existing);
+        return;
+      }
+      final now = DateTime.now();
+      final record = WildCatchRecord(
+        id: const Uuid().v4(),
+        caughtAt: now,
+        hasSpecificTime: true,
+        place: place,
+        latitude: _latitude,
+        longitude: _longitude,
+        species: const [],
+        startedAt: now,
+        createdAt: now,
+        events: [WildCatchEvent(at: now, action: '开始', detail: '地点：$place')],
+      );
+      await AppDatabase.instance.saveWildCatchRecord(record);
+      if (mounted) Navigator.pop(context, record);
+    } catch (error) {
+      _message('开始野采失败：$error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('野采开始')),
+    bottomNavigationBar: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FilledButton.icon(
+          onPressed: _busy ? null : _start,
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('确认地点并开始野采'),
+        ),
+      ),
+    ),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('先确认本次野采地点', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        const Text('点击开始后才会计时。手机定位可选，地点名称需要手动填写。'),
+        const SizedBox(height: 24),
+        TextField(
+          controller: _place,
+          maxLength: 100,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: '野采地点 *',
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              tooltip: '获取手机定位（可选）',
+              icon: _busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.my_location),
+              onPressed: _busy ? null : _locate,
+            ),
+          ),
+        ),
+        if (_latitude != null)
+          Text(
+            '已确认位置：纬度 ${_latitude!.toStringAsFixed(5)}，经度 ${_longitude!.toStringAsFixed(5)}',
+          ),
+      ],
+    ),
+  );
+}
+
+class LiveWildCatchPage extends StatefulWidget {
+  const LiveWildCatchPage({super.key, required this.initialRecord});
+  final WildCatchRecord initialRecord;
+
+  @override
+  State<LiveWildCatchPage> createState() => _LiveWildCatchPageState();
+}
+
+class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
+  late WildCatchRecord _record = widget.initialRecord;
+  final _timeline = ScrollController();
+  Timer? _timer;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _timeline.dispose();
+    super.dispose();
+  }
+
+  void _message(String text) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    }
+  }
+
+  Future<bool> _commit(WildCatchRecord updated) async {
+    if (_busy) return false;
+    setState(() => _busy = true);
+    try {
+      await AppDatabase.instance.saveWildCatchRecord(updated);
+      if (mounted) {
+        setState(() => _record = updated);
+        if (_timeline.hasClients) _timeline.jumpTo(0);
+      }
+      return true;
+    } catch (error) {
+      _message('保存失败：$error');
+      return false;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -180,63 +258,110 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
     if (_busy) return;
     final source = await choosePhotoSource(context);
     if (source == null || !mounted) return;
-    setState(() => _busy = true);
     final copied = <String>[];
     try {
-      final images = source == ImageSource.camera
-          ? [
-              if (await ImagePicker().pickImage(
-                    source: source,
-                    imageQuality: 86,
-                  )
-                  case final XFile photo)
-                photo,
-            ]
-          : await ImagePicker().pickMultiImage(imageQuality: 86);
-      final pickedAt = DateTime.now();
+      final List<XFile> images;
+      if (source == ImageSource.camera) {
+        final image = await ImagePicker().pickImage(
+          source: source,
+          imageQuality: 86,
+        );
+        images = image == null ? [] : [image];
+      } else {
+        images = await ImagePicker().pickMultiImage(imageQuality: 86);
+      }
+      if (images.isEmpty || !mounted) return;
+      setState(() => _busy = true);
+      final at = DateTime.now();
       for (final image in images) {
         copied.add(await LocalMediaStore.instance.copyImage(image));
       }
-      if (copied.isEmpty) return;
       final updated = _record.withLiveChange(
         photos: [..._record.photos, ...copied],
         event: WildCatchEvent(
-          at: pickedAt,
+          at: at,
           action: '照片',
           detail: '添加 ${copied.length} 张野采照片',
           photoPaths: copied,
         ),
       );
       await AppDatabase.instance.saveWildCatchRecord(updated);
-      if (mounted) setState(() => _record = updated);
+      if (mounted) {
+        setState(() => _record = updated);
+        if (_timeline.hasClients) _timeline.jumpTo(0);
+      }
     } catch (error) {
       await removeUnreferencedMedia(
         AppDatabase.instance,
         LocalMediaStore.instance,
         copied,
       );
-      _error('添加照片失败：$error');
+      _message('添加照片失败：$error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _removePhoto(String path) async {
-    if (_busy) return;
-    await _commit(
-      '照片',
-      '移除 1 张野采照片',
-      (event) => _record.withLiveChange(
-        photos: [..._record.photos]..remove(path),
-        event: event,
+    final updated = _record.withLiveChange(
+      photos: [..._record.photos]..remove(path),
+      event: WildCatchEvent(
+        at: DateTime.now(),
+        action: '照片',
+        detail: '移除 1 张野采照片',
       ),
     );
-    if (!_record.photos.contains(path)) {
+    if (await _commit(updated)) {
       await removeUnreferencedMedia(
         AppDatabase.instance,
         LocalMediaStore.instance,
         [path],
       );
+    }
+  }
+
+  Future<void> _addNote() async {
+    final controller = TextEditingController();
+    try {
+      final note = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('记录野采事件'),
+          content: TextField(
+            controller: controller,
+            maxLength: 500,
+            maxLines: 4,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '记录此刻发生的事',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.isEmpty) return;
+                Navigator.pop(context, value);
+              },
+              child: const Text('记录'),
+            ),
+          ],
+        ),
+      );
+      if (note == null || !mounted) return;
+      await _commit(
+        _record.withLiveChange(
+          note: note,
+          event: WildCatchEvent(at: DateTime.now(), action: '备注', detail: note),
+        ),
+      );
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -304,7 +429,7 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
                       .showSnackBar(SnackBar(content: Text(error.message)));
                 }
               },
-              child: const Text('保存蚁群'),
+              child: const Text('记录'),
             ),
           ],
         ),
@@ -321,9 +446,15 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
         );
       }
       await _commit(
-        '战果',
-        '采获 ${result.name} 1 群',
-        (event) => _record.withLiveChange(species: next, event: event),
+        _record.withLiveChange(
+          species: next,
+          event: WildCatchEvent(
+            at: DateTime.now(),
+            action: '战果',
+            detail:
+                '采获 ${result.name} 1 群 · ${_colonyLabel(result.colonies.single)}',
+          ),
+        ),
       );
     } finally {
       species.dispose();
@@ -333,7 +464,10 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
     }
   }
 
-  Future<void> _removeColony(int speciesIndex, int colonyIndex) async {
+  Future<WildCatchRecord> _removeColony(
+    int speciesIndex,
+    int colonyIndex,
+  ) async {
     final next = [..._record.species];
     final selected = next[speciesIndex];
     final colonies = [...selected.colonies]..removeAt(colonyIndex);
@@ -346,37 +480,29 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
       );
     }
     await _commit(
-      '战果',
-      '移除 ${selected.name} 第 ${colonyIndex + 1} 群',
-      (event) => _record.withLiveChange(species: next, event: event),
+      _record.withLiveChange(
+        species: next,
+        event: WildCatchEvent(
+          at: DateTime.now(),
+          action: '战果',
+          detail: '移除 ${selected.name} 第 ${colonyIndex + 1} 群',
+        ),
+      ),
     );
+    return _record;
   }
 
   Future<void> _end() async {
-    if (_place.text.trim().isEmpty ||
-        _place.text.trim().length > 100 ||
-        _note.text.trim().length > 500) {
-      _error('结束前请检查地点和备注。');
-      return;
-    }
-    if (_place.text.trim() != _record.place) await _savePlace();
-    if (_note.text.trim() != (_record.note ?? '')) await _saveNote();
-    if (_record.place != _place.text.trim() ||
-        (_record.note ?? '') != _note.text.trim()) {
-      _error('请先保存本次填写的信息。');
-      return;
-    }
     if (_busy) return;
-    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('结束本次野采？'),
-        content: const Text('结束时间会记入时间线。'),
+        content: const Text('结束时间和期间的每条记录都会保留。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('继续记录'),
+            child: const Text('继续野采'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
@@ -385,267 +511,432 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
-    await _commit(
-      '结束',
-      '本次野采结束',
-      (event) => _record.withLiveChange(endedAt: event.at, event: event),
+    if (confirmed != true || !mounted) return;
+    final at = DateTime.now();
+    final updated = _record.withLiveChange(
+      endedAt: at,
+      event: WildCatchEvent(at: at, action: '结束', detail: '本次野采结束'),
     );
-    if (!_record.isActive) _timer?.cancel();
+    if (await _commit(updated) && mounted) {
+      _timer?.cancel();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => WildCatchEndPage(record: updated)),
+      );
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final active = _record.isActive;
-    final duration = (_record.endedAt ?? DateTime.now()).difference(
-      _record.startedAt!,
-    );
-    String two(int value) => value.toString().padLeft(2, '0');
-    final elapsed =
-        '${duration.inHours}:${two(duration.inMinutes.remainder(60))}:${two(duration.inSeconds.remainder(60))}';
-    return Scaffold(
-      appBar: AppBar(title: Text(active ? '实时野采' : '野采时间线')),
-      bottomNavigationBar: active
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _end,
-                  icon: const Icon(Icons.stop_circle_outlined),
-                  label: const Text('结束野采'),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('野采进行中')),
+    bottomNavigationBar: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FilledButton.icon(
+          onPressed: _busy ? null : _end,
+          icon: const Icon(Icons.stop_circle_outlined),
+          label: const Text('结束野采'),
+        ),
+      ),
+    ),
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '已用时 ${_elapsed(_record.startedAt!, DateTime.now())}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text('地点：${_record.place}'),
+              if (_record.latitude != null)
+                Text(
+                  '纬度 ${_record.latitude!.toStringAsFixed(5)}，经度 ${_record.longitude!.toStringAsFixed(5)}',
                 ),
-              ),
-            )
-          : null,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    active ? '进行中 · 已用时 $elapsed' : '已结束 · 历时 $elapsed',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text('开始：${wildCatchExactTime(_record.startedAt!)}'),
-                  if (_record.endedAt != null)
-                    Text('结束：${wildCatchExactTime(_record.endedAt!)}'),
-                  Text('记录创建：${wildCatchExactTime(_record.createdAt)}'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (active) ...[
-            TextField(
-              controller: _place,
-              maxLength: 100,
-              decoration: const InputDecoration(
-                labelText: '野采地点 *',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
+              Text('开始：${wildCatchExactTime(_record.startedAt!)}'),
+              const SizedBox(height: 12),
+              Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: [
-                  OutlinedButton(
-                    onPressed: _busy ? null : _savePlace,
-                    child: const Text('保存地点'),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _addPhotos,
+                    icon: const Icon(Icons.add_a_photo_outlined),
+                    label: const Text('拍照'),
                   ),
-                  TextButton.icon(
-                    onPressed: _busy ? null : _locate,
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('获取手机定位（可选）'),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _addColony,
+                    icon: const Icon(Icons.add),
+                    label: const Text('记战果'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _addNote,
+                    icon: const Icon(Icons.edit_note),
+                    label: const Text('记事件'),
                   ),
                 ],
               ),
-            ),
-          ] else
-            ListTile(title: const Text('野采地点'), subtitle: Text(_record.place)),
-          if (_record.latitude != null)
-            Text(
-              '纬度 ${_record.latitude!.toStringAsFixed(5)}，经度 ${_record.longitude!.toStringAsFixed(5)}',
-            ),
-          const SizedBox(height: 16),
-          Text('野采照片', style: Theme.of(context).textTheme.titleMedium),
-          const Text('照片只关联本次野采，无需选择蚁种或蚁群。'),
-          if (_record.photos.isNotEmpty)
-            SizedBox(
-              height: 96,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  for (final path in _record.photos)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8, top: 8),
-                      child: Stack(
-                        children: [
-                          _LivePhoto(key: ValueKey(path), path: path),
-                          if (active)
-                            Positioned(
-                              right: 0,
-                              top: 0,
-                              child: IconButton.filledTonal(
-                                tooltip: '移除野采照片',
-                                onPressed: _busy
-                                    ? null
-                                    : () => _removePhoto(path),
-                                icon: const Icon(Icons.close, size: 18),
-                                constraints: const BoxConstraints(
-                                  minWidth: 32,
-                                  minHeight: 32,
-                                ),
-                                padding: EdgeInsets.zero,
-                              ),
-                            ),
-                        ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WildCatchResultsPage(
+                        record: _record,
+                        onRemove: _removeColony,
                       ),
                     ),
-                ],
-              ),
-            ),
-          if (active)
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _addPhotos,
-              icon: const Icon(Icons.add_a_photo_outlined),
-              label: const Text('拍照或添加照片'),
-            ),
-          const SizedBox(height: 16),
-          Text('野采战果', style: Theme.of(context).textTheme.titleMedium),
-          for (
-            var speciesIndex = 0;
-            speciesIndex < _record.species.length;
-            speciesIndex++
-          )
-            for (
-              var colonyIndex = 0;
-              colonyIndex < _record.species[speciesIndex].colonies.length;
-              colonyIndex++
-            )
-              ListTile(
-                title: Text(
-                  '${_record.species[speciesIndex].name} · 第 ${colonyIndex + 1} 群',
-                ),
-                subtitle: Text(
-                  [
-                    if (_record
-                            .species[speciesIndex]
-                            .colonies[colonyIndex]
-                            .queenCount !=
-                        null)
-                      '蚁后 ${_record.species[speciesIndex].colonies[colonyIndex].queenCount}',
-                    if (_record
-                            .species[speciesIndex]
-                            .colonies[colonyIndex]
-                            .workerCount !=
-                        null)
-                      '工蚁 ${_record.species[speciesIndex].colonies[colonyIndex].workerCount}',
-                    if (_record
-                            .species[speciesIndex]
-                            .colonies[colonyIndex]
-                            .note
-                            ?.isNotEmpty ==
-                        true)
-                      _record.species[speciesIndex].colonies[colonyIndex].note!,
-                  ].join(' · '),
-                ),
-                trailing: active
-                    ? IconButton(
-                        tooltip: '移除采获蚁群',
-                        icon: const Icon(Icons.close),
-                        onPressed: _busy
-                            ? null
-                            : () => _removeColony(speciesIndex, colonyIndex),
-                      )
-                    : null,
-              ),
-          if (active)
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _addColony,
-              icon: const Icon(Icons.add),
-              label: const Text('记录采获蚁群'),
-            ),
-          const SizedBox(height: 16),
-          if (active) ...[
-            TextField(
-              controller: _note,
-              maxLength: 500,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: '本次野采备注（可选）',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton(
-                onPressed: _busy ? null : _saveNote,
-                child: const Text('保存备注'),
-              ),
-            ),
-          ] else if (_record.note?.isNotEmpty == true)
-            ListTile(title: const Text('备注'), subtitle: Text(_record.note!)),
-          const SizedBox(height: 16),
-          Text('时间线', style: Theme.of(context).textTheme.titleMedium),
-          for (final event in _record.events)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.timeline),
-                  title: Text(event.action),
-                  subtitle: Text(
-                    '${wildCatchExactTime(event.at)}${event.detail.isEmpty ? '' : '\n${event.detail}'}',
                   ),
-                  isThreeLine: event.detail.isNotEmpty,
+                  icon: const Icon(Icons.summarize_outlined),
+                  label: const Text('查看当前战果汇总'),
                 ),
-                if (event.photoPaths.any(_record.photos.contains))
-                  SizedBox(
-                    height: 96,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        for (final path in event.photoPaths)
-                          if (_record.photos.contains(path))
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 72,
-                                right: 8,
-                                top: 8,
-                              ),
-                              child: _LivePhoto(
-                                key: ValueKey('event-$path'),
-                                path: path,
-                              ),
-                            ),
-                      ],
-                    ),
-                  ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: _WildCatchTimeline(
+            record: _record,
+            controller: _timeline,
+            onRemovePhoto: _busy ? null : _removePhoto,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class WildCatchEndPage extends StatelessWidget {
+  const WildCatchEndPage({super.key, required this.record});
+  final WildCatchRecord record;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('野采结束')),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Icon(Icons.check_circle_outline, size: 64),
+        const SizedBox(height: 12),
+        Center(
+          child: Text('本次野采已结束', style: Theme.of(context).textTheme.titleLarge),
+        ),
+        const SizedBox(height: 24),
+        _WildCatchSummary(record: record),
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WildCatchDataPage(record: record),
             ),
-        ],
+          ),
+          child: const Text('查看本次野采数据'),
+        ),
+        OutlinedButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('返回野采列表'),
+        ),
+      ],
+    ),
+  );
+}
+
+class WildCatchDataPage extends StatelessWidget {
+  const WildCatchDataPage({super.key, required this.record});
+  final WildCatchRecord record;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('野采数据')),
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        _WildCatchSummary(record: record),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WildCatchResultsPage(record: record),
+            ),
+          ),
+          icon: const Icon(Icons.summarize_outlined),
+          label: const Text('查看野采战果汇总'),
+        ),
+        const SizedBox(height: 16),
+        Text('记录时间线', style: Theme.of(context).textTheme.titleMedium),
+        _WildCatchTimeline(record: record, shrinkWrap: true),
+      ],
+    ),
+  );
+}
+
+class _WildCatchSummary extends StatelessWidget {
+  const _WildCatchSummary({required this.record});
+  final WildCatchRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final colonyCount = record.species.fold<int>(
+      0,
+      (total, entry) => total + entry.colonies.length,
+    );
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(record.place, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text('开始：${wildCatchExactTime(record.startedAt!)}'),
+            if (record.endedAt != null)
+              Text('结束：${wildCatchExactTime(record.endedAt!)}'),
+            Text('记录创建：${wildCatchExactTime(record.createdAt)}'),
+            if (record.endedAt != null)
+              Text('历时：${_elapsed(record.startedAt!, record.endedAt!)}'),
+            const SizedBox(height: 8),
+            Text(
+              '${record.species.length} 种 · $colonyCount 群 · ${record.photos.length} 张照片 · ${record.events.length} 条事件',
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _LivePhoto extends StatefulWidget {
-  const _LivePhoto({super.key, required this.path});
-  final String path;
+class WildCatchResultsPage extends StatefulWidget {
+  const WildCatchResultsPage({super.key, required this.record, this.onRemove});
+  final WildCatchRecord record;
+  final Future<WildCatchRecord> Function(int speciesIndex, int colonyIndex)?
+  onRemove;
+
   @override
-  State<_LivePhoto> createState() => _LivePhotoState();
+  State<WildCatchResultsPage> createState() => _WildCatchResultsPageState();
 }
 
-class _LivePhotoState extends State<_LivePhoto> {
+class _WildCatchResultsPageState extends State<WildCatchResultsPage> {
+  late WildCatchRecord _record = widget.record;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('野采战果汇总')),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_record.species.isEmpty) const Text('目前还没有采获蚁群。'),
+        for (
+          var speciesIndex = 0;
+          speciesIndex < _record.species.length;
+          speciesIndex++
+        )
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_record.species[speciesIndex].name} · ${_record.species[speciesIndex].colonies.length} 群',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  for (
+                    var colonyIndex = 0;
+                    colonyIndex < _record.species[speciesIndex].colonies.length;
+                    colonyIndex++
+                  )
+                    ListTile(
+                      title: Text('第 ${colonyIndex + 1} 群'),
+                      subtitle: Text(
+                        _colonyLabel(
+                          _record.species[speciesIndex].colonies[colonyIndex],
+                        ),
+                      ),
+                      trailing: widget.onRemove == null
+                          ? null
+                          : IconButton(
+                              tooltip: '移除采获蚁群',
+                              icon: const Icon(Icons.close),
+                              onPressed: () async {
+                                final updated = await widget.onRemove!(
+                                  speciesIndex,
+                                  colonyIndex,
+                                );
+                                if (mounted) setState(() => _record = updated);
+                              },
+                            ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _WildCatchTimeline extends StatelessWidget {
+  const _WildCatchTimeline({
+    required this.record,
+    this.controller,
+    this.shrinkWrap = false,
+    this.onRemovePhoto,
+  });
+  final WildCatchRecord record;
+  final ScrollController? controller;
+  final bool shrinkWrap;
+  final Future<void> Function(String path)? onRemovePhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final events = record.events.reversed.toList();
+    return ListView.builder(
+      controller: controller,
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.fromLTRB(12, 12, 16, 20),
+      itemCount: events.length,
+      itemBuilder: (context, index) {
+        final event = events[index];
+        final visiblePhotos = event.photoPaths
+            .where(record.photos.contains)
+            .toList();
+        return Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _TimelineRailPainter(
+                    color: Theme.of(context).colorScheme.primary,
+                    first: index == 0,
+                    last: index == events.length - 1,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 44),
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.action,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        wildCatchExactTime(event.at),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (event.detail.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(event.detail),
+                        ),
+                      if (visiblePhotos.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: SizedBox(
+                            height: 88,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: [
+                                for (final path in visiblePhotos)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Stack(
+                                      children: [
+                                        _WildCatchPhoto(path: path),
+                                        if (onRemovePhoto != null)
+                                          Positioned(
+                                            right: 0,
+                                            top: 0,
+                                            child: IconButton.filledTonal(
+                                              tooltip: '移除野采照片',
+                                              icon: const Icon(
+                                                Icons.close,
+                                                size: 18,
+                                              ),
+                                              onPressed: () =>
+                                                  onRemovePhoto!(path),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TimelineRailPainter extends CustomPainter {
+  const _TimelineRailPainter({
+    required this.color,
+    required this.first,
+    required this.last,
+  });
+  final Color color;
+  final bool first;
+  final bool last;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    const y = 32.0;
+    if (!first) {
+      canvas.drawLine(const Offset(16, 0), const Offset(16, y), paint);
+    }
+    if (!last) {
+      canvas.drawLine(const Offset(16, y), Offset(16, size.height), paint);
+    }
+    canvas.drawLine(const Offset(16, y), const Offset(43, y), paint);
+    canvas.drawCircle(const Offset(16, y), 5, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TimelineRailPainter oldDelegate) =>
+      color != oldDelegate.color ||
+      first != oldDelegate.first ||
+      last != oldDelegate.last;
+}
+
+class _WildCatchPhoto extends StatefulWidget {
+  const _WildCatchPhoto({required this.path});
+  final String path;
+  @override
+  State<_WildCatchPhoto> createState() => _WildCatchPhotoState();
+}
+
+class _WildCatchPhotoState extends State<_WildCatchPhoto> {
   late final Future<Uint8List> _bytes = LocalMediaStore.instance.readImage(
     widget.path,
   );
+
   @override
   Widget build(BuildContext context) => FutureBuilder<Uint8List>(
     future: _bytes,

@@ -42,7 +42,9 @@ class _WildCatchPageState extends State<WildCatchPage> {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => LiveWildCatchPage(initialRecord: record),
+        builder: (_) => record.isActive
+            ? LiveWildCatchPage(initialRecord: record)
+            : WildCatchDataPage(record: record),
       ),
     );
     if (mounted) _refresh();
@@ -52,27 +54,11 @@ class _WildCatchPageState extends State<WildCatchPage> {
     if (_startingLive) return;
     _startingLive = true;
     try {
-      final existing = (await AppDatabase.instance.listWildCatchRecords())
-          .where((record) => record.isActive)
-          .firstOrNull;
-      if (!mounted) return;
-      if (existing != null) {
-        await _openLive(existing);
-        return;
-      }
-      final now = DateTime.now();
-      final record = WildCatchRecord(
-        id: const Uuid().v4(),
-        caughtAt: now,
-        hasSpecificTime: true,
-        place: '',
-        species: const [],
-        startedAt: now,
-        createdAt: now,
-        events: [WildCatchEvent(at: now, action: '开始', detail: '开始本次野采')],
+      final record = await Navigator.push<WildCatchRecord>(
+        context,
+        MaterialPageRoute(builder: (_) => const StartWildCatchPage()),
       );
-      await AppDatabase.instance.saveWildCatchRecord(record);
-      if (mounted) await _openLive(record);
+      if (record != null && mounted) await _openLive(record);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -121,7 +107,7 @@ class _WildCatchPageState extends State<WildCatchPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('蚂蚁野采记录'),
+      title: const Text('野采数据'),
       actions: [
         TextButton(onPressed: () => _edit(), child: const Text('补记野采')),
       ],
@@ -129,7 +115,7 @@ class _WildCatchPageState extends State<WildCatchPage> {
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _startLive,
       icon: const Icon(Icons.play_arrow),
-      label: const Text('开始实时野采'),
+      label: const Text('开始野采'),
     ),
     body: FutureBuilder<List<WildCatchRecord>>(
       future: _records,
