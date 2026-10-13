@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 
 import 'data/app_database.dart';
@@ -107,6 +110,10 @@ class _WildCatchPageState extends State<WildCatchPage> {
                         ),
                     ],
                     if (record.note?.isNotEmpty == true) Text(record.note!),
+                    if (record.latitude != null)
+                      Text(
+                        _coordinateLabel(record.latitude!, record.longitude!),
+                      ),
                   ],
                 ),
                 isThreeLine: true,
@@ -133,6 +140,9 @@ String _colonySummary(WildCatchColony colony) {
   ];
   return parts.isEmpty ? '未填写数量' : parts.join(' · ');
 }
+
+String _coordinateLabel(double latitude, double longitude) =>
+    '纬度 ${latitude.toStringAsFixed(5)}，经度 ${longitude.toStringAsFixed(5)}';
 
 class _ColonyDraft {
   _ColonyDraft([WildCatchColony? colony])
@@ -205,6 +215,9 @@ class _WildCatchFormState extends State<_WildCatchForm> {
   final _retiredColonies = <_ColonyDraft>[];
   late final _note = TextEditingController(text: widget.record?.note);
   bool _saving = false;
+  bool _locating = false;
+  late double? _latitude = widget.record?.latitude;
+  late double? _longitude = widget.record?.longitude;
 
   @override
   void dispose() {
@@ -257,6 +270,74 @@ class _WildCatchFormState extends State<_WildCatchForm> {
           time.minute,
         ),
       );
+    }
+  }
+
+  Future<void> _locate() async {
+    setState(() => _locating = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw const _LocationMessage('手机定位服务未开启，请开启后重试，或手动填写地点。');
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw const _LocationMessage('定位权限已被关闭，请在系统设置中开启，或手动填写地点。');
+      }
+      if (permission == LocationPermission.denied) {
+        throw const _LocationMessage('未获得定位权限，仍可手动填写地点。');
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认当前位置'),
+          content: Text(
+            '${_coordinateLabel(position.latitude, position.longitude)}\n'
+            '定位精度约 ${position.accuracy.round()} 米。\n'
+            '此坐标会随野采记录保存在本机；地点名称仍需自行填写。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('使用此定位'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true && mounted) {
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+        });
+      }
+    } on _LocationMessage catch (error) {
+      _showLocationError(error.message);
+    } on TimeoutException {
+      _showLocationError('定位超时，请重试，或手动填写地点。');
+    } catch (_) {
+      _showLocationError('暂时无法获取定位，请重试，或手动填写地点。');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  void _showLocationError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -403,6 +484,8 @@ class _WildCatchFormState extends State<_WildCatchForm> {
           caughtAt: _caughtAt,
           hasSpecificTime: _specificTime,
           place: _place.text.trim(),
+          latitude: _latitude,
+          longitude: _longitude,
           species: _species.map((entry) => entry.toModel()).toList(),
           note: _note.text.trim().isEmpty ? null : _note.text.trim(),
           createdAt: widget.record?.createdAt ?? DateTime.now(),
@@ -469,6 +552,36 @@ class _WildCatchFormState extends State<_WildCatchForm> {
               validator: (value) =>
                   value == null || value.trim().isEmpty ? '请填写野采地点' : null,
             ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _locating ? null : _locate,
+                icon: _locating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location),
+                label: Text(_locating ? '定位中…' : '获取手机定位（可选）'),
+              ),
+            ),
+            if (_latitude != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(_coordinateLabel(_latitude!, _longitude!)),
+                  ),
+                  IconButton(
+                    tooltip: '移除定位',
+                    onPressed: () => setState(() {
+                      _latitude = null;
+                      _longitude = null;
+                    }),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
             Text('野采战果', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             if (_species.isEmpty)
@@ -498,4 +611,10 @@ class _WildCatchFormState extends State<_WildCatchForm> {
       ),
     ),
   );
+}
+
+class _LocationMessage implements Exception {
+  const _LocationMessage(this.message);
+
+  final String message;
 }

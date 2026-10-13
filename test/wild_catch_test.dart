@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
+import 'package:antkeep/data/database_path.dart';
 import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/data/backup_logic.dart';
 import 'package:antkeep/domain/wild_catch_record.dart';
@@ -8,6 +9,7 @@ import 'package:antkeep/wild_catch_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -52,6 +54,8 @@ void main() {
         id: 'catch-1',
         caughtAt: now,
         place: '山脚',
+        latitude: 31.23456,
+        longitude: 121.45678,
         species: const [
           WildCatchSpecies(
             name: '弓背蚁',
@@ -82,6 +86,15 @@ void main() {
         'media': <String>[],
       };
       probe.validateManifestMap(manifest);
+      probe.validateManifestMap({...manifest, 'version': 7});
+      final legacyRecord = Map<String, Object?>.from(record.toMap())
+        ..remove('latitude')
+        ..remove('longitude');
+      final legacySnapshot = Map<String, dynamic>.from(snapshot)
+        ..['wild_catch_records'] = [legacyRecord];
+      BackupData.validate(legacySnapshot);
+      await db.replaceAll(legacySnapshot);
+      expect((await db.listWildCatchRecords()).single.latitude, isNull);
       final previous = Map<String, dynamic>.from(snapshot)
         ..remove('wild_catch_records');
       probe.validateManifestMap({...manifest, 'version': 5, 'data': previous});
@@ -164,6 +177,92 @@ void main() {
     await _settleDatabase(tester);
     expect(await tester.runAsync(db.listWildCatchRecords), isEmpty);
   });
+
+  testWidgets('phone location is optional and requires confirmation', (
+    tester,
+  ) async {
+    final original = GeolocatorPlatform.instance;
+    final location = _FakeGeolocator();
+    GeolocatorPlatform.instance = location;
+    addTearDown(() => GeolocatorPlatform.instance = original);
+
+    await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
+    await _settleDatabase(tester);
+    await tester.tap(find.text('记录战果'));
+    await tester.pumpAndSettle();
+    expect(location.requests, 0);
+    await tester.enterText(find.widgetWithText(TextFormField, '野采地点 *'), '河边');
+    await tester.tap(find.text('获取手机定位（可选）'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('确认当前位置'), findsOneWidget);
+    expect(location.requests, 1);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('移除定位'), findsNothing);
+
+    await tester.tap(find.text('获取手机定位（可选）'));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.text('使用此定位'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('移除定位'), findsOneWidget);
+    await tester.tap(find.text('保存记录'));
+    await _settleDatabase(tester);
+    final record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+    expect(record.place, '河边');
+    expect(record.latitude, 31.23456);
+    expect(record.longitude, 121.45678);
+
+    await tester.tap(find.text('河边'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('移除定位'));
+    await tester.tap(find.text('保存记录'));
+    await _settleDatabase(tester);
+    expect(
+      (await tester.runAsync(db.listWildCatchRecords))!.single.latitude,
+      isNull,
+    );
+  });
+
+  test('version 26 records survive the location column upgrade', () async {
+    await db.close();
+    final raw = await databaseFactoryFfi.openDatabase(
+      await applicationDatabasePath(),
+    );
+    await raw.execute('DROP TABLE wild_catch_records');
+    await raw.execute('''CREATE TABLE wild_catch_records (
+      id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
+      has_specific_time INTEGER NOT NULL DEFAULT 0,
+      place TEXT NOT NULL, species_json TEXT NOT NULL DEFAULT '[]',
+      note TEXT, created_at TEXT NOT NULL
+    )''');
+    await raw.insert('wild_catch_records', {
+      'id': 'old-catch',
+      'caught_at': now.toIso8601String(),
+      'place': '旧地点',
+      'created_at': now.toIso8601String(),
+    });
+    await raw.execute('PRAGMA user_version = 26');
+    await raw.close();
+
+    await db.open();
+    final record = (await db.listWildCatchRecords()).single;
+    expect(record.place, '旧地点');
+    expect(record.latitude, isNull);
+    await db.saveWildCatchRecord(
+      WildCatchRecord(
+        id: record.id,
+        caughtAt: record.caughtAt,
+        place: record.place,
+        species: record.species,
+        latitude: 31.23456,
+        longitude: 121.45678,
+        createdAt: record.createdAt,
+      ),
+    );
+    expect((await db.listWildCatchRecords()).single.latitude, 31.23456);
+  });
 }
 
 Future<void> _settleDatabase(WidgetTester tester) async {
@@ -179,4 +278,37 @@ Future<void> _settleDatabase(WidgetTester tester) async {
 class _BackupProbe with BackupLogic {
   @override
   AppDatabase get database => AppDatabase.instance;
+}
+
+class _FakeGeolocator extends GeolocatorPlatform {
+  int requests = 0;
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async =>
+      LocationPermission.denied;
+
+  @override
+  Future<LocationPermission> requestPermission() async {
+    requests++;
+    return LocationPermission.whileInUse;
+  }
+
+  @override
+  Future<Position> getCurrentPosition({
+    LocationSettings? locationSettings,
+  }) async => Position(
+    longitude: 121.45678,
+    latitude: 31.23456,
+    timestamp: DateTime.now(),
+    accuracy: 12,
+    altitude: 0,
+    altitudeAccuracy: 0,
+    heading: 0,
+    headingAccuracy: 0,
+    speed: 0,
+    speedAccuracy: 0,
+  );
 }

@@ -45,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 26,
+      version: 27,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -105,6 +105,14 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int newVersion,
   ) async {
     if (oldVersion < 26) await _createWildCatchTable(database);
+    if (oldVersion < 27) {
+      await database.execute(
+        'ALTER TABLE wild_catch_records ADD COLUMN latitude REAL',
+      );
+      await database.execute(
+        'ALTER TABLE wild_catch_records ADD COLUMN longitude REAL',
+      );
+    }
     if (oldVersion < 25) await _createMilestonesTable(database);
     if (oldVersion < 24) await _createWinterAndFlightTables(database);
     if (oldVersion < 23) {
@@ -393,7 +401,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
       has_specific_time INTEGER NOT NULL DEFAULT 0 CHECK (has_specific_time IN (0, 1)),
       place TEXT NOT NULL, species_json TEXT NOT NULL DEFAULT '[]',
-      note TEXT, created_at TEXT NOT NULL
+      note TEXT, latitude REAL, longitude REAL, created_at TEXT NOT NULL
     )''');
     await db.execute(
       'CREATE INDEX wild_catch_by_time ON wild_catch_records(caught_at DESC)',

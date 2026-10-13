@@ -78,6 +78,8 @@ class WildCatchRecord {
     required this.species,
     this.hasSpecificTime = false,
     this.note,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
@@ -86,13 +88,20 @@ class WildCatchRecord {
   final String place;
   final List<WildCatchSpecies> species;
   final String? note;
+  final double? latitude;
+  final double? longitude;
   final DateTime createdAt;
 
   void validate() {
     if (id.isEmpty ||
         place.trim().isEmpty ||
         place.length > 100 ||
-        (note?.length ?? 0) > 500) {
+        (note?.length ?? 0) > 500 ||
+        (latitude == null) != (longitude == null) ||
+        (latitude != null &&
+            (!latitude!.isFinite || latitude! < -90 || latitude! > 90)) ||
+        (longitude != null &&
+            (!longitude!.isFinite || longitude! < -180 || longitude! > 180))) {
       throw const FormatException('野采记录内容无效。');
     }
     for (final entry in species) {
@@ -114,6 +123,8 @@ class WildCatchRecord {
           )
           .toList(),
       note: row['note'] as String?,
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
       createdAt: DateTime.parse(row['created_at']! as String),
     );
     record.validate();
@@ -127,6 +138,8 @@ class WildCatchRecord {
     'place': place,
     'species_json': jsonEncode(species.map((entry) => entry.toJson()).toList()),
     'note': note,
+    'latitude': latitude,
+    'longitude': longitude,
     'created_at': createdAt.toIso8601String(),
   };
 }

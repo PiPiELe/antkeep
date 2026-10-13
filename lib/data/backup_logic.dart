@@ -10,7 +10,7 @@ import 'backup_data.dart';
 
 enum BackupRestoreMode { incremental, overwrite }
 
-const backupVersion = 6;
+const backupVersion = 7;
 
 mixin BackupLogic {
   AppDatabase get database;
@@ -184,6 +184,7 @@ mixin BackupLogic {
             manifest['version'] != 3 &&
             manifest['version'] != 4 &&
             manifest['version'] != 5 &&
+            manifest['version'] != 6 &&
             manifest['version'] != backupVersion) ||
         data is! Map<String, dynamic> ||
         data['colonies'] is! List ||
