@@ -4,6 +4,7 @@ import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/database_path.dart';
 import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/data/backup_logic.dart';
+import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/wild_catch_record.dart';
 import 'package:antkeep/wild_catch_page.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final db = AppDatabase.instance;
+  final media = LocalMediaStore.instance;
   late Directory directory;
   final now = DateTime(2026, 10, 13);
 
@@ -28,6 +30,7 @@ void main() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
     await db.open();
+    await media.initialize();
   });
 
   tearDownAll(() async {
@@ -116,7 +119,7 @@ void main() {
   testWidgets('add, edit, and delete a wild catch', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
     await _settleDatabase(tester);
-    await tester.tap(find.text('记录战果'));
+    await tester.tap(find.text('补记野采'));
     await tester.pumpAndSettle();
     expect(find.text('记录具体时间'), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextFormField, '野采地点 *'), '山脚');
@@ -178,6 +181,96 @@ void main() {
     expect(await tester.runAsync(db.listWildCatchRecords), isEmpty);
   });
 
+  testWidgets(
+    'live catch persists actions, resumes, and records the end time',
+    (tester) async {
+      final image = File('${directory.path}/live-catch.jpg');
+      await tester.runAsync(() => image.writeAsBytes([1, 2, 3]));
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/image_picker'),
+            (_) async => [image.path],
+          );
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('plugins.flutter.io/image_picker'),
+              null,
+            ),
+      );
+      await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
+      await _settleDatabase(tester);
+      await tester.tap(find.text('开始实时野采'));
+      await _settleDatabase(tester);
+      var record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+      expect(record.isActive, isTrue);
+      expect(record.events.map((event) => event.action), ['开始']);
+
+      await tester.enterText(find.widgetWithText(TextField, '野采地点 *'), '溪边');
+      await tester.tap(find.text('保存地点'));
+      await _settleDatabase(tester);
+      record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+      expect(record.place, '溪边');
+      expect(record.events.map((event) => event.action), ['开始', '地点']);
+
+      await tester.ensureVisible(find.text('拍照或添加照片'));
+      await tester.tap(find.text('拍照或添加照片'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从图库选择'));
+      await _settleDatabase(tester);
+      record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+      expect(record.photos, hasLength(1));
+      expect(record.events.last.photoPaths, record.photos);
+
+      await tester.pageBack();
+      await _settleDatabase(tester);
+      await tester.tap(find.text('溪边'));
+      await _settleDatabase(tester);
+      expect(find.textContaining('进行中 · 已用时'), findsOneWidget);
+      expect(find.text('结束野采'), findsOneWidget);
+      await tester.tap(find.text('结束野采'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('结束野采').last);
+      await _settleDatabase(tester);
+      record = (await tester.runAsync(db.listWildCatchRecords))!.single;
+      expect(record.endedAt, isNotNull);
+      expect(record.isActive, isFalse);
+      expect(record.events.map((event) => event.action), [
+        '开始',
+        '地点',
+        '照片',
+        '结束',
+      ]);
+      expect(
+        record.startedAt!.isBefore(record.endedAt!) ||
+            record.startedAt == record.endedAt,
+        isTrue,
+      );
+      final snapshot = (await tester.runAsync(db.snapshot))!;
+      BackupData.validate(snapshot);
+      await tester.runAsync(() => db.replaceAll(snapshot));
+      expect(
+        (await tester.runAsync(db.listWildCatchRecords))!.single.events.length,
+        4,
+      );
+      await tester.pageBack();
+      await _settleDatabase(tester);
+      await tester.tap(find.byTooltip('编辑野采记录'));
+      await tester.pumpAndSettle();
+      expect(find.text('野采日期'), findsNothing);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '野采地点 *'),
+        '新溪边',
+      );
+      await tester.tap(find.text('保存记录'));
+      await _settleDatabase(tester);
+      final revised = (await tester.runAsync(db.listWildCatchRecords))!.single;
+      expect(revised.startedAt, record.startedAt);
+      expect(revised.endedAt, record.endedAt);
+      expect(revised.events.last.action, '修订');
+    },
+  );
+
   testWidgets('phone location is optional and requires confirmation', (
     tester,
   ) async {
@@ -188,7 +281,7 @@ void main() {
 
     await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
     await _settleDatabase(tester);
-    await tester.tap(find.text('记录战果'));
+    await tester.tap(find.text('补记野采'));
     await tester.pumpAndSettle();
     expect(location.requests, 0);
     await tester.enterText(find.widgetWithText(TextFormField, '野采地点 *'), '河边');
@@ -223,6 +316,90 @@ void main() {
       (await tester.runAsync(db.listWildCatchRecords))!.single.latitude,
       isNull,
     );
+  });
+
+  testWidgets('photos belong to the wild catch without a species', (
+    tester,
+  ) async {
+    final first = File('${directory.path}/wild-first.jpg');
+    final second = File('${directory.path}/wild-second.jpg');
+    await tester.runAsync(() async {
+      await first.writeAsBytes([1, 2, 3]);
+      await second.writeAsBytes([4, 5, 6]);
+    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/image_picker'),
+          (call) async => [first.path, second.path],
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/image_picker'),
+            null,
+          ),
+    );
+
+    await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
+    await _settleDatabase(tester);
+    await tester.tap(find.text('补记野采'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, '野采地点 *'), '河岸');
+    await tester.ensureVisible(find.text('添加野采照片'));
+    await tester.tap(find.text('添加野采照片'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('从图库选择'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('移除野采照片'), findsNWidgets(2));
+    await tester.tap(find.text('保存记录'));
+    await _settleDatabase(tester);
+
+    final saved = (await tester.runAsync(db.listWildCatchRecords))!.single;
+    expect(saved.species, isEmpty);
+    expect(saved.photos, hasLength(2));
+    expect(saved.photos.first, isNot(first.path));
+    expect(await tester.runAsync(() => media.readImage(saved.photos.first)), [
+      1,
+      2,
+      3,
+    ]);
+    expect(find.text('2 张野采照片'), findsOneWidget);
+
+    await tester.tap(find.text('河岸'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -250),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('移除野采照片').first);
+    await tester.tap(find.text('保存记录'));
+    await _settleDatabase(tester);
+    final edited = (await tester.runAsync(db.listWildCatchRecords))!.single;
+    expect(edited.photos, [saved.photos.last]);
+    await tester.runAsync(() async {
+      await expectLater(
+        media.readImage(saved.photos.first),
+        throwsA(isA<FileSystemException>()),
+      );
+    });
+    expect(await tester.runAsync(() => media.readImage(saved.photos.last)), [
+      4,
+      5,
+      6,
+    ]);
+
+    await tester.tap(find.byTooltip('删除野采记录'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('删除').last);
+    await _settleDatabase(tester);
+    expect(await tester.runAsync(db.listWildCatchRecords), isEmpty);
+    await tester.runAsync(() async {
+      await expectLater(
+        media.readImage(saved.photos.last),
+        throwsA(isA<FileSystemException>()),
+      );
+    });
   });
 
   test('version 26 records survive the location column upgrade', () async {
@@ -262,6 +439,64 @@ void main() {
       ),
     );
     expect((await db.listWildCatchRecords()).single.latitude, 31.23456);
+  });
+
+  test('version 27 records gain an empty photo list', () async {
+    await db.close();
+    final raw = await databaseFactoryFfi.openDatabase(
+      await applicationDatabasePath(),
+    );
+    await raw.execute('DROP TABLE wild_catch_records');
+    await raw.execute('''CREATE TABLE wild_catch_records (
+      id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
+      has_specific_time INTEGER NOT NULL DEFAULT 0,
+      place TEXT NOT NULL, species_json TEXT NOT NULL DEFAULT '[]',
+      note TEXT, latitude REAL, longitude REAL, created_at TEXT NOT NULL
+    )''');
+    await raw.insert('wild_catch_records', {
+      'id': 'location-catch',
+      'caught_at': now.toIso8601String(),
+      'place': '旧地点',
+      'latitude': 31.23456,
+      'longitude': 121.45678,
+      'created_at': now.toIso8601String(),
+    });
+    await raw.execute('PRAGMA user_version = 27');
+    await raw.close();
+
+    await db.open();
+    final record = (await db.listWildCatchRecords()).single;
+    expect(record.latitude, 31.23456);
+    expect(record.photos, isEmpty);
+  });
+
+  test('version 28 records gain empty live timeline fields', () async {
+    await db.close();
+    final raw = await databaseFactoryFfi.openDatabase(
+      await applicationDatabasePath(),
+    );
+    await raw.execute('DROP TABLE wild_catch_records');
+    await raw.execute('''CREATE TABLE wild_catch_records (
+      id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
+      has_specific_time INTEGER NOT NULL DEFAULT 0,
+      place TEXT NOT NULL, species_json TEXT NOT NULL DEFAULT '[]',
+      note TEXT, latitude REAL, longitude REAL,
+      photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL
+    )''');
+    await raw.insert('wild_catch_records', {
+      'id': 'photo-catch',
+      'caught_at': now.toIso8601String(),
+      'place': '旧地点',
+      'created_at': now.toIso8601String(),
+    });
+    await raw.execute('PRAGMA user_version = 28');
+    await raw.close();
+
+    await db.open();
+    final record = (await db.listWildCatchRecords()).single;
+    expect(record.isLive, isFalse);
+    expect(record.events, isEmpty);
+    expect(record.endedAt, isNull);
   });
 }
 

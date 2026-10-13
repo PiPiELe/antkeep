@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/database_path.dart';
 import 'package:antkeep/data/backup_archive.dart';
+import 'package:antkeep/data/backup_logic.dart';
 import 'package:antkeep/data/backup_resources.dart';
 import 'package:antkeep/data/backup_service.dart';
 import 'package:antkeep/data/local_media_store.dart';
@@ -234,11 +235,15 @@ void main() {
     'wild catch records survive ZIP restore and incremental import',
     () async {
       final date = DateTime(2026, 10, 13);
+      await media.restoreFiles({
+        'wild.jpg': [4, 5, 6],
+      });
       await database.saveWildCatchRecord(
         WildCatchRecord(
           id: 'wild-catch',
           caughtAt: date,
           place: '山脚',
+          photos: const ['wild.jpg'],
           species: const [
             WildCatchSpecies(
               name: '弓背蚁',
@@ -259,12 +264,19 @@ void main() {
       await database.replaceAll(fixture());
       expect(await database.listWildCatchRecords(), isEmpty);
       await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
-      expect(
-        (await database.listWildCatchRecords()).single.species.first.colonies,
-        hasLength(2),
-      );
+      final imported = (await database.listWildCatchRecords()).single;
+      expect(imported.photos, hasLength(1));
+      expect(imported.photos.single, isNot('wild.jpg'));
+      expect(await media.readImage(imported.photos.single), [4, 5, 6]);
+      expect(imported.species.first.colonies, hasLength(2));
       await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
       expect(await database.listWildCatchRecords(), hasLength(1));
+
+      await service.restoreBytes(bytes, mode: BackupRestoreMode.overwrite);
+      expect((await database.listWildCatchRecords()).single.photos, [
+        'wild.jpg',
+      ]);
+      expect(await media.readImage('wild.jpg'), [4, 5, 6]);
 
       final old = await database.snapshot()
         ..remove('wild_catch_records');
@@ -518,7 +530,7 @@ void main() {
         BackupArchive.decode(bytes).findFile('manifest.json')!.content,
       ),
     );
-    expect(manifest['version'], 6);
+    expect(manifest['version'], backupVersion);
     await service.restoreBytes(archiveBytes(fixture()));
     expect(await database.listMemorials(), isEmpty);
     await service.undoLastRestore();

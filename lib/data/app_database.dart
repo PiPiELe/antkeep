@@ -45,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 27,
+      version: 29,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -105,7 +105,23 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int newVersion,
   ) async {
     if (oldVersion < 26) await _createWildCatchTable(database);
-    if (oldVersion < 27) {
+    if (oldVersion >= 26 && oldVersion < 28) {
+      await database.execute(
+        "ALTER TABLE wild_catch_records ADD COLUMN photos_json TEXT NOT NULL DEFAULT '[]'",
+      );
+    }
+    if (oldVersion >= 26 && oldVersion < 29) {
+      await database.execute(
+        'ALTER TABLE wild_catch_records ADD COLUMN started_at TEXT',
+      );
+      await database.execute(
+        'ALTER TABLE wild_catch_records ADD COLUMN ended_at TEXT',
+      );
+      await database.execute(
+        "ALTER TABLE wild_catch_records ADD COLUMN events_json TEXT NOT NULL DEFAULT '[]'",
+      );
+    }
+    if (oldVersion == 26) {
       await database.execute(
         'ALTER TABLE wild_catch_records ADD COLUMN latitude REAL',
       );
@@ -401,7 +417,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
       has_specific_time INTEGER NOT NULL DEFAULT 0 CHECK (has_specific_time IN (0, 1)),
       place TEXT NOT NULL, species_json TEXT NOT NULL DEFAULT '[]',
-      note TEXT, latitude REAL, longitude REAL, created_at TEXT NOT NULL
+      note TEXT, latitude REAL, longitude REAL,
+      photos_json TEXT NOT NULL DEFAULT '[]', started_at TEXT, ended_at TEXT,
+      events_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL
     )''');
     await db.execute(
       'CREATE INDEX wild_catch_by_time ON wild_catch_records(caught_at DESC)',
@@ -1749,6 +1767,12 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       if (cover is String && cover.isNotEmpty) paths.add(cover);
     }
     for (final entry in snapshot['care_records'] as List<dynamic>) {
+      final photos = (entry as Map)['photos_json'];
+      if (photos is String && photos.isNotEmpty) {
+        paths.addAll((jsonDecode(photos) as List<dynamic>).cast<String>());
+      }
+    }
+    for (final entry in snapshot['wild_catch_records'] as List? ?? const []) {
       final photos = (entry as Map)['photos_json'];
       if (photos is String && photos.isNotEmpty) {
         paths.addAll((jsonDecode(photos) as List<dynamic>).cast<String>());
