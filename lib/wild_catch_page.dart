@@ -3,11 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'data/app_database.dart';
+import 'data/local_media_store.dart';
+import 'data/media_cleanup.dart';
 import 'date_display.dart';
 import 'domain/wild_catch_record.dart';
+import 'live_wild_catch_page.dart';
+import 'widgets/photo_source_picker.dart';
 
 class WildCatchPage extends StatefulWidget {
   const WildCatchPage({super.key});
@@ -17,6 +22,7 @@ class WildCatchPage extends StatefulWidget {
 }
 
 class _WildCatchPageState extends State<WildCatchPage> {
+  bool _startingLive = false;
   late Future<List<WildCatchRecord>> _records = AppDatabase.instance
       .listWildCatchRecords();
 
@@ -30,6 +36,51 @@ class _WildCatchPageState extends State<WildCatchPage> {
       MaterialPageRoute(builder: (_) => _WildCatchForm(record: record)),
     );
     if (saved == true && mounted) _refresh();
+  }
+
+  Future<void> _openLive(WildCatchRecord record) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LiveWildCatchPage(initialRecord: record),
+      ),
+    );
+    if (mounted) _refresh();
+  }
+
+  Future<void> _startLive() async {
+    if (_startingLive) return;
+    _startingLive = true;
+    try {
+      final existing = (await AppDatabase.instance.listWildCatchRecords())
+          .where((record) => record.isActive)
+          .firstOrNull;
+      if (!mounted) return;
+      if (existing != null) {
+        await _openLive(existing);
+        return;
+      }
+      final now = DateTime.now();
+      final record = WildCatchRecord(
+        id: const Uuid().v4(),
+        caughtAt: now,
+        hasSpecificTime: true,
+        place: '',
+        species: const [],
+        startedAt: now,
+        createdAt: now,
+        events: [WildCatchEvent(at: now, action: '开始', detail: '开始本次野采')],
+      );
+      await AppDatabase.instance.saveWildCatchRecord(record);
+      if (mounted) await _openLive(record);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('开始野采失败：$error')));
+      }
+    } finally {
+      _startingLive = false;
+    }
   }
 
   Future<void> _delete(WildCatchRecord record) async {
@@ -53,6 +104,11 @@ class _WildCatchPageState extends State<WildCatchPage> {
     if (confirmed != true) return;
     try {
       await AppDatabase.instance.deleteWildCatchRecord(record.id);
+      await removeUnreferencedMedia(
+        AppDatabase.instance,
+        LocalMediaStore.instance,
+        record.photos,
+      );
       if (mounted) _refresh();
     } catch (error) {
       if (mounted) {
@@ -64,11 +120,16 @@ class _WildCatchPageState extends State<WildCatchPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('蚂蚁野采记录')),
+    appBar: AppBar(
+      title: const Text('蚂蚁野采记录'),
+      actions: [
+        TextButton(onPressed: () => _edit(), child: const Text('补记野采')),
+      ],
+    ),
     floatingActionButton: FloatingActionButton.extended(
-      onPressed: () => _edit(),
-      icon: const Icon(Icons.add),
-      label: const Text('记录战果'),
+      onPressed: _startLive,
+      icon: const Icon(Icons.play_arrow),
+      label: const Text('开始实时野采'),
     ),
     body: FutureBuilder<List<WildCatchRecord>>(
       future: _records,
@@ -89,13 +150,15 @@ class _WildCatchPageState extends State<WildCatchPage> {
             final record = snapshot.data![index];
             return Card(
               child: ListTile(
-                title: Text(record.place),
+                title: Text(record.place.isEmpty ? '进行中的野采' : record.place),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       [
                         chineseDate(record.caughtAt),
+                        if (record.isActive) '进行中',
+                        if (record.isLive && !record.isActive) '实时记录',
                         if (record.hasSpecificTime)
                           TimeOfDay.fromDateTime(record.caughtAt)
                               .format(context),
@@ -114,14 +177,42 @@ class _WildCatchPageState extends State<WildCatchPage> {
                       Text(
                         _coordinateLabel(record.latitude!, record.longitude!),
                       ),
+                    if (record.photos.isNotEmpty) ...[
+                      Text('${record.photos.length} 张野采照片'),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        height: 72,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: record.photos.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) => _WildCatchImage(
+                            key: ValueKey(record.photos[index]),
+                            relativePath: record.photos[index],
+                            size: 72,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 isThreeLine: true,
-                onTap: () => _edit(record),
-                trailing: IconButton(
-                  tooltip: '删除野采记录',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _delete(record),
+                onTap: () => record.isLive ? _openLive(record) : _edit(record),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (record.isLive && !record.isActive)
+                      IconButton(
+                        tooltip: '编辑野采记录',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => _edit(record),
+                      ),
+                    IconButton(
+                      tooltip: '删除野采记录',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _delete(record),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -143,6 +234,68 @@ String _colonySummary(WildCatchColony colony) {
 
 String _coordinateLabel(double latitude, double longitude) =>
     '纬度 ${latitude.toStringAsFixed(5)}，经度 ${longitude.toStringAsFixed(5)}';
+
+class _WildCatchImage extends StatefulWidget {
+  const _WildCatchImage({
+    super.key,
+    this.relativePath,
+    this.image,
+    required this.size,
+  });
+
+  final String? relativePath;
+  final XFile? image;
+  final double size;
+
+  @override
+  State<_WildCatchImage> createState() => _WildCatchImageState();
+}
+
+class _WildCatchImageState extends State<_WildCatchImage> {
+  late final Future<Uint8List> _bytes =
+      widget.image?.readAsBytes() ??
+      LocalMediaStore.instance.readImage(widget.relativePath!);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+    future: _bytes,
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: Icon(
+            snapshot.hasError
+                ? Icons.broken_image_outlined
+                : Icons.image_outlined,
+          ),
+        );
+      }
+      return InkWell(
+        onTap: () => showDialog<void>(
+          context: context,
+          builder: (context) => Dialog(
+            child: InteractiveViewer(child: Image.memory(snapshot.data!)),
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.memory(
+            snapshot.data!,
+            width: widget.size,
+            height: widget.size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => SizedBox(
+              width: widget.size,
+              height: widget.size,
+              child: const Icon(Icons.broken_image_outlined),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
 
 class _ColonyDraft {
   _ColonyDraft([WildCatchColony? colony])
@@ -214,7 +367,10 @@ class _WildCatchFormState extends State<_WildCatchForm> {
   final _retiredSpecies = <_SpeciesDraft>[];
   final _retiredColonies = <_ColonyDraft>[];
   late final _note = TextEditingController(text: widget.record?.note);
+  late final _savedPhotos = <String>[...?widget.record?.photos];
+  final _newPhotos = <XFile>[];
   bool _saving = false;
+  bool _pickingPhoto = false;
   bool _locating = false;
   late double? _latitude = widget.record?.latitude;
   late double? _longitude = widget.record?.longitude;
@@ -338,6 +494,34 @@ class _WildCatchFormState extends State<_WildCatchForm> {
     if (mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _pickPhotos() async {
+    setState(() => _pickingPhoto = true);
+    try {
+      final source = await choosePhotoSource(context);
+      if (source == null || !mounted) return;
+      final List<XFile> images;
+      if (source == ImageSource.camera) {
+        final image = await ImagePicker().pickImage(
+          source: source,
+          imageQuality: 86,
+        );
+        images = image == null ? [] : [image];
+      } else {
+        images = await ImagePicker().pickMultiImage(imageQuality: 86);
+      }
+      if (images.isNotEmpty && mounted) {
+        setState(() => _newPhotos.addAll(images));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('选择照片失败，请重试。')));
+      }
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
     }
   }
 
@@ -477,7 +661,11 @@ class _WildCatchFormState extends State<_WildCatchForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
+    final copied = <String>[];
     try {
+      for (final photo in _newPhotos) {
+        copied.add(await LocalMediaStore.instance.copyImage(photo));
+      }
       await AppDatabase.instance.saveWildCatchRecord(
         WildCatchRecord(
           id: widget.record?.id ?? const Uuid().v4(),
@@ -486,13 +674,36 @@ class _WildCatchFormState extends State<_WildCatchForm> {
           place: _place.text.trim(),
           latitude: _latitude,
           longitude: _longitude,
+          photos: [..._savedPhotos, ...copied],
           species: _species.map((entry) => entry.toModel()).toList(),
           note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+          startedAt: widget.record?.startedAt,
+          endedAt: widget.record?.endedAt,
+          events: [
+            ...?widget.record?.events,
+            if (widget.record?.isLive == true)
+              WildCatchEvent(
+                at: DateTime.now(),
+                action: '修订',
+                detail: '结束后修改野采记录',
+              ),
+          ],
           createdAt: widget.record?.createdAt ?? DateTime.now(),
         ),
       );
+      await removeUnreferencedMedia(
+        AppDatabase.instance,
+        LocalMediaStore.instance,
+        widget.record?.photos.where((photo) => !_savedPhotos.contains(photo)) ??
+            const [],
+      );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
+      await removeUnreferencedMedia(
+        AppDatabase.instance,
+        LocalMediaStore.instance,
+        copied,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('保存失败：$error')));
@@ -520,20 +731,22 @@ class _WildCatchFormState extends State<_WildCatchForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListTile(
-              title: const Text('野采日期'),
-              subtitle: Text(chineseDate(_caughtAt)),
-              onTap: _pickDate,
-            ),
-            SwitchListTile(
-              title: const Text('记录具体时间'),
-              value: _specificTime,
-              onChanged: (value) => setState(() {
-                _specificTime = value;
-                if (!value) _caughtAt = DateUtils.dateOnly(_caughtAt);
-              }),
-            ),
-            if (_specificTime)
+            if (widget.record?.isLive != true)
+              ListTile(
+                title: const Text('野采日期'),
+                subtitle: Text(chineseDate(_caughtAt)),
+                onTap: _pickDate,
+              ),
+            if (widget.record?.isLive != true)
+              SwitchListTile(
+                title: const Text('记录具体时间'),
+                value: _specificTime,
+                onChanged: (value) => setState(() {
+                  _specificTime = value;
+                  if (!value) _caughtAt = DateUtils.dateOnly(_caughtAt);
+                }),
+              ),
+            if (_specificTime && widget.record?.isLive != true)
               ListTile(
                 title: const Text('时间'),
                 subtitle: Text(
@@ -597,6 +810,41 @@ class _WildCatchFormState extends State<_WildCatchForm> {
               label: const Text('添加蚁种'),
             ),
             const SizedBox(height: 16),
+            Text('野采照片（可选）', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            const Text('照片只关联本次野采，无需选择蚁种或蚁群。'),
+            const SizedBox(height: 8),
+            if (_savedPhotos.isNotEmpty || _newPhotos.isNotEmpty) ...[
+              SizedBox(
+                height: 88,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final photo in List<String>.of(_savedPhotos))
+                      _photoItem(
+                        key: ValueKey(photo),
+                        relativePath: photo,
+                        onRemove: () =>
+                            setState(() => _savedPhotos.remove(photo)),
+                      ),
+                    for (final photo in List<XFile>.of(_newPhotos))
+                      _photoItem(
+                        key: ObjectKey(photo),
+                        image: photo,
+                        onRemove: () =>
+                            setState(() => _newPhotos.remove(photo)),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            OutlinedButton.icon(
+              onPressed: _saving || _pickingPhoto ? null : _pickPhotos,
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              label: const Text('添加野采照片'),
+            ),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _note,
               maxLength: 500,
@@ -609,6 +857,36 @@ class _WildCatchFormState extends State<_WildCatchForm> {
           ],
         ),
       ),
+    ),
+  );
+
+  Widget _photoItem({
+    required Key key,
+    String? relativePath,
+    XFile? image,
+    required VoidCallback onRemove,
+  }) => Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: Stack(
+      children: [
+        _WildCatchImage(
+          key: key,
+          relativePath: relativePath,
+          image: image,
+          size: 80,
+        ),
+        Positioned(
+          right: 0,
+          top: 0,
+          child: IconButton.filledTonal(
+            tooltip: '移除野采照片',
+            onPressed: _saving ? null : onRemove,
+            icon: const Icon(Icons.close, size: 18),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.zero,
+          ),
+        ),
+      ],
     ),
   );
 }

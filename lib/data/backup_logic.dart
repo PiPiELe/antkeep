@@ -10,7 +10,7 @@ import 'backup_data.dart';
 
 enum BackupRestoreMode { incremental, overwrite }
 
-const backupVersion = 7;
+const backupVersion = 9;
 
 mixin BackupLogic {
   AppDatabase get database;
@@ -167,6 +167,14 @@ mixin BackupLogic {
         ]);
       }
     }
+    for (final row in added['wild_catch_records'] as List) {
+      final photos = row['photos_json'];
+      if (photos is String && photos.isNotEmpty) {
+        row['photos_json'] = jsonEncode([
+          for (final source in jsonDecode(photos) as List) renamed[source]!,
+        ]);
+      }
+    }
     return (
       merged,
       {
@@ -185,6 +193,8 @@ mixin BackupLogic {
             manifest['version'] != 4 &&
             manifest['version'] != 5 &&
             manifest['version'] != 6 &&
+            manifest['version'] != 7 &&
+            manifest['version'] != 8 &&
             manifest['version'] != backupVersion) ||
         data is! Map<String, dynamic> ||
         data['colonies'] is! List ||

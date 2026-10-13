@@ -69,6 +69,53 @@ class WildCatchSpecies {
   };
 }
 
+class WildCatchEvent {
+  const WildCatchEvent({
+    required this.at,
+    required this.action,
+    required this.detail,
+    this.photoPaths = const [],
+  });
+
+  final DateTime at;
+  final String action;
+  final String detail;
+  final List<String> photoPaths;
+
+  void validate() {
+    if (action.isEmpty ||
+        action.length > 40 ||
+        detail.length > 600 ||
+        photoPaths.any(
+          (path) =>
+              path.isEmpty ||
+              path.contains('..') ||
+              path.contains('/') ||
+              path.contains('\\'),
+        )) {
+      throw const FormatException('野采时间线内容无效。');
+    }
+  }
+
+  factory WildCatchEvent.fromJson(Map<String, dynamic> json) {
+    final event = WildCatchEvent(
+      at: DateTime.parse(json['at'] as String),
+      action: json['action'] as String,
+      detail: json['detail'] as String,
+      photoPaths: (json['photo_paths'] as List? ?? const []).cast<String>(),
+    );
+    event.validate();
+    return event;
+  }
+
+  Map<String, Object?> toJson() => {
+    'at': at.toIso8601String(),
+    'action': action,
+    'detail': detail,
+    'photo_paths': photoPaths,
+  };
+}
+
 class WildCatchRecord {
   const WildCatchRecord({
     required this.id,
@@ -80,6 +127,10 @@ class WildCatchRecord {
     this.note,
     this.latitude,
     this.longitude,
+    this.photos = const [],
+    this.startedAt,
+    this.endedAt,
+    this.events = const [],
   });
 
   final String id;
@@ -90,22 +141,71 @@ class WildCatchRecord {
   final String? note;
   final double? latitude;
   final double? longitude;
+  final List<String> photos;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
+  final List<WildCatchEvent> events;
   final DateTime createdAt;
+
+  bool get isLive => startedAt != null;
+  bool get isActive => startedAt != null && endedAt == null;
+
+  WildCatchRecord withLiveChange({
+    String? place,
+    String? note,
+    double? latitude,
+    double? longitude,
+    List<String>? photos,
+    List<WildCatchSpecies>? species,
+    DateTime? endedAt,
+    WildCatchEvent? event,
+  }) => WildCatchRecord(
+    id: id,
+    caughtAt: caughtAt,
+    hasSpecificTime: hasSpecificTime,
+    place: place ?? this.place,
+    note: note ?? this.note,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+    photos: photos ?? this.photos,
+    species: species ?? this.species,
+    startedAt: startedAt,
+    endedAt: endedAt ?? this.endedAt,
+    events: event == null ? events : [...events, event],
+    createdAt: createdAt,
+  );
 
   void validate() {
     if (id.isEmpty ||
-        place.trim().isEmpty ||
+        (place.trim().isEmpty && !isActive) ||
         place.length > 100 ||
+        (endedAt != null && startedAt == null) ||
+        (startedAt != null &&
+            endedAt != null &&
+            endedAt!.isBefore(startedAt!)) ||
         (note?.length ?? 0) > 500 ||
         (latitude == null) != (longitude == null) ||
         (latitude != null &&
             (!latitude!.isFinite || latitude! < -90 || latitude! > 90)) ||
         (longitude != null &&
-            (!longitude!.isFinite || longitude! < -180 || longitude! > 180))) {
+            (!longitude!.isFinite || longitude! < -180 || longitude! > 180)) ||
+        photos.any(
+          (photo) =>
+              photo.isEmpty ||
+              photo.contains('..') ||
+              photo.contains('/') ||
+              photo.contains('\\'),
+        )) {
       throw const FormatException('野采记录内容无效。');
     }
     for (final entry in species) {
       entry.validate();
+    }
+    for (final event in events) {
+      event.validate();
+      if (startedAt == null || event.at.isBefore(startedAt!)) {
+        throw const FormatException('野采时间线时间无效。');
+      }
     }
   }
 
@@ -125,6 +225,21 @@ class WildCatchRecord {
       note: row['note'] as String?,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
+      photos: (jsonDecode(row['photos_json'] as String? ?? '[]') as List)
+          .cast<String>(),
+      startedAt: row['started_at'] == null
+          ? null
+          : DateTime.parse(row['started_at']! as String),
+      endedAt: row['ended_at'] == null
+          ? null
+          : DateTime.parse(row['ended_at']! as String),
+      events: (jsonDecode(row['events_json'] as String? ?? '[]') as List)
+          .map(
+            (entry) => WildCatchEvent.fromJson(
+              Map<String, dynamic>.from(entry as Map),
+            ),
+          )
+          .toList(),
       createdAt: DateTime.parse(row['created_at']! as String),
     );
     record.validate();
@@ -140,6 +255,10 @@ class WildCatchRecord {
     'note': note,
     'latitude': latitude,
     'longitude': longitude,
+    'photos_json': jsonEncode(photos),
+    'started_at': startedAt?.toIso8601String(),
+    'ended_at': endedAt?.toIso8601String(),
+    'events_json': jsonEncode(events.map((event) => event.toJson()).toList()),
     'created_at': createdAt.toIso8601String(),
   };
 }
