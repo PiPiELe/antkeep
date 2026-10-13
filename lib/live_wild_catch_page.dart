@@ -794,6 +794,27 @@ class _WildCatchTimeline extends StatelessWidget {
   final bool shrinkWrap;
   final Future<void> Function(String path)? onRemovePhoto;
 
+  Widget _photoThumbnail(String path) => Stack(
+    children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: _WildCatchPhoto(path: path),
+      ),
+      if (onRemovePhoto != null)
+        Positioned(
+          right: 0,
+          top: 0,
+          child: IconButton(
+            tooltip: '移除野采照片',
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            padding: EdgeInsets.zero,
+            icon: const Icon(Icons.cancel, size: 18),
+            onPressed: () => onRemovePhoto!(path),
+          ),
+        ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final events = record.events.reversed.toList();
@@ -808,6 +829,21 @@ class _WildCatchTimeline extends StatelessWidget {
         final visiblePhotos = event.photoPaths
             .where(record.photos.contains)
             .toList();
+        final description = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(event.action, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              wildCatchExactTime(event.at),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (event.detail.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(event.detail),
+              ),
+          ],
+        );
         return Stack(
           fit: StackFit.passthrough,
           children: [
@@ -831,20 +867,18 @@ class _WildCatchTimeline extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        event.action,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(
-                        wildCatchExactTime(event.at),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      if (event.detail.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(event.detail),
-                        ),
-                      if (visiblePhotos.isNotEmpty)
+                      if (visiblePhotos.length == 1)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: description),
+                            const SizedBox(width: 8),
+                            _photoThumbnail(visiblePhotos.single),
+                          ],
+                        )
+                      else
+                        description,
+                      if (visiblePhotos.length > 1)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: SizedBox(
@@ -855,25 +889,7 @@ class _WildCatchTimeline extends StatelessWidget {
                                 for (final path in visiblePhotos)
                                   Padding(
                                     padding: const EdgeInsets.only(right: 8),
-                                    child: Stack(
-                                      children: [
-                                        _WildCatchPhoto(path: path),
-                                        if (onRemovePhoto != null)
-                                          Positioned(
-                                            right: 0,
-                                            top: 0,
-                                            child: IconButton.filledTonal(
-                                              tooltip: '移除野采照片',
-                                              icon: const Icon(
-                                                Icons.close,
-                                                size: 18,
-                                              ),
-                                              onPressed: () =>
-                                                  onRemovePhoto!(path),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
+                                    child: _photoThumbnail(path),
                                   ),
                               ],
                             ),
