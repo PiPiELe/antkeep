@@ -8,6 +8,7 @@ import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/wild_catch_record.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/live_wild_catch_page.dart';
+import 'package:antkeep/main.dart' show ColonyFormPage;
 import 'package:antkeep/wild_catch_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -274,6 +275,100 @@ void main() {
       expect(find.textContaining('已关联蚁群'), findsNWidgets(2));
     },
   );
+
+  testWidgets('existing colony can link a wild catch result while editing', (
+    tester,
+  ) async {
+    final colony = Colony(
+      id: 'edited-colony',
+      name: '已有蚁群',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final record = WildCatchRecord(
+      id: 'catch-from-edit',
+      caughtAt: now,
+      place: '河岸',
+      species: const [
+        WildCatchSpecies(
+          name: '弓背蚁',
+          colonies: [WildCatchColony(queenCount: 1)],
+        ),
+      ],
+      createdAt: now,
+    );
+    await tester.runAsync(() async {
+      await db.saveColony(colony);
+      await db.saveWildCatchRecord(record);
+    });
+    await tester.pumpWidget(MaterialApp(home: ColonyFormPage(colony: colony)));
+    await _settleDatabase(tester);
+    await tester.scrollUntilVisible(
+      find.text('关联野采战果（可选）'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -220));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('wild-catch-link-field')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('河岸 · 弓背蚁 · 第 1 群').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存蚁群'));
+    await _settleDatabase(tester);
+    final saved = (await tester.runAsync(db.listWildCatchRecords))!.single;
+    expect(saved.species.single.colonies.single.colonyId, colony.id);
+    expect(
+      (await tester.runAsync(() => db.findColony(colony.id)))!.isWildCatch,
+      isTrue,
+    );
+    final edited = (await tester.runAsync(() => db.findColony(colony.id)))!;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(MaterialApp(home: ColonyFormPage(colony: edited)));
+    await _settleDatabase(tester);
+    await tester.scrollUntilVisible(
+      find.textContaining('已关联野采战果：河岸 · 弓背蚁 · 第 1 群'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('关联野采战果（可选）'), findsNothing);
+  });
+
+  test('failed wild catch link rolls back the colony edit', () async {
+    final colony = Colony(
+      id: 'rollback-colony',
+      name: '原名',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await db.saveColony(colony);
+    await db.saveWildCatchRecord(
+      WildCatchRecord(
+        id: 'already-linked',
+        caughtAt: now,
+        place: '河岸',
+        species: const [
+          WildCatchSpecies(
+            name: '弓背蚁',
+            colonies: [WildCatchColony(colonyId: 'another-colony')],
+          ),
+        ],
+        createdAt: now,
+      ),
+    );
+    await expectLater(
+      db.saveColony(
+        Colony(id: colony.id, name: '新名', createdAt: now, updatedAt: now),
+        wildCatchResult: (
+          recordId: 'already-linked',
+          speciesIndex: 0,
+          colonyIndex: 0,
+        ),
+      ),
+      throwsStateError,
+    );
+    expect((await db.findColony(colony.id))!.name, '原名');
+  });
 
   testWidgets('add, edit, and delete a wild catch', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));

@@ -520,7 +520,25 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     required int colonyIndex,
     required String colonyId,
     Colony? newColony,
-  }) => _db.transaction((transaction) async {
+  }) => _db.transaction(
+    (transaction) => _linkWildCatchColony(
+      transaction,
+      recordId: recordId,
+      speciesIndex: speciesIndex,
+      colonyIndex: colonyIndex,
+      colonyId: colonyId,
+      newColony: newColony,
+    ),
+  );
+
+  Future<WildCatchRecord> _linkWildCatchColony(
+    Transaction transaction, {
+    required String recordId,
+    required int speciesIndex,
+    required int colonyIndex,
+    required String colonyId,
+    Colony? newColony,
+  }) async {
     final rows = await transaction.query(
       'wild_catch_records',
       where: 'id = ?',
@@ -565,7 +583,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       whereArgs: [recordId],
     );
     return updated;
-  });
+  }
 
   Future<Set<String>> _wildCatchLinkedColonyIds() async {
     final records = await listWildCatchRecords();
@@ -855,9 +873,10 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   @override
-  Future<void> saveColony(Colony colony) => _db.transaction((
-    transaction,
-  ) async {
+  Future<void> saveColony(
+    Colony colony, {
+    ({String recordId, int speciesIndex, int colonyIndex})? wildCatchResult,
+  }) => _db.transaction((transaction) async {
     await _applyGrowth(transaction, DateTime.now(), colony.id);
     final previous = await transaction.query(
       'colonies',
@@ -893,6 +912,15 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
           ).toMap(),
         );
       }
+    }
+    if (wildCatchResult != null) {
+      await _linkWildCatchColony(
+        transaction,
+        recordId: wildCatchResult.recordId,
+        speciesIndex: wildCatchResult.speciesIndex,
+        colonyIndex: wildCatchResult.colonyIndex,
+        colonyId: colony.id,
+      );
     }
   });
 

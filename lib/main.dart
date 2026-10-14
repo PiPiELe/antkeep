@@ -45,6 +45,7 @@ import 'data/local_media_store.dart';
 import 'data/media_cleanup.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/wild_catch_record.dart';
 import 'domain/care_task.dart';
 import 'domain/memorial.dart';
 import 'domain/milestone.dart';
@@ -1372,12 +1373,15 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   XFile? _cover;
   Future<Uint8List?>? _coverPreview;
   var _saving = false;
+  Future<List<WildCatchRecord>>? _wildCatchRecords;
+  ({String recordId, int speciesIndex, int colonyIndex})? _selectedWildCatch;
 
   @override
   void initState() {
     super.initState();
     final colony = widget.colony;
     if (colony == null) return;
+    _wildCatchRecords = AppDatabase.instance.listWildCatchRecords();
     _name.text = colony.name;
     _source.text = colony.source ?? '';
     final sourceMatch = RegExp(
@@ -1535,6 +1539,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           createdAt: widget.colony?.createdAt ?? now,
           updatedAt: now,
         ),
+        wildCatchResult: _selectedWildCatch,
       );
       if (_cover != null && widget.colony?.coverPhotoPath != null) {
         await removeUnreferencedMedia(
@@ -1585,6 +1590,79 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
 
     return displayName.substring(0, match.start);
   }
+
+  Widget _wildCatchField() => FutureBuilder<List<WildCatchRecord>>(
+    future: _wildCatchRecords,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Text('野采战果加载失败，请重新打开页面。');
+      }
+      if (!snapshot.hasData) return const LinearProgressIndicator();
+
+      final linked = <String>[];
+      final available =
+          <
+            ({String recordId, int speciesIndex, int colonyIndex, String label})
+          >[];
+      for (final record in snapshot.data!) {
+        for (
+          var speciesIndex = 0;
+          speciesIndex < record.species.length;
+          speciesIndex++
+        ) {
+          final species = record.species[speciesIndex];
+          for (
+            var colonyIndex = 0;
+            colonyIndex < species.colonies.length;
+            colonyIndex++
+          ) {
+            final result = species.colonies[colonyIndex];
+            final label =
+                '${record.place} · ${species.displayName} · 第 ${colonyIndex + 1} 群';
+            if (result.colonyId == widget.colony!.id) {
+              linked.add(label);
+            } else if (result.colonyId == null) {
+              available.add((
+                recordId: record.id,
+                speciesIndex: speciesIndex,
+                colonyIndex: colonyIndex,
+                label: label,
+              ));
+            }
+          }
+        }
+      }
+      if (linked.isNotEmpty) return Text('已关联野采战果：${linked.join('、')}');
+      if (available.isEmpty) return const Text('暂无可关联的野采战果');
+
+      return DropdownButtonFormField<
+        ({String recordId, int speciesIndex, int colonyIndex})
+      >(
+        key: const ValueKey('wild-catch-link-field'),
+        initialValue: _selectedWildCatch,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          labelText: '关联野采战果（可选）',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          const DropdownMenuItem(value: null, child: Text('不关联')),
+          for (final option in available)
+            DropdownMenuItem(
+              value: (
+                recordId: option.recordId,
+                speciesIndex: option.speciesIndex,
+                colonyIndex: option.colonyIndex,
+              ),
+              child: Text(option.label, overflow: TextOverflow.ellipsis),
+            ),
+        ],
+        onChanged: _saving
+            ? null
+            : (value) => setState(() => _selectedWildCatch = value),
+      );
+    },
+  );
 
   String? get _sourceValue {
     if (_sourceType == _originalSourceType &&
@@ -2083,6 +2161,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                   ),
                 ),
               ),
+              if (_wildCatchRecords != null) ...[
+                const SizedBox(height: 12),
+                _wildCatchField(),
+              ],
               const SizedBox(height: 12),
               _PurchasePriceField(controller: _purchasePrice),
               const SizedBox(height: 12),
