@@ -66,8 +66,16 @@ void main() {
       expect(legacy.purchasedAt, DateTime(2026, 9, 2));
       final selected = items.where((item) => !item.purchased).take(2).toList();
       final details = {
-        selected.first.id: (quantity: 2, purchasePriceCents: 1299),
-        selected.last.id: (quantity: null, purchasePriceCents: 0),
+        selected.first.id: (
+          quantity: 2,
+          purchasePriceCents: 1299,
+          purpose: '稳定换巢',
+        ),
+        selected.last.id: (
+          quantity: null,
+          purchasePriceCents: 0,
+          purpose: null,
+        ),
       };
       await db.execute(
         '''CREATE TRIGGER fail_checkout BEFORE UPDATE ON inventory_items
@@ -104,6 +112,7 @@ void main() {
       expect(priced.quantity, 2);
       expect(priced.purchasePriceCents, 1299);
       expect(priced.purchasePriceText, '12.99');
+      expect(priced.purpose, '稳定换巢');
       expect(priced.purchased, isTrue);
       final free = restored.singleWhere((item) => item.id == selected.last.id);
       expect(free.purchasePriceCents, 0);
@@ -118,6 +127,8 @@ void main() {
       );
       final legacyMap = legacy.toMap()..remove('purchase_price_cents');
       expect(InventoryItem.fromMap(legacyMap).purchasePriceCents, isNull);
+      legacyMap.remove('purpose');
+      expect(InventoryItem.fromMap(legacyMap).purpose, isNull);
     },
   );
 }

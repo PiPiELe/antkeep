@@ -348,6 +348,7 @@ class InventoryItem {
     this.quantity,
     this.purchasePriceCents,
     this.groupName,
+    this.purpose,
   });
 
   final String id;
@@ -361,6 +362,7 @@ class InventoryItem {
   final int? quantity;
   final int? purchasePriceCents;
   final String? groupName;
+  final String? purpose;
 
   String? get groupLabel =>
       groupName ??
@@ -406,6 +408,7 @@ class InventoryItem {
     quantity: map['quantity'] as int?,
     purchasePriceCents: map['purchase_price_cents'] as int?,
     groupName: map['group_name'] as String?,
+    purpose: map['purpose'] as String?,
   );
 
   Map<String, Object?> toMap() => {
@@ -420,6 +423,7 @@ class InventoryItem {
     'quantity': quantity,
     'purchase_price_cents': purchasePriceCents,
     'group_name': groupName,
+    'purpose': purpose,
   };
 }
 

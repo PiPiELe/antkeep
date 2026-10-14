@@ -55,6 +55,7 @@ Map<String, dynamic> fixture() {
         createdAt: time,
         quantity: 2,
         purchasePriceCents: 100,
+        purpose: '临时饲养',
       ).toMap(),
     ],
   };
@@ -826,6 +827,21 @@ void main() {
     expect(await database.listFeederRecords(FeederType.cricket), isEmpty);
     // Older backups did not cover inventory, so existing items remain intact.
     expect((await database.listInventory()).single.id, 'i');
+  });
+
+  test('versions 10 and 11 inventory without purpose restore', () async {
+    final older = await database.snapshot();
+    final items = List<Map<String, Object?>>.from(
+      (older['inventory_items'] as List).map(
+        (row) => Map<String, Object?>.from(row as Map),
+      ),
+    );
+    items[0] = Map<String, Object?>.from(items[0] as Map)..remove('purpose');
+    older['inventory_items'] = items;
+    for (final version in [10, 11]) {
+      await service.restoreBytes(archiveBytes(older, version: version));
+      expect((await database.listInventory()).single.purpose, isNull);
+    }
   });
 
   test('format 1 and 2 feeding history imports without new fields', () async {
