@@ -1669,6 +1669,33 @@ void main() {
     }
   });
 
+  testWidgets('edit colony alert starts collapsed', (tester) async {
+    final now = DateTime.now();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ColonyFormPage(
+          colony: Colony(
+            id: 'alert-collapsed',
+            name: '预警测试',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final alertSection = find.text('环境预警（可选）');
+    await tester.scrollUntilVisible(
+      alertSection,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.widgetWithText(TextFormField, '温度下限 °C'), findsNothing);
+    await tester.tap(alertSection);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextFormField, '温度下限 °C'), findsOneWidget);
+  });
+
   testWidgets('colony alert bounds validate and persist', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
     await tester.pumpAndSettle();

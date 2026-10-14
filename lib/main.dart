@@ -1818,7 +1818,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
         children: [
           _section(
             icon: Icons.pest_control_outlined,
-            title: '品种',
+            title: '品种与昵称',
             children: [
               _SearchableChoiceField(
                 label: '品种分类/细分种类',
@@ -1843,17 +1843,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _section(
-            icon: Icons.edit_outlined,
-            title: '蚁群昵称 *',
-            children: [
+              const SizedBox(height: 8),
               TextFormField(
                 key: const ValueKey('colony-name'),
                 controller: _name,
-                decoration: const InputDecoration(hintText: '例如：红土一号'),
+                decoration: const InputDecoration(
+                  labelText: '蚁群昵称 *',
+                  hintText: '例如：红土一号',
+                ),
                 validator: (value) =>
                     _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
               ),
@@ -1948,13 +1945,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 '工蚁填 0 表示从新后开始养',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
+              const SizedBox(height: 8),
+              Row(
                 children: [
                   Checkbox(
                     value: _showSpecialized,
@@ -1978,7 +1970,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                   ],
                 ],
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 12),
           _section(
@@ -1999,7 +1991,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             clipBehavior: Clip.antiAlias,
             child: ExpansionTile(
               controller: _environmentExpansion,
-              initiallyExpanded: widget.colony != null,
+              initiallyExpanded: false,
               maintainState: true,
               leading: Icon(
                 Icons.thermostat_outlined,
@@ -2168,34 +2160,56 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
               const SizedBox(height: 12),
               _PurchasePriceField(controller: _purchasePrice),
               const SizedBox(height: 12),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.calendar_today_outlined),
-                label: Text(
-                  _acquiredOn == null
-                      ? '选择入手日期（可选）'
-                      : '入手日期：${_date(_acquiredOn!)}',
-                ),
-                onPressed: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime.now(),
-                    initialDate: _acquiredOn ?? DateTime.now(),
-                  );
-                  if (date != null) setState(() => _acquiredOn = date);
-                },
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.photo_outlined),
-                label: Text(
-                  _cover != null
-                      ? '已选择封面照片'
-                      : widget.colony?.coverPhotoPath != null
-                      ? '更换封面照片'
-                      : '添加封面照片（可选）',
-                ),
-                onPressed: _saving ? null : _pickCover,
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                      label: Text(
+                        _acquiredOn == null
+                            ? '入手日期（可选）'
+                            : '入手日期：${_date(_acquiredOn!)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now(),
+                          initialDate: _acquiredOn ?? DateTime.now(),
+                        );
+                        if (date != null) setState(() => _acquiredOn = date);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      icon: const Icon(Icons.photo_outlined, size: 16),
+                      label: Text(
+                        _cover != null
+                            ? '已选择封面照片'
+                            : widget.colony?.coverPhotoPath != null
+                            ? '更换封面照片'
+                            : '添加封面照片',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: _saving ? null : _pickCover,
+                    ),
+                  ),
+                ],
               ),
               if (_coverPreview != null) ...[
                 const SizedBox(height: 12),

@@ -26,6 +26,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(
+        find
+            .ancestor(of: find.text('品种与昵称'), matching: find.byType(Card))
+            .evaluate()
+            .single,
+        find
+            .ancestor(
+              of: find.byKey(const ValueKey('colony-name')),
+              matching: find.byType(Card),
+            )
+            .evaluate()
+            .single,
+      );
+
       for (final label in ['蚁后 *', '工蚁 *', '卵', '茧']) {
         final field = find.widgetWithText(TextFormField, label);
         await tester.ensureVisible(field);
@@ -48,6 +62,34 @@ void main() {
         tester.getTopLeft(workerField).dy,
         reason: 'queen and worker fields must align at the top',
       );
+
+      final specialized = find.text('特化');
+      await tester.scrollUntilVisible(
+        specialized,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find
+            .ancestor(of: specialized, matching: find.byType(Card))
+            .evaluate()
+            .single,
+        find
+            .ancestor(of: find.text('数量'), matching: find.byType(Card))
+            .evaluate()
+            .single,
+      );
+
+      final acquiredOn = find.text('入手日期（可选）');
+      final cover = find.text('添加封面照片');
+      await tester.scrollUntilVisible(
+        acquiredOn,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(acquiredOn).dy, tester.getTopLeft(cover).dy);
       expect(tester.takeException(), isNull);
     });
   }

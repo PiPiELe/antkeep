@@ -90,7 +90,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
     expect(preview, findsNothing);
     pickerResult = pickedImage.path;
-    await pick(tester, '添加封面照片（可选）', source: ImageSource.camera);
+    await pick(tester, '添加封面照片', source: ImageSource.camera);
     expect(pickerCall?.method, 'pickImage');
     expect((pickerCall?.arguments as Map)['source'], ImageSource.camera.index);
     await tester.ensureVisible(preview);
