@@ -14,6 +14,7 @@ import 'backup_zip_io.dart';
 import 'local_media_store.dart';
 import 'media_cleanup.dart';
 import 'rollback_store.dart';
+import '../online/online_controller.dart';
 
 class BackupService with BackupLogic {
   BackupService(this.database, this._mediaStore);
@@ -103,6 +104,12 @@ class BackupService with BackupLogic {
         ) !=
         null;
   });
+
+  Future<Map<String, dynamic>> uploadBackup(OnlineController online) =>
+      _operation((temporary) async {
+        final file = await _snapshot(temporary, 'upload.zip');
+        return online.uploadBackup(file.openRead(), await file.length());
+      });
 
   /// Byte APIs remain for callers/tests. The mobile UI uses file APIs exclusively.
   Future<Uint8List> createBackupBytes() => _operation(

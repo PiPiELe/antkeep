@@ -168,7 +168,13 @@ void main() {
       expect(find.text('数据推送'), findsNothing);
       await openCategory(tester, '数据管理');
       expect(find.text('数据推送'), findsOneWidget);
+      expect(find.text('备份上传'), findsOneWidget);
       expect(find.text('导出备份'), findsOneWidget);
+      await tester.tap(find.text('备份上传'));
+      await tester.pumpAndSettle();
+      expect(find.text('请先开启在线模式并登录账号。'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await tester.tap(find.text('恢复备份'));
       await tester.pumpAndSettle();
       expect(find.text('选择恢复方式'), findsOneWidget);

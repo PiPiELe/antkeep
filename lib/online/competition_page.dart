@@ -774,7 +774,7 @@ class _CompetitionProposalPageState extends State<CompetitionProposalPage> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('比赛名称提交内容管理后台审核，通过后其他用户才能看到并报名。'),
+          const Text('比赛名称提交蚁记管理后台审核，通过后其他用户才能看到并报名。'),
           const SizedBox(height: 16),
           TextFormField(
             controller: _title,

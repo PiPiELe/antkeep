@@ -313,6 +313,34 @@ class OnlineController extends ChangeNotifier {
   Future<Map<String, dynamic>> inventoryPushStatus() =>
       _authenticatedRequest('/api/app/inventory-pushes/status');
 
+  Future<Map<String, dynamic>> backupUploads() =>
+      _authenticatedRequest('/api/app/backups');
+
+  Future<void> deleteBackup(String id) async {
+    final token = _token;
+    if (!enabled || token == null || user == null) {
+      throw const ApiFailure('请先开启在线模式并登录账号。');
+    }
+    await api.request('/api/app/backups/$id', method: 'DELETE', token: token);
+  }
+
+  Future<Map<String, dynamic>> uploadBackup(
+    Stream<List<int>> bytes,
+    int length,
+  ) async {
+    final token = _token;
+    if (!enabled || token == null || user == null) {
+      throw const ApiFailure('请先开启在线模式并登录账号。');
+    }
+    final result = jsonDecode(
+      await api.uploadBackup(bytes, length, token: token),
+    ) as Map<String, dynamic>;
+    if (!enabled || _token != token) {
+      throw const ApiFailure('账号状态已变化，请重新打开备份页面确认上传结果。');
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>> pushInventory(
     List<InventoryItem> items, {
     required String code,

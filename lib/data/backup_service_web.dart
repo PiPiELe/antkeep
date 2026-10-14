@@ -11,6 +11,7 @@ import 'backup_logic.dart';
 import 'local_media_store.dart';
 import 'media_cleanup.dart';
 import 'rollback_store.dart';
+import '../online/online_controller.dart';
 
 class BackupService with BackupLogic {
   BackupService(this._database, this._mediaStore);
@@ -29,6 +30,11 @@ class BackupService with BackupLogic {
       bytes: await createBackupBytes(),
     );
     return destination != null;
+  }
+
+  Future<Map<String, dynamic>> uploadBackup(OnlineController online) async {
+    final bytes = await createBackupBytes();
+    return online.uploadBackup(Stream<List<int>>.value(bytes), bytes.length);
   }
 
   Future<Uint8List> createBackupBytes() async {
