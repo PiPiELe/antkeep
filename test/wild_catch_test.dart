@@ -340,6 +340,47 @@ void main() {
     expect(await tester.runAsync(db.listWildCatchRecords), isEmpty);
   });
 
+  testWidgets('wild catch card keeps long details out of the narrow summary', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final record = WildCatchRecord(
+      id: 'narrow-card',
+      caughtAt: now,
+      place: '公司楼下',
+      hasSpecificTime: true,
+      startedAt: now,
+      endedAt: now.add(const Duration(hours: 1)),
+      species: const [
+        WildCatchSpecies(
+          name: '石头蚁群',
+          colonies: [WildCatchColony(queenCount: 1, workerCount: 50)],
+        ),
+      ],
+      note: '跟随蚂蚁来到一棵树下，看到入口后又观察了很久，记录附近的环境和路线。',
+      latitude: 40.04197,
+      longitude: 116.29888,
+      createdAt: now,
+    );
+    await tester.runAsync(() => db.saveWildCatchRecord(record));
+
+    await tester.pumpWidget(const MaterialApp(home: WildCatchPage()));
+    await _settleDatabase(tester);
+    expect(find.text('石头蚁群 · 1 群'), findsOneWidget);
+    expect(find.textContaining('第 1 群：'), findsNothing);
+    expect(find.byTooltip('管理野采战果'), findsOneWidget);
+    expect(find.byTooltip('编辑野采记录'), findsOneWidget);
+    expect(find.byTooltip('删除野采记录'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('查看详情'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('第 1 群：蚁后 1 只'), findsOneWidget);
+    expect(find.textContaining('纬度 40.04197'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'start, record events, resume, finish, and view wild catch data',
     (tester) async {

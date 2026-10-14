@@ -23,6 +23,7 @@ class WildCatchPage extends StatefulWidget {
 
 class _WildCatchPageState extends State<WildCatchPage> {
   bool _startingLive = false;
+  final Set<String> _expandedRecords = {};
   late Future<List<WildCatchRecord>> _records = AppDatabase.instance
       .listWildCatchRecords();
 
@@ -134,36 +135,108 @@ class _WildCatchPageState extends State<WildCatchPage> {
           itemCount: snapshot.data!.length,
           itemBuilder: (context, index) {
             final record = snapshot.data![index];
+            final expanded = _expandedRecords.contains(record.id);
+            final colors = Theme.of(context).colorScheme;
+            final textTheme = Theme.of(context).textTheme;
+            final speciesCount = record.species
+                .where((entry) => entry.name.isNotEmpty)
+                .length;
+            final colonyCount = record.species.fold<int>(
+              0,
+              (total, entry) => total + entry.colonies.length,
+            );
             return Card(
-              child: ListTile(
-                title: Text(record.place.isEmpty ? '进行中的野采' : record.place),
-                subtitle: Column(
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      [
-                        chineseDate(record.caughtAt),
-                        if (record.isActive) '进行中',
-                        if (record.isLive && !record.isActive) '实时记录',
-                        if (record.hasSpecificTime)
-                          TimeOfDay.fromDateTime(record.caughtAt)
-                              .format(context),
-                        '${record.species.where((entry) => entry.name.isNotEmpty).length} 种 · ${record.species.fold<int>(0, (total, entry) => total + entry.colonies.length)} 群',
-                      ].join(' · '),
+                    InkWell(
+                      onTap: () =>
+                          record.isLive ? _openLive(record) : _edit(record),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              record.place.isEmpty ? '进行中的野采' : record.place,
+                              style: textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              [
+                                chineseDate(record.caughtAt),
+                                if (record.isActive) '进行中',
+                                if (record.isLive && !record.isActive) '实时记录',
+                                if (record.hasSpecificTime)
+                                  TimeOfDay.fromDateTime(record.caughtAt)
+                                      .format(context),
+                              ].join(' · '),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text('$speciesCount 种 · $colonyCount 群'),
+                            if (record.species.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              for (final entry in record.species)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    '${entry.displayName} · ${entry.colonies.length} 群',
+                                  ),
+                                ),
+                            ],
+                            if (record.note?.isNotEmpty == true &&
+                                !expanded) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                record.note!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                    for (final entry in record.species) ...[
-                      Text('${entry.displayName} · ${entry.colonies.length} 群'),
-                      for (var i = 0; i < entry.colonies.length; i++)
-                        Text(
-                          '  第 ${i + 1} 群：${_colonySummary(entry.colonies[i])}',
+                    if (expanded) ...[
+                      const Divider(height: 20),
+                      for (final entry in record.species)
+                        for (var i = 0; i < entry.colonies.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8, bottom: 4),
+                            child: Text(
+                              '${entry.displayName} · 第 ${i + 1} 群：${_colonySummary(entry.colonies[i])}',
+                            ),
+                          ),
+                      if (record.note?.isNotEmpty == true)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8, bottom: 4),
+                          child: Text(record.note!),
+                        ),
+                      if (record.latitude != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Text(
+                            _coordinateLabel(
+                              record.latitude!,
+                              record.longitude!,
+                            ),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
                         ),
                     ],
-                    if (record.note?.isNotEmpty == true) Text(record.note!),
-                    if (record.latitude != null)
-                      Text(
-                        _coordinateLabel(record.latitude!, record.longitude!),
-                      ),
                     if (record.photos.isNotEmpty) ...[
+                      const SizedBox(height: 10),
                       Text('${record.photos.length} 张野采照片'),
                       const SizedBox(height: 6),
                       SizedBox(
@@ -180,38 +253,50 @@ class _WildCatchPageState extends State<WildCatchPage> {
                         ),
                       ),
                     ],
-                  ],
-                ),
-                isThreeLine: true,
-                onTap: () => record.isLive ? _openLive(record) : _edit(record),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (record.species.isNotEmpty)
-                      IconButton(
-                        tooltip: '管理野采战果',
-                        icon: const Icon(Icons.summarize_outlined),
-                        onPressed: () async {
-                          await Navigator.push<void>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  WildCatchResultsPage(record: record),
-                            ),
-                          );
-                          if (mounted) _refresh();
-                        },
-                      ),
-                    if (record.isLive && !record.isActive)
-                      IconButton(
-                        tooltip: '编辑野采记录',
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () => _edit(record),
-                      ),
-                    IconButton(
-                      tooltip: '删除野采记录',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _delete(record),
+                    const Divider(height: 20),
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => setState(() {
+                            if (expanded) {
+                              _expandedRecords.remove(record.id);
+                            } else {
+                              _expandedRecords.add(record.id);
+                            }
+                          }),
+                          icon: Icon(
+                            expanded ? Icons.expand_less : Icons.expand_more,
+                          ),
+                          label: Text(expanded ? '收起详情' : '查看详情'),
+                        ),
+                        const Spacer(),
+                        if (record.species.isNotEmpty)
+                          IconButton(
+                            tooltip: '管理野采战果',
+                            icon: const Icon(Icons.summarize_outlined),
+                            onPressed: () async {
+                              await Navigator.push<void>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      WildCatchResultsPage(record: record),
+                                ),
+                              );
+                              if (mounted) _refresh();
+                            },
+                          ),
+                        if (record.isLive && !record.isActive)
+                          IconButton(
+                            tooltip: '编辑野采记录',
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () => _edit(record),
+                          ),
+                        IconButton(
+                          tooltip: '删除野采记录',
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _delete(record),
+                        ),
+                      ],
                     ),
                   ],
                 ),
