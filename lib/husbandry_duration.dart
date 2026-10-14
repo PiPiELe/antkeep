@@ -14,7 +14,6 @@ class HusbandryDuration extends StatefulWidget {
     this.expanded = false,
     this.compact = false,
     this.rightVerticalLabel = false,
-    this.tall = false,
     this.stackedLabel = false,
     this.showAcquiredDate = false,
     this.labelWidth,
@@ -25,7 +24,6 @@ class HusbandryDuration extends StatefulWidget {
   final bool expanded;
   final bool compact;
   final bool rightVerticalLabel;
-  final bool tall;
   final bool stackedLabel;
   final bool showAcquiredDate;
   final double? labelWidth;
@@ -99,7 +97,35 @@ class _HusbandryDurationState extends State<HusbandryDuration>
           ],
         );
       }
-      if (widget.tall || widget.stackedLabel) {
+      if (widget.stackedLabel) {
+        final numberStyle = TextStyle(
+          fontSize: widget.compact ? 42 : 72,
+          height: 1,
+          letterSpacing: -3,
+          fontWeight: FontWeight.w700,
+          color: theme.colorScheme.primary,
+        );
+        final unitStyle = theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        );
+        // Reserve the same space for one-, two- and three-digit durations so
+        // FittedBox applies the same scale to every card in the list.
+        final reference = TextPainter(
+          text: TextSpan(
+            style: unitStyle,
+            children: [
+              TextSpan(
+                text: '8' * math.max(3, '$days'.length),
+                style: numberStyle,
+              ),
+              const TextSpan(text: ' 天'),
+            ],
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        final referenceSize = reference.size;
+        reference.dispose();
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -114,28 +140,20 @@ class _HusbandryDurationState extends State<HusbandryDuration>
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerRight,
-              child: Text.rich(
-                TextSpan(
-                  children: [
+              child: SizedBox(
+                width: referenceSize.width,
+                height: referenceSize.height,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text.rich(
                     TextSpan(
-                      text: '$days',
-                      style: TextStyle(
-                        fontSize: widget.tall
-                            ? 100
-                            : widget.compact
-                            ? 42
-                            : 72,
-                        height: 1,
-                        letterSpacing: -3,
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.primary,
-                      ),
+                      children: [
+                        TextSpan(text: '$days', style: numberStyle),
+                        const TextSpan(text: ' 天'),
+                      ],
                     ),
-                    const TextSpan(text: ' 天'),
-                  ],
-                ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                    style: unitStyle,
+                  ),
                 ),
               ),
             ),
