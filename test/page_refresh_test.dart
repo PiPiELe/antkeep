@@ -1790,6 +1790,9 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -400));
+    await tester.pumpAndSettle();
     expect(temperatureLower, findsNothing);
     await tester.tap(alertSection);
     await tester.pumpAndSettle();
@@ -2029,7 +2032,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('未收录？手动填写品种'));
+      await tester.tap(find.text('未收录？'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.widgetWithText(TextFormField, '学名 / 正式名'),
@@ -2039,7 +2042,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('测试品种'), findsNWidgets(2));
-      await tester.tap(find.text('未收录？手动填写品种'));
+      await tester.tap(find.text('未收录？'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
@@ -2061,7 +2064,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.widgetWithText(FloatingActionButton, '蚁群'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('未收录？手动填写品种'));
+        await tester.tap(find.text('未收录？'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('确认'));
         await tester.pumpAndSettle();
@@ -2089,7 +2092,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('编辑蚁群'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('未收录？手动填写品种'));
+        await tester.tap(find.text('未收录？'));
         await tester.pumpAndSettle();
         expect(find.text(formal), findsOneWidget);
         expect(find.text(common), findsOneWidget);
@@ -2113,7 +2116,7 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('未收录？手动填写品种'));
+    await tester.tap(find.text('未收录？'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextFormField, '通用名（可选）'),
@@ -2156,7 +2159,7 @@ void main() {
         expect(tester.widget<TextFormField>(field).enabled, isTrue);
         expect(find.textContaining(' / $oldName'), findsOneWidget);
         if (formalName == '费氏弓背蚁') {
-          await tester.tap(find.text('未收录？手动填写品种'));
+          await tester.tap(find.text('未收录？'));
           await tester.pumpAndSettle();
           final commonField = tester.widget<TextFormField>(
             find.widgetWithText(TextFormField, '通用名（可选）'),

@@ -427,8 +427,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               ),
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          subtitle,
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              if (edition == AppEdition.offline)
+                                TextSpan(
+                                  text: '核心功能均可用。',
+                                  style: TextStyle(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              TextSpan(text: subtitle),
+                            ],
+                          ),
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 height: 1.5,

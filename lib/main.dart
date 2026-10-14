@@ -1800,6 +1800,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   Widget _section({
     required IconData icon,
     required String title,
+    String? hint,
+    Widget? action,
     required List<Widget> children,
   }) => Card(
     clipBehavior: Clip.antiAlias,
@@ -1813,6 +1815,18 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
               Icon(icon, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               Text(title, style: Theme.of(context).textTheme.titleMedium),
+              if (hint != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    hint,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(fontSize: 10, height: 1.2),
+                  ),
+                ),
+              ],
+              if (action != null) ...[const Spacer(), action],
             ],
           ),
           const SizedBox(height: 14),
@@ -1844,6 +1858,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           _section(
             icon: Icons.pest_control_outlined,
             title: '品种与昵称',
+            action: TextButton(
+              onPressed: _enterCustomSpecies,
+              child: const Text('未收录？', style: TextStyle(fontSize: 10)),
+            ),
             children: [
               _SearchableChoiceField(
                 label: '品种分类/细分种类',
@@ -1856,17 +1874,6 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 },
                 onSelected: _selectFamily,
                 onSearchSelected: _selectSpecies,
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: _enterCustomSpecies,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text(
-                    '未收录？手动填写品种',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
               ),
               const SizedBox(height: 8),
               TextFormField(
@@ -1885,6 +1892,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           _section(
             icon: Icons.bar_chart_outlined,
             title: '数量',
+            hint: '档案起始数量，日记中的死亡数量会从此扣减',
             children: [
               DropdownButtonFormField<GrowthPath>(
                 isExpanded: true,
@@ -1919,14 +1927,6 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  '档案起始数量，日记中的死亡数量会从此扣减',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -1948,7 +1948,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       validator: _validateCount,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        labelText: '茧',
+                        labelText: '蛹茧',
                         hintText: '可选',
                       ),
                     ),
