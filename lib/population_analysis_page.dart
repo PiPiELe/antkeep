@@ -18,6 +18,18 @@ typedef _PopulationSeries = ({
   List<PopulationPoint> forecast,
 });
 
+enum _AnalysisTimeFilter {
+  all('全部时间', 0),
+  last7Days('近 7 天', 7),
+  last30Days('近 30 天', 30),
+  last90Days('近 90 天', 90),
+  custom('自定义日期', 0);
+
+  const _AnalysisTimeFilter(this.label, this.days);
+  final String label;
+  final int days;
+}
+
 class PopulationAnalysisPage extends StatefulWidget {
   const PopulationAnalysisPage({
     super.key,
@@ -47,6 +59,68 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   bool get _showMortality => _tabIndex == 2;
   bool _showForecast = false;
   ForecastHorizon _forecastHorizon = ForecastHorizon.month;
+  _AnalysisTimeFilter _analysisTimeFilter = _AnalysisTimeFilter.all;
+  DateTimeRange? _analysisCustomRange;
+
+  DateTimeRange? get _analysisDateRange {
+    if (_analysisTimeFilter == _AnalysisTimeFilter.custom) {
+      return _analysisCustomRange;
+    }
+    final days = _analysisTimeFilter.days;
+    if (days == 0) return null;
+    final today = DateUtils.dateOnly(DateTime.now());
+    return DateTimeRange(
+      start: DateTime(today.year, today.month, today.day - days + 1),
+      end: today,
+    );
+  }
+
+  List<PopulationPoint> _withinAnalysisRange(List<PopulationPoint> points) {
+    final range = _analysisDateRange;
+    if (range == null) return points;
+    return points.where((point) {
+      final date = DateUtils.dateOnly(point.time.toLocal());
+      return !date.isBefore(range.start) && !date.isAfter(range.end);
+    }).toList();
+  }
+
+  Future<void> _selectAnalysisTime() async {
+    final filter = await showModalBottomSheet<_AnalysisTimeFilter>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final choice in _AnalysisTimeFilter.values)
+              ListTile(
+                title: Text(choice.label),
+                trailing: choice == _analysisTimeFilter
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => Navigator.pop(sheetContext, choice),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (filter == null || !mounted) return;
+    if (filter == _AnalysisTimeFilter.custom) {
+      final range = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(1900),
+        lastDate: DateTime(2100),
+        initialDateRange: _analysisCustomRange,
+        helpText: '选择分析时间范围',
+      );
+      if (range == null || !mounted) return;
+      setState(() {
+        _analysisCustomRange = range;
+        _analysisTimeFilter = filter;
+      });
+    } else {
+      setState(() => _analysisTimeFilter = filter);
+    }
+  }
 
   String? get _forecastUnavailableReason => _colony == null
       ? 'DLC 暂无自动扩充规则'
@@ -313,17 +387,28 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                               points: snapshot.data!.history,
                             );
                           }
+                          final points = _withinAnalysisRange(
+                            snapshot.data!.history,
+                          );
+                          final forecast = _withinAnalysisRange(
+                            snapshot.data!.forecast,
+                          );
                           return _PopulationResult(
-                            points: snapshot.data!.history,
-                            forecast: snapshot.data!.forecast,
+                            points: points,
+                            forecast: forecast.length > 1 && points.isNotEmpty
+                                ? forecast
+                                : const [],
                             metric: _metric,
+                            timeFilter: _analysisTimeFilter,
+                            dateRange: _analysisDateRange,
+                            onSelectTime: _selectAnalysisTime,
                           );
                         },
                       ),
                       if (!_showMortality) ...[
                         const SizedBox(height: 16),
                         Text(
-                          '按全部有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
+                          '按所选时间范围内有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
                           '${_colony != null ? "初始数量以入手日期（未填写时用建档时间）计入。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
                           '同一时刻的同一指标使用最后录入的有效值。连线仅连接记录点，不代表期间每天的数量。',
                           style: Theme.of(context).textTheme.bodySmall,
@@ -475,18 +560,58 @@ class _PopulationResult extends StatelessWidget {
     required this.points,
     required this.forecast,
     required this.metric,
+    required this.timeFilter,
+    required this.dateRange,
+    required this.onSelectTime,
   });
   final List<PopulationPoint> forecast;
   final List<PopulationPoint> points;
   final PopulationMetric metric;
+  final _AnalysisTimeFilter timeFilter;
+  final DateTimeRange? dateRange;
+  final VoidCallback onSelectTime;
+
+  Widget _timeSelector() {
+    final range = dateRange;
+    final label = range == null
+        ? points.isEmpty
+              ? timeFilter.label
+              : '${_date(points.first.time)} — ${_date(forecast.isEmpty ? points.last.time : forecast.last.time)}'
+        : '${timeFilter.label} · ${_date(range.start)} — ${_date(range.end)}';
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton(
+        key: const ValueKey('analysis-time-range'),
+        onPressed: onSelectTime,
+        style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+        child: Row(
+          children: [
+            const Icon(Icons.date_range_outlined),
+            const SizedBox(width: 8),
+            Expanded(child: Text(label)),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     if (points.isEmpty) {
-      return const Card(
+      return Card(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('暂无有效数量记录\n请先在该对象的记录中填写所选指标的数量。'),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _timeSelector(),
+              const Padding(
+                padding: EdgeInsets.all(8),
+                child: Text('所选时间范围内暂无有效数量记录\n请调整时间范围或填写所选指标的数量。'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -522,9 +647,7 @@ class _PopulationResult extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              '${_date(points.first.time)} — ${_date(forecast.isEmpty ? points.last.time : forecast.last.time)}',
-            ),
+            _timeSelector(),
             if (forecast.isNotEmpty) ...[
               Text(
                 '预测至 ${_date(forecast.last.time)} · ${forecast.last.count} 只（估算）',

@@ -3,6 +3,7 @@ import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/population_analysis.dart';
 import 'package:antkeep/population_analysis_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final start = DateTime(2026, 1, 1);
@@ -219,6 +220,141 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('time shortcuts filter the chart summary and quantity records', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final today = DateUtils.dateOnly(DateTime.now());
+    DateTime day(int daysAgo) =>
+        DateTime(today.year, today.month, today.day - daysAgo);
+    final datedColony = Colony(
+      id: 'dated',
+      name: '时间筛选群',
+      createdAt: day(100),
+      updatedAt: today,
+      initialWorkerCount: 10,
+    );
+    CareRecord observation(int daysAgo, int count) => CareRecord(
+      id: '$daysAgo',
+      colonyId: datedColony.id,
+      type: CareRecordType.observation,
+      occurredAt: day(daysAgo),
+      createdAt: day(daysAgo),
+      workerCount: count,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const [Locale('zh', 'CN')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: PopulationAnalysisPage(
+          loadColonies: () async => [datedColony],
+          loadRecords: (_) async => [
+            observation(90, 20),
+            observation(89, 30),
+            observation(30, 40),
+            observation(29, 50),
+            observation(7, 60),
+            observation(6, 70),
+            observation(0, 80),
+          ],
+          loadFeederRecords: (_) async => [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('analysis-subject')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('蚁群 · 时间筛选群').last);
+    await tester.pumpAndSettle();
+    expect(find.text('工蚁 · 最近 80 只 · 8 个时间点'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    Future<void> choose(String label) async {
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('analysis-time-range')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('analysis-time-range')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label).last);
+      await tester.pumpAndSettle();
+    }
+
+    await choose('近 7 天');
+    expect(tester.takeException(), isNull);
+    expect(find.text('工蚁 · 最近 80 只 · 2 个时间点'), findsOneWidget);
+    expect(find.text('较首次数量 +10 只'), findsOneWidget);
+    await tester.tap(find.text('数量记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('70 只'), findsOneWidget);
+    expect(find.text('60 只'), findsNothing);
+
+    await choose('近 30 天');
+    expect(tester.takeException(), isNull);
+    expect(find.text('工蚁 · 最近 80 只 · 4 个时间点'), findsOneWidget);
+    expect(find.text('较首次数量 +30 只'), findsOneWidget);
+
+    await choose('近 90 天');
+    expect(tester.takeException(), isNull);
+    expect(find.text('工蚁 · 最近 80 只 · 6 个时间点'), findsOneWidget);
+    expect(find.text('较首次数量 +50 只'), findsOneWidget);
+
+    await choose('全部时间');
+    expect(tester.takeException(), isNull);
+    expect(find.text('工蚁 · 最近 80 只 · 8 个时间点'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('analysis-time-range')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自定义日期').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(DateRangePickerDialog), findsOneWidget);
+    Navigator.of(tester.element(find.byType(DateRangePickerDialog))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('工蚁 · 最近 80 只 · 8 个时间点'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty selected period keeps the time selector available', (
+    tester,
+  ) async {
+    final old = DateTime.now().subtract(const Duration(days: 100));
+    final oldColony = Colony(
+      id: 'old',
+      name: '旧记录群',
+      createdAt: old,
+      updatedAt: old,
+      initialWorkerCount: 10,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PopulationAnalysisPage(
+          loadColonies: () async => [oldColony],
+          loadRecords: (_) async => [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('analysis-subject')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('蚁群 · 旧记录群').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('analysis-time-range')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('analysis-time-range')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('近 7 天').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('所选时间范围内暂无有效数量记录'), findsOneWidget);
+    expect(find.byKey(const ValueKey('analysis-time-range')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'forecast defaults off, changes horizon and never changes history statistics',
