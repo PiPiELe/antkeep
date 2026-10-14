@@ -108,8 +108,8 @@ class _HusbandryDurationState extends State<HusbandryDuration>
         final unitStyle = theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         );
-        // Reserve the same space for one-, two- and three-digit durations so
-        // FittedBox applies the same scale to every card in the list.
+        // Reserve width for three digits and compress only horizontally so
+        // shorter durations retain the same large numeral height.
         final reference = TextPainter(
           text: TextSpan(
             style: unitStyle,
@@ -137,22 +137,28 @@ class _HusbandryDurationState extends State<HusbandryDuration>
               ),
             ),
             const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: referenceSize.width,
+            LayoutBuilder(
+              builder: (context, constraints) => SizedBox(
+                width: math.min(constraints.maxWidth, referenceSize.width),
                 height: referenceSize.height,
-                child: Align(
+                child: FittedBox(
+                  fit: BoxFit.fill,
                   alignment: Alignment.centerRight,
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: '$days', style: numberStyle),
-                        const TextSpan(text: ' 天'),
-                      ],
+                  child: SizedBox(
+                    width: referenceSize.width,
+                    height: referenceSize.height,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: '$days', style: numberStyle),
+                            const TextSpan(text: ' 天'),
+                          ],
+                        ),
+                        style: unitStyle,
+                      ),
                     ),
-                    style: unitStyle,
                   ),
                 ),
               ),

@@ -1240,6 +1240,7 @@ void main() {
           heights.add(tester.getRect(number).height);
         }
         expect(heights[0], closeTo(heights[1], 1));
+        expect(heights, everyElement(greaterThan(58)));
         expect(tester.takeException(), isNull);
       },
     );
