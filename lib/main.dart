@@ -3195,31 +3195,18 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                         ),
                     ],
                   ),
-                  onTap: colony.archived
-                      ? null
-                      : () async {
-                          final saved = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute(
-                              builder: (_) => MilestoneFormPage(
-                                colony: colony,
-                                milestone: milestone,
-                              ),
-                            ),
-                          );
-                          if (saved == true && mounted) setState(_reload);
-                        },
-                  trailing: IconButton(
-                    tooltip: '分享里程碑',
-                    icon: const Icon(Icons.share_outlined),
-                    onPressed: () => Navigator.of(context).push(
+                  onTap: () async {
+                    await Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => MilestoneSharePage(
                           colony: colony,
                           milestone: milestone,
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                    if (mounted) setState(_reload);
+                  },
+                  trailing: const Icon(Icons.chevron_right),
                 ),
               ),
           ],
@@ -3831,6 +3818,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   var _addQueenMemorial = false;
   var _addWorkerMemorial = false;
   var _addMilestone = false;
+  var _milestoneArtwork = MilestoneArtwork.harvest;
   var _type = CareRecordType.observation;
   FeedingResponse? _feedingResponse;
   bool? _feedingLeftovers;
@@ -4036,6 +4024,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
                     note: _textOrNull(_note.text),
                     occurredAt: _occurredAt,
                     createdAt: record.createdAt,
+                    artwork: _milestoneArtwork,
                   )
                 : null,
           );
@@ -4398,15 +4387,50 @@ class _RecordFormPageState extends State<RecordFormPage> {
                         if (_addMilestone)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                            child: TextField(
-                              controller: _milestoneTitle,
-                              maxLength: 80,
-                              decoration: const InputDecoration(
-                                labelText: '里程碑标题',
-                                hintText: '例如：首批工蚁羽化',
-                                helperText: '日期与备注同步保存，之后可单独编辑',
-                                helperMaxLines: 2,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  controller: _milestoneTitle,
+                                  maxLength: 80,
+                                  decoration: const InputDecoration(
+                                    labelText: '里程碑标题',
+                                    hintText: '例如：首批工蚁羽化',
+                                    helperText: '日期与备注同步保存，之后可单独编辑',
+                                    helperMaxLines: 2,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '选择石刻画面',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 8),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      for (final artwork
+                                          in MilestoneArtwork.values) ...[
+                                        ChoiceChip(
+                                          label: Text(artwork.label),
+                                          selected:
+                                              _milestoneArtwork == artwork,
+                                          onSelected: _saving
+                                              ? null
+                                              : (_) => setState(
+                                                  () => _milestoneArtwork =
+                                                      artwork,
+                                                ),
+                                        ),
+                                        if (artwork !=
+                                            MilestoneArtwork.values.last)
+                                          const SizedBox(width: 8),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],

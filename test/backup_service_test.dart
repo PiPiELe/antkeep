@@ -215,6 +215,7 @@ void main() {
         title: '首批工蚁羽化',
         occurredAt: date,
         createdAt: date,
+        artwork: MilestoneArtwork.battle,
       ),
     );
     await database.saveMilestone(
@@ -223,6 +224,7 @@ void main() {
         title: '独立里程碑',
         occurredAt: date,
         createdAt: date,
+        artwork: MilestoneArtwork.brood,
       ),
     );
     final bytes = await service.createBackupBytes();
@@ -231,14 +233,39 @@ void main() {
     await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
     expect((await database.listMilestones('c')).single.title, '首批工蚁羽化');
     expect(
+      (await database.listMilestones('c')).single.artwork,
+      MilestoneArtwork.battle,
+    );
+    expect(
       (await database.listAllMilestones())
           .singleWhere((item) => item.milestone.id == 'independent')
-          .milestone.colonyId,
+          .milestone
+          .colonyId,
       isNull,
+    );
+    expect(
+      (await database.listAllMilestones())
+          .singleWhere((item) => item.milestone.id == 'independent')
+          .milestone
+          .artwork,
+      MilestoneArtwork.brood,
     );
     await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
     expect(await database.listMilestones('c'), hasLength(1));
     expect(await database.listAllMilestones(), hasLength(2));
+
+    final legacy = await database.snapshot();
+    legacy['milestones'] = (legacy['milestones']! as List<dynamic>)
+        .map((row) => Map<String, Object?>.from(row as Map)..remove('artwork'))
+        .toList();
+    await service.restoreBytes(
+      archiveBytes(legacy, version: 10),
+      mode: BackupRestoreMode.overwrite,
+    );
+    expect(
+      (await database.listMilestones('c')).single.artwork,
+      MilestoneArtwork.harvest,
+    );
 
     final old = await database.snapshot()
       ..remove('milestones');
