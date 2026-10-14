@@ -352,7 +352,7 @@ void main() {
     await tester.tap(choice);
     await save(tester);
     expect(find.text('飞升英灵殿'), findsOneWidget);
-    expect(find.text('蚁后死亡'), findsWidgets);
+    expect(find.text('蚁后驾崩'), findsWidgets);
     expect(find.widgetWithText(TextFormField, '纪念名称 *'), findsOneWidget);
     await tester.tap(find.text('保存纪念'));
     await settle(tester);

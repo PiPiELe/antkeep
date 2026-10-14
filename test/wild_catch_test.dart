@@ -6,6 +6,7 @@ import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/data/backup_logic.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/wild_catch_record.dart';
+import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/live_wild_catch_page.dart';
 import 'package:antkeep/wild_catch_page.dart';
 import 'package:flutter/material.dart';
@@ -114,6 +115,163 @@ void main() {
           },
         ];
       expect(() => BackupData.validate(invalid), throwsFormatException);
+    },
+  );
+
+  test(
+    'converted and linked results survive backup with wild catch tags',
+    () async {
+      final record = WildCatchRecord(
+        id: 'catch-linked',
+        caughtAt: now,
+        place: '山脚',
+        species: const [
+          WildCatchSpecies(
+            name: '弓背蚁',
+            colonies: [
+              WildCatchColony(queenCount: 1, workerCount: 3),
+              WildCatchColony(queenCount: 2),
+            ],
+          ),
+        ],
+        createdAt: now,
+      );
+      final converted = Colony(
+        id: 'converted',
+        name: '山脚弓背蚁',
+        species: '弓背蚁',
+        acquiredOn: now,
+        source: '野采（山脚）',
+        queenCount: 1,
+        initialWorkerCount: 3,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final existing = Colony(
+        id: 'existing',
+        name: '已有蚁群',
+        source: '蚁友赠送',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await db.saveWildCatchRecord(record);
+      await db.saveColony(existing);
+      await db.linkWildCatchColony(
+        recordId: record.id,
+        speciesIndex: 0,
+        colonyIndex: 0,
+        colonyId: converted.id,
+        newColony: converted,
+      );
+      await db.linkWildCatchColony(
+        recordId: record.id,
+        speciesIndex: 0,
+        colonyIndex: 1,
+        colonyId: existing.id,
+      );
+      expect((await db.findColony(converted.id))!.isWildCatch, isTrue);
+      expect((await db.findColony(existing.id))!.isWildCatch, isTrue);
+      expect((await db.findColony(existing.id))!.source, '蚁友赠送');
+      final snapshot = await db.snapshot();
+      BackupData.validate(snapshot);
+      await db.replaceAll(snapshot);
+      expect(
+        (await db.listWildCatchRecords()).single.species.single.colonies.map(
+          (result) => result.colonyId,
+        ),
+        [converted.id, existing.id],
+      );
+      expect((await db.findColony(existing.id))!.isWildCatch, isTrue);
+      await expectLater(
+        db.linkWildCatchColony(
+          recordId: record.id,
+          speciesIndex: 0,
+          colonyIndex: 0,
+          colonyId: existing.id,
+        ),
+        throwsStateError,
+      );
+      await db.deleteColony(existing.id);
+      final afterDeletion = (await db.listWildCatchRecords()).single;
+      expect(
+        afterDeletion.species.single.colonies.first.colonyId,
+        converted.id,
+      );
+      expect(afterDeletion.species.single.colonies.last.colonyId, isNull);
+    },
+  );
+
+  testWidgets(
+    'wild catch results can be converted or linked from the summary',
+    (tester) async {
+      final record = WildCatchRecord(
+        id: 'catch-ui',
+        caughtAt: now,
+        place: '河边',
+        species: const [
+          WildCatchSpecies(
+            name: '收获蚁',
+            colonies: [
+              WildCatchColony(queenCount: 1, workerCount: 4),
+              WildCatchColony(queenCount: 2),
+            ],
+          ),
+        ],
+        createdAt: now,
+      );
+      await tester.runAsync(() async {
+        await db.saveWildCatchRecord(record);
+        await db.saveColony(
+          Colony(
+            id: 'existing-ui',
+            name: '已有蚁群',
+            source: '蚁友赠送',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      });
+      await tester.pumpWidget(
+        MaterialApp(home: WildCatchResultsPage(record: record)),
+      );
+      await tester.tap(find.byTooltip('关联蚁群').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('转换为新蚁群'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('创建蚁群'));
+      await _settleDatabase(tester);
+      final linked = (await tester.runAsync(db.listWildCatchRecords))!
+          .single
+          .species
+          .single
+          .colonies
+          .first
+          .colonyId;
+      expect(linked, isNotNull);
+      final colony = await tester.runAsync(() => db.findColony(linked!));
+      expect(colony!.species, '收获蚁');
+      expect(colony.queenCount, 1);
+      expect(colony.initialWorkerCount, 4);
+      expect(colony.isWildCatch, isTrue);
+      expect(find.textContaining('已关联蚁群'), findsOneWidget);
+      await tester.tap(find.byTooltip('关联蚁群'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('关联已有蚁群'));
+      await _settleDatabase(tester);
+      await tester.tap(find.text('已有蚁群'));
+      await _settleDatabase(tester);
+      final results = (await tester.runAsync(db.listWildCatchRecords))!
+          .single
+          .species
+          .single
+          .colonies;
+      expect(results.last.colonyId, 'existing-ui');
+      final existing = await tester.runAsync(
+        () => db.findColony('existing-ui'),
+      );
+      expect(existing!.source, '蚁友赠送');
+      expect(existing.isWildCatch, isTrue);
+      expect(find.textContaining('已关联蚁群'), findsNWidgets(2));
     },
   );
 
@@ -228,7 +386,7 @@ void main() {
 
       await tester.tap(find.text('记战果'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, '蚁种名称 *'), '弓背蚁');
+      await tester.enterText(find.widgetWithText(TextField, '蚁种名称（可选）'), '弓背蚁');
       await tester.enterText(find.widgetWithText(TextField, '蚁后数量（可选）'), '1');
       await tester.tap(find.text('记录').last);
       await _settleDatabase(tester);
@@ -304,6 +462,56 @@ void main() {
       expect(revised.events.last.action, '修订');
     },
   );
+
+  testWidgets('live catch can save without species or select one', (
+    tester,
+  ) async {
+    final started = DateTime.now().subtract(const Duration(minutes: 1));
+    final record = WildCatchRecord(
+      id: 'optional-species',
+      caughtAt: started,
+      place: '溪边',
+      species: const [],
+      startedAt: started,
+      createdAt: started,
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: LiveWildCatchPage(initialRecord: record)),
+    );
+
+    await tester.tap(find.text('记战果'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('记录').last);
+    await _settleDatabase(tester);
+    var saved = (await tester.runAsync(db.listWildCatchRecords))!.single;
+    expect(saved.species.single.name, isEmpty);
+    expect(saved.species.single.displayName, '未填写品种');
+    expect(WildCatchRecord.fromMap(saved.toMap()).species.single.name, isEmpty);
+    expect(find.text('未填写品种'), findsOneWidget);
+
+    await tester.tap(find.text('记战果'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('从品种库选择'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('弓背蚁').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '尼科巴弓背蚁');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('尼科巴弓背蚁').last);
+    await tester.pumpAndSettle();
+    expect(find.text('尼科巴弓背蚁'), findsOneWidget);
+    await tester.tap(find.text('记录').last);
+    await _settleDatabase(tester);
+    saved = (await tester.runAsync(db.listWildCatchRecords))!.single;
+    expect(saved.species.map((entry) => entry.name), ['', '尼科巴弓背蚁']);
+    expect(find.text('尼科巴弓背蚁'), findsOneWidget);
+    expect(find.text('采获 1 群'), findsNWidgets(2));
+    expect(
+      tester.getTopLeft(find.text('尼科巴弓背蚁')).dx,
+      greaterThan(tester.getTopRight(find.text('战果').first).dx),
+    );
+    expect(find.textContaining('采获 尼科巴弓背蚁'), findsNothing);
+  });
 
   testWidgets('live photo can be removed from preview after confirmation', (
     tester,

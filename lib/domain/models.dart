@@ -12,6 +12,7 @@ class Colony {
     this.species,
     this.acquiredOn,
     this.source,
+    this.wildCatchLinked = false,
     this.purchasePriceCents,
     this.queenCount,
     this.specializedCount,
@@ -36,6 +37,10 @@ class Colony {
   final String? species;
   final DateTime? acquiredOn;
   final String? source;
+  final bool wildCatchLinked;
+  bool get isWildCatch =>
+      wildCatchLinked ||
+      RegExp(r'^野采(?:$|[（(\s])').hasMatch(source?.trim() ?? '');
   final int? purchasePriceCents;
 
   String? get purchasePriceText => formatPurchasePrice(purchasePriceCents);
@@ -113,12 +118,16 @@ class Colony {
     return remaining;
   }
 
-  factory Colony.fromMap(Map<String, Object?> map) => Colony(
+  factory Colony.fromMap(
+    Map<String, Object?> map, {
+    bool wildCatchLinked = false,
+  }) => Colony(
     id: map['id']! as String,
     name: map['name']! as String,
     species: map['species'] as String?,
     acquiredOn: _dateOrNull(map['acquired_on']),
     source: map['source'] as String?,
+    wildCatchLinked: wildCatchLinked,
     purchasePriceCents: map['purchase_price_cents'] as int?,
     queenCount: map['queen_count'] as int?,
     specializedCount: map['specialized_count'] as int?,

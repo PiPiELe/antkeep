@@ -11,7 +11,9 @@ import 'data/local_media_store.dart';
 import 'data/media_cleanup.dart';
 import 'date_display.dart';
 import 'domain/wild_catch_record.dart';
+import 'domain/models.dart';
 import 'widgets/photo_source_picker.dart';
+import 'widgets/species_picker.dart';
 
 String wildCatchExactTime(DateTime time) {
   String two(int value) => value.toString().padLeft(2, '0');
@@ -374,34 +376,71 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
       final result = await showDialog<WildCatchSpecies>(
         context: context,
         builder: (context) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           title: const Text('记录采获蚁群'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: species,
-                  maxLength: 100,
-                  decoration: const InputDecoration(labelText: '蚁种名称 *'),
-                ),
-                TextField(
-                  controller: queens,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(labelText: '蚁后数量（可选）'),
-                ),
-                TextField(
-                  controller: workers,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(labelText: '工蚁数量（可选）'),
-                ),
-                TextField(
-                  controller: note,
-                  maxLength: 300,
-                  decoration: const InputDecoration(labelText: '这群的备注（可选）'),
-                ),
-              ],
+          content: SizedBox(
+            width: 360,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: species,
+                    maxLength: 100,
+                    decoration: const InputDecoration(
+                      labelText: '蚁种名称（可选）',
+                      hintText: '可手动填写',
+                      border: OutlineInputBorder(),
+                      counterText: '',
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        final selected = await pickSpecies(context);
+                        if (selected != null) species.text = selected;
+                      },
+                      icon: const Icon(Icons.search, size: 18),
+                      label: const Text('从品种库选择'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: queens,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: '蚁后数量（可选）',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: workers,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: '工蚁数量（可选）',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: note,
+                    maxLength: 300,
+                    decoration: const InputDecoration(
+                      labelText: '这群的备注（可选）',
+                      border: OutlineInputBorder(),
+                      counterText: '',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -452,7 +491,7 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
             at: DateTime.now(),
             action: '战果',
             detail:
-                '采获 ${result.name} 1 群 · ${_colonyLabel(result.colonies.single)}',
+                '采获 ${result.displayName} 1 群 · ${_colonyLabel(result.colonies.single)}',
           ),
         ),
       );
@@ -485,7 +524,7 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
         event: WildCatchEvent(
           at: DateTime.now(),
           action: '战果',
-          detail: '移除 ${selected.name} 第 ${colonyIndex + 1} 群',
+          detail: '移除 ${selected.displayName} 第 ${colonyIndex + 1} 群',
         ),
       ),
     );
@@ -588,6 +627,8 @@ class _LiveWildCatchPageState extends State<LiveWildCatchPage> {
                       builder: (_) => WildCatchResultsPage(
                         record: _record,
                         onRemove: _removeColony,
+                        onLinked: (updated) =>
+                            setState(() => _record = updated),
                       ),
                     ),
                   ),
@@ -638,6 +679,7 @@ class WildCatchEndPage extends StatelessWidget {
           ),
           child: const Text('查看本次野采数据'),
         ),
+        const SizedBox(height: 12),
         OutlinedButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('返回野采列表'),
@@ -703,7 +745,7 @@ class _WildCatchSummary extends StatelessWidget {
               Text('历时：${_elapsed(record.startedAt!, record.endedAt!)}'),
             const SizedBox(height: 8),
             Text(
-              '${record.species.length} 种 · $colonyCount 群 · ${record.photos.length} 张照片 · ${record.events.length} 条事件',
+              '${record.species.where((entry) => entry.name.isNotEmpty).length} 种 · $colonyCount 群 · ${record.photos.length} 张照片 · ${record.events.length} 条事件',
             ),
           ],
         ),
@@ -713,10 +755,16 @@ class _WildCatchSummary extends StatelessWidget {
 }
 
 class WildCatchResultsPage extends StatefulWidget {
-  const WildCatchResultsPage({super.key, required this.record, this.onRemove});
+  const WildCatchResultsPage({
+    super.key,
+    required this.record,
+    this.onRemove,
+    this.onLinked,
+  });
   final WildCatchRecord record;
   final Future<WildCatchRecord> Function(int speciesIndex, int colonyIndex)?
   onRemove;
+  final ValueChanged<WildCatchRecord>? onLinked;
 
   @override
   State<WildCatchResultsPage> createState() => _WildCatchResultsPageState();
@@ -724,6 +772,107 @@ class WildCatchResultsPage extends StatefulWidget {
 
 class _WildCatchResultsPageState extends State<WildCatchResultsPage> {
   late WildCatchRecord _record = widget.record;
+  bool _busy = false;
+
+  Future<void> _link(int speciesIndex, int colonyIndex, bool create) async {
+    final species = _record.species[speciesIndex];
+    final result = species.colonies[colonyIndex];
+    Colony? newColony;
+    String? colonyId;
+    if (create) {
+      final suggestedName = species.name.isEmpty
+          ? '野采蚁群 ${colonyIndex + 1}'
+          : '${species.name} ${colonyIndex + 1} 群';
+      var colonyName = suggestedName.length > 40
+          ? suggestedName.substring(0, 40)
+          : suggestedName;
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('转换为蚁群'),
+          content: TextFormField(
+            initialValue: colonyName,
+            onChanged: (value) => colonyName = value,
+            autofocus: true,
+            maxLength: 40,
+            decoration: const InputDecoration(labelText: '蚁群名称'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = colonyName.trim();
+                if (name.isNotEmpty) Navigator.pop(context, name);
+              },
+              child: const Text('创建蚁群'),
+            ),
+          ],
+        ),
+      );
+      if (name == null) return;
+      final now = DateTime.now();
+      colonyId = const Uuid().v4();
+      newColony = Colony(
+        id: colonyId,
+        name: name,
+        species: species.name.isEmpty ? null : species.name,
+        acquiredOn: _record.caughtAt,
+        source: '野采（${_record.place}）',
+        queenCount: result.queenCount,
+        initialWorkerCount: result.workerCount,
+        createdAt: now,
+        updatedAt: now,
+      );
+    } else {
+      final colonies = await AppDatabase.instance.listColonies();
+      if (!mounted) return;
+      if (colonies.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('还没有可关联的蚁群')));
+        return;
+      }
+      final selected = await showDialog<Colony>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('关联已有蚁群'),
+          children: [
+            for (final colony in colonies)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, colony),
+                child: Text(colony.name),
+              ),
+          ],
+        ),
+      );
+      if (selected == null) return;
+      colonyId = selected.id;
+    }
+    if (!mounted) return;
+    setState(() => _busy = true);
+    try {
+      final updated = await AppDatabase.instance.linkWildCatchColony(
+        recordId: _record.id,
+        speciesIndex: speciesIndex,
+        colonyIndex: colonyIndex,
+        colonyId: colonyId,
+        newColony: newColony,
+      );
+      if (mounted) {
+        setState(() => _record = updated);
+        widget.onLinked?.call(updated);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('关联失败：$error')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -744,7 +893,7 @@ class _WildCatchResultsPageState extends State<WildCatchResultsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${_record.species[speciesIndex].name} · ${_record.species[speciesIndex].colonies.length} 群',
+                    '${_record.species[speciesIndex].displayName} · ${_record.species[speciesIndex].colonies.length} 群',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   for (
@@ -755,23 +904,60 @@ class _WildCatchResultsPageState extends State<WildCatchResultsPage> {
                     ListTile(
                       title: Text('第 ${colonyIndex + 1} 群'),
                       subtitle: Text(
-                        _colonyLabel(
-                          _record.species[speciesIndex].colonies[colonyIndex],
-                        ),
+                        [
+                          _colonyLabel(
+                            _record.species[speciesIndex].colonies[colonyIndex],
+                          ),
+                          if (_record
+                                  .species[speciesIndex]
+                                  .colonies[colonyIndex]
+                                  .colonyId !=
+                              null)
+                            '已关联蚁群',
+                        ].where((part) => part.isNotEmpty).join(' · '),
                       ),
-                      trailing: widget.onRemove == null
-                          ? null
-                          : IconButton(
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_record
+                                  .species[speciesIndex]
+                                  .colonies[colonyIndex]
+                                  .colonyId ==
+                              null)
+                            PopupMenuButton<bool>(
+                              tooltip: '关联蚁群',
+                              enabled: !_busy,
+                              onSelected: (create) =>
+                                  _link(speciesIndex, colonyIndex, create),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: true,
+                                  child: Text('转换为新蚁群'),
+                                ),
+                                PopupMenuItem(
+                                  value: false,
+                                  child: Text('关联已有蚁群'),
+                                ),
+                              ],
+                            ),
+                          if (widget.onRemove != null)
+                            IconButton(
                               tooltip: '移除采获蚁群',
                               icon: const Icon(Icons.close),
-                              onPressed: () async {
-                                final updated = await widget.onRemove!(
-                                  speciesIndex,
-                                  colonyIndex,
-                                );
-                                if (mounted) setState(() => _record = updated);
-                              },
+                              onPressed: _busy
+                                  ? null
+                                  : () async {
+                                      final updated = await widget.onRemove!(
+                                        speciesIndex,
+                                        colonyIndex,
+                                      );
+                                      if (mounted) {
+                                        setState(() => _record = updated);
+                                      }
+                                    },
                             ),
+                        ],
+                      ),
                     ),
                 ],
               ),
@@ -869,18 +1055,63 @@ class _WildCatchTimelineState extends State<_WildCatchTimeline> {
         final visiblePhotos = event.photoPaths
             .where(widget.record.photos.contains)
             .toList();
+        final catchResult = event.action == '战果'
+            ? RegExp(r'^采获 (.+) 1 群 · (.*)$').firstMatch(event.detail)
+            : null;
+        final speciesName = catchResult?.group(1);
+        final resultDetails = catchResult?.group(2);
+        final detail = resultDetails == null
+            ? event.detail
+            : '采获 1 群${resultDetails.isEmpty ? '' : ' · $resultDetails'}';
         final description = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(event.action, style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.action,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                if (speciesName != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          speciesName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
             Text(
               wildCatchExactTime(event.at),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (event.detail.isNotEmpty)
+            if (detail.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(event.detail),
+                child: Text(detail),
               ),
           ],
         );

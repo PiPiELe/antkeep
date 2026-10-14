@@ -63,6 +63,7 @@ void main() {
     'nest_entries': [],
     'winter_cycles': [],
     'flight_observations': [],
+    'wild_catch_records': [],
   };
   final records = tables['feeder_records']!;
   late Directory directory;

@@ -54,121 +54,10 @@ import 'domain/population_analysis.dart';
 import 'domain/purchase_price.dart';
 import 'domain/beginner_care_notice.dart';
 import 'domain/species_profile.dart';
-import 'domain/imported_species_catalog.dart';
+import 'widgets/species_picker.dart';
 import 'widgets/diary_record_actions.dart';
 import 'widgets/justified_label.dart';
 import 'widgets/photo_source_picker.dart';
-
-const _builtInSpeciesOptions = <String, List<String>>{
-  '收获蚁': [
-    '工匠收获蚁',
-    '野蛮收获蚁（原生收获蚁）',
-    '红胸收获蚁',
-    '大头收获蚁',
-    '强壮收获蚁',
-    '针毛收获蚁',
-    '无颚齿收获蚁',
-    '勤劳收获蚁',
-    '白刺收获蚁',
-    '东方收获蚁',
-    '巨首收获蚁（肯尼亚收获蚁）',
-    '希伯来收获蚁',
-  ],
-  '弓背蚁': [
-    '费氏弓背蚁',
-    '大头弓背蚁',
-    '尼科巴弓背蚁',
-    '巴瑞弓背蚁',
-    '拟光腹弓背蚁',
-    '全黄土耳其弓背蚁',
-    '日本弓背蚁',
-    '广布弓背蚁',
-    '窄颈弓背蚁（窄径）',
-    '红头弓背蚁',
-    '沃斯曼弓背蚁',
-    '神圣弓背蚁',
-    '统领弓背蚁（统领蚁）',
-    '白纵斑弓背蚁（白纵斑蚁）',
-  ],
-  '猛蚁': [
-    '横纹猛蚁',
-    '横纹齿猛蚁',
-    '聚纹双刺猛蚁',
-    '大齿猛蚁',
-    '扁头猛蚁',
-    '红足穴猛蚁',
-    '山大齿猛蚁',
-    '双色曲颊猛蚁',
-    '中华细猛蚁',
-    '条纹细猛蚁',
-    '金属皱突蚁（金属蚁）',
-  ],
-  '蜜罐蚁': ['墨西哥蜜罐蚁', '大平眼蜜罐蚁'],
-  '孔蚁': ['巨人孔蚁'],
-  '子弹蚁': ['子弹蚁'],
-  '铺道蚁': ['双隆骨铺道蚁', '草地铺道蚁'],
-  '多刺蚁': ['拟弓多刺蚁', '拟黑多刺蚁', '双齿多刺蚁', '梅氏多刺蚁'],
-  '大头蚁': ['中华大头蚁', '皮氏大头蚁', '伊大头蚁', '宽结大头蚁', '史氏大头蚁'],
-  '毛蚁': ['玉米毛蚁', '黑毛蚁', '黄墩蚁', '亮毛蚁'],
-  '细长蚁': ['红黑细长蚁', '黑细长蚁', '宾氏细长蚁'],
-  '巨首蚁': ['全异巨首蚁', '近缘巨首蚁'],
-  '虹臭蚁': ['扁平虹臭蚁', '紫彩虹臭蚁'],
-  '盾胸切叶蚁': ['二色盾胸切叶蚁'],
-  '原蚁': ['蒙古原蚁'],
-  '举腹蚁': ['大阪举腹蚁', '黑褐举腹蚁'],
-  '林蚁': ['日本黑褐蚁', '丝光蚁', '红须蚁'],
-  '织叶蚁': ['黄猄蚁'],
-  '须蚁': ['红胡须蚁（巴巴特斯）'],
-  '箭蚁': ['银丝箭蚁（银丝蚁）'],
-};
-
-// Retain recognition of saved names and common input variants without duplicate
-// picker entries. Existing colony records are not rewritten.
-const _builtInSpeciesAliases = <String, String>{
-  '全黄弓背蚁': '全黄土耳其弓背蚁',
-  '无恶齿收获蚁': '无颚齿收获蚁',
-  '铺道蚁': '草地铺道蚁',
-  '全蚁巨首蚁': '全异巨首蚁',
-  '拟广腹弓背蚁': '拟光腹弓背蚁',
-  '费氏弓背蚁（黑金弓背蚁）': '费氏弓背蚁',
-  '费事弓背蚁': '费氏弓背蚁',
-  '黑金弓背蚁': '费氏弓背蚁',
-  '野蛮收获蚁': '野蛮收获蚁（原生收获蚁）',
-  '原生收获蚁': '野蛮收获蚁（原生收获蚁）',
-  '巨首收获蚁': '巨首收获蚁（肯尼亚收获蚁）',
-  '肯尼亚收获蚁': '巨首收获蚁（肯尼亚收获蚁）',
-  '希伯来': '希伯来收获蚁',
-  '统领弓背蚁': '统领弓背蚁（统领蚁）',
-  '统领蚁': '统领弓背蚁（统领蚁）',
-  '白纵斑弓背蚁': '白纵斑弓背蚁（白纵斑蚁）',
-  '白纵斑蚁': '白纵斑弓背蚁（白纵斑蚁）',
-  '金属皱突蚁': '金属皱突蚁（金属蚁）',
-  '金属皱猛蚁': '金属皱突蚁（金属蚁）',
-  '金属蚁': '金属皱突蚁（金属蚁）',
-  '红胡须蚁': '红胡须蚁（巴巴特斯）',
-  '巴巴特斯': '红胡须蚁（巴巴特斯）',
-  '巴巴斯特': '红胡须蚁（巴巴特斯）',
-  '银丝箭蚁': '银丝箭蚁（银丝蚁）',
-  '银丝蚁': '银丝箭蚁（银丝蚁）',
-  '紫菜蚁': '紫彩虹臭蚁',
-  '紫菜虹臭蚁': '紫彩虹臭蚁',
-};
-
-final _speciesOptions = <String, List<String>>{
-  for (final category in {
-    ..._builtInSpeciesOptions.keys,
-    ...importedSpeciesOptions.keys,
-  })
-    category: [
-      ...?_builtInSpeciesOptions[category],
-      ...?importedSpeciesOptions[category],
-    ],
-};
-
-final _speciesAliases = <String, String>{
-  ...importedSpeciesAliases,
-  ..._builtInSpeciesAliases,
-};
 
 const _nestTypeOptions = [
   '试管巢',
@@ -1028,6 +917,7 @@ class _ColonyCard extends StatelessWidget {
       colony.nestType,
     ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
     final hasTags =
+        colony.isWildCatch ||
         colony.isNewQueenColony ||
         workers != null ||
         colony.nestType?.isNotEmpty == true;
@@ -1331,6 +1221,13 @@ class _ColonyTags extends StatelessWidget {
     final tags = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (colony.isWildCatch) ...[
+          badge('野采', scheme.tertiary),
+          if (colony.isNewQueenColony ||
+              scale != null ||
+              colony.nestType?.isNotEmpty == true)
+            const SizedBox(width: 8),
+        ],
         if (colony.isNewQueenColony) badge('新后群', scheme.primary, crown: true),
         if (colony.isNewQueenColony &&
             (scale != null || colony.nestType?.isNotEmpty == true))
@@ -1497,9 +1394,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     _targetHumidityLower.text = colony.targetHumidityLower?.toString() ?? '';
     _targetHumidity.text = colony.targetHumidity?.toString() ?? '';
     _selectedSpecies = colony.species;
-    for (final entry in _speciesOptions.entries) {
+    for (final entry in speciesOptions.entries) {
       if (entry.value.contains(
-        _speciesAliases[colony.species] ?? colony.species,
+        speciesAliases[colony.species] ?? colony.species,
       )) {
         _speciesFamily = entry.key;
         break;
@@ -1646,8 +1543,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     setState(() {
       _selectedSpecies = species;
       _speciesFamily = null;
-      for (final entry in _speciesOptions.entries) {
-        if (entry.value.contains(_speciesAliases[species] ?? species)) {
+      for (final entry in speciesOptions.entries) {
+        if (entry.value.contains(speciesAliases[species] ?? species)) {
           _speciesFamily = entry.key;
           break;
         }
@@ -1659,7 +1556,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   String _speciesNickname(String species) {
     final displayName = species.contains('（')
         ? species
-        : _speciesAliases[species] ?? species;
+        : speciesAliases[species] ?? species;
     final match = RegExp(r'（([^（）]+)）').firstMatch(displayName);
     if (match == null) return displayName;
 
@@ -1690,9 +1587,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           context: context,
           isScrollControlled: true,
           showDragHandle: true,
-          builder: (_) => _ChoicePickerSheet(
+          builder: (_) => ChoicePickerSheet(
             title: '细分品种',
-            options: _speciesOptions[family] ?? const [],
+            options: speciesOptions[family] ?? const [],
           ),
         );
     if (species != null && mounted) _selectSpecies(species.value);
@@ -1703,7 +1600,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     // Keep the keeper's saved common name when editing an existing record.
     final currentName = selectedName.contains('（')
         ? selectedName
-        : _speciesAliases[selectedName] ?? selectedName;
+        : speciesAliases[selectedName] ?? selectedName;
     final names = RegExp(r'^(.*?)（([^（）]+)）$').firstMatch(currentName);
     var speciesName = names?.group(1) ?? currentName;
     var commonName =
@@ -1829,9 +1726,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 label: '品种分类/细分种类',
                 hintText: '点击选择或搜索品种',
                 value: [?_speciesFamily, ?_selectedSpecies].join(' / '),
-                options: _speciesOptions.keys.toList(),
+                options: speciesOptions.keys.toList(),
                 searchOptions: {
-                  for (final entry in _speciesOptions.entries)
+                  for (final entry in speciesOptions.entries)
                     for (final species in entry.value) species: entry.key,
                 },
                 onSelected: _selectFamily,
@@ -2331,7 +2228,7 @@ class _SearchableChoiceField extends StatelessWidget {
           context: context,
           isScrollControlled: true,
           showDragHandle: true,
-          builder: (_) => _ChoicePickerSheet(
+          builder: (_) => ChoicePickerSheet(
             title: label,
             options: options,
             searchOptions: searchOptions,
@@ -2357,117 +2254,6 @@ class _SearchableChoiceField extends StatelessWidget {
       suffixIcon: const Icon(Icons.search),
     ),
   );
-}
-
-class _ChoicePickerSheet extends StatefulWidget {
-  const _ChoicePickerSheet({
-    required this.title,
-    required this.options,
-    this.searchOptions = const {},
-  });
-  final String title;
-  final List<String> options;
-  final Map<String, String> searchOptions;
-
-  @override
-  State<_ChoicePickerSheet> createState() => _ChoicePickerSheetState();
-}
-
-class _ChoicePickerSheetState extends State<_ChoicePickerSheet> {
-  final _query = TextEditingController();
-
-  @override
-  void dispose() {
-    _query.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final normalizedQuery = _query.text.trim().toLowerCase();
-    final options =
-        <({String value, String? category})>[
-              for (final option in widget.options)
-                (value: option, category: null),
-              if (normalizedQuery.isNotEmpty)
-                for (final entry in widget.searchOptions.entries)
-                  (value: entry.key, category: entry.value),
-            ]
-            .where(
-              (option) =>
-                  option.value.toLowerCase().contains(normalizedQuery) ||
-                  _speciesAliases.entries.any(
-                    (alias) =>
-                        alias.value == option.value &&
-                        alias.key.toLowerCase().contains(normalizedQuery),
-                  ) ||
-                  importedSpeciesSearchAliases.entries.any(
-                    (alias) =>
-                        alias.value.contains(option.value) &&
-                        alias.key.toLowerCase().contains(normalizedQuery),
-                  ),
-            )
-            .toList();
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .72,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            children: [
-              Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _query,
-                autofocus: true,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText: widget.searchOptions.isEmpty
-                      ? '输入名称搜索'
-                      : '搜索分类或细分品种',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: options.isEmpty
-                    ? const _EmptyState(
-                        icon: Icons.search_off_outlined,
-                        title: '没有匹配项',
-                        message: '换一个关键词试试。',
-                      )
-                    : ListView.separated(
-                        itemCount: options.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (context, index) => ListTile(
-                          title: Text(options[index].value),
-                          subtitle:
-                              options[index].category != null ||
-                                  importedSpeciesDisambiguation.containsKey(
-                                    options[index].value,
-                                  )
-                              ? Text(
-                                  [
-                                    ?options[index].category,
-                                    ?importedSpeciesDisambiguation[options[index]
-                                        .value],
-                                  ].join(' · '),
-                                )
-                              : null,
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => Navigator.pop(context, (
-                            value: options[index].value,
-                            isSearchResult: options[index].category != null,
-                          )),
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 Future<Colony?> _openDiarySettings(
@@ -3429,7 +3215,8 @@ class _ColonyProfileSummary extends StatelessWidget {
             ),
           );
     List<Widget> profileDetails({required bool singleLine}) => [
-      if (colony.isNewQueenColony ||
+      if (colony.isWildCatch ||
+          colony.isNewQueenColony ||
           workers != null ||
           colony.nestType?.isNotEmpty == true) ...[
         const SizedBox(height: 10),
@@ -3496,7 +3283,7 @@ class _ColonyProfileSummary extends StatelessWidget {
                     label: const Text('百科'),
                     onPressed: () {
                       final species = colony.species!.trim();
-                      final query = _speciesAliases[species] ?? species;
+                      final query = speciesAliases[species] ?? species;
                       final profile = findSpeciesProfile(query);
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(

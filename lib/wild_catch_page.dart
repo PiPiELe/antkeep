@@ -148,11 +148,11 @@ class _WildCatchPageState extends State<WildCatchPage> {
                         if (record.hasSpecificTime)
                           TimeOfDay.fromDateTime(record.caughtAt)
                               .format(context),
-                        '${record.species.length} 种 · ${record.species.fold<int>(0, (total, entry) => total + entry.colonies.length)} 群',
+                        '${record.species.where((entry) => entry.name.isNotEmpty).length} 种 · ${record.species.fold<int>(0, (total, entry) => total + entry.colonies.length)} 群',
                       ].join(' · '),
                     ),
                     for (final entry in record.species) ...[
-                      Text('${entry.name} · ${entry.colonies.length} 群'),
+                      Text('${entry.displayName} · ${entry.colonies.length} 群'),
                       for (var i = 0; i < entry.colonies.length; i++)
                         Text(
                           '  第 ${i + 1} 群：${_colonySummary(entry.colonies[i])}',
@@ -187,6 +187,21 @@ class _WildCatchPageState extends State<WildCatchPage> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (record.species.isNotEmpty)
+                      IconButton(
+                        tooltip: '管理野采战果',
+                        icon: const Icon(Icons.summarize_outlined),
+                        onPressed: () async {
+                          await Navigator.push<void>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  WildCatchResultsPage(record: record),
+                            ),
+                          );
+                          if (mounted) _refresh();
+                        },
+                      ),
                     if (record.isLive && !record.isActive)
                       IconButton(
                         tooltip: '编辑野采记录',
@@ -287,11 +302,13 @@ class _ColonyDraft {
   _ColonyDraft([WildCatchColony? colony])
     : queens = TextEditingController(text: colony?.queenCount?.toString()),
       workers = TextEditingController(text: colony?.workerCount?.toString()),
-      note = TextEditingController(text: colony?.note);
+      note = TextEditingController(text: colony?.note),
+      colonyId = colony?.colonyId;
 
   final TextEditingController queens;
   final TextEditingController workers;
   final TextEditingController note;
+  final String? colonyId;
 
   void dispose() {
     queens.dispose();
@@ -300,6 +317,7 @@ class _ColonyDraft {
   }
 
   WildCatchColony toModel() => WildCatchColony(
+    colonyId: colonyId,
     queenCount: queens.text.trim().isEmpty
         ? null
         : int.parse(queens.text.trim()),
@@ -620,12 +638,17 @@ class _WildCatchFormState extends State<_WildCatchForm> {
             TextFormField(
               controller: draft.name,
               maxLength: 100,
-              decoration: const InputDecoration(
-                labelText: '蚁种名称 *',
+              decoration: InputDecoration(
+                labelText: widget.record?.isLive == true
+                    ? '蚁种名称（可选）'
+                    : '蚁种名称 *',
                 border: OutlineInputBorder(),
               ),
               validator: (value) =>
-                  value == null || value.trim().isEmpty ? '请填写蚁种名称' : null,
+                  widget.record?.isLive == true ||
+                      (value != null && value.trim().isNotEmpty)
+                  ? null
+                  : '请填写蚁种名称',
             ),
             for (var i = 0; i < draft.colonies.length; i++)
               _colonyEditor(draft, i),

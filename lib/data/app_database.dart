@@ -514,6 +514,69 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   Future<void> deleteWildCatchRecord(String id) async =>
       _db.delete('wild_catch_records', where: 'id = ?', whereArgs: [id]);
 
+  Future<WildCatchRecord> linkWildCatchColony({
+    required String recordId,
+    required int speciesIndex,
+    required int colonyIndex,
+    required String colonyId,
+    Colony? newColony,
+  }) => _db.transaction((transaction) async {
+    final rows = await transaction.query(
+      'wild_catch_records',
+      where: 'id = ?',
+      whereArgs: [recordId],
+    );
+    if (rows.isEmpty) throw StateError('野采记录已不存在');
+    final record = WildCatchRecord.fromMap(rows.single);
+    if (speciesIndex < 0 ||
+        speciesIndex >= record.species.length ||
+        colonyIndex < 0 ||
+        colonyIndex >= record.species[speciesIndex].colonies.length) {
+      throw StateError('野采战果已变化，请重新打开');
+    }
+    final result = record.species[speciesIndex].colonies[colonyIndex];
+    if (result.colonyId != null) throw StateError('这条战果已关联蚁群');
+    if (newColony != null) {
+      if (newColony.id != colonyId) throw ArgumentError('蚁群 ID 不一致');
+      await transaction.insert('colonies', newColony.toMap());
+    } else {
+      final colonies = await transaction.query(
+        'colonies',
+        columns: ['id'],
+        where: 'id = ? AND archived = 0',
+        whereArgs: [colonyId],
+      );
+      if (colonies.isEmpty) throw StateError('所选蚁群已不存在');
+    }
+    final species = [...record.species];
+    final entry = species[speciesIndex];
+    final results = [...entry.colonies];
+    results[colonyIndex] = result.withColonyId(colonyId);
+    species[speciesIndex] = WildCatchSpecies(
+      name: entry.name,
+      colonies: results,
+    );
+    final updated = record.withLiveChange(species: species);
+    updated.validate();
+    await transaction.update(
+      'wild_catch_records',
+      updated.toMap(),
+      where: 'id = ?',
+      whereArgs: [recordId],
+    );
+    return updated;
+  });
+
+  Future<Set<String>> _wildCatchLinkedColonyIds() async {
+    final records = await listWildCatchRecords();
+    return {
+      for (final record in records)
+        for (final species in record.species)
+          for (final result in species.colonies)
+            if (result.colonyId != null) result.colonyId!,
+    };
+  }
+
   static Future<void> _seedLegacyNests(DatabaseExecutor db) async {
     final columns = await db.rawQuery('PRAGMA table_info(colonies)');
     if (!columns.any((column) => column['name'] == 'nest_type')) return;
@@ -769,18 +832,26 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   @override
   Future<List<Colony>> listColonies() async {
     await applyColonyGrowth();
+    final linked = await _wildCatchLinkedColonyIds();
     return (await _db.query(
-      'colonies',
-      where: 'archived = 0',
-      orderBy: 'CASE WHEN initial_worker_count = 0 THEN 0 ELSE 1 END, updated_at DESC',
-    )).map(Colony.fromMap).toList();
+          'colonies',
+          where: 'archived = 0',
+          orderBy: 'CASE WHEN initial_worker_count = 0 THEN 0 ELSE 1 END, updated_at DESC',
+        ))
+        .map(
+          (row) =>
+              Colony.fromMap(row, wildCatchLinked: linked.contains(row['id'])),
+        )
+        .toList();
   }
 
   @override
   Future<Colony?> findColony(String id) async {
     await applyColonyGrowth(colonyId: id);
     final rows = await _db.query('colonies', where: 'id = ?', whereArgs: [id]);
-    return rows.isEmpty ? null : Colony.fromMap(rows.single);
+    if (rows.isEmpty) return null;
+    final linked = await _wildCatchLinkedColonyIds();
+    return Colony.fromMap(rows.single, wildCatchLinked: linked.contains(id));
   }
 
   @override
@@ -982,8 +1053,35 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   @override
   Future<void> deleteColony(String id) async {
-    // Foreign keys cascade the deletion to this colony's care records.
-    await _db.delete('colonies', where: 'id = ?', whereArgs: [id]);
+    await _db.transaction((transaction) async {
+      final rows = await transaction.query('wild_catch_records');
+      for (final row in rows) {
+        final record = WildCatchRecord.fromMap(row);
+        if (!record.species.any(
+          (species) => species.colonies.any((result) => result.colonyId == id),
+        )) {
+          continue;
+        }
+        final species = [
+          for (final entry in record.species)
+            WildCatchSpecies(
+              name: entry.name,
+              colonies: [
+                for (final result in entry.colonies)
+                  result.colonyId == id ? result.withColonyId(null) : result,
+              ],
+            ),
+        ];
+        await transaction.update(
+          'wild_catch_records',
+          record.withLiveChange(species: species).toMap(),
+          where: 'id = ?',
+          whereArgs: [record.id],
+        );
+      }
+      // Foreign keys cascade the deletion to this colony's care records.
+      await transaction.delete('colonies', where: 'id = ?', whereArgs: [id]);
+    });
     _memorialChanges.add(null);
   }
 

@@ -1,18 +1,32 @@
 import 'dart:convert';
 
 class WildCatchColony {
-  const WildCatchColony({this.queenCount, this.workerCount, this.note});
+  const WildCatchColony({
+    this.queenCount,
+    this.workerCount,
+    this.note,
+    this.colonyId,
+  });
 
   final int? queenCount;
   final int? workerCount;
   final String? note;
+  final String? colonyId;
+
+  WildCatchColony withColonyId(String? id) => WildCatchColony(
+    queenCount: queenCount,
+    workerCount: workerCount,
+    note: note,
+    colonyId: id,
+  );
 
   void validate() {
     bool invalidCount(int? value) =>
         value != null && (value < 0 || value > 1000000);
     if (invalidCount(queenCount) ||
         invalidCount(workerCount) ||
-        (note?.length ?? 0) > 300) {
+        (note?.length ?? 0) > 300 ||
+        (colonyId != null && colonyId!.trim().isEmpty)) {
       throw const FormatException('野采蚁群内容无效。');
     }
   }
@@ -22,6 +36,7 @@ class WildCatchColony {
       queenCount: json['queen_count'] as int?,
       workerCount: json['worker_count'] as int?,
       note: json['note'] as String?,
+      colonyId: json['colony_id'] as String?,
     );
     colony.validate();
     return colony;
@@ -31,6 +46,7 @@ class WildCatchColony {
     'queen_count': queenCount,
     'worker_count': workerCount,
     'note': note,
+    if (colonyId != null) 'colony_id': colonyId,
   };
 }
 
@@ -40,8 +56,12 @@ class WildCatchSpecies {
   final String name;
   final List<WildCatchColony> colonies;
 
+  String get displayName => name.isEmpty ? '未填写品种' : name;
+
   void validate() {
-    if (name.trim().isEmpty || name.length > 100 || colonies.isEmpty) {
+    if ((name.isNotEmpty && name.trim().isEmpty) ||
+        name.length > 100 ||
+        colonies.isEmpty) {
       throw const FormatException('野采蚁种或蚁群内容无效。');
     }
     for (final colony in colonies) {
@@ -184,6 +204,7 @@ class WildCatchRecord {
             endedAt != null &&
             endedAt!.isBefore(startedAt!)) ||
         (note?.length ?? 0) > 500 ||
+        (!isLive && species.any((entry) => entry.name.isEmpty)) ||
         (latitude == null) != (longitude == null) ||
         (latitude != null &&
             (!latitude!.isFinite || latitude! < -90 || latitude! > 90)) ||

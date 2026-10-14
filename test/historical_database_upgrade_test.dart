@@ -228,7 +228,7 @@ void main() {
           path,
           options: factory.options,
         );
-        expect(await upgraded.getVersion(), 26);
+        expect(await upgraded.getVersion(), 29);
         expect(await upgraded.rawQuery('PRAGMA foreign_key_check'), isEmpty);
         expect(
           (await upgraded.rawQuery('PRAGMA integrity_check'))
@@ -368,7 +368,7 @@ void main() {
         path,
         options: factory.options,
       );
-      expect(await retry.getVersion(), 26);
+      expect(await retry.getVersion(), 29);
       expect((await retry.query('care_records')).length, 2);
       await retry.close();
     },
