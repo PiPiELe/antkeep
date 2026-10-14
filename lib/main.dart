@@ -5184,7 +5184,10 @@ class _InventoryPageState extends State<InventoryPage> {
     if (!mounted || items.isEmpty || _purchasing) return;
     final details =
         await showDialog<
-          Map<String, ({int? quantity, int? purchasePriceCents})>
+          Map<
+            String,
+            ({int? quantity, int? purchasePriceCents, String? purpose})
+          >
         >(
           context: context,
           builder: (context) => _InventoryCartDialog(
@@ -5216,6 +5219,7 @@ class _InventoryPageState extends State<InventoryPage> {
     var itemName = '';
     var isGroup = false;
     var childNames = '';
+    var purpose = '';
     String? validationError;
     var shelfLifeMonths = '3';
     var expiryType = InventoryExpiryType.none;
@@ -5245,6 +5249,12 @@ class _InventoryPageState extends State<InventoryPage> {
                   decoration: InputDecoration(
                     labelText: isGroup ? '一级物品名称' : '物品名称',
                   ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  onChanged: (value) => purpose = value,
+                  maxLength: 200,
+                  decoration: const InputDecoration(labelText: '用途（选填）'),
                 ),
                 if (isGroup) ...[
                   const SizedBox(height: 12),
@@ -5352,6 +5362,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   context,
                   _NewInventoryItem(
                     name: name,
+                    purpose: purpose.trim().isEmpty ? null : purpose.trim(),
                     children: children,
                     expiryType: expiryType,
                     shelfLifeMonths: expiryType == InventoryExpiryType.shelfLife
@@ -5372,6 +5383,7 @@ class _InventoryPageState extends State<InventoryPage> {
       InventoryItem createItem(String name) => InventoryItem(
         id: const Uuid().v4(),
         name: name,
+        purpose: item.purpose,
         groupName: item.children.isEmpty ? null : item.name,
         purchased: false,
         createdAt: DateTime.now(),
@@ -5508,7 +5520,12 @@ class _InventoryPageState extends State<InventoryPage> {
   Future<void> _editItem(InventoryItem item) async {
     final result =
         await showDialog<
-          ({bool purchased, int? quantity, int? purchasePriceCents})
+          ({
+            bool purchased,
+            int? quantity,
+            int? purchasePriceCents,
+            String? purpose,
+          })
         >(
           context: context,
           builder: (context) => _InventoryPurchaseDialog(item: item),
@@ -5521,6 +5538,8 @@ class _InventoryPageState extends State<InventoryPage> {
         result.purchased,
         quantity: result.quantity,
         purchasePriceCents: result.purchasePriceCents,
+        purpose: result.purpose,
+        updatePurpose: true,
       );
       if (mounted) {
         setState(() {
@@ -5569,6 +5588,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   ? '已加入购物车'
                   : '点击添加',
             ),
+            if (item.purpose != null) Text('用途：${item.purpose}'),
             if (expiry != null)
               Text(
                 '有效期至：${_date(expiry)}${expired ? ' · 已过期' : ''}',
@@ -5600,6 +5620,7 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
   final _formKey = GlobalKey<FormState>();
   late String _quantity;
   late String _price;
+  late String _purpose;
 
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
@@ -5626,6 +5647,7 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
       purchased: false,
       quantity: null,
       purchasePriceCents: null,
+      purpose: widget.item.purpose,
     ));
   }
 
@@ -5634,29 +5656,38 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
     super.initState();
     _quantity = widget.item.quantity?.toString() ?? '';
     _price = widget.item.purchasePriceText ?? '';
+    _purpose = widget.item.purpose ?? '';
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text(widget.item.fullName),
+    titleTextStyle: Theme.of(context).textTheme.titleLarge
+        ?.copyWith(fontSize: 18),
     content: SingleChildScrollView(
       child: Form(
         key: _formKey,
         child: _InventoryPurchaseFields(
           quantity: _quantity,
           price: _price,
+          purpose: _purpose,
           purchased: widget.item.purchased,
+          compact: true,
           onQuantityChanged: (value) => _quantity = value,
           onPriceChanged: (value) => _price = value,
+          onPurposeChanged: (value) => _purpose = value,
         ),
       ),
     ),
     actions: [
       if (widget.item.purchased)
-        TextButton(onPressed: _delete, child: const Text('删除')),
+        TextButton(
+          onPressed: _delete,
+          child: const Text('删除', style: TextStyle(fontSize: 13)),
+        ),
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('取消'),
+        child: const Text('取消', style: TextStyle(fontSize: 13)),
       ),
       FilledButton(
         onPressed: () {
@@ -5665,9 +5696,13 @@ class _InventoryPurchaseDialogState extends State<_InventoryPurchaseDialog> {
             purchased: true,
             quantity: int.tryParse(_quantity.trim()),
             purchasePriceCents: parsePurchasePrice(_price),
+            purpose: _purpose.trim().isEmpty ? null : _purpose.trim(),
           ));
         },
-        child: Text(widget.item.purchased ? '保存' : '添加'),
+        child: Text(
+          widget.item.purchased ? '保存' : '添加',
+          style: const TextStyle(fontSize: 13),
+        ),
       ),
     ],
   );
@@ -5677,55 +5712,87 @@ class _InventoryPurchaseFields extends StatelessWidget {
   const _InventoryPurchaseFields({
     required this.quantity,
     required this.price,
+    required this.purpose,
     required this.onQuantityChanged,
     required this.onPriceChanged,
+    required this.onPurposeChanged,
     this.purchased = false,
+    this.compact = false,
   });
 
   final String quantity;
   final String price;
+  final String purpose;
   final bool purchased;
+  final bool compact;
   final ValueChanged<String> onQuantityChanged;
   final ValueChanged<String> onPriceChanged;
+  final ValueChanged<String> onPurposeChanged;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      TextFormField(
-        initialValue: quantity,
-        onChanged: onQuantityChanged,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(
-          labelText: '数量（选填）',
-          helperText: purchased ? '有损耗时填写剩余数量；填 0 表示已用完。' : null,
-          helperMaxLines: 2,
+  Widget build(BuildContext context) {
+    final fieldStyle = compact ? const TextStyle(fontSize: 14) : null;
+    final smallStyle = compact ? const TextStyle(fontSize: 11) : null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextFormField(
+          initialValue: purpose,
+          onChanged: onPurposeChanged,
+          maxLength: 200,
+          style: fieldStyle,
+          decoration: InputDecoration(
+            labelText: '用途（选填）',
+            labelStyle: fieldStyle,
+            counterStyle: smallStyle,
+            errorStyle: smallStyle,
+          ),
         ),
-        validator: (value) {
-          final text = value?.trim() ?? '';
-          if (text.isEmpty) return null;
-          final quantity = int.tryParse(text);
-          return quantity == null || quantity < 0 ? '请输入非负整数' : null;
-        },
-      ),
-      const SizedBox(height: 16),
-      TextFormField(
-        initialValue: price,
-        onChanged: onPriceChanged,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
-          labelText: '购入价（选填）',
-          prefixText: '¥ ',
-          helperText: '本次添加物品的总价（元）',
+        const SizedBox(height: 16),
+        TextFormField(
+          initialValue: quantity,
+          onChanged: onQuantityChanged,
+          keyboardType: TextInputType.number,
+          style: fieldStyle,
+          decoration: InputDecoration(
+            labelText: '数量（选填）',
+            labelStyle: fieldStyle,
+            helperText: purchased ? '有损耗时填写剩余数量；填 0 表示已用完。' : null,
+            helperStyle: smallStyle,
+            helperMaxLines: 2,
+            errorStyle: smallStyle,
+          ),
+          validator: (value) {
+            final text = value?.trim() ?? '';
+            if (text.isEmpty) return null;
+            final quantity = int.tryParse(text);
+            return quantity == null || quantity < 0 ? '请输入非负整数' : null;
+          },
         ),
-        validator: (value) =>
-            (value?.trim().isEmpty ?? true) ||
-                parsePurchasePrice(value!) != null
-            ? null
-            : '请输入非负金额，最多两位小数',
-      ),
-    ],
-  );
+        const SizedBox(height: 16),
+        TextFormField(
+          initialValue: price,
+          onChanged: onPriceChanged,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: fieldStyle,
+          decoration: InputDecoration(
+            labelText: '购入价（选填）',
+            labelStyle: fieldStyle,
+            prefixText: '¥ ',
+            prefixStyle: fieldStyle,
+            helperText: '本次添加物品的总价（元）',
+            helperStyle: smallStyle,
+            errorStyle: smallStyle,
+          ),
+          validator: (value) =>
+              (value?.trim().isEmpty ?? true) ||
+                  parsePurchasePrice(value!) != null
+              ? null
+              : '请输入非负金额，最多两位小数',
+        ),
+      ],
+    );
+  }
 }
 
 class _InventoryCartDialog extends StatefulWidget {
@@ -5742,6 +5809,7 @@ class _InventoryCartDialogState extends State<_InventoryCartDialog> {
   late final List<InventoryItem> _items = List.of(widget.items);
   final _quantities = <String, String>{};
   final _prices = <String, String>{};
+  final _purposes = <String, String>{};
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -5783,9 +5851,11 @@ class _InventoryCartDialogState extends State<_InventoryCartDialog> {
                       _InventoryPurchaseFields(
                         quantity: _quantities[item.id] ?? '',
                         price: _prices[item.id] ?? '',
+                        purpose: _purposes[item.id] ?? item.purpose ?? '',
                         onQuantityChanged: (value) =>
                             _quantities[item.id] = value,
                         onPriceChanged: (value) => _prices[item.id] = value,
+                        onPurposeChanged: (value) => _purposes[item.id] = value,
                       ),
                     ],
                   ),
@@ -5814,6 +5884,12 @@ class _InventoryCartDialogState extends State<_InventoryCartDialog> {
                       purchasePriceCents: parsePurchasePrice(
                         _prices[item.id] ?? '',
                       ),
+                      purpose:
+                          (_purposes[item.id] ?? item.purpose ?? '')
+                              .trim()
+                              .isEmpty
+                          ? null
+                          : (_purposes[item.id] ?? item.purpose ?? '').trim(),
                     ),
                 });
               },
@@ -5826,6 +5902,7 @@ class _InventoryCartDialogState extends State<_InventoryCartDialog> {
 class _NewInventoryItem {
   const _NewInventoryItem({
     required this.name,
+    this.purpose,
     required this.expiryType,
     this.shelfLifeMonths,
     this.expiresAt,
@@ -5833,6 +5910,7 @@ class _NewInventoryItem {
   });
 
   final String name;
+  final String? purpose;
   final InventoryExpiryType expiryType;
   final int? shelfLifeMonths;
   final DateTime? expiresAt;

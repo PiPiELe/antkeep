@@ -88,7 +88,7 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
         builder: (context) => AlertDialog(
           title: const Text('确认推送物品数据'),
           content: Text(
-            '将向 B 端推送所选的 ${items.length} 条物品数据，包括名称、分组、购买状态、数量、购入价和日期、有效期信息。成功后今天不能再次推送，并消耗码值一次使用次数。',
+            '将向 B 端推送所选的 ${items.length} 条物品数据，包括名称、分组、用途、购买状态、数量、购入价和日期、有效期信息。成功后今天不能再次推送，并消耗码值一次使用次数。',
           ),
           actions: [
             TextButton(
@@ -267,7 +267,7 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
                                 key: ValueKey(item.id),
                                 title: Text(item.fullName),
                                 subtitle: Text(
-                                  '${item.purchased ? '已购' : '未购'} · 数量 ${item.quantity ?? '未填写'} · 购入价 ${item.purchasePriceText ?? '未填写'}',
+                                  '${item.purchased ? '已购' : '未购'} · 数量 ${item.quantity ?? '未填写'} · 购入价 ${item.purchasePriceText ?? '未填写'}${item.purpose == null ? '' : '\n用途：${item.purpose}'}',
                                 ),
                                 value: _selected.contains(item.id),
                                 onChanged: locked || pushed

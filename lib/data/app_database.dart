@@ -45,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 31,
+      version: 32,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -302,6 +302,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     if (oldVersion >= 25 && oldVersion < 31) {
       await database.execute(
         "ALTER TABLE milestones ADD COLUMN artwork TEXT NOT NULL DEFAULT 'harvest'",
+      );
+    }
+    if (oldVersion >= 13 && oldVersion < 32) {
+      await database.execute(
+        'ALTER TABLE inventory_items ADD COLUMN purpose TEXT',
       );
     }
   }
@@ -863,7 +868,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   static Future<void> _createInventoryTable(DatabaseExecutor executor) async {
     await executor.execute('''CREATE TABLE inventory_items (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, group_name TEXT,
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, group_name TEXT, purpose TEXT,
         purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
         expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER,
         purchased_at TEXT, expires_at TEXT,
@@ -1757,6 +1762,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     bool purchased, {
     int? quantity,
     int? purchasePriceCents,
+    String? purpose,
+    bool updatePurpose = false,
   }) async {
     if (quantity != null && quantity < 0) {
       throw ArgumentError.value(quantity, 'quantity', '数量不能小于零');
@@ -1778,6 +1785,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
             : null,
         'quantity': purchased ? quantity : null,
         'purchase_price_cents': purchased ? purchasePriceCents : null,
+        if (updatePurpose) 'purpose': purpose,
       },
       where: 'id = ?',
       whereArgs: [item.id],
@@ -1786,7 +1794,9 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   Future<void> purchaseInventoryItems(
     Iterable<String> itemIds, {
-    Map<String, ({int? quantity, int? purchasePriceCents})> details = const {},
+    Map<String, ({int? quantity, int? purchasePriceCents, String? purpose})>
+        details =
+        const {},
   }) async {
     final ids = itemIds.toSet();
     if (ids.isEmpty) return;
@@ -1807,6 +1817,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
             'purchased_at': purchasedAt,
             'quantity': details[id]?.quantity,
             'purchase_price_cents': details[id]?.purchasePriceCents,
+            if (details.containsKey(id)) 'purpose': details[id]!.purpose,
           },
           where: 'purchased = 0 AND id = ?',
           whereArgs: [id],
@@ -1846,6 +1857,13 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       whereArgs: ['default-17', '棉花团'],
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
+    await _db.update(
+      'inventory_items',
+      {'name': '10mm 软管', 'purpose': '蚂蚁平稳换巢'},
+      where: 'id = ? AND name = ? AND purpose IS NULL AND group_name IS NULL',
+      whereArgs: ['default-28', '10mm 软管（蚂蚁平稳换巢）'],
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
     // Positions are persisted as IDs. Append new defaults; do not reorder.
     const items = [
       (name: '防逃液', expiryType: InventoryExpiryType.none, months: null),
@@ -1876,11 +1894,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       (name: '平头画笔', expiryType: InventoryExpiryType.none, months: null),
       (name: '营养果冻', expiryType: InventoryExpiryType.shelfLife, months: 3),
       (name: '蚂蚁喂水器', expiryType: InventoryExpiryType.none, months: null),
-      (
-        name: '10mm 软管（蚂蚁平稳换巢）',
-        expiryType: InventoryExpiryType.none,
-        months: null,
-      ),
+      (name: '10mm 软管', expiryType: InventoryExpiryType.none, months: null),
       (name: '滴管', expiryType: InventoryExpiryType.none, months: null),
       (name: '手工玻璃纸', expiryType: InventoryExpiryType.none, months: null),
     ];
@@ -1894,6 +1908,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'created_at': now,
         'expiry_type': items[index].expiryType.storageValue,
         'shelf_life_months': items[index].months,
+        if (index == 28) 'purpose': '蚂蚁平稳换巢',
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     for (final item in const [

@@ -64,7 +64,9 @@ void main() {
       )''');
           await db.insert(
             'inventory_items',
-            legacy.toMap()..remove('group_name'),
+            legacy.toMap()
+              ..remove('group_name')
+              ..remove('purpose'),
           );
         },
       );

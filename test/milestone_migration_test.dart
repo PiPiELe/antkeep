@@ -64,6 +64,7 @@ void main() {
       );
       await old.execute('DROP TABLE milestones');
       await old.execute('ALTER TABLE milestones_v29 RENAME TO milestones');
+      await old.execute('ALTER TABLE inventory_items DROP COLUMN purpose');
       await old.setVersion(29);
       await old.close();
 
@@ -81,7 +82,7 @@ void main() {
       expect((await app.listAllMilestones()).length, 2);
       await app.close();
       final upgraded = await openDatabase(path);
-      expect(await upgraded.getVersion(), 31);
+      expect(await upgraded.getVersion(), 32);
       expect(await upgraded.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       await upgraded.close();
     },

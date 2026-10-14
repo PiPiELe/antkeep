@@ -44,6 +44,13 @@ void main() {
         createdAt: DateTime(2026, 8, 3),
         quantity: 5,
       );
+      final tube = InventoryItem(
+        id: 'default-28',
+        name: '10mm 软管（蚂蚁平稳换巢）',
+        purchased: true,
+        createdAt: DateTime(2026, 8, 3),
+        quantity: 2,
+      );
       final old = await openDatabase(
         path,
         version: 17,
@@ -59,8 +66,9 @@ void main() {
         )''');
           await db.execute('''CREATE UNIQUE INDEX inventory_name_in_group
           ON inventory_items(COALESCE(group_name, ''), name)''');
-          await db.insert('inventory_items', cotton.toMap());
-          await db.insert('inventory_items', custom.toMap());
+          await db.insert('inventory_items', cotton.toMap()..remove('purpose'));
+          await db.insert('inventory_items', custom.toMap()..remove('purpose'));
+          await db.insert('inventory_items', tube.toMap()..remove('purpose'));
         },
       );
       await old.close();
@@ -84,6 +92,9 @@ void main() {
         items.singleWhere((item) => item.id == custom.id).toMap(),
         custom.toMap(),
       );
+      expect(items.singleWhere((item) => item.id == tube.id).name, '10mm 软管');
+      expect(items.singleWhere((item) => item.id == tube.id).purpose, '蚂蚁平稳换巢');
+      expect(items.singleWhere((item) => item.id == tube.id).quantity, 2);
       expect(items.where((item) => item.name == '防逃液'), hasLength(1));
       expect(items.singleWhere((item) => item.id == 'default-18').name, '恒温箱');
       expect(

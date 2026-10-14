@@ -51,7 +51,7 @@ void main() {
       await db.saveInventoryItem(item('standalone', '干巢', group: null));
       await db.purchaseInventoryItems(
         ['dry'],
-        details: {'dry': (quantity: 2, purchasePriceCents: 500)},
+        details: {'dry': (quantity: 2, purchasePriceCents: 500, purpose: '筑巢')},
       );
       final items = await db.listInventory();
       final dry = items.singleWhere((item) => item.id == 'dry');
@@ -59,6 +59,7 @@ void main() {
       expect(dry.fullName, '5 元蚁巢 · 干巢');
       expect(dry.quantity, 2);
       expect(dry.purchasePriceCents, 500);
+      expect(dry.purpose, '筑巢');
       expect(dry.effectiveExpiryDate(), isNotNull);
       expect(items.singleWhere((item) => item.id == 'wet').purchased, isFalse);
       final snapshot = await db.snapshot();

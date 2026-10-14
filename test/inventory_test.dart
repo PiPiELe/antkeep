@@ -148,7 +148,7 @@ void main() {
         '平头画笔',
         '营养果冻',
         '蚂蚁喂水器',
-        '10mm 软管（蚂蚁平稳换巢）',
+        '10mm 软管',
         '滴管',
         '手工玻璃纸',
         '铝制喂食盘',
@@ -156,6 +156,10 @@ void main() {
       ]),
     );
     expect(items.first.quantity, isNull);
+    expect(
+      items.singleWhere((item) => item.id == 'default-28').purpose,
+      '蚂蚁平稳换巢',
+    );
     expect(items.where((item) => item.name == '防逃液'), hasLength(1));
     expect(items.where((item) => item.name == '棉花团'), isEmpty);
     final jelly = items.singleWhere((item) => item.name == '营养果冻');
@@ -185,6 +189,39 @@ void main() {
       await tester.ensureVisible(find.text('离心管 50ml'));
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<AlertDialog>(find.byType(AlertDialog))
+            .titleTextStyle
+            ?.fontSize,
+        18,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.widgetWithText(TextFormField, '用途（选填）'),
+                matching: find.byType(TextField),
+              ),
+            )
+            .style
+            ?.fontSize,
+        14,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.widgetWithText(TextFormField, '购入价（选填）'),
+                matching: find.byType(TextField),
+              ),
+            )
+            .decoration
+            ?.helperStyle
+            ?.fontSize,
+        11,
+      );
+      expect(tester.widget<Text>(find.text('添加')).style?.fontSize, 13);
       await tester.enterText(
         find.widgetWithText(TextFormField, '数量（选填）'),
         '-2',
@@ -211,6 +248,10 @@ void main() {
         find.widgetWithText(TextFormField, '购入价（选填）'),
         '19.90',
       );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '用途（选填）'),
+        '  平稳换巢  ',
+      );
       await tester.tap(find.text('添加'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('离心管 · 已购入'));
@@ -235,14 +276,23 @@ void main() {
         )['purchase_price_cents'],
         1990,
       );
+      expect(
+        rows.singleWhere((row) => row['name'] == '离心管 50ml')['purpose'],
+        '平稳换巢',
+      );
       final purchasedAt = rows.singleWhere(
         (row) => row['name'] == '离心管 50ml',
       )['purchased_at'];
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
       expect(find.text('19.90'), findsOneWidget);
+      expect(find.text('平稳换巢'), findsOneWidget);
       expect(find.text('有损耗时填写剩余数量；填 0 表示已用完。'), findsOneWidget);
       await tester.enterText(find.widgetWithText(TextFormField, '数量（选填）'), '8');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '用途（选填）'),
+        '临时转移',
+      );
       await tester.tap(find.text('保存'));
       await tester.pumpAndSettle();
       expect(find.textContaining('数量：'), findsNothing);
@@ -256,9 +306,14 @@ void main() {
       expect(
         InventoryItem.fromMap(
           saved.singleWhere((row) => row['name'] == '离心管 50ml'),
-        ).toMap()['quantity'],
+        ).toMap(),
+        containsPair('purpose', '临时转移'),
+      );
+      expect(
+        saved.singleWhere((row) => row['name'] == '离心管 50ml')['quantity'],
         8,
       );
+      expect(find.text('用途：临时转移'), findsOneWidget);
       await tester.tap(find.text('离心管 50ml'));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -314,6 +369,7 @@ void main() {
       expect(row['quantity'], isNull);
       expect(row['purchase_price_cents'], isNull);
       expect(row['purchased_at'], isNull);
+      expect(row['purpose'], '临时转移');
       expect(
         rows.where((row) => row['name'] != '离心管 50ml'),
         beforeDelete.where((row) => row['name'] != '离心管 50ml'),
@@ -447,6 +503,10 @@ void main() {
         '23.45',
       );
       await tester.enterText(
+        find.widgetWithText(TextFormField, '用途（选填）').last,
+        '保温运输',
+      );
+      await tester.enterText(
         find.widgetWithText(TextFormField, '数量（选填）').last,
         '4',
       );
@@ -465,6 +525,7 @@ void main() {
         unorderedEquals([0, 2345]),
       );
       expect(purchased.last['quantity'], 4);
+      expect(purchased.last['purpose'], '保温运输');
       expect(find.text('已购 (2)'), findsOneWidget);
       expect(tester.takeException(), isNull);
 

@@ -171,6 +171,11 @@ class BackupData {
               value.length > 80) {
             throw FormatException('字段 ${field.key} 过长。');
           }
+          if (field.key == 'purpose' &&
+              value is String &&
+              (value.trim().isEmpty || value.length > 200)) {
+            throw const FormatException('用途为空或过长。');
+          }
           if (const {
                 'archived',
                 'show_specialized',
