@@ -341,6 +341,19 @@ class OnlineController extends ChangeNotifier {
     return result;
   }
 
+  Future<Map<String, dynamic>> submitFeedback({
+    required String category,
+    required String content,
+    required String operationId,
+  }) => _authenticatedRequest(
+    '/api/app/feedback',
+    body: {
+      'category': category,
+      'content': content,
+      'operationId': operationId,
+    },
+  );
+
   Future<Map<String, dynamic>> pushInventory(
     List<InventoryItem> items, {
     required String code,

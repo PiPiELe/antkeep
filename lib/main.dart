@@ -35,6 +35,7 @@ import 'domain/population_forecast.dart';
 import 'online/runtime.dart';
 import 'online/inventory_push_page.dart';
 import 'online/backup_upload_page.dart';
+import 'online/feedback_page.dart';
 import 'online/competition_page.dart';
 import 'online/app_update.dart';
 import 'online/online_widgets.dart';
@@ -6616,7 +6617,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ? '已开启 · 每天 ${_timeOfDay(themeController.careReminderMinuteOfDay)}'
             : '未开启 · 设置每日提醒',
       SettingsCategory.data => '数据推送、备份上传与恢复',
-      SettingsCategory.help => '使用指南、交流群',
+      SettingsCategory.help => '使用指南、我想说、交流群',
       SettingsCategory.about => switch (appUpdateController.availability) {
         AppUpdateAvailability.required => '在线服务需更新 · 点此查看',
         AppUpdateAvailability.optional =>
@@ -7060,6 +7061,17 @@ class _SettingsPageState extends State<SettingsPage> {
           section: OnlineSettingsSection.help,
           updates: appUpdateController,
           useOffline: () => _setEdition(AppEdition.offline),
+        ),
+        ListTile(
+          leading: const Icon(Icons.rate_review_outlined),
+          title: const Text('我想说'),
+          subtitle: const Text('反馈使用问题或分享更好的想法'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => FeedbackPage(controller: onlineController),
+            ),
+          ),
         ),
         ListTile(
           leading: const Icon(Icons.qr_code_2_outlined),
