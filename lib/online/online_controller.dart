@@ -40,6 +40,7 @@ class OnlineController extends ChangeNotifier {
   PublicContent _cached = PublicContent.bundled;
   PublicContent get content => enabled ? _cached : PublicContent.bundled;
   AppAnnouncement? pendingAnnouncement;
+  List<AppAnnouncement> _announcements = [];
   int _generation = 0;
   Completer<void>? _contentRefreshDone;
 
@@ -54,6 +55,7 @@ class OnlineController extends ChangeNotifier {
     checkin = null;
     _token = null;
     pendingAnnouncement = null;
+    _announcements = [];
     error = null;
     notifyListeners();
     if (!value) {
@@ -111,22 +113,31 @@ class OnlineController extends ChangeNotifier {
       if (!_current(generation)) return;
       _cached = candidate;
       contentNotice = '已更新至资料版本 ${candidate.version}';
-      final announcement = candidate.announcement;
-      Set<String> seenAnnouncements;
-      try {
-        seenAnnouncements = _seenAnnouncements(
-          await store.readSeenAnnouncement(),
-        );
-      } catch (_) {
-        // Do not repeat a notice when its local read state is unavailable.
-        seenAnnouncements = {if (announcement != null) announcement.id};
+      await _selectAnnouncements(
+        [
+          if (candidate.targetedAnnouncement != null)
+            candidate.targetedAnnouncement!,
+          if (candidate.announcement != null) candidate.announcement!,
+        ],
+        generation,
+        token,
+      );
+    } catch (e) {
+      if (e is ApiFailure && e.status == 404 && _current(generation)) {
+        try {
+          final raw = await api.request(
+            '/api/public/announcement',
+            token: token,
+          );
+          final data = jsonDecode(raw) as Map<String, dynamic>;
+          final targeted = PublicContent.decodeTargeted(
+            data['targetedAnnouncement'],
+          );
+          await _selectAnnouncements([?targeted], generation, token);
+        } catch (_) {
+          // The content fallback still works when announcement delivery fails.
+        }
       }
-      if (!_current(generation)) return;
-      pendingAnnouncement =
-          announcement != null && !seenAnnouncements.contains(announcement.id)
-          ? announcement
-          : null;
-    } catch (_) {
       if (_current(generation)) {
         contentNotice = _cached.version == 0
             ? '暂时无法更新，正在使用内置资料。'
@@ -141,13 +152,37 @@ class OnlineController extends ChangeNotifier {
     }
   }
 
+  Future<void> _selectAnnouncements(
+    List<AppAnnouncement> announcements,
+    int generation,
+    String? token,
+  ) async {
+    Set<String> seen;
+    try {
+      seen = _seenAnnouncements(await store.readSeenAnnouncement());
+    } catch (_) {
+      // Do not repeat notices when their local read state is unavailable.
+      seen = announcements.map((announcement) => announcement.id).toSet();
+    }
+    if (!_current(generation) || token != _token) return;
+    _announcements = announcements
+        .where((announcement) => !seen.contains(announcement.id))
+        .toList();
+    pendingAnnouncement = _announcements.firstOrNull;
+  }
+
   Future<void> acknowledgeAnnouncement(String id) async {
     if (pendingAnnouncement?.id != id) return;
+    final generation = _generation;
     pendingAnnouncement = null;
     notifyListeners();
     final seen = _seenAnnouncements(await store.readSeenAnnouncement());
     seen.add(id);
     await store.writeSeenAnnouncement(jsonEncode(seen.toList()));
+    if (!_current(generation)) return;
+    _announcements.removeWhere((announcement) => announcement.id == id);
+    pendingAnnouncement = _announcements.firstOrNull;
+    notifyListeners();
   }
 
   static Set<String> _seenAnnouncements(String? stored) {
@@ -233,6 +268,7 @@ class OnlineController extends ChangeNotifier {
     checkin = null;
     _token = null;
     pendingAnnouncement = null;
+    _announcements = [];
     error = null;
     notifyListeners();
     try {
@@ -421,6 +457,7 @@ class OnlineController extends ChangeNotifier {
       checkin = null;
       _token = null;
       pendingAnnouncement = null;
+      _announcements = [];
     }
     error = e is ApiFailure ? e.message : '在线状态读取或保存失败，请重试。';
   }

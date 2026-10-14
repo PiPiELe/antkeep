@@ -137,6 +137,67 @@ void main() {
       reopened.dispose();
     },
   );
+  test('targeted and public announcements are both shown once', () async {
+    final payload = jsonDecode(snapshot()) as Map<String, dynamic>;
+    payload['texts'] = {
+      'app.announcement': {
+        'title': '维护通知',
+        'body': '今晚维护。',
+        'updatedAt': '2026-10-14T01:00:00Z',
+      },
+    };
+    payload['targetedAnnouncement'] = {
+      'id': 'tag-notice:1',
+      'title': '标签通知',
+      'body': '标签用户内容。',
+    };
+    final store = MemoryOnlineStore();
+    final c = controller(
+      store,
+      (_) async => response(jsonEncode(payload), 200),
+    );
+    await c.setEnabled(true);
+    expect(c.pendingAnnouncement?.title, '标签通知');
+    await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+    expect(c.pendingAnnouncement?.title, '维护通知');
+    await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+    expect(c.pendingAnnouncement, isNull);
+    await c.refreshContent();
+    expect(c.pendingAnnouncement, isNull);
+    c.dispose();
+  });
+
+  test(
+    'targeted announcement arrives before public content is published',
+    () async {
+      final store = MemoryOnlineStore();
+      final c = controller(store, (request) async {
+        if (request.url.path == '/api/public/content') {
+          return response('{"message":"尚无已发布内容。"}', 404);
+        }
+        if (request.url.path == '/api/public/announcement') {
+          return response(
+            jsonEncode({
+              'targetedAnnouncement': {
+                'id': 'early-notice:1',
+                'title': '开站通知',
+                'body': '欢迎使用。',
+              },
+            }),
+            200,
+          );
+        }
+        throw StateError(request.url.path);
+      });
+      await c.setEnabled(true);
+      expect(c.content.version, 0);
+      expect(c.pendingAnnouncement?.title, '开站通知');
+      await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+      await c.refreshContent();
+      expect(c.pendingAnnouncement, isNull);
+      c.dispose();
+    },
+  );
   test(
     'published announcement appears once per edit and can be withdrawn',
     () async {
