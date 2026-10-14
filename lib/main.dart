@@ -1801,6 +1801,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   Widget _section({
     required IconData icon,
     required String title,
+    String? hint,
+    Widget? action,
     required List<Widget> children,
   }) => Card(
     clipBehavior: Clip.antiAlias,
@@ -1814,6 +1816,18 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
               Icon(icon, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               Text(title, style: Theme.of(context).textTheme.titleMedium),
+              if (hint != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    hint,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(fontSize: 10, height: 1.2),
+                  ),
+                ),
+              ],
+              if (action != null) ...[const Spacer(), action],
             ],
           ),
           const SizedBox(height: 14),
@@ -1845,6 +1859,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           _section(
             icon: Icons.pest_control_outlined,
             title: '品种与昵称',
+            action: TextButton(
+              onPressed: _enterCustomSpecies,
+              child: const Text('未收录？', style: TextStyle(fontSize: 10)),
+            ),
             children: [
               _SearchableChoiceField(
                 label: '品种分类/细分种类',
@@ -1857,17 +1875,6 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 },
                 onSelected: _selectFamily,
                 onSearchSelected: _selectSpecies,
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: _enterCustomSpecies,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text(
-                    '未收录？手动填写品种',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
               ),
               const SizedBox(height: 8),
               TextFormField(
@@ -1886,6 +1893,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           _section(
             icon: Icons.bar_chart_outlined,
             title: '数量',
+            hint: '档案起始数量，日记中的死亡数量会从此扣减',
             children: [
               DropdownButtonFormField<GrowthPath>(
                 isExpanded: true,
@@ -1920,14 +1928,6 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  '档案起始数量，日记中的死亡数量会从此扣减',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -1949,7 +1949,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       validator: _validateCount,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        labelText: '茧',
+                        labelText: '蛹茧',
                         hintText: '可选',
                       ),
                     ),
@@ -3196,31 +3196,18 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                         ),
                     ],
                   ),
-                  onTap: colony.archived
-                      ? null
-                      : () async {
-                          final saved = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute(
-                              builder: (_) => MilestoneFormPage(
-                                colony: colony,
-                                milestone: milestone,
-                              ),
-                            ),
-                          );
-                          if (saved == true && mounted) setState(_reload);
-                        },
-                  trailing: IconButton(
-                    tooltip: '分享里程碑',
-                    icon: const Icon(Icons.share_outlined),
-                    onPressed: () => Navigator.of(context).push(
+                  onTap: () async {
+                    await Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => MilestoneSharePage(
                           colony: colony,
                           milestone: milestone,
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                    if (mounted) setState(_reload);
+                  },
+                  trailing: const Icon(Icons.chevron_right),
                 ),
               ),
           ],
@@ -3832,6 +3819,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   var _addQueenMemorial = false;
   var _addWorkerMemorial = false;
   var _addMilestone = false;
+  var _milestoneArtwork = MilestoneArtwork.harvest;
   var _type = CareRecordType.observation;
   FeedingResponse? _feedingResponse;
   bool? _feedingLeftovers;
@@ -4037,6 +4025,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
                     note: _textOrNull(_note.text),
                     occurredAt: _occurredAt,
                     createdAt: record.createdAt,
+                    artwork: _milestoneArtwork,
                   )
                 : null,
           );
@@ -4399,15 +4388,50 @@ class _RecordFormPageState extends State<RecordFormPage> {
                         if (_addMilestone)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                            child: TextField(
-                              controller: _milestoneTitle,
-                              maxLength: 80,
-                              decoration: const InputDecoration(
-                                labelText: '里程碑标题',
-                                hintText: '例如：首批工蚁羽化',
-                                helperText: '日期与备注同步保存，之后可单独编辑',
-                                helperMaxLines: 2,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  controller: _milestoneTitle,
+                                  maxLength: 80,
+                                  decoration: const InputDecoration(
+                                    labelText: '里程碑标题',
+                                    hintText: '例如：首批工蚁羽化',
+                                    helperText: '日期与备注同步保存，之后可单独编辑',
+                                    helperMaxLines: 2,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '选择石刻画面',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 8),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      for (final artwork
+                                          in MilestoneArtwork.values) ...[
+                                        ChoiceChip(
+                                          label: Text(artwork.label),
+                                          selected:
+                                              _milestoneArtwork == artwork,
+                                          onSelected: _saving
+                                              ? null
+                                              : (_) => setState(
+                                                  () => _milestoneArtwork =
+                                                      artwork,
+                                                ),
+                                        ),
+                                        if (artwork !=
+                                            MilestoneArtwork.values.last)
+                                          const SizedBox(width: 8),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],

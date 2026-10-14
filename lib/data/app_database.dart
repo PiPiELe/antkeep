@@ -45,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 30,
+      version: 31,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -299,6 +299,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'ALTER TABLE colonies ADD COLUMN target_humidity_lower REAL',
       );
     }
+    if (oldVersion >= 25 && oldVersion < 31) {
+      await database.execute(
+        "ALTER TABLE milestones ADD COLUMN artwork TEXT NOT NULL DEFAULT 'harvest'",
+      );
+    }
   }
 
   static Future<void> _createMemorialTable(DatabaseExecutor db) async {
@@ -317,6 +322,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await db.execute('''CREATE TABLE milestones (
       id TEXT PRIMARY KEY, colony_id TEXT, title TEXT NOT NULL,
       occurred_at TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL,
+      artwork TEXT NOT NULL DEFAULT 'harvest',
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
     )''');
     await db.execute(
@@ -331,6 +337,16 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         whereArgs: [colonyId],
         orderBy: 'occurred_at DESC, created_at DESC',
       )).map(Milestone.fromMap).toList();
+
+  Future<Milestone?> findMilestone(String id) async {
+    final rows = await _db.query(
+      'milestones',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : Milestone.fromMap(rows.single);
+  }
 
   Future<List<({Milestone milestone, String? colonyName})>>
   listAllMilestones() async =>

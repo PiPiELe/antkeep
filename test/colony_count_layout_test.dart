@@ -39,8 +39,27 @@ void main() {
             .evaluate()
             .single,
       );
+      final customSpeciesAction = find.text('未收录？');
+      expect(
+        tester.getTopLeft(customSpeciesAction).dx,
+        greaterThan(tester.getTopRight(find.text('品种与昵称')).dx),
+      );
+      expect(
+        tester.getBottomLeft(customSpeciesAction).dy,
+        lessThan(tester.getTopLeft(find.text('品种分类/细分种类')).dy),
+      );
+      expect(tester.widget<Text>(customSpeciesAction).style?.fontSize, 10);
 
-      for (final label in ['蚁后 *', '工蚁 *', '卵', '茧']) {
+      final countHint = find.text('档案起始数量，日记中的死亡数量会从此扣减');
+      await tester.ensureVisible(countHint);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getBottomLeft(countHint).dy,
+        lessThan(tester.getTopLeft(find.text('发育模式')).dy),
+      );
+      expect(tester.widget<Text>(countHint).style?.fontSize, 10);
+
+      for (final label in ['蚁后 *', '工蚁 *', '卵', '蛹茧']) {
         final field = find.widgetWithText(TextFormField, label);
         await tester.ensureVisible(field);
         await tester.pumpAndSettle();

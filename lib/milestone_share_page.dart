@@ -5,25 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'data/share_image_export.dart';
+import 'data/app_database.dart';
 import 'domain/milestone.dart';
 import 'domain/models.dart';
+import 'milestone_page.dart';
+
+export 'domain/milestone.dart' show MilestoneArtwork;
 
 const milestonePosterSize = Size(400, 500);
-
-enum MilestoneArtwork {
-  harvest('种群发展', 'stone-chronicle.jpg'),
-  hunt('勇士狩猎-软体昆虫', 'ponerine-hunt.jpg'),
-  beetleHunt('勇士狩猎-甲壳昆虫', 'beetle-hunt.jpg'),
-  battle('种群之战', 'colony-battle.jpg'),
-  brood('卵幼铺底', 'brood-nursery.jpg'),
-  emergence('破茧新生', 'cocoon-emergence.jpg'),
-  firstWorker('文明第一步', 'first-worker.jpg');
-
-  const MilestoneArtwork(this.label, this.fileName);
-  final String label;
-  final String fileName;
-  String get assetPath => 'assets/milestone/$fileName';
-}
 
 final _artworkFutures = <MilestoneArtwork, Future<ui.Image>>{};
 
@@ -61,7 +50,8 @@ class MilestonePoster extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     image: true,
-    label: '${colony?.name ?? '独立里程碑'}，${milestone.title}的里程碑分享图',
+    label:
+        '${colony == null ? '' : '${colony!.name}，'}${milestone.title}的里程碑分享图',
     child: AspectRatio(
       aspectRatio: milestonePosterSize.aspectRatio,
       child: FutureBuilder<ui.Image>(
@@ -137,15 +127,20 @@ class MilestonePosterPainter extends CustomPainter {
       const Color(0xfff6e5bf),
       maxLines: 1,
       letterSpacing: 2,
+      fontWeight: FontWeight.w600,
     );
-    _text(
-      canvas,
-      colony?.name ?? '独立里程碑',
-      const Rect.fromLTWH(45, 46, 310, 25),
-      15,
-      const Color(0xffe7d0a1),
-      maxLines: 1,
-    );
+    if (colony != null) {
+      _text(
+        canvas,
+        colony!.name,
+        const Rect.fromLTWH(45, 46, 310, 25),
+        15,
+        const Color(0xffe7d0a1),
+        maxLines: 1,
+        letterSpacing: 1,
+        fontWeight: FontWeight.w600,
+      );
+    }
     _text(
       canvas,
       milestone.title.trim(),
@@ -154,6 +149,8 @@ class MilestonePosterPainter extends CustomPainter {
       const Color(0xffffe9b9),
       maxLines: 2,
       minimumSize: 15,
+      letterSpacing: 1.2,
+      fontWeight: FontWeight.w700,
     );
     final note = milestone.note?.trim();
     if (note != null && note.isNotEmpty) {
@@ -165,6 +162,7 @@ class MilestonePosterPainter extends CustomPainter {
         const Color(0xffeee0c4),
         maxLines: 3,
         minimumSize: 10,
+        letterSpacing: .4,
       );
     }
     final date = milestone.occurredAt;
@@ -179,6 +177,7 @@ class MilestonePosterPainter extends CustomPainter {
       const Color(0xffe0b977),
       maxLines: 1,
       letterSpacing: 1,
+      fontWeight: FontWeight.w600,
     );
     _text(
       canvas,
@@ -201,6 +200,7 @@ class MilestonePosterPainter extends CustomPainter {
     required int maxLines,
     double minimumSize = 10,
     double letterSpacing = 0,
+    FontWeight fontWeight = FontWeight.w400,
   }) {
     final painter = TextPainter(
       textDirection: TextDirection.ltr,
@@ -213,11 +213,16 @@ class MilestonePosterPainter extends CustomPainter {
         painter.text = TextSpan(
           text: value,
           style: TextStyle(
-            fontFamily: 'serif',
+            fontFamily: 'StoneSerif',
+            fontWeight: fontWeight,
             fontSize: fontSize,
             color: color,
             height: 1.32,
             letterSpacing: letterSpacing,
+            shadows: const [
+              Shadow(color: Color(0xcc1a0e05), offset: Offset(0, 1)),
+              Shadow(color: Color(0x88967447), offset: Offset(0, -0.5)),
+            ],
           ),
         );
         painter.layout(maxWidth: area.width);
@@ -303,8 +308,37 @@ class MilestoneSharePage extends StatefulWidget {
 }
 
 class _MilestoneSharePageState extends State<MilestoneSharePage> {
-  MilestoneArtwork _artwork = MilestoneArtwork.harvest;
+  late Milestone _milestone = widget.milestone;
+  late Colony? _colony = widget.colony;
   bool _busy = false;
+
+  Future<void> _edit() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            MilestoneFormPage(colony: widget.colony, milestone: _milestone),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    try {
+      final updated = await AppDatabase.instance.findMilestone(_milestone.id);
+      if (updated == null || !mounted) return;
+      final colony = updated.colonyId == null
+          ? null
+          : await AppDatabase.instance.findColony(updated.colonyId!);
+      if (mounted) {
+        setState(() {
+          _milestone = updated;
+          _colony = colony;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('刷新里程碑失败：$error')));
+      }
+    }
+  }
 
   Future<void> _export(
     BuildContext buttonContext, {
@@ -316,9 +350,9 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
     setState(() => _busy = true);
     try {
       final bytes = await renderMilestonePng(
-        widget.colony,
-        widget.milestone,
-        _artwork,
+        _colony,
+        _milestone,
+        _milestone.artwork,
       );
       if (!mounted) return;
       final name =
@@ -357,7 +391,17 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('里程碑分享图')),
+    appBar: AppBar(
+      title: const Text('石刻预览'),
+      actions: [
+        if (_colony?.archived != true)
+          IconButton(
+            tooltip: '编辑里程碑',
+            onPressed: _busy ? null : _edit,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+      ],
+    ),
     bottomNavigationBar: SafeArea(
       top: false,
       child: Padding(
@@ -394,30 +438,13 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('选择石刻画面', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              for (final artwork in MilestoneArtwork.values)
-                ChoiceChip(
-                  label: Text(artwork.label),
-                  selected: _artwork == artwork,
-                  onSelected: _busy
-                      ? null
-                      : (_) => setState(() => _artwork = artwork),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: MilestonePoster(
-                colony: widget.colony,
-                milestone: widget.milestone,
-                artwork: _artwork,
+                colony: _colony,
+                milestone: _milestone,
+                artwork: _milestone.artwork,
               ),
             ),
           ),

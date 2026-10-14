@@ -36,6 +36,16 @@ class _MilestonePageState extends State<MilestonePage> {
     if (saved == true && mounted) _reload();
   }
 
+  Future<void> _preview(Milestone milestone) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            MilestoneSharePage(colony: widget.colony, milestone: milestone),
+      ),
+    );
+    if (mounted) _reload();
+  }
+
   Future<void> _delete(Milestone milestone) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -119,30 +129,14 @@ class _MilestonePageState extends State<MilestonePage> {
                       ),
                   ],
                 ),
-                onTap: widget.colony.archived ? null : () => _edit(milestone),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: '分享里程碑',
-                      icon: const Icon(Icons.share_outlined),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => MilestoneSharePage(
-                            colony: widget.colony,
-                            milestone: milestone,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (!widget.colony.archived)
-                      IconButton(
+                onTap: () => _preview(milestone),
+                trailing: widget.colony.archived
+                    ? null
+                    : IconButton(
                         tooltip: '删除里程碑',
                         icon: const Icon(Icons.delete_outline),
                         onPressed: () => _delete(milestone),
                       ),
-                  ],
-                ),
               ),
             );
           },
@@ -167,7 +161,10 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
   final _note = TextEditingController();
   Future<List<Colony>>? _colonies;
   String? _selectedColonyId;
+  Colony? _selectedColony;
   bool _syncDiary = false;
+  late MilestoneArtwork _artwork =
+      widget.milestone?.artwork ?? MilestoneArtwork.harvest;
   late DateTime _occurredAt =
       widget.milestone?.occurredAt ?? DateUtils.dateOnly(DateTime.now());
   late bool _hasTime =
@@ -251,6 +248,7 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
       note: _note.text.trim().isEmpty ? null : _note.text,
       occurredAt: _occurredAt,
       createdAt: widget.milestone?.createdAt ?? DateTime.now(),
+      artwork: _artwork,
     );
     try {
       milestone.validate();
@@ -331,6 +329,7 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           controller: _title,
           maxLength: 80,
           decoration: const InputDecoration(labelText: '里程碑标题'),
+          onChanged: (_) => setState(() {}),
         ),
         if (_colonies != null)
           FutureBuilder<List<Colony>>(
@@ -360,6 +359,11 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
                     ? null
                     : (value) => setState(() {
                         _selectedColonyId = value;
+                        _selectedColony = value == null
+                            ? null
+                            : snapshot.data!.firstWhere(
+                                (colony) => colony.id == value,
+                              );
                         if (value == null) _syncDiary = false;
                       }),
               );
@@ -402,6 +406,47 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           maxLength: 2000,
           maxLines: 5,
           decoration: const InputDecoration(labelText: '里程碑说明（可选）'),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 20),
+        Text('选择石刻画面', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final artwork in MilestoneArtwork.values) ...[
+                ChoiceChip(
+                  label: Text(artwork.label),
+                  selected: _artwork == artwork,
+                  onSelected: _saving
+                      ? null
+                      : (_) => setState(() => _artwork = artwork),
+                ),
+                if (artwork != MilestoneArtwork.values.last)
+                  const SizedBox(width: 8),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: MilestonePoster(
+              colony: widget.colony ?? _selectedColony,
+              milestone: Milestone(
+                id: widget.milestone?.id ?? 'preview',
+                colonyId: widget.colony?.id ?? _selectedColonyId,
+                title: _title.text.trim().isEmpty ? '里程碑标题' : _title.text,
+                note: _note.text.trim().isEmpty ? null : _note.text,
+                occurredAt: _occurredAt,
+                createdAt: widget.milestone?.createdAt ?? DateTime.now(),
+                artwork: _artwork,
+              ),
+              artwork: _artwork,
+            ),
+          ),
         ),
         const SizedBox(height: 24),
         const Text('里程碑本身不参与日记和数量统计；若同步观察日记，新增的日记会计入篇数。'),

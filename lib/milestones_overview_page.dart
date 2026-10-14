@@ -31,12 +31,10 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
     _items = AppDatabase.instance.listAllMilestones();
   });
 
-  Future<void> _edit([Milestone? milestone]) async {
-    final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => MilestoneFormPage(milestone: milestone),
-      ),
-    );
+  Future<void> _add() async {
+    final saved = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const MilestoneFormPage()));
     if (saved == true && mounted) _reload();
   }
 
@@ -70,22 +68,23 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
     }
   }
 
-  Future<void> _openMilestones(Milestone milestone) async {
-    if (milestone.colonyId == null) {
-      await _edit(milestone);
-      return;
-    }
+  Future<void> _preview(Milestone milestone) async {
     try {
-      final colony = await AppDatabase.instance.findColony(milestone.colonyId!);
+      final colony = milestone.colonyId == null
+          ? null
+          : await AppDatabase.instance.findColony(milestone.colonyId!);
       if (!mounted) return;
-      if (colony == null) {
+      if (milestone.colonyId != null && colony == null) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('蚁群不存在，无法查看里程碑')));
         _reload();
         return;
       }
       await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => MilestonePage(colony: colony)),
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              MilestoneSharePage(colony: colony, milestone: milestone),
+        ),
       );
       if (mounted) _reload();
     } catch (error) {
@@ -145,24 +144,8 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
                       trailing: milestone.colonyId == null
                           ? PopupMenuButton<String>(
                               tooltip: '里程碑操作',
-                              onSelected: (action) {
-                                if (action == 'share') {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => MilestoneSharePage(
-                                        milestone: milestone,
-                                      ),
-                                    ),
-                                  );
-                                } else if (action == 'delete') {
-                                  _delete(milestone);
-                                }
-                              },
+                              onSelected: (_) => _delete(milestone),
                               itemBuilder: (_) => const [
-                                PopupMenuItem(
-                                  value: 'share',
-                                  child: Text('分享里程碑'),
-                                ),
                                 PopupMenuItem(
                                   value: 'delete',
                                   child: Text('删除里程碑'),
@@ -170,7 +153,7 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
                               ],
                             )
                           : const Icon(Icons.chevron_right),
-                      onTap: () => _openMilestones(milestone),
+                      onTap: () => _preview(milestone),
                     ),
                   );
                 },
@@ -186,7 +169,7 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
           child: SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () => _edit(),
+              onPressed: _add,
               icon: const Icon(Icons.add),
               label: const Text('添加里程碑'),
             ),
