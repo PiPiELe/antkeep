@@ -1207,9 +1207,17 @@ void main() {
                 of: card,
                 matching: find.textContaining('今日待办：'),
               );
+              final dueWidget = tester.widget<Text>(due);
+              expect(dueWidget.maxLines, 1);
+              expect(dueWidget.softWrap, isFalse);
+              expect(dueWidget.style?.fontSize, 11);
               expect(
-                tester.getRect(due).top - tester.getRect(tags).bottom,
-                lessThan(20),
+                tester.getRect(due).top,
+                greaterThan(tester.getRect(tags).bottom),
+              );
+              expect(
+                tester.getRect(due).right,
+                lessThan(tester.getRect(card).right),
               );
             }
             final divider = find.descendant(
@@ -1305,7 +1313,7 @@ void main() {
     );
   }
 
-  testWidgets('colony card scrolls tags before the duration divider', (
+  testWidgets('colony card keeps nest type in description, not tags', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(393, 800);
@@ -1362,14 +1370,14 @@ void main() {
       tester.getRect(tagScroll).right,
       lessThan(tester.getRect(duration).left),
     );
-    final nestTag = find.descendant(
-      of: tagScroll,
-      matching: find.text('横置石膏巢和外接活动区'),
+    expect(
+      find.descendant(of: crowdedCard, matching: find.text('横置石膏巢和外接活动区')),
+      findsOneWidget,
     );
-    final beforeDrag = tester.getTopLeft(nestTag).dx;
-    await tester.drag(tagScroll, const Offset(-80, 0));
-    await tester.pumpAndSettle();
-    expect(tester.getTopLeft(nestTag).dx, lessThan(beforeDrag));
+    expect(
+      find.descendant(of: tagScroll, matching: find.text('横置石膏巢和外接活动区')),
+      findsNothing,
+    );
     final durationLabel = find.descendant(
       of: crowdedCard,
       matching: find.text('已养殖'),
@@ -2396,7 +2404,7 @@ void main() {
     );
   }
 
-  testWidgets('colony card fits a long name and keeps all tags on one row', (
+  testWidgets('colony card keeps new queen first and tags on one row', (
     tester,
   ) async {
     final date = DateTime(2026, 9, 1);
@@ -2406,6 +2414,7 @@ void main() {
         id: 'compact-card',
         name: name,
         nestType: '试管巢',
+        source: '野采',
         queenCount: 1,
         initialWorkerCount: 0,
         createdAt: date,
@@ -2422,10 +2431,17 @@ void main() {
     expect(tester.widget<Text>(find.text(name)).style?.fontSize, lessThan(18));
     final tagTops = [
       '新后群',
+      '野采',
       '小群',
-      '试管巢',
-    ].map((label) => tester.getTopLeft(find.text(label).last).dy).toList();
+    ].map((label) => tester.getTopLeft(find.text(label)).dy).toList();
     expect(tagTops.toSet(), hasLength(1));
+    final tagLefts = [
+      '新后群',
+      '野采',
+      '小群',
+    ].map((label) => tester.getTopLeft(find.text(label)).dx).toList();
+    expect(tagLefts, orderedEquals([...tagLefts]..sort()));
+    expect(find.text('试管巢'), findsOneWidget);
     expect(tester.widget<Text>(find.text('1 蚁后')).style?.fontSize, 13);
     expect(tester.takeException(), isNull);
 
@@ -2443,9 +2459,9 @@ void main() {
     await tester.pumpAndSettle();
     final scaledTagTops = [
       '新后群',
+      '野采',
       '小群',
-      '试管巢',
-    ].map((label) => tester.getTopLeft(find.text(label).last).dy).toList();
+    ].map((label) => tester.getTopLeft(find.text(label)).dy).toList();
     expect(scaledTagTops.toSet(), hasLength(1));
     expect(tester.takeException(), isNull);
   });

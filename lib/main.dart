@@ -959,29 +959,21 @@ class _ColonyCard extends StatelessWidget {
       colony.nestType,
     ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
     final hasTags =
-        colony.isWildCatch ||
-        colony.isNewQueenColony ||
-        workers != null ||
-        colony.nestType?.isNotEmpty == true;
+        colony.isWildCatch || colony.isNewQueenColony || workers != null;
     final dueText = dueTasks.isEmpty
         ? null
         : '今日待办：${dueTasks.map((task) => task.type.label).join('、')}';
     List<Widget> lowerMetadata() => <Widget>[
       if (hasTags) ...[
         const SizedBox(height: 6),
-        _ColonyTags(colony: colony, workers: workers, scrollable: true),
+        _ColonyTags(
+          colony: colony,
+          workers: workers,
+          scrollable: true,
+          showNestType: false,
+        ),
       ],
       const SizedBox(height: 10),
-      if (dueText != null) ...[
-        Text(
-          dueText,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.error,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-      ],
     ];
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1127,6 +1119,20 @@ class _ColonyCard extends StatelessWidget {
                   );
                 },
               ),
+              if (dueText != null) ...[
+                Text(
+                  dueText,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Divider(height: 1, color: antKeepDividerColor(theme.colorScheme)),
               const SizedBox(height: 12),
               Row(
@@ -1174,11 +1180,13 @@ class _ColonyTags extends StatelessWidget {
     required this.workers,
     this.scrollable = false,
     this.singleLine = false,
+    this.showNestType = true,
   });
   final Colony colony;
   final int? workers;
   final bool scrollable;
   final bool singleLine;
+  final bool showNestType;
 
   @override
   Widget build(BuildContext context) {
@@ -1217,21 +1225,25 @@ class _ColonyTags extends StatelessWidget {
     final tags = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (colony.isWildCatch) ...[
-          badge('野采', scheme.tertiary),
-          if (colony.isNewQueenColony ||
+        if (colony.isNewQueenColony) ...[
+          badge('新后群', scheme.primary, crown: true),
+          if (colony.isWildCatch ||
               scale != null ||
-              colony.nestType?.isNotEmpty == true)
+              (showNestType && colony.nestType?.isNotEmpty == true))
             const SizedBox(width: 8),
         ],
-        if (colony.isNewQueenColony) badge('新后群', scheme.primary, crown: true),
-        if (colony.isNewQueenColony &&
-            (scale != null || colony.nestType?.isNotEmpty == true))
-          const SizedBox(width: 8),
+        if (colony.isWildCatch) ...[
+          badge('野采', scheme.tertiary),
+          if (scale != null ||
+              (showNestType && colony.nestType?.isNotEmpty == true))
+            const SizedBox(width: 8),
+        ],
         if (scale != null) badge(scale.label, color),
-        if (scale != null && colony.nestType?.isNotEmpty == true)
+        if (scale != null &&
+            showNestType &&
+            colony.nestType?.isNotEmpty == true)
           const SizedBox(width: 8),
-        if (colony.nestType?.isNotEmpty == true)
+        if (showNestType && colony.nestType?.isNotEmpty == true)
           if (scrollable || singleLine)
             badge(colony.nestType!, scheme.onSurfaceVariant)
           else
