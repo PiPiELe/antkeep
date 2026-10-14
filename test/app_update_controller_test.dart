@@ -43,6 +43,7 @@ AppUpdateController controller({
   bool supported = true,
   Future<bool> Function(Uri)? openUrl,
   Future<void> Function()? onRequiredUpdate,
+  String? Function()? sessionToken,
 }) => AppUpdateController(
   api: OnlineApi(
     baseUrl: 'https://api.example.test',
@@ -52,9 +53,40 @@ AppUpdateController controller({
   supportsUpdates: () => supported,
   openUrl: openUrl,
   onRequiredUpdate: onRequiredUpdate,
+  sessionToken: sessionToken,
 );
 
 void main() {
+  test(
+    'update check sends login token and applies matching mandatory policy',
+    () async {
+      String? token;
+      var requiredCount = 0;
+      final updates = controller(
+        sessionToken: () => token,
+        onRequiredUpdate: () async => requiredCount++,
+        respond: (request) async {
+          final authenticated =
+              request.headers['authorization'] == 'Bearer session-a';
+          return response(
+            policy(
+              latest: authenticated ? '1.2.0' : '1.0.0',
+              minimum: authenticated ? '1.2.0' : null,
+            ),
+            200,
+          );
+        },
+        currentVersion: () async => '1.0.0',
+      );
+      await updates.setOnline(true);
+      expect(updates.availability, AppUpdateAvailability.none);
+      token = 'session-a';
+      await updates.check();
+      expect(updates.availability, AppUpdateAvailability.required);
+      expect(requiredCount, 1);
+      updates.dispose();
+    },
+  );
   test('installed revisions compare against release policies without format errors', () async {
     for (final entry in [
       ('1.0.7', null, AppUpdateAvailability.none),

@@ -76,6 +76,129 @@ http.Response response(String body, int status) => http.Response.bytes(
 
 void main() {
   test(
+    'targeted announcement follows login and never enters the content cache',
+    () async {
+      final store = MemoryOnlineStore();
+      final c = controller(store, (request) async {
+        switch (request.url.path) {
+          case '/api/public/content':
+            final data = jsonDecode(snapshot()) as Map<String, dynamic>;
+            if (request.headers['authorization'] == 'Bearer session-a') {
+              data['targetedAnnouncement'] = {
+                'id': 'notice-1:1',
+                'title': '用户 A 弹窗',
+                'body': '仅登录后显示。',
+              };
+            } else if (request.headers['authorization'] == 'Bearer session-b') {
+              data['targetedAnnouncement'] = {
+                'id': 'notice-2:1',
+                'title': '用户 B 弹窗',
+                'body': '另一条定向内容。',
+              };
+            }
+            return response(jsonEncode(data), 200);
+          case '/api/app/auth/login':
+            final username =
+                (jsonDecode(request.body) as Map<String, dynamic>)['username']
+                    as String;
+            return response(
+              jsonEncode({
+                'token': username == 'alice' ? 'session-a' : 'session-b',
+                'user': user(username),
+              }),
+              200,
+            );
+          case '/api/app/check-ins/summary':
+            return response(jsonEncode(summary(0)), 200);
+          case '/api/app/auth/logout':
+            return response('{"ok":true}', 200);
+        }
+        throw StateError(request.url.path);
+      });
+      await c.setEnabled(true);
+      expect(c.pendingAnnouncement, isNull);
+      await c.login('alice', 'password');
+      expect(c.pendingAnnouncement?.title, '用户 A 弹窗');
+      expect(store.content, isNot(contains('targetedAnnouncement')));
+      await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+      await c.logout();
+      expect(c.pendingAnnouncement, isNull);
+      await c.login('bob', 'password');
+      expect(c.pendingAnnouncement?.title, '用户 B 弹窗');
+      await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+      await c.logout();
+      await c.login('alice', 'password');
+      expect(c.pendingAnnouncement, isNull);
+      c.dispose();
+
+      final reopened = controller(store, (_) async => response('{}', 503));
+      await reopened.setEnabled(true);
+      expect(reopened.content.announcement, isNull);
+      reopened.dispose();
+    },
+  );
+  test('targeted and public announcements are both shown once', () async {
+    final payload = jsonDecode(snapshot()) as Map<String, dynamic>;
+    payload['texts'] = {
+      'app.announcement': {
+        'title': '维护通知',
+        'body': '今晚维护。',
+        'updatedAt': '2026-10-14T01:00:00Z',
+      },
+    };
+    payload['targetedAnnouncement'] = {
+      'id': 'tag-notice:1',
+      'title': '标签通知',
+      'body': '标签用户内容。',
+    };
+    final store = MemoryOnlineStore();
+    final c = controller(
+      store,
+      (_) async => response(jsonEncode(payload), 200),
+    );
+    await c.setEnabled(true);
+    expect(c.pendingAnnouncement?.title, '标签通知');
+    await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+    expect(c.pendingAnnouncement?.title, '维护通知');
+    await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+    expect(c.pendingAnnouncement, isNull);
+    await c.refreshContent();
+    expect(c.pendingAnnouncement, isNull);
+    c.dispose();
+  });
+
+  test(
+    'targeted announcement arrives before public content is published',
+    () async {
+      final store = MemoryOnlineStore();
+      final c = controller(store, (request) async {
+        if (request.url.path == '/api/public/content') {
+          return response('{"message":"尚无已发布内容。"}', 404);
+        }
+        if (request.url.path == '/api/public/announcement') {
+          return response(
+            jsonEncode({
+              'targetedAnnouncement': {
+                'id': 'early-notice:1',
+                'title': '开站通知',
+                'body': '欢迎使用。',
+              },
+            }),
+            200,
+          );
+        }
+        throw StateError(request.url.path);
+      });
+      await c.setEnabled(true);
+      expect(c.content.version, 0);
+      expect(c.pendingAnnouncement?.title, '开站通知');
+      await c.acknowledgeAnnouncement(c.pendingAnnouncement!.id);
+      await c.refreshContent();
+      expect(c.pendingAnnouncement, isNull);
+      c.dispose();
+    },
+  );
+  test(
     'published announcement appears once per edit and can be withdrawn',
     () async {
       final payload = jsonDecode(snapshot()) as Map<String, dynamic>;

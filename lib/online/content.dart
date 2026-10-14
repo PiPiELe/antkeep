@@ -39,6 +39,7 @@ class PublicContent {
     required this.steps,
     this.beginnerCareNotices = bundledBeginnerCareNotices,
     this.announcement,
+    this.targetedAnnouncement,
   });
   final int version;
   final List<ItemTemplate> templates;
@@ -46,6 +47,7 @@ class PublicContent {
   final List<HelpStep> steps;
   final List<BeginnerCareNotice> beginnerCareNotices;
   final AppAnnouncement? announcement;
+  final AppAnnouncement? targetedAnnouncement;
 
   static const bundled = PublicContent(
     version: 0,
@@ -166,6 +168,7 @@ class PublicContent {
         );
       }
     }
+    final targeted = decodeTargeted(data['targetedAnnouncement']);
     return PublicContent(
       version: version,
       templates: templates,
@@ -176,6 +179,19 @@ class PublicContent {
           ? bundledBeginnerCareNotices
           : List.unmodifiable(notices),
       announcement: announcement,
+      targetedAnnouncement: targeted,
+    );
+  }
+
+  static AppAnnouncement? decodeTargeted(dynamic targeted) {
+    if (targeted == null) return null;
+    if (targeted is! Map<String, dynamic>) {
+      throw const FormatException('无效定向弹窗');
+    }
+    return AppAnnouncement(
+      id: _text(targeted['id'], 64),
+      title: _text(targeted['title'], 200),
+      body: _text(targeted['body'], 4000),
     );
   }
 

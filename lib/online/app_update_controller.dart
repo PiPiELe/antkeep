@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -9,6 +11,7 @@ class AppUpdateController extends ChangeNotifier {
     required this.api,
     required this.currentVersion,
     required this.supportsUpdates,
+    this.sessionToken,
     this.onRequiredUpdate,
     Future<bool> Function(Uri)? openUrl,
   }) : _openUrl =
@@ -18,6 +21,7 @@ class AppUpdateController extends ChangeNotifier {
   final OnlineApi api;
   final Future<String> Function() currentVersion;
   final bool Function() supportsUpdates;
+  final String? Function()? sessionToken;
   final Future<void> Function()? onRequiredUpdate;
   final Future<bool> Function(Uri) _openUrl;
   bool online = false, checking = false;
@@ -25,15 +29,17 @@ class AppUpdateController extends ChangeNotifier {
   AppUpdatePolicy? policy;
   AppUpdateAvailability availability = AppUpdateAvailability.none;
   bool _optionalPromptShown = false;
+  bool _recheckRequested = false;
   int _generation = 0;
 
   Future<bool> setOnline(bool value) async {
     final generation = ++_generation;
     online = value;
     api.cancel();
-    // Update checks are anonymous and available in both editions.
+    // Both editions can check updates; online sessions receive their audience rules.
     api.setEnabled(true);
     checking = false;
+    _recheckRequested = false;
     error = null;
     policy = null;
     availability = AppUpdateAvailability.none;
@@ -45,7 +51,10 @@ class AppUpdateController extends ChangeNotifier {
   bool _current(int generation) => generation == _generation;
 
   Future<void> check({bool manual = false}) async {
-    if (checking) return;
+    if (checking) {
+      _recheckRequested = true;
+      return;
+    }
     if (!supportsUpdates()) {
       availability = AppUpdateAvailability.none;
       error = manual ? '当前平台暂不支持应用更新检查。' : null;
@@ -57,10 +66,25 @@ class AppUpdateController extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final raw = await api.request('/api/public/app-update/android');
+      final token = online ? sessionToken?.call() : null;
+      final raw = await api.request(
+        '/api/public/app-update/android',
+        token: token,
+      );
       final candidate = AppUpdatePolicy.decode(raw);
       final installed = AppVersion.parseInstalled(await currentVersion());
       if (!_current(generation)) return;
+      if (online && token != sessionToken?.call()) {
+        _recheckRequested = true;
+        return;
+      }
+      if (policy?.latestVersion.toString() !=
+              candidate.latestVersion.toString() ||
+          policy?.minimumVersion?.toString() !=
+              candidate.minimumVersion?.toString() ||
+          policy?.downloadUrl != candidate.downloadUrl) {
+        _optionalPromptShown = false;
+      }
       policy = candidate;
       availability =
           online &&
@@ -92,6 +116,10 @@ class AppUpdateController extends ChangeNotifier {
       if (_current(generation)) {
         checking = false;
         notifyListeners();
+        if (_recheckRequested) {
+          _recheckRequested = false;
+          unawaited(check());
+        }
       }
     }
   }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
@@ -35,10 +36,13 @@ class OnlineController extends ChangeNotifier {
   String? error, contentNotice;
   String? _token;
   bool get hasSession => _token != null;
+  String? get sessionToken => _token;
   PublicContent _cached = PublicContent.bundled;
   PublicContent get content => enabled ? _cached : PublicContent.bundled;
   AppAnnouncement? pendingAnnouncement;
+  List<AppAnnouncement> _announcements = [];
   int _generation = 0;
+  Completer<void>? _contentRefreshDone;
 
   Future<void> setEnabled(bool value) async {
     if (enabled == value) return;
@@ -49,11 +53,12 @@ class OnlineController extends ChangeNotifier {
     refreshing = false;
     user = null;
     checkin = null;
+    _token = null;
     pendingAnnouncement = null;
+    _announcements = [];
     error = null;
     notifyListeners();
     if (!value) {
-      _token = null;
       return;
     }
     await _loadContent(generation);
@@ -80,37 +85,59 @@ class OnlineController extends ChangeNotifier {
   bool _current(int generation) => enabled && generation == _generation;
 
   Future<void> refreshContent() async {
-    if (!enabled || refreshing) return;
+    if (!enabled) return;
+    if (refreshing) {
+      await _contentRefreshDone?.future;
+      if (enabled) await refreshContent();
+      return;
+    }
     final generation = _generation;
+    final token = _token;
+    final completed = Completer<void>();
+    _contentRefreshDone = completed;
     refreshing = true;
     contentNotice = null;
     notifyListeners();
     try {
-      final raw = await api.request('/api/public/content');
+      final raw = await api.request('/api/public/content', token: token);
       final candidate = PublicContent.decode(raw);
-      if (!_current(generation)) return;
+      if (!_current(generation) || token != _token) return;
       if (candidate.version < _cached.version) {
         throw const FormatException('内容版本回退');
       }
       // Persist validated snapshots only; existing husbandry data is never touched.
-      await store.writeContent(raw);
+      // Audience-specific messages must never be replayed from a shared cache.
+      final publicSnapshot = jsonDecode(raw) as Map<String, dynamic>;
+      publicSnapshot.remove('targetedAnnouncement');
+      await store.writeContent(jsonEncode(publicSnapshot));
       if (!_current(generation)) return;
       _cached = candidate;
       contentNotice = '已更新至资料版本 ${candidate.version}';
-      final announcement = candidate.announcement;
-      String? seenAnnouncement;
-      try {
-        seenAnnouncement = await store.readSeenAnnouncement();
-      } catch (_) {
-        // Do not repeat a notice when its local read state is unavailable.
-        seenAnnouncement = announcement?.id;
+      await _selectAnnouncements(
+        [
+          if (candidate.targetedAnnouncement != null)
+            candidate.targetedAnnouncement!,
+          if (candidate.announcement != null) candidate.announcement!,
+        ],
+        generation,
+        token,
+      );
+    } catch (e) {
+      if (e is ApiFailure && e.status == 404 && _current(generation)) {
+        try {
+          final raw = await api.request(
+            '/api/public/announcement',
+            token: token,
+          );
+          final data = jsonDecode(raw) as Map<String, dynamic>;
+          final targeted = PublicContent.decodeTargeted(
+            data['targetedAnnouncement'],
+          );
+          await _selectAnnouncements([?targeted], generation, token);
+        } catch (_) {
+          // The content fallback still works when announcement delivery fails.
+        }
       }
-      if (!_current(generation)) return;
-      pendingAnnouncement =
-          announcement != null && seenAnnouncement != announcement.id
-          ? announcement
-          : null;
-    } catch (_) {
       if (_current(generation)) {
         contentNotice = _cached.version == 0
             ? '暂时无法更新，正在使用内置资料。'
@@ -121,14 +148,54 @@ class OnlineController extends ChangeNotifier {
         refreshing = false;
         notifyListeners();
       }
+      completed.complete();
     }
+  }
+
+  Future<void> _selectAnnouncements(
+    List<AppAnnouncement> announcements,
+    int generation,
+    String? token,
+  ) async {
+    Set<String> seen;
+    try {
+      seen = _seenAnnouncements(await store.readSeenAnnouncement());
+    } catch (_) {
+      // Do not repeat notices when their local read state is unavailable.
+      seen = announcements.map((announcement) => announcement.id).toSet();
+    }
+    if (!_current(generation) || token != _token) return;
+    _announcements = announcements
+        .where((announcement) => !seen.contains(announcement.id))
+        .toList();
+    pendingAnnouncement = _announcements.firstOrNull;
   }
 
   Future<void> acknowledgeAnnouncement(String id) async {
     if (pendingAnnouncement?.id != id) return;
+    final generation = _generation;
     pendingAnnouncement = null;
     notifyListeners();
-    await store.writeSeenAnnouncement(id);
+    final seen = _seenAnnouncements(await store.readSeenAnnouncement());
+    seen.add(id);
+    await store.writeSeenAnnouncement(jsonEncode(seen.toList()));
+    if (!_current(generation)) return;
+    _announcements.removeWhere((announcement) => announcement.id == id);
+    pendingAnnouncement = _announcements.firstOrNull;
+    notifyListeners();
+  }
+
+  static Set<String> _seenAnnouncements(String? stored) {
+    if (stored == null || stored.isEmpty) return <String>{};
+    try {
+      final values = jsonDecode(stored);
+      if (values is List && values.every((value) => value is String)) {
+        return values.cast<String>().toSet();
+      }
+    } catch (_) {
+      // Existing installs stored a single announcement ID as plain text.
+    }
+    return {stored};
   }
 
   Future<void> login(
@@ -172,6 +239,7 @@ class OnlineController extends ChangeNotifier {
       user = nextUser;
       checkin = null;
       await _summary(generation);
+      if (_current(generation)) await refreshContent();
     } catch (e) {
       if (_current(generation)) await _failure(e);
     } finally {
@@ -199,6 +267,8 @@ class OnlineController extends ChangeNotifier {
     user = null;
     checkin = null;
     _token = null;
+    pendingAnnouncement = null;
+    _announcements = [];
     error = null;
     notifyListeners();
     try {
@@ -215,6 +285,7 @@ class OnlineController extends ChangeNotifier {
       }
     } finally {
       if (_current(generation)) {
+        await _loadContent(generation);
         busy = false;
         notifyListeners();
       }
@@ -385,6 +456,8 @@ class OnlineController extends ChangeNotifier {
       user = null;
       checkin = null;
       _token = null;
+      pendingAnnouncement = null;
+      _announcements = [];
     }
     error = e is ApiFailure ? e.message : '在线状态读取或保存失败，请重试。';
   }
