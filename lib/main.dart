@@ -326,6 +326,33 @@ class _HomePageState extends State<HomePage>
   late List<BeginnerCareNotice> _careNotices;
   bool _competitionPromptBusy = false;
   String? _competitionPromptChecked;
+  Timer? _checkinRefreshTimer;
+
+  void _scheduleCheckinRefresh() {
+    final now = DateTime.now().toUtc();
+    final beijingNow = now.add(const Duration(hours: 8));
+    final nextMidnight = DateTime.utc(
+      beijingNow.year,
+      beijingNow.month,
+      beijingNow.day + 1,
+    ).subtract(const Duration(hours: 8));
+    _checkinRefreshTimer = Timer(
+      nextMidnight.difference(now),
+      _refreshCheckinAtDayChange,
+    );
+  }
+
+  void _refreshCheckinAtDayChange() {
+    if (onlineController.busy && onlineController.user != null) {
+      _checkinRefreshTimer = Timer(
+        const Duration(minutes: 1),
+        _refreshCheckinAtDayChange,
+      );
+      return;
+    }
+    unawaited(onlineController.refreshCheckin());
+    _scheduleCheckinRefresh();
+  }
 
   void _checkCompetitionUpdates() {
     if (!mounted ||
@@ -412,6 +439,7 @@ class _HomePageState extends State<HomePage>
     onlineController.addListener(_updateCareNotices);
     onlineController.addListener(_checkCompetitionUpdates);
     WidgetsBinding.instance.addObserver(this);
+    _scheduleCheckinRefresh();
     _checkCompetitionUpdates();
   }
 
@@ -421,12 +449,15 @@ class _HomePageState extends State<HomePage>
     onlineController.removeListener(_updateCareNotices);
     onlineController.removeListener(_checkCompetitionUpdates);
     WidgetsBinding.instance.removeObserver(this);
+    _checkinRefreshTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _checkinRefreshTimer?.cancel();
+      _scheduleCheckinRefresh();
       unawaited(onlineController.refreshCheckin());
       _checkCompetitionUpdates();
     }
@@ -6382,6 +6413,16 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _savingEdition = false;
   bool _savingSimpleMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.category == SettingsCategory.online) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(onlineController.refreshCheckin());
+      });
+    }
+  }
 
   Future<void> _setSimpleMode(bool enabled) async {
     if (_savingSimpleMode) return;

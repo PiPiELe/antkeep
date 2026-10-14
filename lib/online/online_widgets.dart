@@ -76,26 +76,17 @@ class OnlineSettings extends StatelessWidget {
                           ? '签到状态尚未读取'
                           : '${controller.checkin!.date} · 连续 ${controller.checkin!.consecutiveDays} 天 · 累计 ${controller.checkin!.totalDays} 天',
                     ),
-                    Wrap(
-                      spacing: 12,
-                      children: [
-                        FilledButton(
-                          onPressed: controller.busy
-                              ? null
-                              : () => controller.refreshCheckin(submit: true),
-                          child: Text(
-                            controller.checkin?.checkedInToday == true
-                                ? '已签到 · 再次确认'
-                                : '签到',
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: controller.busy
-                              ? null
-                              : controller.refreshCheckin,
-                          child: const Text('刷新状态'),
-                        ),
-                      ],
+                    FilledButton(
+                      onPressed:
+                          controller.busy ||
+                              controller.checkin?.checkedInToday == true
+                          ? null
+                          : () => controller.refreshCheckin(submit: true),
+                      child: Text(
+                        controller.checkin?.checkedInToday == true
+                            ? '今日已签到'
+                            : '签到',
+                      ),
                     ),
                   ],
                 ),

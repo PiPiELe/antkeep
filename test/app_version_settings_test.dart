@@ -21,6 +21,55 @@ class _Store implements OnlineStore {
 }
 
 void main() {
+  testWidgets(
+    'check-in card has no refresh action and disables repeat submit',
+    (tester) async {
+      final online = OnlineController(
+        api: OnlineApi(baseUrl: ''),
+        store: _Store(),
+      );
+      final updates = AppUpdateController(
+        api: OnlineApi(baseUrl: ''),
+        currentVersion: () async => '1.0.3',
+        supportsUpdates: () => false,
+      );
+      online.enabled = true;
+      online.user = OnlineUser.fromJson({'id': 'alice', 'username': 'alice'});
+
+      Widget settings() => MaterialApp(
+        home: Scaffold(
+          body: OnlineSettings(
+            controller: online,
+            updates: updates,
+            section: OnlineSettingsSection.account,
+            useOffline: () async {},
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(settings());
+      expect(find.text('刷新状态'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '签到'), findsOneWidget);
+
+      online.checkin = CheckinSummary.fromJson({
+        'date': '2026-10-14',
+        'checkedInToday': true,
+        'consecutiveDays': 3,
+        'totalDays': 8,
+      });
+      await tester.pumpWidget(settings());
+      final checkedButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, '今日已签到'),
+      );
+      expect(checkedButton.onPressed, isNull);
+      expect(find.text('2026-10-14 · 连续 3 天 · 累计 8 天'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      updates.dispose();
+      online.dispose();
+    },
+  );
+
   testWidgets('installed version remains visible when update service fails', (
     tester,
   ) async {
