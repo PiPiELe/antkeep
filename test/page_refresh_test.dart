@@ -1131,7 +1131,11 @@ void main() {
               nestType: '试管巢',
               queenCount: 1,
               initialWorkerCount: 12,
-              acquiredOn: DateTime(now.year, now.month, now.day - 41),
+              acquiredOn: DateTime(
+                now.year,
+                now.month,
+                now.day - (id == 'due' ? 167 : 42),
+              ),
               createdAt: now,
               updatedAt: now,
             ).toMap(),
@@ -1172,7 +1176,10 @@ void main() {
           );
           final days = find.descendant(
             of: duration,
-            matching: find.text('41 天', findRichText: true),
+            matching: find.text(
+              '${id == 'due' ? 167 : 42} 天',
+              findRichText: true,
+            ),
           );
           expect(
             tester.widget<HusbandryDuration>(duration).stackedLabel,
@@ -1184,6 +1191,27 @@ void main() {
           );
           durationHeights.add(tester.getRect(days).height);
           if (width >= 360) {
+            final description = find
+                .descendant(of: card, matching: find.text('试管巢'))
+                .first;
+            final tags = find.descendant(
+              of: card,
+              matching: find.byType(SingleChildScrollView),
+            );
+            expect(
+              tester.getRect(tags).top - tester.getRect(description).bottom,
+              lessThan(20),
+            );
+            if (id == 'due') {
+              final due = find.descendant(
+                of: card,
+                matching: find.textContaining('今日待办：'),
+              );
+              expect(
+                tester.getRect(due).top - tester.getRect(tags).bottom,
+                lessThan(20),
+              );
+            }
             final divider = find.descendant(
               of: card,
               matching: find.byKey(const ValueKey('colony-duration-divider')),

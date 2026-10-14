@@ -966,17 +966,10 @@ class _ColonyCard extends StatelessWidget {
     final dueText = dueTasks.isEmpty
         ? null
         : '今日待办：${dueTasks.map((task) => task.type.label).join('、')}';
-    List<Widget> lowerMetadata({double? tagWidth}) => <Widget>[
+    List<Widget> lowerMetadata() => <Widget>[
       if (hasTags) ...[
         const SizedBox(height: 6),
-        SizedBox(
-          width: tagWidth,
-          child: _ColonyTags(
-            colony: colony,
-            workers: workers,
-            scrollable: true,
-          ),
-        ),
+        _ColonyTags(colony: colony, workers: workers, scrollable: true),
       ],
       const SizedBox(height: 10),
       if (dueText != null) ...[
@@ -1078,36 +1071,10 @@ class _ColonyCard extends StatelessWidget {
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final durationWidth = (constraints.maxWidth * .43).clamp(
+                  final durationWidth = (constraints.maxWidth * .40).clamp(
                     120.0,
                     160.0,
                   );
-                  final leftWidth = constraints.maxWidth - durationWidth - 21;
-                  double textWidth(String value, TextStyle? style) {
-                    final painter = TextPainter(
-                      text: TextSpan(text: value, style: style),
-                      maxLines: 1,
-                      textDirection: Directionality.of(context),
-                      textScaler: MediaQuery.textScalerOf(context),
-                    )..layout();
-                    final width = painter.width;
-                    painter.dispose();
-                    return width;
-                  }
-
-                  final canFillSpace =
-                      constraints.maxWidth >= 280 &&
-                      MediaQuery.textScalerOf(context).scale(12) <= 18 &&
-                      colony.acquiredOn != null &&
-                      dueText != null &&
-                      (hasTags || description.isNotEmpty) &&
-                      textWidth(
-                            dueText,
-                            theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ) <=
-                          leftWidth;
                   final duration = InkWell(
                     onTap: colony.acquiredOn == null ? onDurationTap : null,
                     borderRadius: BorderRadius.circular(8),
@@ -1145,40 +1112,17 @@ class _ColonyCard extends StatelessWidget {
                       ],
                     );
                   }
-                  if (canFillSpace) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [identity, ...lowerMetadata()],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        durationWithDivider(),
-                      ],
-                    );
-                  }
-                  return Column(
+                  return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 14),
-                              child: identity,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          durationWithDivider(),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [identity, ...lowerMetadata()],
+                        ),
                       ),
-                      ...lowerMetadata(
-                        tagWidth: constraints.maxWidth - durationWidth - 21,
-                      ),
+                      const SizedBox(width: 10),
+                      durationWithDivider(),
                     ],
                   );
                 },
