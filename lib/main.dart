@@ -123,7 +123,7 @@ class AntKeepApp extends StatefulWidget {
 
 class _AntKeepAppState extends State<AntKeepApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
-  int? _shownRequiredPolicy;
+  String? _shownRequiredPolicy;
   bool _updateDialogOpen = false;
   bool _announcementDialogOpen = false;
 
@@ -188,15 +188,17 @@ class _AntKeepAppState extends State<AntKeepApp> {
     }
     final required =
         appUpdateController.availability == AppUpdateAvailability.required;
+    final requiredKey =
+        '${policy.version}:${policy.minimumVersion}:${policy.downloadUrl}';
     final optional =
         appUpdateController.availability == AppUpdateAvailability.optional &&
         appUpdateController.takeOptionalPrompt();
     if ((!required && !optional) ||
-        (required && _shownRequiredPolicy == policy.version)) {
+        (required && _shownRequiredPolicy == requiredKey)) {
       return;
     }
     if (required) {
-      _shownRequiredPolicy = policy.version;
+      _shownRequiredPolicy = requiredKey;
     }
     _updateDialogOpen = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -459,6 +461,8 @@ class _HomePageState extends State<HomePage>
       _checkinRefreshTimer?.cancel();
       _scheduleCheckinRefresh();
       unawaited(onlineController.refreshCheckin());
+      unawaited(onlineController.refreshContent());
+      unawaited(appUpdateController.check());
       _checkCompetitionUpdates();
     }
   }

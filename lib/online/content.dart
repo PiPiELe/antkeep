@@ -166,6 +166,17 @@ class PublicContent {
         );
       }
     }
+    final targeted = data['targetedAnnouncement'];
+    if (targeted != null) {
+      if (targeted is! Map<String, dynamic>) {
+        throw const FormatException('无效定向弹窗');
+      }
+      announcement = AppAnnouncement(
+        id: _text(targeted['id'], 64),
+        title: _text(targeted['title'], 200),
+        body: _text(targeted['body'], 4000),
+      );
+    }
     return PublicContent(
       version: version,
       templates: templates,
