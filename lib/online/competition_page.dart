@@ -410,9 +410,9 @@ class _CompetitionPageState extends State<CompetitionPage> {
   }
 
   String _mode(String? mode) => switch (mode) {
-    'WORKER_GROWTH' => '亲工工蚁净增长',
-    'TOTAL_GROWTH' => '参赛虫口净增长',
-    _ => '积分',
+    'WORKER_GROWTH' => '工蚁净增长',
+    'TOTAL_GROWTH' => '虫口净增长',
+    _ => '积分制',
   };
   String _state(String? state) => switch (state) {
     'UPCOMING' => '未开始',
@@ -555,8 +555,8 @@ class _CompetitionPageState extends State<CompetitionPage> {
       ),
       const SizedBox(height: 8),
       Text(
-        '排名以报名时的数量为基线。积分赛中，报名时无工蚁和卵幼蛹的纯新后从 10 分开始；已有工蚁或卵幼蛹从 0 分开始。'
-        '已有工蚁的蚁群可报名，须标注合工与亲工数量；合工不计分。亲工工蚁净增加每只 2 分${d['broodPointsEnabled'] == true ? '，卵及亲工幼蛹茧净增加每只 1 分' : '；本场不计卵幼蛹分'}。',
+        '排名以报名时的数量为基线。${d['scoreMode'] == 'POINTS' ? '纯新后且报名时无卵幼蛹，基础获得 ${d['queenBasePoints'] ?? 10} 分；已有工蚁或卵幼蛹从 0 分开始。亲工工蚁净增每只 ${d['workerGrowthPoints'] ?? 2} 分，卵及亲工幼蛹茧净增每只 ${d['broodGrowthPoints'] ?? (d['broodPointsEnabled'] == false ? 0 : 1)} 分。' : ''}'
+        '已有工蚁的蚁群可报名，须标注合工与亲工数量；合工不计分。',
       ),
       if (d['reviewStatus'] == 'APPROVED' && d['enabled'] == true) ...[
         const SizedBox(height: 12),
@@ -688,8 +688,11 @@ class CompetitionProposalPage extends StatefulWidget {
 class _CompetitionProposalPageState extends State<CompetitionProposalPage> {
   final _form = GlobalKey<FormState>();
   final _title = TextEditingController();
+  final _queenPoints = TextEditingController(text: '10');
+  final _workerPoints = TextEditingController(text: '2');
+  final _broodPoints = TextEditingController(text: '1');
   String _mode = 'POINTS';
-  bool _broodPoints = true, _submitting = false;
+  bool _submitting = false;
   DateTime _start = DateTime.now();
   DateTime? _end;
   String? _error;
@@ -697,6 +700,9 @@ class _CompetitionProposalPageState extends State<CompetitionProposalPage> {
   @override
   void dispose() {
     _title.dispose();
+    _queenPoints.dispose();
+    _workerPoints.dispose();
+    _broodPoints.dispose();
     super.dispose();
   }
 
@@ -736,7 +742,15 @@ class _CompetitionProposalPageState extends State<CompetitionProposalPage> {
         'title': _title.text.trim(),
         'type': 'NEW_QUEEN_GROWTH',
         'scoreMode': _mode,
-        'broodPointsEnabled': _broodPoints,
+        'queenBasePoints': _mode == 'POINTS'
+            ? int.parse(_queenPoints.text)
+            : 10,
+        'workerGrowthPoints': _mode == 'POINTS'
+            ? int.parse(_workerPoints.text)
+            : 2,
+        'broodGrowthPoints': _mode == 'POINTS'
+            ? int.parse(_broodPoints.text)
+            : 1,
         'startDate': _date(_start),
         'endDate': _end == null ? null : _date(_end!),
       });
@@ -774,21 +788,22 @@ class _CompetitionProposalPageState extends State<CompetitionProposalPage> {
             initialValue: _mode,
             decoration: const InputDecoration(labelText: '排名方式'),
             items: const [
-              DropdownMenuItem(value: 'POINTS', child: Text('积分赛')),
-              DropdownMenuItem(value: 'WORKER_GROWTH', child: Text('亲工工蚁净增长')),
-              DropdownMenuItem(value: 'TOTAL_GROWTH', child: Text('参赛虫口净增长')),
+              DropdownMenuItem(value: 'POINTS', child: Text('积分制')),
+              DropdownMenuItem(value: 'WORKER_GROWTH', child: Text('工蚁净增长')),
+              DropdownMenuItem(value: 'TOTAL_GROWTH', child: Text('虫口净增长')),
             ],
             onChanged: (value) {
               if (value != null) setState(() => _mode = value);
             },
           ),
-          if (_mode == 'POINTS')
-            SwitchListTile(
-              title: const Text('卵幼蛹计分'),
-              subtitle: const Text('开启后，报名后净增加每只计 1 分'),
-              value: _broodPoints,
-              onChanged: (value) => setState(() => _broodPoints = value),
-            ),
+          if (_mode == 'POINTS') ...[
+            const SizedBox(height: 12),
+            Text('积分设置', style: Theme.of(context).textTheme.titleMedium),
+            const Text('填 0 表示该项不计分；增长按报名后的净增加量计算。'),
+            _pointField('新后基础获得积分', _queenPoints),
+            _pointField('每增工蚁获得积分', _workerPoints),
+            _pointField('每增卵幼蛹获得积分', _broodPoints),
+          ],
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: () => _chooseDate(end: false),
@@ -820,4 +835,18 @@ class _CompetitionProposalPageState extends State<CompetitionProposalPage> {
       ),
     ),
   );
+
+  Widget _pointField(String label, TextEditingController controller) =>
+      TextFormField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(labelText: label),
+        validator: (value) {
+          if (_mode != 'POINTS') return null;
+          final points = int.tryParse(value ?? '');
+          return points == null || points < 0 || points > 100
+              ? '请输入 0 到 100 的整数'
+              : null;
+        },
+      );
 }

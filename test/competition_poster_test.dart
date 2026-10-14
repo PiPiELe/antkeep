@@ -9,6 +9,9 @@ void main() {
     'title': '秋季新后成长挑战赛',
     'scoreMode': 'POINTS',
     'broodPointsEnabled': true,
+    'queenBasePoints': 5,
+    'workerGrowthPoints': 4,
+    'broodGrowthPoints': 3,
     'startDate': '2026-10-01',
     'endDate': null,
     'state': 'ACTIVE',
@@ -96,7 +99,10 @@ void main() {
             ),
           );
           expect(find.text('2026-10-01 — 长期进行'), findsOneWidget);
-          expect(find.textContaining('新增工蚁 +2 分'), findsOneWidget);
+          expect(
+            find.textContaining('新后 5 分 · 新增工蚁 +4 分 · 卵幼蛹 +3 分'),
+            findsOneWidget,
+          );
           expect(find.textContaining('打开蚁记在线版'), findsOneWidget);
           expect(tester.takeException(), isNull);
         },

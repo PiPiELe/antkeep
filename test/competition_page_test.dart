@@ -115,6 +115,28 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('proposal shows three point values only for points ranking', (
+    tester,
+  ) async {
+    final online = controller(
+      MemoryOnlineStore(),
+      (_) async => response('{}', 404),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: CompetitionProposalPage(controller: online)),
+    );
+    expect(find.text('积分制'), findsOneWidget);
+    expect(find.text('新后基础获得积分'), findsOneWidget);
+    expect(find.text('每增工蚁获得积分'), findsOneWidget);
+    expect(find.text('每增卵幼蛹获得积分'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('工蚁净增长').last);
+    await tester.pumpAndSettle();
+    expect(find.text('新后基础获得积分'), findsNothing);
+    online.dispose();
+  });
+
   testWidgets(
     'switching accounts clears private detail even when reload fails',
     (tester) async {

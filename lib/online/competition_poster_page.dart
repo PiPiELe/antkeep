@@ -328,17 +328,15 @@ class CompetitionPoster extends StatelessWidget {
 
   String get _mode => switch (detail['scoreMode']) {
     'WORKER_GROWTH' => '工蚁净增长',
-    'TOTAL_GROWTH' => '总虫口净增长',
-    _ => '积分排名',
+    'TOTAL_GROWTH' => '虫口净增长',
+    _ => '积分制',
   };
 
   String get _rule => switch (detail['scoreMode']) {
     'WORKER_GROWTH' => '按报名后新增的工蚁数量排名',
     'TOTAL_GROWTH' => '按报名后工蚁与卵幼蛹的净增长排名',
     _ =>
-      detail['broodPointsEnabled'] == true
-          ? '纯新后起始 10 分 · 新增工蚁 +2 分 · 卵幼蛹 +1 分'
-          : '纯新后起始 10 分 · 新增工蚁 +2 分',
+      '新后 ${detail['queenBasePoints'] ?? 10} 分 · 新增工蚁 +${detail['workerGrowthPoints'] ?? 2} 分 · 卵幼蛹 +${detail['broodGrowthPoints'] ?? (detail['broodPointsEnabled'] == false ? 0 : 1)} 分',
   };
 
   String get _period =>
