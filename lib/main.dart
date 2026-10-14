@@ -1778,17 +1778,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
               ),
               const SizedBox(height: 16),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: TextFormField(
                       controller: _queens,
                       validator: _validateRequiredCount,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '蚁后 *',
-                        helperText: '档案起始数量，日记中的死亡数量会从此扣减',
-                        helperMaxLines: 2,
-                      ),
+                      decoration: const InputDecoration(labelText: '蚁后 *'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1801,6 +1798,14 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  '档案起始数量，日记中的死亡数量会从此扣减',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
               const SizedBox(height: 16),
               Row(
