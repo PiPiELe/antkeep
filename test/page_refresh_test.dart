@@ -707,6 +707,53 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('new queen colonies stay first despite saved order and drags', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 10, 2);
+    for (final (id, workers) in [('q', 0), ('b', 10), ('a', 10)]) {
+      await AppDatabase.instance.saveColony(
+        Colony(
+          id: id,
+          name: id,
+          initialWorkerCount: workers,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    }
+    await themeController.setColonyOrder(['a', 'b', 'q']);
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('q'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('a'))).dy),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+    );
+
+    await dragColony(tester, 'q', 'b');
+    expect(themeController.colonyOrder.first, 'q');
+    await dragColony(tester, 'b', 'q');
+    expect(themeController.colonyOrder.first, 'q');
+
+    await themeController.load();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('q'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('a'))).dy),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('q'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('failed ordering write restores the visible and saved order', (
     tester,
   ) async {

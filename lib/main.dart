@@ -684,10 +684,14 @@ class _ColoniesPageState extends State<ColoniesPage> {
     final loaded = await AppDatabase.instance.listColonies();
     final tasks = await AppDatabase.instance.listCareTasks();
     final remaining = {for (final colony in loaded) colony.id: colony};
-    final colonies = <Colony>[
+    final ordered = <Colony>[
       for (final id in themeController.colonyOrder)
         if (remaining.containsKey(id)) remaining.remove(id)!,
       ...remaining.values,
+    ];
+    final colonies = <Colony>[
+      ...ordered.where((colony) => colony.isNewQueenColony),
+      ...ordered.where((colony) => !colony.isNewQueenColony),
     ];
     return Future.wait(
       colonies.map((colony) async {
@@ -720,6 +724,12 @@ class _ColoniesPageState extends State<ColoniesPage> {
     setState(() {
       _savingOrder = true;
       colonies.insert(newIndex, colonies.removeAt(oldIndex));
+      final newQueens = colonies
+          .where((entry) => entry.colony.isNewQueenColony)
+          .toList();
+      colonies
+        ..removeWhere((entry) => entry.colony.isNewQueenColony)
+        ..insertAll(0, newQueens);
     });
     try {
       await themeController.setColonyOrder(
