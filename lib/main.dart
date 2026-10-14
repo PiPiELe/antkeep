@@ -499,28 +499,40 @@ class _HomePageState extends State<HomePage>
     return Scaffold(
       appBar: AppBar(
         title: pageIndex == 0
-            ? TabBar(
-                controller: _colonyTabs,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                // Keep the colony switcher visually separate from page content;
-                // the selected-tab indicator alone was too easy to miss.
-                dividerColor: Theme.of(context).colorScheme.outlineVariant
-                    .withValues(alpha: .55),
-                dividerHeight: 1,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-                labelStyle: Theme.of(context).textTheme.titleMedium,
-                onTap: (_) => setState(() {}),
-                tabs: [
-                  for (final tab in ColonyTab.values)
-                    Tab(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onLongPress: () => _renameColonyTab(context, tab),
-                        child: Text(themeController.colonyTabName(tab)),
+            ? ShaderMask(
+                shaderCallback: (bounds) => LinearGradient(
+                  colors: const [
+                    Colors.white,
+                    Colors.white,
+                    Colors.transparent,
+                  ],
+                  stops: [0, (1 - 28 / bounds.width).clamp(0.0, 1.0), 1],
+                ).createShader(bounds),
+                blendMode: BlendMode.dstIn,
+                child: TabBar(
+                  controller: _colonyTabs,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  padding: const EdgeInsets.only(right: 28),
+                  // Keep the colony switcher visually separate from page content;
+                  // the selected-tab indicator alone was too easy to miss.
+                  dividerColor: Theme.of(context).colorScheme.outlineVariant
+                      .withValues(alpha: .55),
+                  dividerHeight: 1,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  labelStyle: Theme.of(context).textTheme.titleMedium,
+                  onTap: (_) => setState(() {}),
+                  tabs: [
+                    for (final tab in ColonyTab.values)
+                      Tab(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onLongPress: () => _renameColonyTab(context, tab),
+                          child: Text(themeController.colonyTabName(tab)),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               )
             : Text(titles[pageIndex]),
         actions: [
