@@ -76,6 +76,31 @@ void main() {
     });
   }
 
+  testWidgets('unlinked milestone also renders a share image', (tester) async {
+    final independent = Milestone(
+      id: 'independent',
+      title: '独立里程碑',
+      occurredAt: date,
+      createdAt: date,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MilestonePoster(
+            milestone: independent,
+            artwork: MilestoneArtwork.harvest,
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    final bytes = await tester.runAsync(
+      () => renderMilestonePng(null, independent, MilestoneArtwork.harvest),
+    );
+    expect(bytes, isNotNull);
+    expect(bytes!.take(8), [137, 80, 78, 71, 13, 10, 26, 10]);
+  });
+
   testWidgets('selected artwork can be shared and saved with long text', (
     tester,
   ) async {

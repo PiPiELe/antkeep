@@ -49,6 +49,15 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  Future<void> settleDatabase(WidgetTester tester) async {
+    for (var frame = 0; frame < 20; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+  }
+
   test(
     'standalone and diary milestones stay outside diary statistics',
     () async {
@@ -110,6 +119,60 @@ void main() {
       );
       await db.deleteMilestone(standalone);
       expect(await db.listMilestones(colony.id), hasLength(1));
+    },
+  );
+
+  test(
+    'unlinked milestone survives backup and can be edited and deleted',
+    () async {
+      final unlinked = Milestone(
+        id: 'unlinked',
+        title: '独立成长节点',
+        occurredAt: date,
+        createdAt: date,
+      );
+      await db.saveMilestone(unlinked);
+      expect(await db.listRecords(colony.id), isEmpty);
+      expect(
+        (await db.listAllMilestones())
+            .firstWhere((item) => item.milestone.id == unlinked.id)
+            .milestone
+            .colonyId,
+        isNull,
+      );
+      final snapshot = await db.snapshot();
+      BackupData.validate(snapshot);
+      await db.replaceAll(snapshot);
+      await db.saveMilestone(
+        Milestone(
+          id: unlinked.id,
+          title: '独立成长节点已更新',
+          occurredAt: date,
+          createdAt: date,
+        ),
+      );
+      expect(
+        (await db.listAllMilestones())
+            .firstWhere((item) => item.milestone.id == unlinked.id)
+            .milestone
+            .title,
+        '独立成长节点已更新',
+      );
+      await db.deleteColony(colony.id);
+      expect(
+        (await db.listAllMilestones()).any(
+          (item) => item.milestone.id == unlinked.id,
+        ),
+        isTrue,
+      );
+      await db.saveColony(colony);
+      await db.deleteMilestone(unlinked);
+      expect(
+        (await db.listAllMilestones()).where(
+          (item) => item.milestone.id == unlinked.id,
+        ),
+        isEmpty,
+      );
     },
   );
 
@@ -321,6 +384,73 @@ void main() {
       await tester.runAsync(() => db.deleteColony(secondColony.id));
     },
   );
+
+  testWidgets('overview creates a milestone without a colony or diary', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await db.deleteColony(colony.id);
+      await db.saveColony(colony);
+    });
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: MilestonesOverviewPage(active: true)),
+      ),
+    );
+    await settleDatabase(tester);
+    await tester.tap(find.text('添加里程碑'));
+    await settleDatabase(tester);
+    expect(find.text('不关联蚁群'), findsOneWidget);
+    expect(find.text('同步一条蚁群日记'), findsNothing);
+    await tester.enterText(find.widgetWithText(TextField, '里程碑标题'), '独立节点');
+    await tester.tap(find.text('保存里程碑'));
+    await settleDatabase(tester);
+    expect(find.text('独立节点'), findsOneWidget);
+    expect(find.textContaining('独立里程碑 ·'), findsOneWidget);
+    expect(
+      (await tester.runAsync(() => db.listAllMilestones()))!
+          .singleWhere((item) => item.milestone.title == '独立节点')
+          .milestone
+          .colonyId,
+      isNull,
+    );
+    expect(await tester.runAsync(() => db.listRecords(colony.id)), isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('overview can link a colony and sync one observation diary', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await db.deleteColony(colony.id);
+      await db.saveColony(colony);
+    });
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: MilestonesOverviewPage(active: true)),
+      ),
+    );
+    await settleDatabase(tester);
+    await tester.tap(find.text('添加里程碑'));
+    await settleDatabase(tester);
+    await tester.tap(find.text('不关联蚁群'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('测试蚁群').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CheckboxListTile, '同步一条蚁群日记'));
+    await tester.enterText(find.widgetWithText(TextField, '里程碑标题'), '首批羽化');
+    await tester.enterText(find.widgetWithText(TextField, '里程碑说明（可选）'), '工蚁诞生');
+    await tester.tap(find.text('保存里程碑'));
+    await settleDatabase(tester);
+    final milestones = await tester.runAsync(
+      () => db.listMilestones(colony.id),
+    );
+    final diaries = await tester.runAsync(() => db.listRecords(colony.id));
+    expect(milestones!.single.title, '首批羽化');
+    expect(diaries!.single.type, CareRecordType.observation);
+    expect(diaries.single.note, '首批羽化\n工蚁诞生');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'diary filter shows milestones without counting them as diaries',

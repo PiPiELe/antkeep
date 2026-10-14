@@ -45,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 29,
+      version: 30,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -104,6 +104,22 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion >= 25 && oldVersion < 30) {
+      await database.execute('''CREATE TABLE milestones_new (
+        id TEXT PRIMARY KEY, colony_id TEXT, title TEXT NOT NULL,
+        occurred_at TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL,
+        FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
+      )''');
+      await database.execute('''INSERT INTO milestones_new
+        (id, colony_id, title, occurred_at, note, created_at)
+        SELECT id, colony_id, title, occurred_at, note, created_at
+        FROM milestones''');
+      await database.execute('DROP TABLE milestones');
+      await database.execute('ALTER TABLE milestones_new RENAME TO milestones');
+      await database.execute(
+        'CREATE INDEX milestones_by_colony_time ON milestones(colony_id, occurred_at DESC)',
+      );
+    }
     if (oldVersion < 26) await _createWildCatchTable(database);
     if (oldVersion >= 26 && oldVersion < 28) {
       await database.execute(
@@ -299,7 +315,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   static Future<void> _createMilestonesTable(DatabaseExecutor db) async {
     await db.execute('''CREATE TABLE milestones (
-      id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, title TEXT NOT NULL,
+      id TEXT PRIMARY KEY, colony_id TEXT, title TEXT NOT NULL,
       occurred_at TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL,
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
     )''');
@@ -316,18 +332,18 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         orderBy: 'occurred_at DESC, created_at DESC',
       )).map(Milestone.fromMap).toList();
 
-  Future<List<({Milestone milestone, String colonyName})>>
+  Future<List<({Milestone milestone, String? colonyName})>>
   listAllMilestones() async =>
       (await _db.rawQuery('''
         SELECT m.*, c.name AS colony_name
         FROM milestones AS m
-        JOIN colonies AS c ON c.id = m.colony_id
+        LEFT JOIN colonies AS c ON c.id = m.colony_id
         ORDER BY m.occurred_at DESC, m.created_at DESC
       '''))
           .map(
             (row) => (
               milestone: Milestone.fromMap(row),
-              colonyName: row['colony_name'] as String,
+              colonyName: row['colony_name'] as String?,
             ),
           )
           .toList();
@@ -335,13 +351,15 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   Future<void> saveMilestone(Milestone milestone) async {
     milestone.validate();
     await _db.transaction((txn) async {
-      final colony = await txn.query(
-        'colonies',
-        where: 'id = ?',
-        whereArgs: [milestone.colonyId],
-      );
-      if (colony.isEmpty || colony.single['archived'] == 1) {
-        throw StateError('蚁群已归档或不存在');
+      if (milestone.colonyId != null) {
+        final colony = await txn.query(
+          'colonies',
+          where: 'id = ?',
+          whereArgs: [milestone.colonyId],
+        );
+        if (colony.isEmpty || colony.single['archived'] == 1) {
+          throw StateError('蚁群已归档或不存在');
+        }
       }
       final existing = await txn.query(
         'milestones',
@@ -365,12 +383,20 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   }
 
   Future<void> deleteMilestone(Milestone milestone) async {
-    final colony = await findColony(milestone.colonyId);
-    if (colony == null || colony.archived) throw StateError('蚁群已归档或不存在');
+    if (milestone.colonyId != null) {
+      final colony = await findColony(milestone.colonyId!);
+      if (colony == null || colony.archived) {
+        throw StateError('蚁群已归档或不存在');
+      }
+    }
     await _db.delete(
       'milestones',
-      where: 'id = ? AND colony_id = ?',
-      whereArgs: [milestone.id, milestone.colonyId],
+      where: milestone.colonyId == null
+          ? 'id = ? AND colony_id IS NULL'
+          : 'id = ? AND colony_id = ?',
+      whereArgs: milestone.colonyId == null
+          ? [milestone.id]
+          : [milestone.id, milestone.colonyId],
     );
   }
 

@@ -395,7 +395,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('里程碑'));
     await tester.pumpAndSettle();
-    expect(find.text('还没有里程碑，可在蚁群详情中添加。'), findsOneWidget);
+    expect(find.text('还没有里程碑，添加一个值得铭记的成长节点吧。'), findsOneWidget);
+    expect(find.text('添加里程碑'), findsOneWidget);
   });
 
   testWidgets(

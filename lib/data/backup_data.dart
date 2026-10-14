@@ -43,7 +43,10 @@ class BackupData {
       'milestones',
       (row) => Milestone.fromMap(row).toMap(),
     );
-    if (milestones.any((row) => !colonyIds.contains(row['colony_id']))) {
+    if (milestones.any(
+      (row) =>
+          row['colony_id'] != null && !colonyIds.contains(row['colony_id']),
+    )) {
       throw const FormatException('里程碑引用了不存在的蚁群。');
     }
     final cycles = _rows(

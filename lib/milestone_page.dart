@@ -153,9 +153,9 @@ class _MilestonePageState extends State<MilestonePage> {
 }
 
 class MilestoneFormPage extends StatefulWidget {
-  const MilestoneFormPage({super.key, required this.colony, this.milestone});
+  const MilestoneFormPage({super.key, this.colony, this.milestone});
 
-  final Colony colony;
+  final Colony? colony;
   final Milestone? milestone;
 
   @override
@@ -165,6 +165,9 @@ class MilestoneFormPage extends StatefulWidget {
 class _MilestoneFormPageState extends State<MilestoneFormPage> {
   final _title = TextEditingController();
   final _note = TextEditingController();
+  Future<List<Colony>>? _colonies;
+  String? _selectedColonyId;
+  bool _syncDiary = false;
   late DateTime _occurredAt =
       widget.milestone?.occurredAt ?? DateUtils.dateOnly(DateTime.now());
   late bool _hasTime =
@@ -177,6 +180,9 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
     super.initState();
     _title.text = widget.milestone?.title ?? '';
     _note.text = widget.milestone?.note ?? '';
+    if (widget.colony == null && widget.milestone == null) {
+      _colonies = AppDatabase.instance.listColonies();
+    }
   }
 
   @override
@@ -234,9 +240,13 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
 
   Future<void> _save() async {
     if (_saving) return;
+    final colonyId =
+        widget.colony?.id ?? widget.milestone?.colonyId ?? _selectedColonyId;
+    final syncDiary =
+        widget.milestone == null && _syncDiary && colonyId != null;
     final milestone = Milestone(
       id: widget.milestone?.id ?? const Uuid().v4(),
-      colonyId: widget.colony.id,
+      colonyId: colonyId,
       title: _title.text,
       note: _note.text.trim().isEmpty ? null : _note.text,
       occurredAt: _occurredAt,
@@ -244,8 +254,51 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
     );
     try {
       milestone.validate();
+      var recalculateAllGrowth = false;
+      if (syncDiary) {
+        recalculateAllGrowth = await AppDatabase.instance
+            .needsGlobalGrowthRecalculation(colonyId, [_occurredAt]);
+        if (!mounted) return;
+        if (recalculateAllGrowth) {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('需要全局更新'),
+              content: const Text('同步的日记早于 30 天界碑，保存后将全局重算相关自动扩充日记。'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('继续保存'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true || !mounted) return;
+        }
+      }
       setState(() => _saving = true);
-      await AppDatabase.instance.saveMilestone(milestone);
+      if (syncDiary) {
+        final title = _title.text.trim();
+        final note = _note.text.trim();
+        await AppDatabase.instance.saveRecord(
+          CareRecord(
+            id: const Uuid().v4(),
+            colonyId: colonyId,
+            type: CareRecordType.observation,
+            occurredAt: _occurredAt,
+            createdAt: DateTime.now(),
+            note: note.isEmpty ? title : '$title\n$note',
+          ),
+          milestone: milestone,
+          recalculateAllGrowth: recalculateAllGrowth,
+        );
+      } else {
+        await AppDatabase.instance.saveMilestone(milestone);
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
@@ -279,6 +332,50 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           maxLength: 80,
           decoration: const InputDecoration(labelText: '里程碑标题'),
         ),
+        if (_colonies != null)
+          FutureBuilder<List<Colony>>(
+            future: _colonies,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Text('加载蚁群失败：${snapshot.error}');
+              }
+              if (!snapshot.hasData) {
+                return const LinearProgressIndicator();
+              }
+              return DropdownButtonFormField<String?>(
+                initialValue: _selectedColonyId,
+                decoration: const InputDecoration(labelText: '关联蚁群（可选）'),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('不关联蚁群'),
+                  ),
+                  for (final colony in snapshot.data!)
+                    DropdownMenuItem<String?>(
+                      value: colony.id,
+                      child: Text(colony.name),
+                    ),
+                ],
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() {
+                        _selectedColonyId = value;
+                        if (value == null) _syncDiary = false;
+                      }),
+              );
+            },
+          ),
+        if (widget.milestone == null &&
+            (widget.colony != null || _selectedColonyId != null))
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('同步一条蚁群日记'),
+            subtitle: const Text('保存为观察日记，记录里程碑标题和说明。'),
+            value: _syncDiary,
+            onChanged: _saving
+                ? null
+                : (value) => setState(() => _syncDiary = value ?? false),
+          ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _saving ? null : _pickDate,
@@ -307,7 +404,7 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           decoration: const InputDecoration(labelText: '里程碑说明（可选）'),
         ),
         const SizedBox(height: 24),
-        const Text('里程碑独立保存，不参与日记和数量统计。'),
+        const Text('里程碑本身不参与日记和数量统计；若同步观察日记，新增的日记会计入篇数。'),
       ],
     ),
   );

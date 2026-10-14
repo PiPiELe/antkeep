@@ -49,19 +49,19 @@ Future<ui.Image> loadMilestoneArtwork(MilestoneArtwork artwork) =>
 class MilestonePoster extends StatelessWidget {
   const MilestonePoster({
     super.key,
-    required this.colony,
+    this.colony,
     required this.milestone,
     required this.artwork,
   });
 
-  final Colony colony;
+  final Colony? colony;
   final Milestone milestone;
   final MilestoneArtwork artwork;
 
   @override
   Widget build(BuildContext context) => Semantics(
     image: true,
-    label: '${colony.name}，${milestone.title}的里程碑分享图',
+    label: '${colony?.name ?? '独立里程碑'}，${milestone.title}的里程碑分享图',
     child: AspectRatio(
       aspectRatio: milestonePosterSize.aspectRatio,
       child: FutureBuilder<ui.Image>(
@@ -85,7 +85,7 @@ class MilestonePoster extends StatelessWidget {
 class MilestonePosterPainter extends CustomPainter {
   const MilestonePosterPainter(this.colony, this.milestone, this.artwork);
 
-  final Colony colony;
+  final Colony? colony;
   final Milestone milestone;
   final ui.Image artwork;
 
@@ -140,7 +140,7 @@ class MilestonePosterPainter extends CustomPainter {
     );
     _text(
       canvas,
-      colony.name,
+      colony?.name ?? '独立里程碑',
       const Rect.fromLTWH(45, 46, 310, 25),
       15,
       const Color(0xffe7d0a1),
@@ -247,7 +247,7 @@ class MilestonePosterPainter extends CustomPainter {
 }
 
 Future<Uint8List> renderMilestonePng(
-  Colony colony,
+  Colony? colony,
   Milestone milestone,
   MilestoneArtwork artwork,
 ) async {
@@ -287,13 +287,13 @@ typedef SaveMilestoneImage = Future<String?> Function(Uint8List bytes);
 class MilestoneSharePage extends StatefulWidget {
   const MilestoneSharePage({
     super.key,
-    required this.colony,
+    this.colony,
     required this.milestone,
     this.shareImage,
     this.saveImage,
   });
 
-  final Colony colony;
+  final Colony? colony;
   final Milestone milestone;
   final ShareMilestoneImage? shareImage;
   final SaveMilestoneImage? saveImage;

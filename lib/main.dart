@@ -2916,11 +2916,14 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => MilestonePage(colony: colony),
-                      ),
-                    ),
+                    onPressed: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => MilestonePage(colony: colony),
+                        ),
+                      );
+                      if (mounted) setState(_reload);
+                    },
                   ),
                 ),
               ],

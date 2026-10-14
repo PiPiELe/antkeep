@@ -217,18 +217,34 @@ void main() {
         createdAt: date,
       ),
     );
+    await database.saveMilestone(
+      Milestone(
+        id: 'independent',
+        title: '独立里程碑',
+        occurredAt: date,
+        createdAt: date,
+      ),
+    );
     final bytes = await service.createBackupBytes();
     await database.replaceAll(fixture());
     expect(await database.listMilestones('c'), isEmpty);
     await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
     expect((await database.listMilestones('c')).single.title, '首批工蚁羽化');
+    expect(
+      (await database.listAllMilestones())
+          .singleWhere((item) => item.milestone.id == 'independent')
+          .milestone.colonyId,
+      isNull,
+    );
     await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
     expect(await database.listMilestones('c'), hasLength(1));
+    expect(await database.listAllMilestones(), hasLength(2));
 
     final old = await database.snapshot()
       ..remove('milestones');
     await service.restoreBytes(archiveBytes(old, version: 4));
     expect(await database.listMilestones('c'), isEmpty);
+    expect(await database.listAllMilestones(), isEmpty);
   });
 
   test(
