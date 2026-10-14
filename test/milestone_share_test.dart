@@ -28,13 +28,13 @@ void main() {
 
   setUpAll(() async {
     final font = Platform.environment['ANTKEEP_TEST_FONT'];
-    if (font != null) {
-      final loader = FontLoader('serif')
-        ..addFont(
-          File(font).readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
-        );
-      await loader.load();
-    }
+    final loader = FontLoader('StoneSerif')
+      ..addFont(
+        font == null
+            ? rootBundle.load('assets/fonts/NotoSerifSC.ttf')
+            : File(font).readAsBytes().then(ByteData.sublistView),
+      );
+    await loader.load();
     for (final artwork in MilestoneArtwork.values) {
       await loadMilestoneArtwork(artwork);
     }
@@ -79,7 +79,7 @@ void main() {
   testWidgets('unlinked milestone also renders a share image', (tester) async {
     final independent = Milestone(
       id: 'independent',
-      title: '独立里程碑',
+      title: '首次发现',
       occurredAt: date,
       createdAt: date,
     );
@@ -94,11 +94,19 @@ void main() {
       ),
     );
     expect(tester.takeException(), isNull);
+    expect(find.bySemanticsLabel('首次发现的里程碑分享图'), findsOneWidget);
     final bytes = await tester.runAsync(
       () => renderMilestonePng(null, independent, MilestoneArtwork.harvest),
     );
     expect(bytes, isNotNull);
     expect(bytes!.take(8), [137, 80, 78, 71, 13, 10, 26, 10]);
+    final previewDir = Platform.environment['ANTKEEP_MILESTONE_PREVIEW_DIR'];
+    if (previewDir != null) {
+      await tester.runAsync(() async {
+        await Directory(previewDir).create(recursive: true);
+        await File('$previewDir/independent.png').writeAsBytes(bytes);
+      });
+    }
   });
 
   testWidgets('selected artwork can be shared and saved with long text', (
@@ -113,6 +121,7 @@ void main() {
       note: '当时的巢室与蚁群故事。' * 100,
       occurredAt: date,
       createdAt: date,
+      artwork: MilestoneArtwork.battle,
     );
     Uint8List? shared;
     Uint8List? saved;
@@ -133,7 +142,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('种群之战'));
+    expect(find.text('选择石刻画面'), findsNothing);
     await tester.tap(find.text('转发分享'));
     await _settle(tester);
     expect(shared, isNotNull);
