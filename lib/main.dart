@@ -1081,7 +1081,6 @@ class _ColonyCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     child: HusbandryDuration(
                       colony: colony,
-                      tall: canFillSpace,
                       stackedLabel: true,
                     ),
                   );

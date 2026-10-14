@@ -1152,7 +1152,7 @@ void main() {
         await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
         await tester.pumpAndSettle();
         final durationLefts = <double>[];
-        final tallDurations = <bool>[];
+        final durationHeights = <double>[];
         for (final id in ['quiet', 'due']) {
           final card = find.ancestor(
             of: find.text(id),
@@ -1165,7 +1165,6 @@ void main() {
             matching: find.byType(HusbandryDuration),
           );
           durationLefts.add(tester.getRect(duration).left);
-          tallDurations.add(tester.widget<HusbandryDuration>(duration).tall);
           final label = find.descendant(
             of: duration,
             matching: find.text('已养殖'),
@@ -1182,9 +1181,65 @@ void main() {
             tester.getRect(label).bottom,
             lessThan(tester.getRect(days).top),
           );
+          durationHeights.add(tester.getRect(days).height);
         }
         expect(durationLefts[0], closeTo(durationLefts[1], 1));
-        if (width == 440) expect(tallDurations, [false, true]);
+        expect(durationHeights[0], closeTo(durationHeights[1], 1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final width in [320.0, 360.0, 393.0, 440.0]) {
+    testWidgets(
+      '42 and 167 day colony cards use equal numeral height at $width',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final now = DateTime.now();
+        for (final (id, days) in [('quiet', 42), ('due', 167)]) {
+          tables['colonies']!.add(
+            Colony(
+              id: id,
+              name: id,
+              nestType: '试管巢',
+              queenCount: 1,
+              initialWorkerCount: 12,
+              acquiredOn: DateTime(now.year, now.month, now.day - days),
+              createdAt: now,
+              updatedAt: now,
+            ).toMap(),
+          );
+        }
+        tables['care_tasks']!.add(
+          CareTask(
+            id: 'due-cleaning',
+            colonyId: 'due',
+            type: CareTaskType.cleaning,
+            intervalDays: 1,
+            nextDueOn: now,
+          ).toMap(),
+        );
+
+        await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+        await tester.pumpAndSettle();
+        final heights = <double>[];
+        for (final (id, days) in [('quiet', 42), ('due', 167)]) {
+          final card = find.ancestor(
+            of: find.text(id),
+            matching: find.byType(Card),
+          );
+          await tester.ensureVisible(card);
+          await tester.pumpAndSettle();
+          final number = find.descendant(
+            of: card,
+            matching: find.text('$days 天', findRichText: true),
+          );
+          heights.add(tester.getRect(number).height);
+        }
+        expect(heights[0], closeTo(heights[1], 1));
         expect(tester.takeException(), isNull);
       },
     );
@@ -1231,12 +1286,6 @@ void main() {
 
     await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widgetList<HusbandryDuration>(find.byType(HusbandryDuration))
-          .map((duration) => duration.tall),
-      [true, true, true],
-    );
     final crowdedCard = find.ancestor(
       of: find.text('内容较多 crowded'),
       matching: find.byType(Card),
