@@ -324,6 +324,7 @@ class _HomePageState extends State<HomePage>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   var _index = 0;
   late final TabController _colonyTabs;
+  bool _fadeColonyTabsOnLeft = false;
   late BeginnerCareNotice _beginnerCareNotice;
   late List<BeginnerCareNotice> _careNotices;
   bool _competitionPromptBusy = false;
@@ -503,39 +504,60 @@ class _HomePageState extends State<HomePage>
     return Scaffold(
       appBar: AppBar(
         title: pageIndex == 0
-            ? ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: const [
-                    Colors.white,
-                    Colors.white,
-                    Colors.transparent,
-                  ],
-                  stops: [0, (1 - 28 / bounds.width).clamp(0.0, 1.0), 1],
-                ).createShader(bounds),
-                blendMode: BlendMode.dstIn,
-                child: TabBar(
-                  controller: _colonyTabs,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  padding: const EdgeInsets.only(right: 28),
-                  // Keep the colony switcher visually separate from page content;
-                  // the selected-tab indicator alone was too easy to miss.
-                  dividerColor: Theme.of(context).colorScheme.outlineVariant
-                      .withValues(alpha: .55),
-                  dividerHeight: 1,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  labelStyle: Theme.of(context).textTheme.titleMedium,
-                  onTap: (_) => setState(() {}),
-                  tabs: [
-                    for (final tab in ColonyTab.values)
-                      Tab(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onLongPress: () => _renameColonyTab(context, tab),
-                          child: Text(themeController.colonyTabName(tab)),
+            ? NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification.depth != 0 ||
+                      notification.metrics.axis != Axis.horizontal) {
+                    return false;
+                  }
+                  final fade =
+                      notification.metrics.pixels >
+                      notification.metrics.minScrollExtent + .5;
+                  if (fade != _fadeColonyTabsOnLeft) {
+                    setState(() => _fadeColonyTabsOnLeft = fade);
+                  }
+                  return false;
+                },
+                child: ShaderMask(
+                  shaderCallback: (bounds) => LinearGradient(
+                    colors: [
+                      _fadeColonyTabsOnLeft ? Colors.transparent : Colors.white,
+                      Colors.white,
+                      Colors.white,
+                      Colors.transparent,
+                    ],
+                    stops: [
+                      0,
+                      (24 / bounds.width).clamp(0.0, 1.0),
+                      (1 - 28 / bounds.width).clamp(0.0, 1.0),
+                      1,
+                    ],
+                  ).createShader(bounds),
+                  blendMode: BlendMode.dstIn,
+                  child: TabBar(
+                    controller: _colonyTabs,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    padding: const EdgeInsets.only(right: 28),
+                    // Keep the colony switcher visually separate from page content;
+                    // the selected-tab indicator alone was too easy to miss.
+                    dividerColor: Theme.of(context).colorScheme.outlineVariant
+                        .withValues(alpha: .55),
+                    dividerHeight: 1,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    labelStyle: Theme.of(context).textTheme.titleMedium,
+                    onTap: (_) => setState(() {}),
+                    tabs: [
+                      for (final tab in ColonyTab.values)
+                        Tab(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onLongPress: () => _renameColonyTab(context, tab),
+                            child: Text(themeController.colonyTabName(tab)),
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               )
             : Text(titles[pageIndex]),
