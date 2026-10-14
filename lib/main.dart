@@ -1913,18 +1913,26 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                   Expanded(
                     child: TextFormField(
                       controller: _queens,
-                      validator: _validateRequiredCount,
+                      validator: widget.colony == null
+                          ? _validateRequiredCount
+                          : _validateCount,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '蚁后 *'),
+                      decoration: InputDecoration(
+                        labelText: widget.colony == null ? '蚁后 *' : '蚁后',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextFormField(
                       controller: _workers,
-                      validator: _validateRequiredCount,
+                      validator: widget.colony == null
+                          ? _validateRequiredCount
+                          : _validateCount,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '工蚁 *'),
+                      decoration: InputDecoration(
+                        labelText: widget.colony == null ? '工蚁 *' : '工蚁',
+                      ),
                     ),
                   ),
                 ],

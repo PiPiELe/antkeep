@@ -2686,7 +2686,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('自定义品种'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey('colony-name')), '编辑后');
-    await tester.enterText(find.widgetWithText(TextFormField, '工蚁 *'), '1000');
+    await tester.enterText(find.widgetWithText(TextFormField, '工蚁'), '1000');
     final sourceField = find.widgetWithText(TextFormField, '来源（可选）');
     await tester.scrollUntilVisible(
       sourceField,

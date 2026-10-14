@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/main.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,9 @@ void main() {
       const MethodChannel('plugins.flutter.io/path_provider'),
       (_) async => directory.path,
     );
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    await AppDatabase.instance.open();
     await LocalMediaStore.instance.initialize();
     await LocalMediaStore.instance.restoreFiles({'existing.png': bytes});
     messenger.setMockMethodCallHandler(
@@ -44,6 +49,7 @@ void main() {
   });
 
   tearDownAll(() async {
+    await AppDatabase.instance.close();
     messenger.setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
       null,

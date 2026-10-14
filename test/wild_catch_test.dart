@@ -318,11 +318,10 @@ void main() {
     await _settleDatabase(tester);
     final saved = (await tester.runAsync(db.listWildCatchRecords))!.single;
     expect(saved.species.single.colonies.single.colonyId, colony.id);
-    expect(
-      (await tester.runAsync(() => db.findColony(colony.id)))!.isWildCatch,
-      isTrue,
-    );
     final edited = (await tester.runAsync(() => db.findColony(colony.id)))!;
+    expect(edited.isWildCatch, isTrue);
+    expect(edited.queenCount, isNull);
+    expect(edited.initialWorkerCount, isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(MaterialApp(home: ColonyFormPage(colony: edited)));
     await _settleDatabase(tester);
@@ -875,6 +874,8 @@ void main() {
     final raw = await databaseFactoryFfi.openDatabase(
       await applicationDatabasePath(),
     );
+    await raw.execute('ALTER TABLE inventory_items DROP COLUMN purpose');
+    await raw.execute('ALTER TABLE milestones DROP COLUMN artwork');
     await raw.execute('DROP TABLE wild_catch_records');
     await raw.execute('''CREATE TABLE wild_catch_records (
       id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
@@ -914,6 +915,8 @@ void main() {
     final raw = await databaseFactoryFfi.openDatabase(
       await applicationDatabasePath(),
     );
+    await raw.execute('ALTER TABLE inventory_items DROP COLUMN purpose');
+    await raw.execute('ALTER TABLE milestones DROP COLUMN artwork');
     await raw.execute('DROP TABLE wild_catch_records');
     await raw.execute('''CREATE TABLE wild_catch_records (
       id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
@@ -943,6 +946,8 @@ void main() {
     final raw = await databaseFactoryFfi.openDatabase(
       await applicationDatabasePath(),
     );
+    await raw.execute('ALTER TABLE inventory_items DROP COLUMN purpose');
+    await raw.execute('ALTER TABLE milestones DROP COLUMN artwork');
     await raw.execute('DROP TABLE wild_catch_records');
     await raw.execute('''CREATE TABLE wild_catch_records (
       id TEXT PRIMARY KEY, caught_at TEXT NOT NULL,
