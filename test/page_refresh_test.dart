@@ -1153,6 +1153,7 @@ void main() {
         await tester.pumpAndSettle();
         final durationLefts = <double>[];
         final durationHeights = <double>[];
+        final dividerTops = <double>[];
         for (final id in ['quiet', 'due']) {
           final card = find.ancestor(
             of: find.text(id),
@@ -1182,9 +1183,21 @@ void main() {
             lessThan(tester.getRect(days).top),
           );
           durationHeights.add(tester.getRect(days).height);
+          if (width >= 360) {
+            final divider = find.descendant(
+              of: card,
+              matching: find.byKey(const ValueKey('colony-duration-divider')),
+            );
+            dividerTops.add(
+              tester.getRect(divider).top - tester.getRect(card).top,
+            );
+          }
         }
         expect(durationLefts[0], closeTo(durationLefts[1], 1));
         expect(durationHeights[0], closeTo(durationHeights[1], 1));
+        if (width >= 360) {
+          expect(dividerTops[0], closeTo(dividerTops[1], 1));
+        }
         expect(tester.takeException(), isNull);
       },
     );
@@ -1225,7 +1238,10 @@ void main() {
 
         await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
         await tester.pumpAndSettle();
+        expect(find.textContaining('今日待办'), findsOneWidget);
         final heights = <double>[];
+        final dividerTops = <double>[];
+        final dividerLefts = <double>[];
         for (final (id, days) in [('quiet', 42), ('due', 167)]) {
           final card = find.ancestor(
             of: find.text(id),
@@ -1238,9 +1254,24 @@ void main() {
             matching: find.text('$days 天', findRichText: true),
           );
           heights.add(tester.getRect(number).height);
+          if (width >= 360) {
+            final divider = find.descendant(
+              of: card,
+              matching: find.byKey(const ValueKey('colony-duration-divider')),
+            );
+            dividerTops.add(
+              tester.getRect(divider).top - tester.getRect(card).top,
+            );
+            dividerLefts.add(tester.getRect(divider).left);
+          }
         }
         expect(heights[0], closeTo(heights[1], 1));
-        expect(heights, everyElement(greaterThan(58)));
+        expect(heights, everyElement(greaterThan(75)));
+        if (width >= 360) {
+          expect(dividerTops[0], closeTo(dividerTops[1], 1));
+          expect(dividerLefts[0], closeTo(dividerLefts[1], 1));
+          expect(dividerTops, everyElement(closeTo(28, 1)));
+        }
         expect(tester.takeException(), isNull);
       },
     );

@@ -1084,6 +1084,23 @@ class _ColonyCard extends StatelessWidget {
                       stackedLabel: true,
                     ),
                   );
+                  Widget durationWithDivider() => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: Container(
+                          key: const ValueKey('colony-duration-divider'),
+                          width: 1,
+                          height: 62,
+                          color: antKeepDividerColor(theme.colorScheme),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(width: durationWidth, child: duration),
+                    ],
+                  );
                   if (constraints.maxWidth < 280 ||
                       MediaQuery.textScalerOf(context).scale(12) > 18) {
                     return Column(
@@ -1107,13 +1124,7 @@ class _ColonyCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Container(
-                          width: 1,
-                          height: 62,
-                          color: antKeepDividerColor(theme.colorScheme),
-                        ),
-                        const SizedBox(width: 10),
-                        SizedBox(width: durationWidth, child: duration),
+                        durationWithDivider(),
                       ],
                     );
                   }
@@ -1121,16 +1132,16 @@ class _ColonyCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: identity),
-                          const SizedBox(width: 10),
-                          Container(
-                            width: 1,
-                            height: 62,
-                            color: antKeepDividerColor(theme.colorScheme),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: identity,
+                            ),
                           ),
                           const SizedBox(width: 10),
-                          SizedBox(width: durationWidth, child: duration),
+                          durationWithDivider(),
                         ],
                       ),
                       ...lowerMetadata(

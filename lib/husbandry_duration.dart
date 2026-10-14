@@ -99,7 +99,7 @@ class _HusbandryDurationState extends State<HusbandryDuration>
       }
       if (widget.stackedLabel) {
         final numberStyle = TextStyle(
-          fontSize: widget.compact ? 42 : 72,
+          fontSize: widget.compact ? 42 : 84,
           height: 1,
           letterSpacing: -3,
           fontWeight: FontWeight.w700,
@@ -108,24 +108,31 @@ class _HusbandryDurationState extends State<HusbandryDuration>
         final unitStyle = theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         );
-        // Reserve width for three digits and compress only horizontally so
-        // shorter durations retain the same large numeral height.
-        final reference = TextPainter(
-          text: TextSpan(
-            style: unitStyle,
-            children: [
-              TextSpan(
-                text: '8' * math.max(3, '$days'.length),
-                style: numberStyle,
-              ),
-              const TextSpan(text: ' 天'),
-            ],
-          ),
-          textDirection: Directionality.of(context),
-          textScaler: MediaQuery.textScalerOf(context),
-        )..layout();
-        final referenceSize = reference.size;
-        reference.dispose();
+        Size measureDuration(String number) {
+          final painter = TextPainter(
+            text: TextSpan(
+              style: unitStyle,
+              children: [
+                TextSpan(text: number, style: numberStyle),
+                const TextSpan(text: ' 天'),
+              ],
+            ),
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+          )..layout();
+          final size = painter.size;
+          painter.dispose();
+          return size;
+        }
+
+        // Use the requested three-digit appearance as a minimum width while
+        // keeping longer or wider values on one line.
+        final targetSize = measureDuration('167');
+        final actualSize = measureDuration('$days');
+        final referenceSize = Size(
+          math.max(targetSize.width, actualSize.width),
+          math.max(targetSize.height, actualSize.height),
+        );
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
