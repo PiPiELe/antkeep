@@ -39,6 +39,15 @@ void main() {
           reason: '$label must be fully visible',
         );
       }
+      final queenField = find.widgetWithText(TextFormField, '蚁后 *');
+      final workerField = find.widgetWithText(TextFormField, '工蚁 *');
+      await tester.ensureVisible(queenField);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(queenField).dy,
+        tester.getTopLeft(workerField).dy,
+        reason: 'queen and worker fields must align at the top',
+      );
       expect(tester.takeException(), isNull);
     });
   }
