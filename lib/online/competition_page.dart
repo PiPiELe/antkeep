@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/app_database.dart';
@@ -96,7 +96,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
       final contests = await widget.controller.competitions();
       if (!current()) return;
       final colonies = (await AppDatabase.instance.listColonies())
-          .where((c) => c.isNewQueenColony)
+          .where((c) => !c.archived)
           .toList();
       if (!current()) return;
       setState(() {
@@ -181,6 +181,82 @@ class _CompetitionPageState extends State<CompetitionPage> {
     }
   }
 
+  Future<Map<String, int>?> _markOriginCounts(int workers, int brood) async {
+    final form = GlobalKey<FormState>();
+    final fields = <String, TextEditingController>{
+      'adoptedWorkerCount': TextEditingController(),
+      'ownWorkerCount': TextEditingController(),
+      'adoptedBroodCount': TextEditingController(),
+      'ownBroodCount': TextEditingController(),
+    };
+    final route = DialogRoute<Map<String, int>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: const Text('标注参赛数量来源'),
+        content: Form(
+          key: form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('当前工蚁 $workers 只，幼蛹茧 $brood 只。请分别填写合工与亲工数量；合工不参与比赛得分。'),
+              const SizedBox(height: 12),
+              for (final field in [
+                ('adoptedWorkerCount', '合工工蚁（不计分）'),
+                ('ownWorkerCount', '亲工工蚁（计分）'),
+                ('adoptedBroodCount', '合工幼蛹茧（不计分）'),
+                ('ownBroodCount', '亲工幼蛹茧（计分）'),
+              ])
+                TextFormField(
+                  controller: fields[field.$1],
+                  decoration: InputDecoration(labelText: field.$2),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) {
+                    final count = int.tryParse(value ?? '');
+                    return count == null || count > 1000000
+                        ? '请填写 0～1000000 的整数'
+                        : null;
+                  },
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!form.currentState!.validate()) return;
+              final counts = fields.map(
+                (key, value) => MapEntry(key, int.parse(value.text)),
+              );
+              if (counts['adoptedWorkerCount']! + counts['ownWorkerCount']! !=
+                      workers ||
+                  counts['adoptedBroodCount']! + counts['ownBroodCount']! !=
+                      brood) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('合工与亲工之和须分别等于当前工蚁、幼蛹茧总数。')),
+                );
+                return;
+              }
+              Navigator.pop(context, counts);
+            },
+            child: const Text('确认数量'),
+          ),
+        ],
+      ),
+    );
+    final result = await Navigator.of(context, rootNavigator: true).push(route);
+    await route.completed;
+    for (final controller in fields.values) {
+      controller.dispose();
+    }
+    return result;
+  }
+
   Future<void> _submit() async {
     final detail = _detail;
     if (detail == null || _submitting) return;
@@ -196,7 +272,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
     final colony = _colonies.where((c) => c.id == id).firstOrNull;
     if (colony == null) {
       setState(
-        () => _message = registering ? '请先选择仍在饲养的新后群。' : '报名的蚁群已不在本机，无法读取当前数量。',
+        () => _message = registering ? '请先选择仍在饲养的蚁群。' : '报名的蚁群已不在本机，无法读取当前数量。',
       );
       return;
     }
@@ -215,6 +291,14 @@ class _CompetitionPageState extends State<CompetitionPage> {
           counts.cocoons == null) {
         throw const ApiFailure('卵、幼虫、蛹或工蚁数量未知，请先在蚁群日记中补齐当前数量。');
       }
+      final needsOrigin = counts.workers! > 0 || mine?['originTracked'] == true;
+      final originCounts = needsOrigin
+          ? await _markOriginCounts(
+              counts.workers!,
+              counts.larvae! + counts.cocoons!,
+            )
+          : null;
+      if (!current() || (needsOrigin && originCounts == null)) return;
       if (!mounted) return;
       Map<String, dynamic>? disclaimer;
       bool? confirmed;
@@ -285,12 +369,12 @@ class _CompetitionPageState extends State<CompetitionPage> {
         'larvaCount': counts.larvae,
         'cocoonCount': counts.cocoons,
         'workerCount': counts.workers,
+        ...?originCounts,
         if (_photo != null) 'photoBase64': base64Encode(_photo!),
         if (registering) ...{
           'colonyId': colony.id,
           'colonyName': colony.name,
           'species': colony.species,
-          'initialWorkerCount': colony.initialWorkerCount,
           'disclaimerPublicationId': disclaimer!['id'],
           'disclaimerAccepted': true,
         },
@@ -326,8 +410,8 @@ class _CompetitionPageState extends State<CompetitionPage> {
   }
 
   String _mode(String? mode) => switch (mode) {
-    'WORKER_GROWTH' => '工蚁净增长',
-    'TOTAL_GROWTH' => '总虫口净增长',
+    'WORKER_GROWTH' => '亲工工蚁净增长',
+    'TOTAL_GROWTH' => '参赛虫口净增长',
     _ => '积分',
   };
   String _state(String? state) => switch (state) {
@@ -472,7 +556,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
       const SizedBox(height: 8),
       Text(
         '排名以报名时的数量为基线。积分赛中，报名时无工蚁和卵幼蛹的纯新后从 10 分开始；已有工蚁或卵幼蛹从 0 分开始。'
-        '工蚁净增加每只 2 分${d['broodPointsEnabled'] == true ? '，卵幼蛹净增加每只 1 分' : '；本场不计卵幼蛹分'}。',
+        '已有工蚁的蚁群可报名，须标注合工与亲工数量；合工不计分。亲工工蚁净增加每只 2 分${d['broodPointsEnabled'] == true ? '，卵及亲工幼蛹茧净增加每只 1 分' : '；本场不计卵幼蛹分'}。',
       ),
       if (d['reviewStatus'] == 'APPROVED' && d['enabled'] == true) ...[
         const SizedBox(height: 12),
@@ -502,7 +586,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
         DropdownButtonFormField<String>(
           key: ValueKey(_selectedColonyId),
           initialValue: _selectedColonyId,
-          decoration: const InputDecoration(labelText: '选择新后群'),
+          decoration: const InputDecoration(labelText: '选择参赛蚁群'),
           items: _colonies
               .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
               .toList(),
@@ -515,7 +599,9 @@ class _CompetitionPageState extends State<CompetitionPage> {
             }
           }),
         ),
-        if (_colonies.isEmpty) const Text('本机暂无初始工蚁数为 0 的在养新后群。'),
+        if (_colonies.isEmpty) const Text('本机暂无在养蚁群。'),
+        if (_colonies.isNotEmpty)
+          const Text('已有工蚁的蚁群也可报名，提交时需标注合工、亲工的工蚁及幼蛹茧数量。'),
       ],
       if (mine != null)
         Text(
@@ -567,7 +653,8 @@ class _CompetitionPageState extends State<CompetitionPage> {
             ),
             subtitle: Text(
               '工蚁 ${e['workerCount']} · 卵 ${e['eggCount'] ?? '未知'} · '
-              '幼虫 ${e['larvaCount'] ?? '未知'} · 蛹 ${e['cocoonCount'] ?? '未知'}',
+              '幼虫 ${e['larvaCount'] ?? '未知'} · 蛹 ${e['cocoonCount'] ?? '未知'}'
+              '${e['adoptedWorkerCount'] == null ? '' : '\n合工工蚁 ${e['adoptedWorkerCount']} / 亲工工蚁 ${e['ownWorkerCount']} · 合工幼蛹茧 ${e['adoptedBroodCount']} / 亲工幼蛹茧 ${e['ownBroodCount']}'}',
             ),
             trailing: Text(
               '${e['score']}${d['scoreMode'] == 'POINTS' ? ' 分' : ' 只'}',
@@ -688,8 +775,8 @@ class _CompetitionProposalPageState extends State<CompetitionProposalPage> {
             decoration: const InputDecoration(labelText: '排名方式'),
             items: const [
               DropdownMenuItem(value: 'POINTS', child: Text('积分赛')),
-              DropdownMenuItem(value: 'WORKER_GROWTH', child: Text('工蚁净增长')),
-              DropdownMenuItem(value: 'TOTAL_GROWTH', child: Text('总虫口净增长')),
+              DropdownMenuItem(value: 'WORKER_GROWTH', child: Text('亲工工蚁净增长')),
+              DropdownMenuItem(value: 'TOTAL_GROWTH', child: Text('参赛虫口净增长')),
             ],
             onChanged: (value) {
               if (value != null) setState(() => _mode = value);

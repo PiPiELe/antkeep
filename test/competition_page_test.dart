@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/online/competition_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
@@ -41,6 +43,12 @@ void main() {
     await File('${directory.path}/photo.png').writeAsBytes(photo);
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    final fontFile = File('/System/Library/Fonts/Hiragino Sans GB.ttc');
+    if (await fontFile.exists()) {
+      final font = FontLoader('PreviewChinese');
+      font.addFont(fontFile.readAsBytes().then(ByteData.sublistView));
+      await font.load();
+    }
     await AppDatabase.instance.open();
     final now = DateTime(2026, 10, 10);
     for (final id in ['colony-1', 'colony-2']) {
@@ -54,6 +62,18 @@ void main() {
         ),
       );
     }
+    await AppDatabase.instance.saveColony(
+      Colony(
+        id: 'colony-with-workers',
+        name: '已有工蚁的蚁群',
+        createdAt: now,
+        updatedAt: now,
+        initialWorkerCount: 5,
+        initialEggCount: 0,
+        initialLarvaCount: 2,
+        initialCocoonCount: 1,
+      ),
+    );
   });
 
   tearDownAll(() async {
@@ -205,16 +225,142 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('选择报名图片（必选）'), findsOneWidget);
 
-    await tester.tap(find.text('选择报名图片（必选）'));
+    await tester.runAsync(() async {
+      await tester.tap(find.text('选择报名图片（必选）'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从图库选择'));
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.pump();
+        if (find.text('已选图片 · 重新选择').evaluate().isNotEmpty) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    });
     await tester.pumpAndSettle();
-    await tester.tap(find.text('从图库选择'));
-    await until(tester, find.text('已选图片 · 重新选择'));
+    expect(find.text('已选图片 · 重新选择'), findsOneWidget);
     expect((pickerCall?.arguments as Map)['source'], ImageSource.gallery.index);
     await tester.tap(find.text('全部比赛'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('contest-2'));
     await until(tester, find.text('选择报名图片（必选）'));
     expect(find.text('已选图片 · 重新选择'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    online.dispose();
+  });
+
+  testWidgets('worker colony can enter with separate origin counts', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 1700);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    Map<String, dynamic>? submitted;
+    final online = controller(MemoryOnlineStore(), (request) async {
+      switch (request.url.path) {
+        case '/api/public/content':
+          return response(snapshot(), 200);
+        case '/api/app/auth/login':
+          return response(
+            jsonEncode({'token': 'alice', 'user': user('alice')}),
+            200,
+          );
+        case '/api/app/check-ins/summary':
+          return response(jsonEncode(summary(0)), 200);
+        case '/api/app/competitions':
+          return response(jsonEncode([contest('contest-1')]), 200);
+        case '/api/app/competitions/contest-1':
+          return response(
+            jsonEncode({
+              ...contest('contest-1'),
+              'title': '巴巴养殖赛',
+              'startDate': '2026-10-10',
+              'endDate': '2026-10-17',
+            }),
+            200,
+          );
+        case '/api/app/competitions/disclaimer':
+          return response(
+            jsonEncode({
+              'id': 'disclaimer-1',
+              'title': '比赛声明',
+              'version': 1,
+              'content': '请如实填写参赛数量。',
+            }),
+            200,
+          );
+        case '/api/app/competitions/contest-1/entries':
+          submitted = jsonDecode(request.body) as Map<String, dynamic>;
+          return response(
+            jsonEncode({'entryId': 'entry-1', 'date': '2026-10-10'}),
+            201,
+          );
+      }
+      return response('{}', 404);
+    });
+    await tester.runAsync(() async {
+      await online.setEnabled(true);
+      await online.login('alice', 'password');
+    });
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: const Key('competition-preview'),
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(fontFamily: 'PreviewChinese'),
+          home: CompetitionPage(controller: online, initialId: 'contest-1'),
+        ),
+      ),
+    );
+    await until(tester, find.text('选择报名图片（必选）'));
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('已有工蚁的蚁群').last);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.text('选择报名图片（必选）'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从图库选择'));
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.pump();
+        if (find.text('已选图片 · 重新选择').evaluate().isNotEmpty) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('已选图片 · 重新选择'), findsOneWidget);
+    await tester.ensureVisible(find.text('报名并上传'));
+    await tester.tap(find.text('报名并上传'));
+    await until(tester, find.text('标注参赛数量来源'));
+    final inputs = find.byType(TextFormField);
+    for (final (index, value) in ['2', '3', '1', '2'].indexed) {
+      await tester.enterText(inputs.at(index), value);
+    }
+    await tester.pumpAndSettle();
+    final previewPath = Platform.environment['ANTKEEP_PREVIEW_PATH'];
+    if (previewPath != null) {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+        find.byKey(const Key('competition-preview')),
+      );
+      await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: 2);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await File(previewPath).writeAsBytes(bytes!.buffer.asUint8List());
+      });
+    }
+    await tester.tap(find.text('确认数量'));
+    await tester.pumpAndSettle();
+    await until(tester, find.text('比赛声明 · v1'));
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('同意并报名'));
+    await until(tester, find.text('报名成功，今日数据已上传。'));
+    expect(submitted?['workerCount'], 5);
+    expect(submitted?['adoptedWorkerCount'], 2);
+    expect(submitted?['ownWorkerCount'], 3);
+    expect(submitted?['adoptedBroodCount'], 1);
+    expect(submitted?['ownBroodCount'], 2);
     await tester.pumpWidget(const SizedBox());
     online.dispose();
   });
