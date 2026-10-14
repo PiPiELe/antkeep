@@ -174,6 +174,58 @@ class _HusbandryDurationState extends State<HusbandryDuration>
         );
       }
       if (widget.rightVerticalLabel) {
+        if ('$days'.length >= 4) {
+          return LayoutBuilder(
+            builder: (context, constraints) => Center(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '已养殖',
+                      key: const ValueKey('duration-right-label'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: math.max(0, constraints.maxWidth - 8),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: '$days',
+                                style: TextStyle(
+                                  fontSize: 52,
+                                  height: 1,
+                                  letterSpacing: -2,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              const TextSpan(text: ' 天'),
+                            ],
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         return LayoutBuilder(
           builder: (context, constraints) {
             final height = constraints.hasBoundedHeight

@@ -1477,6 +1477,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in [320.0, 360.0, 393.0, 440.0]) {
+    testWidgets('four-digit detail duration fits at ${width.toInt()}px', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final now = DateTime.now();
+      tables['colonies']!.add(
+        Colony(
+          id: 'long-duration',
+          name: '长时间养殖',
+          acquiredOn: DateTime(now.year, now.month, now.day - 6405),
+          createdAt: now,
+          updatedAt: now,
+        ).toMap(),
+      );
+
+      await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('长时间养殖'));
+      await tester.pumpAndSettle();
+
+      final duration = find.byType(HusbandryDuration);
+      final label = find.byKey(const ValueKey('duration-right-label'));
+      final value = find.descendant(
+        of: duration,
+        matching: find.text('6405 天', findRichText: true),
+      );
+      expect(label, findsOneWidget);
+      expect(value, findsOneWidget);
+      expect(tester.getRect(label).bottom, lessThan(tester.getRect(value).top));
+      expect(
+        tester.getRect(value).right,
+        lessThanOrEqualTo(tester.getRect(duration).right),
+      );
+      expect(
+        tester.getRect(value).left,
+        greaterThanOrEqualTo(tester.getRect(duration).left),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'phone detail keeps the cover beside duration and actions usable',
     (tester) async {
