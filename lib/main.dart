@@ -211,53 +211,82 @@ class _AntKeepAppState extends State<AntKeepApp> {
       }
       await showDialog<void>(
         context: dialogContext,
-        barrierDismissible: !required,
-        builder: (context) => AlertDialog(
-          scrollable: true,
-          title: Text(required ? '在线版需要更新' : '发现新版本 ${policy.latestVersion}'),
-          content: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (required) ...[
-                Text(
-                  '请更新至 ${policy.minimumVersion} 后继续使用在线版。蚁群、记录、照片和备份仍可在离线版正常使用。',
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (policy.apk case final apk?) ...[
-                Text('安装包', style: Theme.of(context).textTheme.titleSmall),
+        barrierDismissible: false,
+        builder: (context) => AnimatedBuilder(
+          animation: appUpdateController,
+          builder: (context, _) => AlertDialog(
+            scrollable: true,
+            title: Text(required ? '在线版需要更新' : '发现新版本 ${policy.latestVersion}'),
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (required) ...[
+                  Text(
+                    '请更新至 ${policy.minimumVersion} 后继续使用在线版。蚁群、记录、照片和备份仍可在离线版正常使用。',
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (policy.apk case final apk?) ...[
+                  Text('安装包', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(apk.filename),
+                  Text('文件大小：${apk.formattedSize}'),
+                  if (apk.sha256 != null) const Text('下载完成后将打开系统安装界面。'),
+                  const SizedBox(height: 16),
+                ],
+                Text('更新说明', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text(apk.filename),
-                Text('文件大小：${apk.formattedSize}'),
-                const SizedBox(height: 16),
+                UpdateReleaseNotes(notes: policy.releaseNotes),
+                if (appUpdateController.downloading) ...[
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: appUpdateController.downloadProgress,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '正在下载：${((appUpdateController.downloadProgress ?? 0) * 100).round()}%',
+                  ),
+                ],
+                if (appUpdateController.error case final message?) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
               ],
-              Text('更新说明', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 4),
-              UpdateReleaseNotes(notes: policy.releaseNotes),
+            ),
+            actions: [
+              if (required)
+                TextButton(
+                  onPressed: appUpdateController.downloading
+                      ? null
+                      : () async {
+                          await themeController.setEdition(AppEdition.offline);
+                          if (context.mounted) Navigator.of(context).pop();
+                        },
+                  child: const Text('使用离线版'),
+                )
+              else
+                TextButton(
+                  onPressed: appUpdateController.downloading
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: const Text('稍后更新'),
+                ),
+              FilledButton(
+                onPressed: appUpdateController.downloading
+                    ? null
+                    : () async {
+                        await appUpdateController.openDownload();
+                      },
+                child: Text(appUpdateController.downloading ? '下载中…' : '立即更新'),
+              ),
             ],
           ),
-          actions: [
-            if (required)
-              TextButton(
-                onPressed: () async {
-                  await themeController.setEdition(AppEdition.offline);
-                  if (context.mounted) Navigator.of(context).pop();
-                },
-                child: const Text('使用离线版'),
-              )
-            else
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('稍后更新'),
-              ),
-            FilledButton(
-              onPressed: () async {
-                await appUpdateController.openDownload();
-              },
-              child: const Text('立即更新'),
-            ),
-          ],
         ),
       );
       _updateDialogOpen = false;

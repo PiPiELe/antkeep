@@ -4,7 +4,11 @@ import android.content.Intent
 import android.content.ContentValues
 import android.os.Build
 import android.os.Environment
+import android.net.Uri
+import android.provider.Settings
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
+import java.io.File
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -20,6 +24,37 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         backupBridge = BackupBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pipiele.antkeep/app_update")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "installApk") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val file = call.argument<String>("path")?.let(::File)
+                val updates = File(cacheDir, "antkeep_updates").canonicalFile
+                if (file == null || !file.isFile || file.canonicalFile.parentFile != updates ||
+                    !file.name.matches(Regex("[0-9a-f]{64}\\.apk"))) {
+                    result.error("invalid_apk", "安装包不存在", null)
+                    return@setMethodCallHandler
+                }
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                        startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:$packageName")))
+                        result.error("install_permission", "请允许蚁记安装应用", null)
+                        return@setMethodCallHandler
+                    }
+                    val uri = FileProvider.getUriForFile(this,
+                        "$packageName.update_provider", file)
+                    startActivity(Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    })
+                    result.success(null)
+                } catch (error: Exception) {
+                    result.error("install_failed", "无法打开系统安装器", null)
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pipiele.antkeep/share_image")
             .setMethodCallHandler { call, result ->
                 if (call.method != "saveImage") {

@@ -124,12 +124,24 @@ class OnlineSettings extends StatelessWidget {
                   ? (updates.policy == null ? '应用更新' : '应用已是最新版本')
                   : '发现新版本 ${updates.policy?.latestVersion}',
             ),
-            subtitle: Text(
-              updates.error ??
-                  (updates.availability == AppUpdateAvailability.required
-                      ? '需更新后才能使用在线版；本地数据仍可离线使用。'
-                      : updates.policy?.releaseNotes ??
-                            '仅检查 Android 更新，不会上传本地养殖数据。'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  updates.error ??
+                      (updates.availability == AppUpdateAvailability.required
+                          ? '需更新后才能使用在线版；本地数据仍可离线使用。'
+                          : updates.policy?.releaseNotes ??
+                                '仅检查 Android 更新，不会上传本地养殖数据。'),
+                ),
+                if (updates.downloading) ...[
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(value: updates.downloadProgress),
+                  Text(
+                    '正在下载：${((updates.downloadProgress ?? 0) * 100).round()}%',
+                  ),
+                ],
+              ],
             ),
             trailing: updates.checking
                 ? const SizedBox(
@@ -138,13 +150,16 @@ class OnlineSettings extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : TextButton(
-                    onPressed:
-                        updates.availability == AppUpdateAvailability.none
+                    onPressed: updates.downloading
+                        ? null
+                        : updates.availability == AppUpdateAvailability.none
                         ? () => updates.check(manual: true)
                         : updates.openDownload,
                     child: Text(
                       updates.availability == AppUpdateAvailability.none
                           ? '检查更新'
+                          : updates.downloading
+                          ? '下载中…'
                           : '去更新',
                     ),
                   ),
@@ -229,17 +244,27 @@ class _RequiredUpdateCard extends StatelessWidget {
             spacing: 10,
             children: [
               FilledButton(
-                onPressed: updates.openDownload,
-                child: const Text('立即更新'),
+                onPressed: updates.downloading ? null : updates.openDownload,
+                child: Text(updates.downloading ? '下载中…' : '立即更新'),
               ),
               TextButton(
-                onPressed: () {
-                  useOffline();
-                },
+                onPressed: updates.downloading ? null : useOffline,
                 child: const Text('使用离线版'),
               ),
             ],
           ),
+          if (updates.downloading) ...[
+            const SizedBox(height: 8),
+            LinearProgressIndicator(value: updates.downloadProgress),
+            Text('正在下载：${((updates.downloadProgress ?? 0) * 100).round()}%'),
+          ],
+          if (updates.error case final message?) ...[
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
         ],
       ),
     ),

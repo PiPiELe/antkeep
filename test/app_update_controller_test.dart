@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:antkeep/online/app_update.dart';
 import 'package:antkeep/online/app_update_controller.dart';
+import 'package:antkeep/online/app_update_downloader.dart';
+import 'package:crypto/crypto.dart';
 import 'package:antkeep/online/online_api.dart';
 import 'package:antkeep/online/online_controller.dart';
 import 'package:antkeep/online/online_store.dart';
@@ -42,6 +45,7 @@ AppUpdateController controller({
   required Future<String> Function() currentVersion,
   bool supported = true,
   Future<bool> Function(Uri)? openUrl,
+  AppUpdateDownloader? downloader,
   Future<void> Function()? onRequiredUpdate,
   String? Function()? sessionToken,
 }) => AppUpdateController(
@@ -52,6 +56,7 @@ AppUpdateController controller({
   currentVersion: currentVersion,
   supportsUpdates: () => supported,
   openUrl: openUrl,
+  downloader: downloader,
   onRequiredUpdate: onRequiredUpdate,
   sessionToken: sessionToken,
 );
@@ -428,4 +433,44 @@ void main() {
       expect(updates.error, contains('无法打开'));
     },
   );
+
+  test('published APK downloads inside app without opening browser', () async {
+    final cache = await Directory.systemTemp.createTemp(
+      'antkeep-update-controller-',
+    );
+    addTearDown(() => cache.delete(recursive: true));
+    final bytes = List<int>.filled(64, 42);
+    var browserOpened = false;
+    var installerOpened = false;
+    final updates = controller(
+      respond: (_) async => response(
+        jsonEncode({
+          ...jsonDecode(policy()),
+          'apk': {
+            'filename': 'AntKeep.apk',
+            'sizeBytes': bytes.length,
+            'sha256': sha256.convert(bytes).toString(),
+          },
+        }),
+        200,
+      ),
+      currentVersion: () async => '1.0.0',
+      openUrl: (_) async {
+        browserOpened = true;
+        return true;
+      },
+      downloader: AppUpdateDownloader(
+        clientFactory: () =>
+            MockClient((_) async => http.Response.bytes(bytes, 200)),
+        cacheDirectory: () async => cache,
+        installApk: (_) async => installerOpened = true,
+      ),
+    );
+    addTearDown(updates.dispose);
+    await updates.setOnline(false);
+    expect(await updates.openDownload(), isTrue);
+    expect(installerOpened, isTrue);
+    expect(browserOpened, isFalse);
+    expect(updates.downloading, isFalse);
+  });
 }

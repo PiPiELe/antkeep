@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app_update.dart';
+import 'app_update_downloader.dart';
 import 'online_api.dart';
 
 class AppUpdateController extends ChangeNotifier {
@@ -14,9 +15,11 @@ class AppUpdateController extends ChangeNotifier {
     this.sessionToken,
     this.onRequiredUpdate,
     Future<bool> Function(Uri)? openUrl,
+    AppUpdateDownloader? downloader,
   }) : _openUrl =
            openUrl ??
-           ((url) => launchUrl(url, mode: LaunchMode.externalApplication));
+           ((url) => launchUrl(url, mode: LaunchMode.externalApplication)),
+       _downloader = downloader ?? AppUpdateDownloader();
 
   final OnlineApi api;
   final Future<String> Function() currentVersion;
@@ -24,7 +27,9 @@ class AppUpdateController extends ChangeNotifier {
   final String? Function()? sessionToken;
   final Future<void> Function()? onRequiredUpdate;
   final Future<bool> Function(Uri) _openUrl;
-  bool online = false, checking = false;
+  final AppUpdateDownloader _downloader;
+  bool online = false, checking = false, downloading = false;
+  double? downloadProgress;
   String? error;
   AppUpdatePolicy? policy;
   AppUpdateAvailability availability = AppUpdateAvailability.none;
@@ -134,10 +139,33 @@ class AppUpdateController extends ChangeNotifier {
   }
 
   Future<bool> openDownload() async {
-    final url = policy?.downloadUrl;
-    if (url == null) return false;
+    final update = policy;
+    if (update == null || downloading) return false;
+    error = null;
+    if (update.apk?.sha256 != null) {
+      downloading = true;
+      downloadProgress = 0;
+      notifyListeners();
+      try {
+        await _downloader.downloadAndInstall(update, (received, total) {
+          downloadProgress = received / total;
+          notifyListeners();
+        });
+        return true;
+      } on AppUpdateDownloadException catch (failure) {
+        error = failure.message;
+        return false;
+      } catch (_) {
+        error = '下载失败，请稍后重试。';
+        return false;
+      } finally {
+        downloading = false;
+        downloadProgress = null;
+        notifyListeners();
+      }
+    }
     try {
-      final opened = await _openUrl(url);
+      final opened = await _openUrl(update.downloadUrl);
       if (!opened) error = '无法打开下载页面，请稍后重试。';
       notifyListeners();
       return opened;

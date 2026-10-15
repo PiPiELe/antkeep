@@ -47,10 +47,15 @@ class AppVersion implements Comparable<AppVersion> {
 }
 
 class AppUpdateApk {
-  const AppUpdateApk({required this.filename, required this.sizeBytes});
+  const AppUpdateApk({
+    required this.filename,
+    required this.sizeBytes,
+    this.sha256,
+  });
 
   final String filename;
   final int sizeBytes;
+  final String? sha256;
 
   // Older publications may only have a download URL. Invalid optional metadata
   // must not prevent the user from seeing an otherwise valid update.
@@ -62,10 +67,18 @@ class AppUpdateApk {
         filename.trim().isEmpty ||
         filename.length > 255 ||
         sizeBytes is! int ||
-        sizeBytes <= 0) {
+        sizeBytes <= 0 ||
+        sizeBytes > 128 * 1024 * 1024) {
       return null;
     }
-    return AppUpdateApk(filename: filename, sizeBytes: sizeBytes);
+    final digest = value['sha256'];
+    return AppUpdateApk(
+      filename: filename,
+      sizeBytes: sizeBytes,
+      sha256: digest is String && RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(digest)
+          ? digest.toLowerCase()
+          : null,
+    );
   }
 
   String get formattedSize {
