@@ -95,14 +95,19 @@ void main() {
     await tester.tap(find.text('没有账号，去注册'));
     await tester.pumpAndSettle();
     expect(find.text('邀请码（选填）'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextFormField, '用户名'), 'alice');
+    await tester.enterText(find.widgetWithText(TextFormField, '用户名'), '蚁友');
     await tester.enterText(
       find.widgetWithText(TextFormField, '密码'),
       'password123',
     );
     await tester.tap(find.text('注册并登录'));
     await tester.pumpAndSettle();
-    expect(api.registration, {'username': 'alice', 'password': 'password123'});
+    expect(find.text('请检查用户名格式'), findsOneWidget);
+    expect(api.registration, isNull);
+    await tester.enterText(find.widgetWithText(TextFormField, '用户名'), '中华蚁友');
+    await tester.tap(find.text('注册并登录'));
+    await tester.pumpAndSettle();
+    expect(api.registration, {'username': '中华蚁友', 'password': 'password123'});
     controller.dispose();
   });
 }
