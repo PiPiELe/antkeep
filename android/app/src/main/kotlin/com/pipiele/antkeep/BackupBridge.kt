@@ -36,6 +36,7 @@ class BackupBridge(private val activity: Activity, messenger: BinaryMessenger) {
                     } else {
                         val file = call.argument<String>("path")?.let { File(it) }
                         val name = call.argument<String>("name")
+                        val mimeType = call.argument<String>("mimeType") ?: "application/zip"
                         if (file == null || !file.isFile || name == null) {
                             result.error("invalid_file", "备份文件不存在", null)
                         } else {
@@ -44,7 +45,7 @@ class BackupBridge(private val activity: Activity, messenger: BinaryMessenger) {
                             try {
                                 activity.startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                                     addCategory(Intent.CATEGORY_OPENABLE)
-                                    type = "application/zip"
+                                    type = mimeType
                                     putExtra(Intent.EXTRA_TITLE, name)
                                 }, requestCode)
                             } catch (error: Exception) {

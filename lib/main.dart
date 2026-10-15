@@ -6944,18 +6944,43 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: const Icon(Icons.upload_file_outlined),
           title: const Text('导出备份'),
           trailing: const Icon(Icons.chevron_right),
-          subtitle: const Text('生成包含记录和照片的 .zip 文件'),
+          subtitle: const Text('选择完整 ZIP 备份或 Excel 数据表'),
           onTap: () async {
+            final zip = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => SimpleDialog(
+                title: const Text('选择导出格式'),
+                children: [
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const ListTile(
+                      leading: Icon(Icons.folder_zip_outlined),
+                      title: Text('ZIP 完整备份'),
+                      subtitle: Text('包含记录和照片，可用于恢复'),
+                    ),
+                  ),
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const ListTile(
+                      leading: Icon(Icons.table_chart_outlined),
+                      title: Text('Excel 数据表'),
+                      subtitle: Text('便于查看记录；不含照片，不能用于恢复'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+            if (zip == null || !context.mounted) return;
             try {
-              final exported = await _runBackupTask(
-                context,
-                () => BackupService(
+              final exported = await _runBackupTask(context, () {
+                final service = BackupService(
                   AppDatabase.instance,
                   LocalMediaStore.instance,
-                ).exportBackup(),
-              );
+                );
+                return zip ? service.exportBackup() : service.exportExcel();
+              });
               if (exported && context.mounted) {
-                _showInfo(context, '已完成备份导出。');
+                _showInfo(context, zip ? '已完成备份导出。' : '已完成 Excel 导出。');
               }
             } catch (error) {
               if (context.mounted) _showError(context, error);

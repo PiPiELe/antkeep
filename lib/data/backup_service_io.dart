@@ -11,6 +11,7 @@ import 'backup_archive.dart';
 import 'backup_logic.dart';
 import 'backup_resources.dart';
 import 'backup_zip_io.dart';
+import 'excel_export.dart';
 import 'local_media_store.dart';
 import 'media_cleanup.dart';
 import 'rollback_store.dart';
@@ -101,6 +102,28 @@ class BackupService with BackupLogic {
           fileName: 'antkeep-$timestamp.zip',
           bytes: await file.readAsBytes(),
           mimeType: 'application/zip',
+        ) !=
+        null;
+  });
+
+  Future<bool> exportExcel() => _operation((temporary) async {
+    final data = await database.snapshot();
+    final bytes = await Isolate.run(() => ExcelExport.encode(data));
+    final file = File(path.join(temporary.path, 'export.xlsx'));
+    await file.writeAsBytes(bytes);
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    if (Platform.isAndroid || Platform.isIOS) {
+      return await BackupResources.channel.invokeMethod<bool>('saveBackup', {
+            'path': file.path,
+            'name': 'antkeep-$timestamp.xlsx',
+            'mimeType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }) ??
+          false;
+    }
+    return await FilePicker.saveFile(
+          fileName: 'antkeep-$timestamp.xlsx',
+          bytes: bytes,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ) !=
         null;
   });

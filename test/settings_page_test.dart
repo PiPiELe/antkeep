@@ -186,6 +186,13 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('导出备份'), findsOneWidget);
+      await tester.tap(find.text('导出备份'));
+      await tester.pumpAndSettle();
+      expect(find.text('选择导出格式'), findsOneWidget);
+      expect(find.text('ZIP 完整备份'), findsOneWidget);
+      expect(find.text('Excel 数据表'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('外观与展示'), findsOneWidget);

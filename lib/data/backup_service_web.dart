@@ -8,6 +8,7 @@ import 'app_database.dart';
 import 'backup_archive.dart';
 import 'backup_data.dart';
 import 'backup_logic.dart';
+import 'excel_export.dart';
 import 'local_media_store.dart';
 import 'media_cleanup.dart';
 import 'rollback_store.dart';
@@ -30,6 +31,19 @@ class BackupService with BackupLogic {
       bytes: await createBackupBytes(),
     );
     return destination != null;
+  }
+
+  Future<bool> exportExcel() async {
+    final bytes = ExcelExport.encode(await _database.snapshot());
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    return await FilePicker.saveFile(
+          dialogTitle: '导出蚁记 Excel',
+          fileName: 'antkeep-$timestamp.xlsx',
+          type: FileType.custom,
+          allowedExtensions: const ['xlsx'],
+          bytes: bytes,
+        ) !=
+        null;
   }
 
   Future<Map<String, dynamic>> uploadBackup(OnlineController online) async {
