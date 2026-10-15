@@ -381,6 +381,31 @@ class OnlineController extends ChangeNotifier {
       await _competitionRequest('/api/app/competitions/$id')
           as Map<String, dynamic>;
 
+  Future<Uint8List> competitionPhoto(String id) async {
+    final sessionUser = user;
+    final token = _token;
+    if (!enabled || sessionUser == null || token == null) {
+      throw const ApiFailure('请切换在线版并登录后使用。');
+    }
+    final generation = _generation;
+    try {
+      final bytes = await api.requestImage(
+        '/api/app/competition-updates/$id/photo',
+        token: token,
+      );
+      if (!_current(generation) || user?.id != sessionUser.id) {
+        throw const ApiFailure('在线状态已改变，请重新登录后查看比赛。');
+      }
+      return bytes;
+    } catch (error) {
+      if (_current(generation) && error is ApiFailure && error.status == 401) {
+        await _failure(error);
+        notifyListeners();
+      }
+      rethrow;
+    }
+  }
+
   Future<Map<String, dynamic>> competitionDisclaimer() async =>
       await _competitionRequest('/api/app/competitions/disclaimer')
           as Map<String, dynamic>;

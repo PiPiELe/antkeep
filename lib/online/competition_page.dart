@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/app_database.dart';
 import '../domain/models.dart';
 import '../widgets/photo_source_picker.dart';
+import '../widgets/photo_save_preview.dart';
 import 'competition_poster_page.dart';
 import 'online_api.dart';
 import 'online_controller.dart';
@@ -27,6 +28,8 @@ class _CompetitionPageState extends State<CompetitionPage> {
   Map<String, dynamic>? _detail;
   String? _selectedColonyId, _message;
   Uint8List? _photo;
+  String? _openingPhotoId;
+  bool _photoPreviewOpen = false;
   bool _loading = false, _submitting = false;
   OnlineUser? _account;
   int _revision = 0, _photoTargetRevision = 0;
@@ -51,6 +54,10 @@ class _CompetitionPageState extends State<CompetitionPage> {
     final account = widget.controller.user;
     if (identical(account, _account) && widget.controller.enabled) return;
     _account = account;
+    if (_photoPreviewOpen && mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      _photoPreviewOpen = false;
+    }
     ++_revision;
     ++_photoTargetRevision;
     setState(() {
@@ -177,6 +184,34 @@ class _CompetitionPageState extends State<CompetitionPage> {
           identical(account, widget.controller.user) &&
           targetRevision == _photoTargetRevision) {
         setState(() => _message = _error(error));
+      }
+    }
+  }
+
+  Future<void> _openOwnPhoto(String id) async {
+    final revision = _revision;
+    final account = widget.controller.user;
+    setState(() => _openingPhotoId = id);
+    try {
+      final bytes = await widget.controller.competitionPhoto(id);
+      if (!mounted ||
+          revision != _revision ||
+          !identical(account, widget.controller.user)) {
+        return;
+      }
+      setState(() => _openingPhotoId = null);
+      _photoPreviewOpen = true;
+      await showPhotoSavePreview(context, bytes: bytes, title: '比赛照片');
+    } catch (error) {
+      if (mounted &&
+          revision == _revision &&
+          identical(account, widget.controller.user)) {
+        setState(() => _message = _error(error));
+      }
+    } finally {
+      _photoPreviewOpen = false;
+      if (mounted && _openingPhotoId == id) {
+        setState(() => _openingPhotoId = null);
       }
     }
   }
@@ -608,6 +643,28 @@ class _CompetitionPageState extends State<CompetitionPage> {
           '我的名次：${mine['rank']} · ${mine['score']} ${d['scoreMode'] == 'POINTS' ? '分' : '只'} · '
           '${updatedToday ? '今日已更新' : '今日待更新'}',
         ),
+      if (mine != null &&
+          (mine['photos'] as List<dynamic>? ?? []).isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Text('我的比赛照片', style: Theme.of(context).textTheme.titleMedium),
+        for (final item
+            in (mine['photos'] as List<dynamic>).cast<Map<String, dynamic>>())
+          ListTile(
+            leading: const Icon(Icons.photo_outlined),
+            title: Text(item['date'] as String),
+            subtitle: const Text('查看并保存照片'),
+            trailing: _openingPhotoId == item['id']
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(),
+                  )
+                : const Icon(Icons.chevron_right),
+            onTap: _openingPhotoId == null
+                ? () => _openOwnPhoto(item['id'] as String)
+                : null,
+          ),
+      ],
       if (active && !updatedToday) ...[
         const SizedBox(height: 8),
         OutlinedButton.icon(

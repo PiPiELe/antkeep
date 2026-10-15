@@ -294,6 +294,25 @@ void main() {
     },
   );
 
+  testWidgets('JPEG photo keeps its bytes and extension when saved', (
+    tester,
+  ) async {
+    final jpeg = Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]);
+    Uint8List? saved;
+    String? name;
+    messenger.setMockMethodCallHandler(ShareImageExport.channel, (call) async {
+      saved = (call.arguments as Map)['bytes'] as Uint8List;
+      name = (call.arguments as Map)['name'] as String;
+      return '已保存到相册';
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(ShareImageExport.channel, null),
+    );
+    expect(await ShareImageExport.save(jpeg), '已保存到相册');
+    expect(saved, orderedEquals(jpeg));
+    expect(name, matches(RegExp(r'^antkeep-[0-9]+\.jpg$')));
+  });
+
   testWidgets('all posters paint at narrow width with long captions', (
     tester,
   ) async {

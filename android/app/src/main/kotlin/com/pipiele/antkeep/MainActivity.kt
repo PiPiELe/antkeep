@@ -68,7 +68,7 @@ class MainActivity : FlutterActivity() {
                 }
                 val bytes = call.argument<ByteArray>("bytes")
                 val name = call.argument<String>("name")
-                if (bytes == null || bytes.isEmpty() || name == null || !name.matches(Regex("antkeep-[0-9]+\\.png"))) {
+                if (bytes == null || bytes.isEmpty() || name == null || !name.matches(Regex("antkeep-[0-9]+\\.(png|jpg)"))) {
                     result.error("invalid_image", "无效的图片", null)
                     return@setMethodCallHandler
                 }
@@ -77,7 +77,7 @@ class MainActivity : FlutterActivity() {
                     try {
                         val values = ContentValues().apply {
                             put(MediaStore.Images.Media.DISPLAY_NAME, name)
-                            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                            put(MediaStore.Images.Media.MIME_TYPE, if (name.endsWith(".jpg")) "image/jpeg" else "image/png")
                             put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/AntKeep")
                             put(MediaStore.Images.Media.IS_PENDING, 1)
                         }

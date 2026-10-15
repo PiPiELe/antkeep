@@ -13,6 +13,7 @@ import 'date_display.dart';
 import 'domain/wild_catch_record.dart';
 import 'live_wild_catch_page.dart';
 import 'widgets/photo_source_picker.dart';
+import 'widgets/photo_save_preview.dart';
 
 class WildCatchPage extends StatefulWidget {
   const WildCatchPage({super.key});
@@ -358,12 +359,8 @@ class _WildCatchImageState extends State<_WildCatchImage> {
         );
       }
       return InkWell(
-        onTap: () => showDialog<void>(
-          context: context,
-          builder: (context) => Dialog(
-            child: InteractiveViewer(child: Image.memory(snapshot.data!)),
-          ),
-        ),
+        onTap: () =>
+            showPhotoSavePreview(context, bytes: snapshot.data!, title: '野采照片'),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.memory(

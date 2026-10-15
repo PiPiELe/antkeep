@@ -61,6 +61,7 @@ import 'widgets/species_picker.dart';
 import 'widgets/diary_record_actions.dart';
 import 'widgets/justified_label.dart';
 import 'widgets/photo_source_picker.dart';
+import 'widgets/photo_save_preview.dart';
 
 const _nestTypeOptions = [
   '试管巢',
@@ -4612,6 +4613,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
                         width: 80,
                         height: 80,
                         borderRadius: 8,
+                        previewTitle: '日记照片',
                       ),
                     ),
                   ),
@@ -5040,6 +5042,7 @@ class _RecordCardState extends State<_RecordCard> {
                     width: 88,
                     height: 88,
                     borderRadius: 8,
+                    previewTitle: '日记照片',
                   ),
                 ),
               ),
@@ -7211,6 +7214,7 @@ class _StoredImage extends StatelessWidget {
     required this.height,
     required this.borderRadius,
     this.fallback,
+    this.previewTitle,
   });
 
   final String relativePath;
@@ -7218,6 +7222,7 @@ class _StoredImage extends StatelessWidget {
   final double height;
   final double borderRadius;
   final Widget? fallback;
+  final String? previewTitle;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<Uint8List>(
@@ -7233,7 +7238,7 @@ class _StoredImage extends StatelessWidget {
       if (snapshot.hasError || snapshot.data == null) {
         return fallback ?? _missingImage(context);
       }
-      return ClipRRect(
+      final image = ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: Image.memory(
           snapshot.data!,
@@ -7244,6 +7249,16 @@ class _StoredImage extends StatelessWidget {
               fallback ?? _missingImage(context),
         ),
       );
+      return previewTitle == null
+          ? image
+          : InkWell(
+              onTap: () => showPhotoSavePreview(
+                context,
+                bytes: snapshot.data!,
+                title: previewTitle!,
+              ),
+              child: image,
+            );
     },
   );
 

@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import 'data/app_database.dart';
 import 'data/local_media_store.dart';
+import 'data/share_image_export.dart';
 import 'data/media_cleanup.dart';
 import 'date_display.dart';
 import 'domain/wild_catch_record.dart';
@@ -1268,6 +1269,26 @@ class _WildCatchPhotoState extends State<_WildCatchPhoto> {
         ),
       ),
       actions: [
+        if (bytes != null)
+          TextButton.icon(
+            onPressed: () async {
+              try {
+                final message = await ShareImageExport.save(bytes);
+                if (dialogContext.mounted && message != null) {
+                  ScaffoldMessenger.of(dialogContext)
+                      .showSnackBar(SnackBar(content: Text(message)));
+                }
+              } catch (_) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(
+                    dialogContext,
+                  ).showSnackBar(const SnackBar(content: Text('图片保存失败，请重试')));
+                }
+              }
+            },
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('保存到本地'),
+          ),
         if (widget.onRemove != null)
           TextButton.icon(
             onPressed: () async {

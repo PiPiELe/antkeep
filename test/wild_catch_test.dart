@@ -5,6 +5,7 @@ import 'package:antkeep/data/database_path.dart';
 import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/data/backup_logic.dart';
 import 'package:antkeep/data/local_media_store.dart';
+import 'package:antkeep/data/share_image_export.dart';
 import 'package:antkeep/domain/wild_catch_record.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/live_wild_catch_page.dart';
@@ -651,6 +652,16 @@ void main() {
   testWidgets('live photo can be removed from preview after confirmation', (
     tester,
   ) async {
+    Uint8List? savedPhoto;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(ShareImageExport.channel, (call) async {
+          savedPhoto = (call.arguments as Map)['bytes'] as Uint8List;
+          return '已保存到相册';
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(ShareImageExport.channel, null),
+    );
     const photoPath = 'live-photo.png';
     final started = DateTime.now().subtract(const Duration(minutes: 5));
     final record = WildCatchRecord(
@@ -688,6 +699,9 @@ void main() {
     await tester.tap(find.byType(Image).first);
     await tester.pumpAndSettle();
     expect(find.text('野采照片'), findsOneWidget);
+    await tester.tap(find.text('保存到本地'));
+    await tester.pumpAndSettle();
+    expect(savedPhoto, isNotNull);
     await tester.tap(find.text('删除照片'));
     await tester.pumpAndSettle();
     expect(find.text('删除这张照片？'), findsOneWidget);

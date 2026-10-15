@@ -98,6 +98,64 @@ class OnlineApi {
     }
   }
 
+  Future<Uint8List> requestImage(String path, {required String token}) async {
+    if (!enabled) throw const ApiFailure('当前为离线模式。');
+    final base = Uri.tryParse(baseUrl);
+    if (base == null ||
+        !base.hasAuthority ||
+        base.userInfo.isNotEmpty ||
+        base.hasQuery ||
+        base.hasFragment ||
+        (base.path.isNotEmpty && base.path != '/') ||
+        (base.scheme != 'https' &&
+            !(kDebugMode &&
+                base.scheme == 'http' &&
+                ['localhost', '127.0.0.1', '10.0.2.2'].contains(base.host)))) {
+      throw const ApiFailure('在线服务尚未配置；本地功能可正常使用。');
+    }
+    final client = _clientFactory();
+    _active.add(client);
+    try {
+      final request = http.Request('GET', base.resolve(path));
+      request.headers['Authorization'] = 'Bearer $token';
+      request.followRedirects = false;
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 15));
+      final bytes = <int>[];
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 15),
+      )) {
+        bytes.addAll(chunk);
+        if (bytes.length > 262144) throw const ApiFailure('图片超过读取上限。');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiFailure('读取比赛照片失败，请重试。', status: response.statusCode);
+      }
+      final image = Uint8List.fromList(bytes);
+      final jpeg =
+          image.length >= 3 &&
+          image[0] == 0xff &&
+          image[1] == 0xd8 &&
+          image[2] == 0xff;
+      final png =
+          image.length >= 4 &&
+          image[0] == 0x89 &&
+          image[1] == 0x50 &&
+          image[2] == 0x4e &&
+          image[3] == 0x47;
+      if (!jpeg && !png) throw const ApiFailure('比赛照片格式不受支持。');
+      return image;
+    } on ApiFailure {
+      rethrow;
+    } catch (_) {
+      throw const ApiFailure('无法读取比赛照片，请检查网络后重试。');
+    } finally {
+      _active.remove(client);
+      client.close();
+    }
+  }
+
   Future<String> uploadBackup(
     Stream<List<int>> bytes,
     int length, {

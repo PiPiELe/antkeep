@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:antkeep/data/app_database.dart';
+import 'package:antkeep/data/share_image_export.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/online/competition_page.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:http/http.dart' as http;
 
 import 'online_controller_test.dart'
     show MemoryOnlineStore, controller, response, snapshot, summary, user;
@@ -134,6 +136,80 @@ void main() {
     await tester.tap(find.text('工蚁净增长').last);
     await tester.pumpAndSettle();
     expect(find.text('新后基础获得积分'), findsNothing);
+    online.dispose();
+  });
+
+  testWidgets('own competition photo can be previewed and saved', (
+    tester,
+  ) async {
+    Uint8List? saved;
+    String? savedName;
+    messenger.setMockMethodCallHandler(ShareImageExport.channel, (call) async {
+      saved = (call.arguments as Map)['bytes'] as Uint8List;
+      savedName = (call.arguments as Map)['name'] as String;
+      return '已保存到相册';
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(ShareImageExport.channel, null),
+    );
+    final online = controller(MemoryOnlineStore(), (request) async {
+      switch (request.url.path) {
+        case '/api/public/content':
+          return response(snapshot(), 200);
+        case '/api/app/auth/login':
+          return response(
+            jsonEncode({'token': 'alice', 'user': user('alice')}),
+            200,
+          );
+        case '/api/app/check-ins/summary':
+          return response(jsonEncode(summary(0)), 200);
+        case '/api/app/auth/logout':
+          return response('{}', 200);
+        case '/api/app/competitions':
+          return response(jsonEncode([contest('contest-1')]), 200);
+        case '/api/app/competitions/contest-1':
+          final detail = contest('contest-1');
+          detail['myEntry'] = {
+            'rank': 1,
+            'score': 10,
+            'lastUpdateDate': '2026-10-10',
+            'photos': [
+              {'id': 'photo-1', 'date': '2026-10-09'},
+            ],
+          };
+          return response(jsonEncode(detail), 200);
+        case '/api/app/competition-updates/photo-1/photo':
+          expect(request.headers['authorization'], 'Bearer alice');
+          return http.Response.bytes(
+            photo,
+            200,
+            headers: {'content-type': 'image/png'},
+          );
+      }
+      return response('{}', 404);
+    });
+    await tester.runAsync(() async {
+      await online.setEnabled(true);
+      await online.login('alice', 'password');
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CompetitionPage(controller: online, initialId: 'contest-1'),
+      ),
+    );
+    await until(tester, find.text('我的比赛照片'));
+    await tester.ensureVisible(find.text('2026-10-09'));
+    await tester.tap(find.text('2026-10-09'));
+    await until(tester, find.text('比赛照片'));
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    await tester.tap(find.byTooltip('保存到本地'));
+    await tester.pumpAndSettle();
+    expect(saved, orderedEquals(photo));
+    expect(savedName, matches(RegExp(r'^antkeep-[0-9]+\.png$')));
+    await tester.runAsync(online.logout);
+    await tester.pumpAndSettle();
+    expect(find.text('比赛照片'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
     online.dispose();
   });
 
