@@ -2,12 +2,16 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:xml/xml.dart';
 
+import 'backup_archive.dart';
 import 'backup_data.dart';
 
-/// A readable copy of the local tables. ZIP remains the restorable backup.
+/// An AntKeep workbook; a companion ZIP can carry its original photos.
 class ExcelExport {
   ExcelExport._();
+
+  static const maxInputBytes = 32 * 1024 * 1024;
 
   static const _sheetNames = <String, String>{
     'colonies': '蚁群',
@@ -89,9 +93,9 @@ class ExcelExport {
     );
 
     final overview = <List<Object?>>[
-      ['蚁记数据导出', 'Excel 用于查看和整理；完整恢复请使用 ZIP 备份。'],
+      ['蚁记数据导出', 'Excel 可恢复记录；完整恢复照片请使用 ZIP 备份。'],
       ['导出时间', DateTime.now().toIso8601String()],
-      ['照片', '仅保留记录中的照片路径，不包含照片文件。'],
+      ['照片', '仅保留路径供查看；从 Excel 恢复时会清除照片关联。'],
       ['字段', '表头括号中是数据库原字段名；0 表示否，1 表示是。'],
       ['数据表', '记录数'],
       for (final entry in tables)
@@ -125,6 +129,236 @@ class ExcelExport {
       );
     }
     return ZipEncoder().encodeBytes(archive);
+  }
+
+  /// Reads an AntKeep workbook, including copies resaved with shared strings.
+  /// Photo paths are retained only when a companion package supplies originals.
+  static Map<String, dynamic> decode(
+    Uint8List bytes, {
+    bool keepPhotoPaths = false,
+  }) {
+    if (bytes.length > maxInputBytes) {
+      throw const FormatException('Excel 文件超过 32 MB 的导入上限。');
+    }
+    BackupArchive.preflightZip(
+      bytes,
+      entryLimit: 64,
+      fileLimit: 64 * 1024 * 1024,
+      totalLimit: 96 * 1024 * 1024,
+    );
+    final archive = ZipDecoder().decodeBytes(bytes, verify: true);
+    final parts = <String, ArchiveFile>{};
+    for (final file in archive.files.where((file) => file.isFile)) {
+      if (file.isSymbolicLink || parts.containsKey(file.name)) {
+        throw const FormatException('Excel 文件包含重复或不支持的内容。');
+      }
+      parts[file.name] = file;
+    }
+    XmlDocument read(String name) {
+      final content = parts[name]?.readBytes();
+      if (content == null) throw const FormatException('不是蚁记导出的 Excel 文件。');
+      final source = utf8.decode(content);
+      if (source.contains('<!DOCTYPE') || source.contains('<!ENTITY')) {
+        throw const FormatException('Excel 文件包含不支持的 XML 声明。');
+      }
+      return XmlDocument.parse(source);
+    }
+
+    try {
+      final workbook = read('xl/workbook.xml');
+      final relationships = read('xl/_rels/workbook.xml.rels');
+      final targets = <String, String>{};
+      for (final relation in relationships.findAllElements(
+        'Relationship',
+        namespace: '*',
+      )) {
+        final id = relation.getAttribute('Id');
+        final target = relation.getAttribute('Target');
+        if (id == null || target == null) continue;
+        final name = target.startsWith('/')
+            ? target.substring(1)
+            : 'xl/$target';
+        if (RegExp(r'^xl/worksheets/[A-Za-z0-9_-]+\.xml$').hasMatch(name)) {
+          targets[id] = name;
+        }
+      }
+      final sheets = <String, String>{};
+      for (final sheet in workbook.findAllElements('sheet', namespace: '*')) {
+        final name = sheet.getAttribute('name');
+        final id = sheet.getAttribute('id', namespace: '*');
+        if (name == null ||
+            id == null ||
+            targets[id] == null ||
+            sheets.containsKey(name)) {
+          throw const FormatException('Excel 工作表目录无效。');
+        }
+        sheets[name] = targets[id]!;
+      }
+      if (sheets.length != _sheetNames.length + 1 ||
+          !sheets.keys.toSet().containsAll({'导出说明', ..._sheetNames.values})) {
+        throw const FormatException('Excel 缺少蚁记导出的数据表。');
+      }
+      final shared = <String>[];
+      if (parts.containsKey('xl/sharedStrings.xml')) {
+        for (final entry in read(
+          'xl/sharedStrings.xml',
+        ).findAllElements('si', namespace: '*')) {
+          shared.add(
+            entry
+                .findAllElements('t', namespace: '*')
+                .map((text) => text.innerText)
+                .join(),
+          );
+        }
+      }
+      final overview = _rows(read(sheets['导出说明']!), shared);
+      if (overview.isEmpty || overview.first[0] != '蚁记数据导出') {
+        throw const FormatException('不是蚁记导出的 Excel 文件。');
+      }
+      final data = <String, dynamic>{};
+      for (final entry in _sheetNames.entries) {
+        final rows = _rows(read(sheets[entry.value]!), shared);
+        if (rows.isEmpty) throw FormatException('${entry.value}缺少字段表头。');
+        final header = rows.first;
+        if (header.length == 1 && header[0] == '暂无记录') {
+          if (rows.length != 1) throw FormatException('${entry.value}表头无效。');
+          data[entry.key] = <Map<String, Object?>>[];
+          continue;
+        }
+        if (header.isEmpty || header.length > 16384) {
+          throw FormatException('${entry.value}表头无效。');
+        }
+        final fields = <String>[];
+        for (
+          var index = 0;
+          index <= header.keys.reduce((a, b) => a > b ? a : b);
+          index++
+        ) {
+          final label = header[index];
+          if (label is! String || label.isEmpty) {
+            throw FormatException('${entry.value}表头有空字段。');
+          }
+          final suffix = RegExp(r'\(([^()]*)\)$').firstMatch(label);
+          final field = suffix?.group(1) ?? label;
+          if (field.isEmpty || fields.contains(field)) {
+            throw FormatException('${entry.value}表头有重复字段。');
+          }
+          fields.add(field);
+        }
+        final records = <Map<String, Object?>>[];
+        for (final cells in rows.skip(1)) {
+          if (cells.isEmpty) continue;
+          if (cells.keys.any((index) => index >= fields.length)) {
+            throw FormatException('${entry.value}含有表头之外的数据。');
+          }
+          records.add({
+            for (var index = 0; index < fields.length; index++)
+              fields[index]: cells[index],
+          });
+        }
+        data[entry.key] = records;
+      }
+      if (!keepPhotoPaths) clearPhotoPaths(data);
+      BackupData.validate(data);
+      return data;
+    } on XmlException catch (_) {
+      throw const FormatException('Excel 文件结构无效。');
+    }
+  }
+
+  static void clearPhotoPaths(Map<String, dynamic> data) {
+    for (final row in (data['colonies'] as List).cast<Map<String, Object?>>()) {
+      row['cover_photo_path'] = null;
+    }
+    for (final table in ['care_records', 'wild_catch_records']) {
+      for (final row
+          in (data[table] as List? ?? const []).cast<Map<String, Object?>>()) {
+        row['photos_json'] = '[]';
+      }
+    }
+  }
+
+  static List<Map<int, Object?>> _rows(
+    XmlDocument document,
+    List<String> shared,
+  ) {
+    final rows = <Map<int, Object?>>[];
+    final sheetData = document
+        .findAllElements('sheetData', namespace: '*')
+        .firstOrNull;
+    if (sheetData == null) throw const FormatException('Excel 缺少工作表数据。');
+    var lastRow = 0;
+    for (final row in sheetData.findElements('row', namespace: '*')) {
+      final number = int.tryParse(row.getAttribute('r') ?? '');
+      if (number == null ||
+          number <= lastRow ||
+          number > 1048576 ||
+          rows.length >= 100000) {
+        throw const FormatException('Excel 行号无效或记录过多。');
+      }
+      lastRow = number;
+      final cells = <int, Object?>{};
+      for (final cell in row.findElements('c', namespace: '*')) {
+        final address = cell.getAttribute('r') ?? '';
+        final match = RegExp(r'^([A-Z]+)([1-9][0-9]*)$').firstMatch(address);
+        if (match == null ||
+            int.parse(match.group(2)!) != number ||
+            cell.findElements('f', namespace: '*').isNotEmpty) {
+          throw const FormatException('Excel 单元格位置或公式无效。');
+        }
+        var column = 0;
+        for (final code in match.group(1)!.codeUnits) {
+          column = column * 26 + code - 64;
+        }
+        column--;
+        if (column >= 16384 || cells.containsKey(column)) {
+          throw const FormatException('Excel 列号无效或重复。');
+        }
+        final type = cell.getAttribute('t');
+        final value = cell
+            .findElements('v', namespace: '*')
+            .firstOrNull
+            ?.innerText;
+        Object? decoded;
+        if (type == 'inlineStr') {
+          decoded = cell
+              .findAllElements('t', namespace: '*')
+              .map((text) => text.innerText)
+              .join();
+        } else if (type == 's') {
+          final index = int.tryParse(value ?? '');
+          if (index == null || index < 0 || index >= shared.length) {
+            throw const FormatException('Excel 共享文字索引无效。');
+          }
+          decoded = shared[index];
+        } else if (type == 'str' || type == 'd') {
+          decoded = value;
+        } else if (type == 'b') {
+          if (value != '0' && value != '1') {
+            throw const FormatException('Excel 布尔值无效。');
+          }
+          decoded = int.parse(value!);
+        } else if (type == null || type == 'n') {
+          if (value != null) {
+            final number = num.tryParse(value);
+            if (number == null || !number.isFinite) {
+              throw const FormatException('Excel 数字无效。');
+            }
+            decoded =
+                number is double &&
+                    number.abs() < 1000000000000000 &&
+                    number == number.roundToDouble()
+                ? number.toInt()
+                : number;
+          }
+        } else {
+          throw const FormatException('Excel 包含不支持的单元格类型。');
+        }
+        if (decoded != null) cells[column] = decoded;
+      }
+      rows.add(cells);
+    }
+    return rows;
   }
 
   static String _contentTypes(int count) =>

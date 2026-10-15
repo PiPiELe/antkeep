@@ -178,6 +178,7 @@ void main() {
       await tester.tap(find.text('恢复备份'));
       await tester.pumpAndSettle();
       expect(find.text('选择恢复方式'), findsOneWidget);
+      expect(find.text('恢复图片'), findsOneWidget);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('数据推送'));
@@ -191,6 +192,8 @@ void main() {
       expect(find.text('选择导出格式'), findsOneWidget);
       expect(find.text('ZIP 完整备份'), findsOneWidget);
       expect(find.text('Excel 数据表'), findsOneWidget);
+      expect(find.text('Excel + 原图（ZIP）'), findsOneWidget);
+      expect(find.text('可恢复记录；不含照片文件'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.pageBack();

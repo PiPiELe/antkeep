@@ -6978,15 +6978,15 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: const Icon(Icons.upload_file_outlined),
           title: const Text('导出备份'),
           trailing: const Icon(Icons.chevron_right),
-          subtitle: const Text('选择完整 ZIP 备份或 Excel 数据表'),
+          subtitle: const Text('选择 ZIP、Excel，或 Excel + 原图'),
           onTap: () async {
-            final zip = await showDialog<bool>(
+            final exportType = await showDialog<int>(
               context: context,
               builder: (dialogContext) => SimpleDialog(
                 title: const Text('选择导出格式'),
                 children: [
                   SimpleDialogOption(
-                    onPressed: () => Navigator.pop(dialogContext, true),
+                    onPressed: () => Navigator.pop(dialogContext, 0),
                     child: const ListTile(
                       leading: Icon(Icons.folder_zip_outlined),
                       title: Text('ZIP 完整备份'),
@@ -6994,27 +6994,42 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   SimpleDialogOption(
-                    onPressed: () => Navigator.pop(dialogContext, false),
+                    onPressed: () => Navigator.pop(dialogContext, 1),
                     child: const ListTile(
                       leading: Icon(Icons.table_chart_outlined),
                       title: Text('Excel 数据表'),
-                      subtitle: Text('便于查看记录；不含照片，不能用于恢复'),
+                      subtitle: Text('可恢复记录；不含照片文件'),
+                    ),
+                  ),
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.pop(dialogContext, 2),
+                    child: const ListTile(
+                      leading: Icon(Icons.photo_library_outlined),
+                      title: Text('Excel + 原图（ZIP）'),
+                      subtitle: Text('一个 ZIP 包含 Excel 数据表和本地原图'),
                     ),
                   ),
                 ],
               ),
             );
-            if (zip == null || !context.mounted) return;
+            if (exportType == null || !context.mounted) return;
             try {
               final exported = await _runBackupTask(context, () {
                 final service = BackupService(
                   AppDatabase.instance,
                   LocalMediaStore.instance,
                 );
-                return zip ? service.exportBackup() : service.exportExcel();
+                return switch (exportType) {
+                  0 => service.exportBackup(),
+                  1 => service.exportExcel(),
+                  _ => service.exportExcelWithPhotos(),
+                };
               });
               if (exported && context.mounted) {
-                _showInfo(context, zip ? '已完成备份导出。' : '已完成 Excel 导出。');
+                _showInfo(
+                  context,
+                  exportType == 0 ? '已完成备份导出。' : '已完成 Excel 导出。',
+                );
               }
             } catch (error) {
               if (context.mounted) _showError(context, error);
@@ -7025,46 +7040,71 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: const Icon(Icons.download_outlined),
           title: const Text('恢复备份'),
           trailing: const Icon(Icons.chevron_right),
-          subtitle: const Text('可选择增量恢复或覆盖恢复'),
+          subtitle: const Text('支持 ZIP 或 Excel，可选择增量或覆盖恢复'),
           onTap: () async {
-            final mode = await showDialog<BackupRestoreMode>(
+            final selection = await showDialog<(BackupRestoreMode, bool)>(
               context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('选择恢复方式'),
-                scrollable: true,
-                content: const Text(
-                  '增量恢复：保留本机数据，只补入缺失的蚁群、记录、待办和物品。'
-                  '相同 ID 的数据、同一蚁群同类型待办，以及同分组同名物品，保留本机内容。\n\n'
-                  '覆盖恢复：用备份替换本机现有蚁群、记录和待办。'
-                  '旧备份没有待办时，本机待办也会被清空。\n\n'
-                  '两种方式都会在恢复前保存回退副本，可撤销上一次恢复。',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('取消'),
+              builder: (context) {
+                var restorePhotos = true;
+                return StatefulBuilder(
+                  builder: (context, setDialogState) => AlertDialog(
+                    title: const Text('选择恢复方式'),
+                    scrollable: true,
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          '增量恢复：保留本机数据，只补入缺失的蚁群、记录、待办和物品。'
+                          '相同 ID 的数据、同一蚁群同类型待办，以及同分组同名物品，保留本机内容。\n\n'
+                          '覆盖恢复：用备份替换本机现有蚁群、记录和待办。'
+                          '旧备份没有待办时，本机待办也会被清空。\n\n'
+                          '单独 Excel 只恢复记录。带原图 ZIP 可选择恢复图片。\n\n'
+                          '两种方式都会在恢复前保存回退副本，可撤销上一次恢复。',
+                        ),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('恢复图片'),
+                          subtitle: const Text('仅对含原图的 ZIP 有效；关闭后清除导入记录的照片关联'),
+                          value: restorePhotos,
+                          onChanged: (value) => setDialogState(
+                            () => restorePhotos = value ?? true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('取消'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, (
+                          BackupRestoreMode.overwrite,
+                          restorePhotos,
+                        )),
+                        child: const Text('覆盖恢复'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, (
+                          BackupRestoreMode.incremental,
+                          restorePhotos,
+                        )),
+                        child: const Text('增量恢复'),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () =>
-                        Navigator.pop(context, BackupRestoreMode.overwrite),
-                    child: const Text('覆盖恢复'),
-                  ),
-                  FilledButton(
-                    onPressed: () =>
-                        Navigator.pop(context, BackupRestoreMode.incremental),
-                    child: const Text('增量恢复'),
-                  ),
-                ],
-              ),
+                );
+              },
             );
-            if (mode == null || !context.mounted) return;
+            if (selection == null || !context.mounted) return;
+            final (mode, restorePhotos) = selection;
             try {
               final restored = await _runBackupTask(
                 context,
                 () => BackupService(
                   AppDatabase.instance,
                   LocalMediaStore.instance,
-                ).restoreBackup(mode: mode),
+                ).restoreBackup(mode: mode, restorePhotos: restorePhotos),
               );
               if (restored && context.mounted) {
                 _showInfo(

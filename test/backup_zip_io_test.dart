@@ -54,6 +54,33 @@ void main() {
     },
   );
 
+  test('file writer packages workbook and original photo bytes', () async {
+    final photo = await File('${directory.path}/original.jpg')
+        .writeAsBytes([1, 2, 3]);
+    final workbook = await File('${directory.path}/data.xlsx')
+        .writeAsBytes([4, 5, 6]);
+    final output = File('${directory.path}/excel-photos.zip');
+    await BackupZip.write(
+      output,
+      Uint8List.fromList([123, 125]),
+      {'original.jpg': photo.path},
+      64 * 1024,
+      workbook: workbook,
+    );
+    final entries = await BackupZip.inspect(output);
+    expect(entries.map((entry) => entry.name).toSet(), {
+      'manifest.json',
+      'data.xlsx',
+      'media/original.jpg',
+    });
+    final decoded = BackupArchive.decode(
+      await output.readAsBytes(),
+      hasWorkbook: true,
+    );
+    expect(decoded.findFile('data.xlsx')!.readBytes(), [4, 5, 6]);
+    expect(decoded.findFile('media/original.jpg')!.readBytes(), [1, 2, 3]);
+  });
+
   for (final compression in [CompressionType.none, CompressionType.deflate]) {
     test('reads legacy $compression archives with CRC verification', () async {
       final zip = await legacyArchive(compression: compression);

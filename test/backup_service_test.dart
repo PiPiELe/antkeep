@@ -8,6 +8,7 @@ import 'package:antkeep/data/backup_archive.dart';
 import 'package:antkeep/data/backup_logic.dart';
 import 'package:antkeep/data/backup_resources.dart';
 import 'package:antkeep/data/backup_service.dart';
+import 'package:antkeep/data/excel_export.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/data/media_cleanup.dart';
 import 'package:antkeep/data/rollback_store.dart';
@@ -65,6 +66,7 @@ Uint8List archiveBytes(
   Map<String, dynamic> data, {
   Map<String, List<int>>? media,
   int version = 1,
+  Uint8List? workbook,
 }) {
   media ??= {
     'image.jpg': [9, 9, 9],
@@ -79,6 +81,9 @@ Uint8List archiveBytes(
   );
   final archive = Archive()
     ..addFile(ArchiveFile('manifest.json', manifest.length, manifest));
+  if (workbook != null) {
+    archive.addFile(ArchiveFile('data.xlsx', workbook.length, workbook));
+  }
   for (final entry in media.entries) {
     archive.addFile(
       ArchiveFile('media/${entry.key}', entry.value.length, entry.value),
@@ -171,6 +176,137 @@ void main() {
     );
     await service.undoLastRestore();
     expect(await media.readImage('image.jpg'), [1, 2, 3]);
+  });
+
+  test(
+    'Excel overwrite restores records without photos and can be undone',
+    () async {
+      final file = File('${directory.path}/records.xlsx');
+      await file.writeAsBytes(ExcelExport.encode(await database.snapshot()));
+      await service.restoreExcelFile(file);
+      final restored = await database.snapshot();
+      expect((restored['care_records'] as List).single['photos_json'], '[]');
+      await expectLater(
+        media.readImage('image.jpg'),
+        throwsA(isA<FileSystemException>()),
+      );
+      await service.undoLastRestore();
+      expect(
+        (await database.snapshot())['care_records'],
+        fixture()['care_records'],
+      );
+      expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    },
+  );
+
+  test('Excel incremental import retains photos on existing records', () async {
+    final incoming = await database.snapshot();
+    incoming['care_records'] = [
+      ...incoming['care_records'] as List,
+      {
+        ...(incoming['care_records'] as List).single as Map<String, Object?>,
+        'id': 'new-record',
+        'photos_json': '["missing-on-this-device.jpg"]',
+      },
+    ];
+    final file = File('${directory.path}/records.xlsx');
+    await file.writeAsBytes(ExcelExport.encode(incoming));
+    await service.restoreExcelFile(file, mode: BackupRestoreMode.incremental);
+    final rows = (await database.snapshot())['care_records'] as List;
+    expect(rows, hasLength(2));
+    expect(
+      rows.singleWhere((row) => row['id'] == 'r')['photos_json'],
+      '["image.jpg"]',
+    );
+    expect(
+      rows.singleWhere((row) => row['id'] == 'new-record')['photos_json'],
+      '[]',
+    );
+    expect(await media.readImage('image.jpg'), [1, 2, 3]);
+  });
+
+  test(
+    'Excel and original photos ZIP restores workbook edits and image bytes',
+    () async {
+      final original = await database.snapshot();
+      final edited = await database.snapshot();
+      edited['care_records'] = [
+        {
+          ...(edited['care_records'] as List).single as Map<String, Object?>,
+          'note': 'Excel 编辑后的内容',
+        },
+      ];
+      final zip = archiveBytes(original, workbook: ExcelExport.encode(edited));
+      await database.replaceAll({
+        ...original,
+        'care_records': <Map<String, Object?>>[],
+      });
+      await service.restoreBytes(zip);
+      final restored = await database.snapshot();
+      expect((restored['care_records'] as List).single['note'], 'Excel 编辑后的内容');
+      expect(
+        (restored['care_records'] as List).single['photos_json'],
+        contains('image.jpg'),
+      );
+      expect(await media.readImage('image.jpg'), [9, 9, 9]);
+    },
+  );
+
+  test(
+    'ZIP restore without photos clears incoming references and supports undo',
+    () async {
+      final data = await database.snapshot();
+      final zip = archiveBytes(data, workbook: ExcelExport.encode(data));
+      await service.restoreBytes(zip, restorePhotos: false);
+      final restored = await database.snapshot();
+      expect((restored['care_records'] as List).single['photos_json'], '[]');
+      await expectLater(
+        media.readImage('image.jpg'),
+        throwsA(isA<FileSystemException>()),
+      );
+      await service.undoLastRestore();
+      expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    },
+  );
+
+  test(
+    'Excel photo ZIP rejects workbook references absent from media',
+    () async {
+      final data = await database.snapshot();
+      final edited = await database.snapshot();
+      edited['care_records'] = [
+        {
+          ...(edited['care_records'] as List).single as Map<String, Object?>,
+          'photos_json': '["absent.jpg"]',
+        },
+      ];
+      final zip = archiveBytes(data, workbook: ExcelExport.encode(edited));
+      await expectLater(service.restoreBytes(zip), throwsFormatException);
+      expect(await media.readImage('image.jpg'), [1, 2, 3]);
+    },
+  );
+
+  test('legacy ZIP can restore records without images', () async {
+    final zip = archiveBytes(await database.snapshot());
+    await service.restoreBytes(zip, restorePhotos: false);
+    final restored = await database.snapshot();
+    expect((restored['care_records'] as List).single['photos_json'], '[]');
+    await expectLater(
+      media.readImage('image.jpg'),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
+
+  test('incomplete Excel file leaves data and undo copy intact', () async {
+    final before = await database.snapshot();
+    final file = File('${directory.path}/incomplete.xlsx');
+    await file.writeAsBytes(ExcelExport.encode(fixture()));
+    await expectLater(
+      service.restoreExcelFile(file),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await database.snapshot(), before);
+    expect(await RollbackStore.instance.read(), previousRollback);
   });
 
   test(

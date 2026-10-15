@@ -11,8 +11,8 @@ class BackupArchive {
   static const maxSingleFileBytes = 64 * 1024 * 1024;
   static const maxManifestBytes = 8 * 1024 * 1024;
 
-  static Uint8List encode(Archive archive) {
-    validateArchive(archive);
+  static Uint8List encode(Archive archive, {bool hasWorkbook = false}) {
+    validateArchive(archive, hasWorkbook: hasWorkbook);
     final bytes = Uint8List.fromList(ZipEncoder().encodeBytes(archive));
     _validateInputSize(bytes);
     return bytes;
@@ -26,15 +26,20 @@ class BackupArchive {
     }
   }
 
-  static Archive decode(Uint8List bytes) {
+  static Archive decode(Uint8List bytes, {bool hasWorkbook = false}) {
     _validateInputSize(bytes);
-    _preflightZip(bytes);
+    preflightZip(bytes, entryLimit: maxEntries + (hasWorkbook ? 1 : 0));
     final archive = ZipDecoder().decodeBytes(bytes, verify: true);
-    validateArchive(archive);
+    validateArchive(archive, hasWorkbook: hasWorkbook);
     return archive;
   }
 
-  static void _preflightZip(Uint8List bytes) {
+  static void preflightZip(
+    Uint8List bytes, {
+    int entryLimit = maxEntries,
+    int fileLimit = maxSingleFileBytes,
+    int totalLimit = maxTotalUncompressedBytes,
+  }) {
     const endOfCentralDirectory = 0x06054b50;
     const centralDirectoryHeader = 0x02014b50;
     final data = ByteData.sublistView(bytes);
@@ -59,7 +64,7 @@ class BackupArchive {
     final entryCount = data.getUint16(endOffset + 10, Endian.little);
     final directorySize = data.getUint32(endOffset + 12, Endian.little);
     final directoryOffset = data.getUint32(endOffset + 16, Endian.little);
-    if (entriesOnDisk != entryCount || entryCount > maxEntries) {
+    if (entriesOnDisk != entryCount || entryCount > entryLimit) {
       throw const FormatException('备份包含的文件过多或跨磁盘 ZIP。');
     }
     final directoryEnd = directoryOffset + directorySize;
@@ -88,11 +93,11 @@ class BackupArchive {
           fileType == 0xa000) {
         throw const FormatException('备份包含不支持的 ZIP 条目。');
       }
-      if (uncompressedSize > maxSingleFileBytes) {
+      if (uncompressedSize > fileLimit) {
         throw const FormatException('备份中存在超出大小限制的文件。');
       }
       totalSize += uncompressedSize;
-      if (totalSize > maxTotalUncompressedBytes) {
+      if (totalSize > totalLimit) {
         throw const FormatException('备份解压后的内容超过导入上限。');
       }
       cursor += 46 + fileNameLength + extraLength + commentLength;
@@ -102,9 +107,9 @@ class BackupArchive {
     }
   }
 
-  static void validateArchive(Archive archive) {
+  static void validateArchive(Archive archive, {bool hasWorkbook = false}) {
     final files = archive.files.where((file) => file.isFile).toList();
-    if (files.length > maxEntries) {
+    if (files.length > maxEntries + (hasWorkbook ? 1 : 0)) {
       throw const FormatException('备份包含的文件过多。');
     }
     var totalSize = 0;
@@ -114,6 +119,8 @@ class BackupArchive {
       }
       final limit = file.name == 'manifest.json'
           ? maxManifestBytes
+          : file.name == 'data.xlsx' && hasWorkbook
+          ? 32 * 1024 * 1024
           : maxSingleFileBytes;
       if (file.size > limit) {
         throw const FormatException('备份中存在超出大小限制的文件。');
@@ -127,10 +134,12 @@ class BackupArchive {
 
   static void validateFiles(
     Map<String, ArchiveFile> files,
-    Set<String> declaredMedia,
-  ) {
+    Set<String> declaredMedia, {
+    bool hasWorkbook = false,
+  }) {
     final expectedFiles = <String>{
       'manifest.json',
+      if (hasWorkbook) 'data.xlsx',
       ...declaredMedia.map((relativePath) => 'media/$relativePath'),
     };
     if (files.length != expectedFiles.length ||

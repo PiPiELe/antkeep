@@ -46,6 +46,33 @@ class BackupService with BackupLogic {
         null;
   }
 
+  Future<bool> exportExcelWithPhotos() async {
+    final data = await _database.snapshot();
+    BackupData.validate(data);
+    final paths = _database.photoPaths(data);
+    if (paths.length + 1 > BackupArchive.maxEntries) {
+      throw const FormatException('备份照片数量超过上限。');
+    }
+    for (final name in paths) {
+      BackupArchive.validateMediaPath(name);
+    }
+    final media = await _mediaStore.readFiles(paths);
+    final workbook = ExcelExport.encode(data);
+    if (workbook.length > ExcelExport.maxInputBytes) {
+      throw const FormatException('Excel 文件超过 32 MB 的导入上限。');
+    }
+    final bytes = _encodeBackup(data, media, workbook: workbook);
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    return await FilePicker.saveFile(
+          dialogTitle: '导出蚁记 Excel 和原图',
+          fileName: 'antkeep-excel-photos-$timestamp.zip',
+          type: FileType.custom,
+          allowedExtensions: const ['zip'],
+          bytes: bytes,
+        ) !=
+        null;
+  }
+
   Future<Map<String, dynamic>> uploadBackup(OnlineController online) async {
     final bytes = await createBackupBytes();
     return online.uploadBackup(Stream<List<int>>.value(bytes), bytes.length);
@@ -69,8 +96,9 @@ class BackupService with BackupLogic {
 
   Uint8List _encodeBackup(
     Map<String, dynamic> data,
-    Map<String, List<int>> media,
-  ) {
+    Map<String, List<int>> media, {
+    Uint8List? workbook,
+  }) {
     final archive = Archive();
     final manifestBytes = utf8.encode(
       jsonEncode({
@@ -84,22 +112,42 @@ class BackupService with BackupLogic {
     archive.addFile(
       ArchiveFile('manifest.json', manifestBytes.length, manifestBytes),
     );
+    if (workbook != null) {
+      archive.addFile(ArchiveFile('data.xlsx', workbook.length, workbook));
+    }
     for (final entry in media.entries) {
       archive.addFile(
         ArchiveFile('media/${entry.key}', entry.value.length, entry.value),
       );
     }
-    return BackupArchive.encode(archive);
+    return BackupArchive.encode(archive, hasWorkbook: workbook != null);
   }
 
-  Future<bool> restoreBackup({required BackupRestoreMode mode}) async {
+  Future<bool> restoreBackup({
+    required BackupRestoreMode mode,
+    bool restorePhotos = true,
+  }) async {
     final selection = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['zip'],
+      allowedExtensions: const ['zip', 'xlsx'],
     );
     if (selection.isEmpty) return false;
-    await restoreBytes(await selection.single.readAsBytes(), mode: mode);
+    final selected = selection.single;
+    final bytes = await selected.readAsBytes();
+    if (selected.name.toLowerCase().endsWith('.xlsx')) {
+      await restoreExcelBytes(bytes, mode: mode);
+    } else {
+      await restoreBytes(bytes, mode: mode, restorePhotos: restorePhotos);
+    }
     return true;
+  }
+
+  Future<void> restoreExcelBytes(
+    Uint8List bytes, {
+    BackupRestoreMode mode = BackupRestoreMode.overwrite,
+  }) async {
+    final data = ExcelExport.decode(bytes);
+    await restoreBytes(_encodeBackup(data, {}), mode: mode);
   }
 
   Future<bool> hasRollback() => RollbackStore.instance.exists();
@@ -113,8 +161,9 @@ class BackupService with BackupLogic {
   Future<void> restoreBytes(
     Uint8List bytes, {
     BackupRestoreMode mode = BackupRestoreMode.overwrite,
+    bool restorePhotos = true,
   }) async {
-    final archive = BackupArchive.decode(bytes);
+    final archive = BackupArchive.decode(bytes, hasWorkbook: true);
     final files = {
       for (final file in archive.files.where((file) => file.isFile))
         file.name: file,
@@ -131,17 +180,41 @@ class BackupService with BackupLogic {
     var data = manifest['data'] as Map<String, dynamic>;
     BackupData.validate(data);
     final declaredMedia = (manifest['media'] as List).cast<String>().toSet();
-    final referencedMedia = _database.photoPaths(data);
+    final manifestReferences = _database.photoPaths(data);
+    if (!declaredMedia.containsAll(manifestReferences) ||
+        !manifestReferences.containsAll(declaredMedia)) {
+      throw const FormatException('备份中有照片记录，但缺少对应的照片文件。');
+    }
+    final workbook = files['data.xlsx'];
+    if (workbook != null) {
+      final workbookBytes = workbook.readBytes();
+      if (workbookBytes == null) throw const FormatException('Excel 文件无法读取。');
+      data = ExcelExport.decode(
+        Uint8List.fromList(workbookBytes),
+        keepPhotoPaths: restorePhotos,
+      );
+    } else if (!restorePhotos) {
+      ExcelExport.clearPhotoPaths(data);
+    }
+    final referencedMedia = restorePhotos
+        ? _database.photoPaths(data)
+        : <String>{};
     if (!declaredMedia.containsAll(referencedMedia) ||
-        !referencedMedia.containsAll(declaredMedia)) {
+        (workbook == null &&
+            restorePhotos &&
+            !referencedMedia.containsAll(declaredMedia))) {
       throw const FormatException('备份中有照片记录，但缺少对应的照片文件。');
     }
     for (final relativePath in declaredMedia) {
       BackupArchive.validateMediaPath(relativePath);
     }
-    BackupArchive.validateFiles(files, declaredMedia);
+    BackupArchive.validateFiles(
+      files,
+      declaredMedia,
+      hasWorkbook: workbook != null,
+    );
     var media = <String, List<int>>{};
-    for (final relativePath in declaredMedia) {
+    for (final relativePath in referencedMedia) {
       final file = files['media/$relativePath'];
       if (file == null) throw FormatException('备份缺少照片：$relativePath');
       final content = file.readBytes();

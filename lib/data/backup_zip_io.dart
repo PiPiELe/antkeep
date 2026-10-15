@@ -46,7 +46,7 @@ class BackupZip {
       final count = tail.getUint16(end + 10, Endian.little);
       final directorySize = tail.getUint32(end + 12, Endian.little);
       final directoryOffset = tail.getUint32(end + 16, Endian.little);
-      if (count > BackupArchive.maxEntries ||
+      if (count > BackupArchive.maxEntries + 1 ||
           tail.getUint16(end + 4, Endian.little) != 0 ||
           tail.getUint16(end + 6, Endian.little) != 0 ||
           tail.getUint16(end + 8, Endian.little) != count ||
@@ -89,7 +89,9 @@ class BackupZip {
         final nameBytes = nameData.buffer.asUint8List();
         final name = utf8.decode(nameBytes);
         if (!names.add(name)) throw const FormatException('备份包含重复文件。');
-        if (name != 'manifest.json' && name != 'media/') {
+        if (name != 'manifest.json' &&
+            name != 'media/' &&
+            name != 'data.xlsx') {
           if (!name.startsWith('media/')) {
             throw const FormatException('备份包含未声明的文件。');
           }
@@ -97,6 +99,8 @@ class BackupZip {
         }
         final limit = name == 'manifest.json'
             ? BackupArchive.maxManifestBytes
+            : name == 'data.xlsx'
+            ? 32 * 1024 * 1024
             : BackupArchive.maxSingleFileBytes;
         if (size > limit || (name == 'media/' && size != 0)) {
           throw const FormatException('备份中存在超出大小限制的文件。');
@@ -146,6 +150,9 @@ class BackupZip {
       }
       if (cursor != directoryOffset + directorySize) {
         throw const FormatException('备份目录无效。');
+      }
+      if (count > BackupArchive.maxEntries && !names.contains('data.xlsx')) {
+        throw const FormatException('备份包含的文件过多。');
       }
       return entries;
     } finally {
@@ -222,20 +229,24 @@ class BackupZip {
     File destination,
     Uint8List manifest,
     Map<String, String> media,
-    int bufferBytes,
-  ) async {
+    int bufferBytes, {
+    File? workbook,
+  }) async {
     final sizes = <String, int>{'manifest.json': manifest.length};
+    if (workbook != null) sizes['data.xlsx'] = await workbook.length();
     for (final entry in media.entries) {
       BackupArchive.validateMediaPath(entry.key);
       sizes['media/${entry.key}'] = await File(entry.value).length();
     }
-    if (sizes.length > BackupArchive.maxEntries) {
+    if (sizes.length > BackupArchive.maxEntries + (workbook == null ? 0 : 1)) {
       throw const FormatException('备份照片数量超过上限。');
     }
     var total = 0;
     for (final entry in sizes.entries) {
       final limit = entry.key == 'manifest.json'
           ? BackupArchive.maxManifestBytes
+          : entry.key == 'data.xlsx'
+          ? 32 * 1024 * 1024
           : BackupArchive.maxSingleFileBytes;
       if (entry.value > limit) throw const FormatException('备份中存在超出大小限制的文件。');
       total += entry.value;
@@ -273,7 +284,9 @@ class BackupZip {
         final source = entry.key == 'manifest.json'
             ? Stream<List<int>>.value(manifest)
             : _chunks(
-                File(media[entry.key.substring(6)]!),
+                entry.key == 'data.xlsx'
+                    ? workbook!
+                    : File(media[entry.key.substring(6)]!),
                 0,
                 entry.value,
                 bufferBytes,

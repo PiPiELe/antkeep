@@ -54,10 +54,12 @@ class BackupService with BackupLogic {
     Directory temporary,
     String name,
     Map<String, dynamic> data,
-    Map<String, String> media,
-  ) async {
+    Map<String, String> media, {
+    File? workbook,
+  }) async {
     final manifest = encodeManifest(data, media.keys);
     var expanded = manifest.length;
+    if (workbook != null) expanded += await workbook.length();
     for (final source in media.values) {
       final size = await File(source).length();
       if (size > BackupArchive.maxSingleFileBytes) {
@@ -73,7 +75,10 @@ class BackupService with BackupLogic {
     resources.requireDisk(expanded + expanded ~/ 100 + 1024 * 1024);
     final output = File(path.join(temporary.path, name));
     final buffer = resources.bufferBytes;
-    await Isolate.run(() => BackupZip.write(output, manifest, media, buffer));
+    await Isolate.run(
+      () =>
+          BackupZip.write(output, manifest, media, buffer, workbook: workbook),
+    );
     return output;
   }
 
@@ -90,43 +95,66 @@ class BackupService with BackupLogic {
   Future<bool> exportBackup() => _operation((temporary) async {
     final file = await _snapshot(temporary, 'export.zip');
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    if (Platform.isAndroid || Platform.isIOS) {
-      return await BackupResources.channel.invokeMethod<bool>('saveBackup', {
-            'path': file.path,
-            'name': 'antkeep-$timestamp.zip',
-          }) ??
-          false;
-    }
-    // The app targets phones; retain the desktop preview's existing save API.
-    return await FilePicker.saveFile(
-          fileName: 'antkeep-$timestamp.zip',
-          bytes: await file.readAsBytes(),
-          mimeType: 'application/zip',
-        ) !=
-        null;
+    return _saveExport(file, 'antkeep-$timestamp.zip', 'application/zip');
   });
 
   Future<bool> exportExcel() => _operation((temporary) async {
     final data = await database.snapshot();
     final bytes = await Isolate.run(() => ExcelExport.encode(data));
+    if (bytes.length > ExcelExport.maxInputBytes) {
+      throw const FormatException('Excel 文件超过 32 MB 的导入上限。');
+    }
     final file = File(path.join(temporary.path, 'export.xlsx'));
     await file.writeAsBytes(bytes);
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    return _saveExport(
+      file,
+      'antkeep-$timestamp.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+  });
+
+  Future<bool> exportExcelWithPhotos() => _operation((temporary) async {
+    final data = await database.snapshot();
+    final names = database.photoPaths(data);
+    final workbookBytes = await Isolate.run(() => ExcelExport.encode(data));
+    if (workbookBytes.length > ExcelExport.maxInputBytes) {
+      throw const FormatException('Excel 文件超过 32 MB 的导入上限。');
+    }
+    final workbook = File(path.join(temporary.path, 'data.xlsx'));
+    await workbook.writeAsBytes(workbookBytes);
+    final photos = await _mediaStore.filePaths(names);
+    final file = await _encode(
+      temporary,
+      'excel-photos.zip',
+      data,
+      photos,
+      workbook: workbook,
+    );
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    return _saveExport(
+      file,
+      'antkeep-excel-photos-$timestamp.zip',
+      'application/zip',
+    );
+  });
+
+  Future<bool> _saveExport(File file, String name, String mimeType) async {
     if (Platform.isAndroid || Platform.isIOS) {
       return await BackupResources.channel.invokeMethod<bool>('saveBackup', {
             'path': file.path,
-            'name': 'antkeep-$timestamp.xlsx',
-            'mimeType': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'name': name,
+            'mimeType': mimeType,
           }) ??
           false;
     }
     return await FilePicker.saveFile(
-          fileName: 'antkeep-$timestamp.xlsx',
-          bytes: bytes,
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          fileName: name,
+          bytes: await file.readAsBytes(),
+          mimeType: mimeType,
         ) !=
         null;
-  });
+  }
 
   Future<Map<String, dynamic>> uploadBackup(OnlineController online) =>
       _operation((temporary) async {
@@ -152,20 +180,46 @@ class BackupService with BackupLogic {
         }
       });
 
-  Future<bool> restoreBackup({required BackupRestoreMode mode}) => _operation((
-    temporary,
-  ) async {
+  Future<bool> restoreBackup({
+    required BackupRestoreMode mode,
+    bool restorePhotos = true,
+  }) => _operation((temporary) async {
     final selection = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['zip'],
+      allowedExtensions: const ['zip', 'xlsx'],
     );
     if (selection.isEmpty) return false;
     // Native file_picker materializes the selected document as a local file.
     final selected = selection.single;
     if (selected.uri.scheme != 'file') throw StateError('无法读取所选备份，请先将文件保存到手机。');
-    await _restore(File.fromUri(selected.uri), temporary, mode);
+    final input = File.fromUri(selected.uri);
+    if (path.extension(selected.name).toLowerCase() == '.xlsx') {
+      await _restoreExcel(input, temporary, mode);
+    } else {
+      await _restore(input, temporary, mode, restorePhotos: restorePhotos);
+    }
     return true;
   });
+
+  Future<void> restoreExcelFile(
+    File file, {
+    BackupRestoreMode mode = BackupRestoreMode.overwrite,
+  }) => _operation((temporary) => _restoreExcel(file, temporary, mode));
+
+  Future<void> _restoreExcel(
+    File input,
+    Directory temporary,
+    BackupRestoreMode mode,
+  ) async {
+    if (await input.length() > ExcelExport.maxInputBytes) {
+      throw const FormatException('Excel 文件超过 32 MB 的导入上限。');
+    }
+    final data = await Isolate.run(
+      () async => ExcelExport.decode(await input.readAsBytes()),
+    );
+    final archive = await _encode(temporary, 'excel-restore.zip', data, {});
+    await _restore(archive, temporary, mode);
+  }
 
   Future<bool> hasRollback() => RollbackStore.instance.exists();
 
@@ -178,25 +232,31 @@ class BackupService with BackupLogic {
   Future<void> restoreBytes(
     Uint8List bytes, {
     BackupRestoreMode mode = BackupRestoreMode.overwrite,
+    bool restorePhotos = true,
   }) => _operation((temporary) async {
     if (bytes.length > BackupArchive.maxInputBytes) {
       throw const FormatException('备份文件超过 512 MB 的大小上限。');
     }
     final file = File(path.join(temporary.path, 'input.zip'));
     await file.writeAsBytes(bytes, flush: true);
-    await _restore(file, temporary, mode);
+    await _restore(file, temporary, mode, restorePhotos: restorePhotos);
   });
 
   Future<void> restoreFile(
     File file, {
     BackupRestoreMode mode = BackupRestoreMode.overwrite,
-  }) => _operation((temporary) => _restore(file, temporary, mode));
+    bool restorePhotos = true,
+  }) => _operation(
+    (temporary) =>
+        _restore(file, temporary, mode, restorePhotos: restorePhotos),
+  );
 
   Future<void> _restore(
     File input,
     Directory temporary,
-    BackupRestoreMode mode,
-  ) async {
+    BackupRestoreMode mode, {
+    bool restorePhotos = true,
+  }) async {
     final entries = await BackupZip.inspect(input);
     final manifestEntry = entries
         .where((entry) => entry.name == 'manifest.json')
@@ -210,16 +270,41 @@ class BackupService with BackupLogic {
     await Isolate.run(
       () => BackupZip.extract(input, manifestEntry, manifestFile, buffer),
     );
+    final workbookEntry = entries
+        .where((entry) => entry.name == 'data.xlsx')
+        .firstOrNull;
     var (data, declared) = parseManifest(
       await manifestFile.readAsBytes(),
-      entries.map((e) => e.name).toSet(),
+      entries.where((e) => e.name != 'data.xlsx').map((e) => e.name).toSet(),
     );
+    if (workbookEntry != null) {
+      final workbookFile = File(path.join(temporary.path, 'data.xlsx'));
+      await Isolate.run(
+        () => BackupZip.extract(input, workbookEntry, workbookFile, buffer),
+      );
+      data = await Isolate.run(
+        () async => ExcelExport.decode(
+          await workbookFile.readAsBytes(),
+          keepPhotoPaths: restorePhotos,
+        ),
+      );
+      if (!declared.containsAll(database.photoPaths(data))) {
+        throw const FormatException('Excel 中的照片路径没有对应的原图。');
+      }
+    } else if (!restorePhotos) {
+      ExcelExport.clearPhotoPaths(data);
+    }
+    final neededMedia = restorePhotos ? database.photoPaths(data) : <String>{};
     final extracted = Directory(path.join(temporary.path, 'incoming'));
     await extracted.create();
     final extractedPath = extracted.path;
     await Isolate.run(() async {
       for (final entry in entries) {
-        if (entry.name == 'manifest.json') continue;
+        if (entry.name == 'manifest.json' ||
+            entry.name == 'data.xlsx' ||
+            !neededMedia.contains(entry.name.substring(6))) {
+          continue;
+        }
         await BackupZip.extract(
           input,
           entry,
@@ -229,7 +314,7 @@ class BackupService with BackupLogic {
       }
     });
     var media = {
-      for (final name in declared) name: path.join(extracted.path, name),
+      for (final name in neededMedia) name: path.join(extracted.path, name),
     };
     if (mode == BackupRestoreMode.incremental) {
       (data, media) = mergeMissing(await database.snapshot(), data, media);
