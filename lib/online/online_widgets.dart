@@ -336,10 +336,11 @@ class _LoginPageState extends State<LoginPage> {
                   autofillHints: const [AutofillHints.username],
                   decoration: const InputDecoration(
                     labelText: '用户名',
-                    helperText: '3–32 位字母、数字或下划线',
+                    helperText: '3–32 位汉字、字母、数字或下划线',
                   ),
                   validator: (v) =>
-                      RegExp(r'^[a-zA-Z0-9_]{3,32}$').hasMatch((v ?? '').trim())
+                      RegExp(r'^[a-zA-Z0-9_\u3400-\u4DBF\u4E00-\u9FFF]{3,32}$')
+                          .hasMatch((v ?? '').trim())
                       ? null
                       : '请检查用户名格式',
                 ),
