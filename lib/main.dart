@@ -1188,20 +1188,6 @@ class _ColonyCard extends StatelessWidget {
                   );
                 },
               ),
-              if (dueText != null) ...[
-                Text(
-                  dueText,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
               Divider(height: 1, color: antKeepDividerColor(theme.colorScheme)),
               const SizedBox(height: 12),
               Row(
@@ -1235,6 +1221,25 @@ class _ColonyCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (dueText != null) ...[
+                const SizedBox(height: 8),
+                Divider(
+                  height: 1,
+                  color: antKeepDividerColor(theme.colorScheme),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  dueText,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

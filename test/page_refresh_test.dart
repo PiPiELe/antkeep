@@ -1213,7 +1213,13 @@ void main() {
               expect(dueWidget.style?.fontSize, 11);
               expect(
                 tester.getRect(due).top,
-                greaterThan(tester.getRect(tags).bottom),
+                greaterThan(
+                  tester
+                      .getRect(
+                        find.descendant(of: card, matching: find.text('1 蚁后')),
+                      )
+                      .bottom,
+                ),
               );
               expect(
                 tester.getRect(due).right,
