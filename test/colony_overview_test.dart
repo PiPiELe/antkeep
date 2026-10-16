@@ -105,4 +105,43 @@ void main() {
     expect(find.text('工蚁数'), findsNWidgets(3));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('overview detail buttons open the related sections', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1050);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var openedColonies = 0;
+    var openedMemorial = 0;
+    final stats = ColonyOverviewStats.fromData([], {}, []);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ColonyOverviewPage(
+            active: true,
+            loadStats: () async => stats,
+            onOpenColonies: () => openedColonies++,
+            onOpenMemorial: () => openedMemorial++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final details = find.widgetWithText(TextButton, '查看详情');
+    expect(details, findsNWidgets(3));
+
+    await tester.tap(details.first);
+    await tester.pumpAndSettle();
+    expect(find.text('历史统计'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.tap(details.at(1));
+    await tester.tap(details.at(2));
+    expect(openedColonies, 1);
+    expect(openedMemorial, 1);
+    expect(tester.takeException(), isNull);
+  });
 }

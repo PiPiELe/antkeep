@@ -87,6 +87,7 @@ flutter:
     - assets/community/
     - assets/competition/ants/
     - assets/memorial/
+    - assets/overview/
     - assets/milestone/
     - assets/images/default-ant-cover.png
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'colony_display_styles.dart';
 import 'data/app_database.dart';
 import 'domain/memorial.dart';
 import 'domain/models.dart';
@@ -136,10 +137,14 @@ class ColonyOverviewPage extends StatefulWidget {
     super.key,
     required this.active,
     this.loadStats = loadColonyOverviewStats,
+    this.onOpenColonies,
+    this.onOpenMemorial,
   });
 
   final bool active;
   final Future<ColonyOverviewStats> Function() loadStats;
+  final VoidCallback? onOpenColonies;
+  final VoidCallback? onOpenMemorial;
 
   @override
   State<ColonyOverviewPage> createState() => _ColonyOverviewPageState();
@@ -184,97 +189,367 @@ class _ColonyOverviewPageState extends State<ColonyOverviewPage> {
       }
       final stats = snapshot.data!;
       return ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           _OverviewSection(
             title: '历史',
             subtitle: '仍保留档案的蚁群；工蚁按数量记录累计估算，死亡不扣减',
+            icon: Icons.folder_copy_rounded,
+            illustration: 'assets/overview/history.png',
+            onDetails: () => _showHistoryDetails(context, stats),
             metrics: [
-              ('蚁群数', '${stats.historicalColonies}'),
-              ('新后群数', '${stats.historicalNewQueenColonies}'),
-              ('蚁后数', stats.historicalQueens),
-              ('工蚁数', stats.historicalWorkers),
+              (
+                label: '蚁群数',
+                value: '${stats.historicalColonies}',
+                kind: _MetricKind.colony,
+              ),
+              (
+                label: '新后群数',
+                value: '${stats.historicalNewQueenColonies}',
+                kind: _MetricKind.newQueen,
+              ),
+              (
+                label: '蚁后数',
+                value: stats.historicalQueens,
+                kind: _MetricKind.queen,
+              ),
+              (
+                label: '工蚁数',
+                value: stats.historicalWorkers,
+                kind: _MetricKind.worker,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           _OverviewSection(
             title: '现役',
             subtitle: '当前饲养的蚁群；蚁后与工蚁数已计入死亡记录',
+            icon: Icons.home_rounded,
+            illustration: 'assets/overview/active.png',
+            onDetails:
+                widget.onOpenColonies ??
+                () =>
+                    _showSectionDetails(context, '现役', '当前饲养的蚁群；蚁后与工蚁数已计入死亡记录'),
             metrics: [
-              ('蚁群数', '${stats.activeColonies}'),
-              ('新后群数', '${stats.activeNewQueenColonies}'),
-              ('蚁后数', stats.activeQueens),
-              ('工蚁数', stats.activeWorkers),
+              (
+                label: '蚁群数',
+                value: '${stats.activeColonies}',
+                kind: _MetricKind.colony,
+              ),
+              (
+                label: '新后群数',
+                value: '${stats.activeNewQueenColonies}',
+                kind: _MetricKind.newQueen,
+              ),
+              (
+                label: '蚁后数',
+                value: stats.activeQueens,
+                kind: _MetricKind.queen,
+              ),
+              (
+                label: '工蚁数',
+                value: stats.activeWorkers,
+                kind: _MetricKind.worker,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           _OverviewSection(
             title: '英灵殿',
             subtitle: '归档蚁群数及已保存的蚁后、工蚁纪念数',
+            icon: Icons.account_balance_rounded,
+            illustration: 'assets/overview/memorial.png',
+            onDetails:
+                widget.onOpenMemorial ??
+                () => _showSectionDetails(context, '英灵殿', '归档蚁群数及已保存的蚁后、工蚁纪念数'),
             metrics: [
-              ('蚁群数', '${stats.memorialColonies}'),
-              ('蚁后数', '${stats.memorialQueens}'),
-              ('工蚁数', '${stats.memorialWorkers}'),
+              (
+                label: '蚁群数',
+                value: '${stats.memorialColonies}',
+                kind: _MetricKind.colony,
+              ),
+              (
+                label: '蚁后数',
+                value: '${stats.memorialQueens}',
+                kind: _MetricKind.queen,
+              ),
+              (
+                label: '工蚁数',
+                value: '${stats.memorialWorkers}',
+                kind: _MetricKind.worker,
+              ),
             ],
           ),
         ],
       );
     },
   );
+
+  void _showHistoryDetails(BuildContext context, ColonyOverviewStats stats) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('历史统计', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Text(
+                '保留档案的蚁群共 ${stats.historicalColonies} 群，其中现役 ${stats.activeColonies} 群，已归档 ${stats.memorialColonies} 群。',
+              ),
+              const SizedBox(height: 8),
+              const Text('蚁后数按档案初始数量统计；工蚁数按数量记录累计估算，死亡不扣减。数量不完整时显示“≥”或“未知”。'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSectionDetails(
+    BuildContext context,
+    String title,
+    String description,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Text(description),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+enum _MetricKind { colony, newQueen, queen, worker }
 
 class _OverviewSection extends StatelessWidget {
   const _OverviewSection({
     required this.title,
     required this.subtitle,
+    required this.icon,
+    required this.illustration,
+    required this.onDetails,
     required this.metrics,
   });
 
   final String title;
   final String subtitle;
-  final List<(String, String)> metrics;
+  final IconData icon;
+  final String illustration;
+  final VoidCallback onDetails;
+  final List<({String label, String value, _MetricKind kind})> metrics;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(subtitle, style: theme.textTheme.bodySmall),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: 12,
-                runSpacing: 16,
-                children: [
-                  for (final (label, value) in metrics)
-                    SizedBox(
-                      width: (constraints.maxWidth - 12) / 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            value,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(label, style: theme.textTheme.bodyMedium),
-                        ],
-                      ),
-                    ),
-                ],
+    final dark = theme.brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: dark
+            ? theme.colorScheme.surfaceContainer
+            : const Color(0xFFFFFAF6),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: dark ? .12 : .08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 65,
+            right: -14,
+            bottom: -10,
+            width: 270,
+            child: Opacity(
+              opacity: dark ? .35 : .8,
+              child: Image.asset(
+                illustration,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomRight,
+                excludeFromSemantics: true,
               ),
             ),
-          ],
-        ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: const Color(0xFF9A6330), size: 26),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: onDetails,
+                      style: TextButton.styleFrom(
+                        foregroundColor: dark
+                            ? theme.colorScheme.onSurface
+                            : const Color(0xFF70461F),
+                        backgroundColor: dark
+                            ? theme.colorScheme.surfaceContainerHigh
+                            : const Color(0xFFF8EEE7),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 9,
+                        ),
+                        minimumSize: const Size(0, 40),
+                      ),
+                      iconAlignment: IconAlignment.end,
+                      icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                      label: const Text('查看详情'),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 38, top: 2),
+                  child: Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxWidth = constraints.maxWidth;
+                    final metricsWidth = maxWidth < 270
+                        ? maxWidth
+                        : maxWidth * (maxWidth < 320 ? .88 : .82);
+                    return SizedBox(
+                      width: metricsWidth,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          for (final metric in metrics)
+                            SizedBox(
+                              width: (metricsWidth - 8) / 2,
+                              child: _MetricTile(metric: metric),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({required this.metric});
+
+  final ({String label, String value, _MetricKind kind}) metric;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final (background, foreground) = switch (metric.kind) {
+      _MetricKind.colony => (const Color(0xFFF8EBDC), const Color(0xFF9B622B)),
+      _MetricKind.newQueen => (
+        const Color(0xFFEBEEDC),
+        const Color(0xFF77914E),
+      ),
+      _MetricKind.queen => (const Color(0xFFF9E2DF), const Color(0xFFAA5A50)),
+      _MetricKind.worker => (const Color(0xFFEDE7F4), const Color(0xFF67597B)),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: .94),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: background,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: switch (metric.kind) {
+              _MetricKind.colony => AntSymbol(color: foreground, size: 24),
+              _MetricKind.newQueen => Icon(
+                Icons.spa_rounded,
+                color: foreground,
+                size: 23,
+              ),
+              _MetricKind.queen => Icon(
+                Icons.workspace_premium_rounded,
+                color: foreground,
+                size: 23,
+              ),
+              _MetricKind.worker => Icon(
+                Icons.pest_control_rounded,
+                color: foreground,
+                size: 23,
+              ),
+            },
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  metric.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  metric.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

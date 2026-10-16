@@ -537,6 +537,10 @@ class _HomePageState extends State<HomePage>
           ColonyOverviewPage(
             active:
                 pageIndex == 0 && _colonyTabs.index == ColonyTab.overview.index,
+            onOpenColonies: () =>
+                setState(() => _colonyTabs.index = ColonyTab.colonies.index),
+            onOpenMemorial: () =>
+                setState(() => _colonyTabs.index = ColonyTab.memorial.index),
           ),
           MemorialPage(
             preferences: themeController,
