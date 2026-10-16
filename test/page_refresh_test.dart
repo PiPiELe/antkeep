@@ -704,21 +704,101 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('drag hint sits beside batch care at phone width', (
+  testWidgets('filter and batch care share one row at phone width', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(360, 800);
+    tester.view.physicalSize = const Size(320, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await showSortableColonies(tester);
-    final button = tester.getRect(
-      find.widgetWithText(OutlinedButton, '批量养护记录'),
+    final batch = tester.getRect(find.byTooltip('批量养护记录'));
+    final filter = tester.getRect(find.widgetWithText(OutlinedButton, '筛选'));
+    expect(filter.width, lessThan(100));
+    expect(filter.left, greaterThanOrEqualTo(batch.right));
+    expect(filter.top, lessThan(batch.bottom));
+    expect(filter.bottom, greaterThan(batch.top));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('quick filters combine and highlight the entry button', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    for (final (id, name, species, nest, workers) in [
+      ('b', '二号群', '红足穴猛蚁', '试管巢', 128),
+      ('a', '一号群', '红足穴猛蚁', '试管巢', 235),
+      ('c', '三号群', '费氏弓背蚁', '平面巢', 20),
+      ('q', '新后蚁群', '红足穴猛蚁', '试管巢', 0),
+    ]) {
+      tables['colonies']!.add(
+        Colony(
+          id: id,
+          name: name,
+          species: species,
+          nestType: nest,
+          initialWorkerCount: workers,
+          createdAt: now,
+          updatedAt: now,
+        ).toMap(),
+      );
+    }
+    for (final id in ['a', 'b']) {
+      tables['care_tasks']!.add(
+        CareTask(
+          id: 'task-$id',
+          colonyId: id,
+          type: CareTaskType.feeding,
+          intervalDays: 3,
+          nextDueOn: DateTime(now.year, now.month, now.day),
+        ).toMap(),
+      );
+    }
+
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, '筛选'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, '筛选'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(ChoiceChip, '试管巢'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '平面巢'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '石膏巢'), findsNothing);
+    for (final label in ['中群', '红足穴猛蚁', '试管巢', '今日有待办', '从多到少']) {
+      final chip = find.widgetWithText(ChoiceChip, label);
+      await tester.ensureVisible(chip);
+      await tester.pumpAndSettle();
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('查看 2 群'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, '筛选 5'), findsOneWidget);
+    final activeButton = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, '筛选 5'),
     );
-    final hint = tester.getRect(find.text('长按蚁群卡片可上下拖动排序'));
-    expect(hint.left, greaterThanOrEqualTo(button.right));
-    expect(hint.top, lessThan(button.bottom));
-    expect(hint.bottom, greaterThan(button.top));
+    expect(activeButton.style?.backgroundColor?.resolve({}), isNotNull);
+    expect(find.text('2/4 群'), findsOneWidget);
+    expect(find.byKey(const ValueKey('c')), findsNothing);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+    );
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '筛选 5'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('清除筛选'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, '筛选'), findsOneWidget);
+    expect(find.byKey(const ValueKey('c')), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '筛选'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, '新后群'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('查看 1 群'));
+    await tester.pumpAndSettle();
+    expect(find.text('1/4 群'), findsOneWidget);
+    expect(find.byKey(const ValueKey('q')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

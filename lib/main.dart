@@ -49,6 +49,7 @@ import 'data/local_media_store.dart';
 import 'data/media_cleanup.dart';
 import 'data/local_notification_service.dart';
 import 'domain/models.dart';
+import 'domain/colony_list_filter.dart';
 import 'domain/wild_catch_record.dart';
 import 'domain/care_task.dart';
 import 'domain/memorial.dart';
@@ -759,6 +760,7 @@ typedef _ColonyListEntry = ({
 
 class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
+  ColonyListFilter _filter = const ColonyListFilter();
   bool _editingAcquiredOn = false;
   bool _savingOrder = false;
   bool _dragging = false;
@@ -892,6 +894,210 @@ class _ColoniesPageState extends State<ColoniesPage> {
     if (saved == true && mounted) setState(_reload);
   }
 
+  Future<void> _openFilters(List<_ColonyListEntry> colonies) async {
+    var scale = _filter.scale;
+    var species = _filter.species;
+    var nestType = _filter.nestType;
+    var newQueen = _filter.newQueen;
+    var todo = _filter.todo;
+    var workerOrder = _filter.workerOrder;
+    final speciesOptions = {
+      for (final entry in colonies)
+        if (entry.colony.species?.trim().isNotEmpty == true)
+          entry.colony.species!.trim(),
+    }.toList()..sort();
+    final nestOptions = {
+      for (final entry in colonies)
+        if (entry.colony.nestType?.trim().isNotEmpty == true)
+          entry.colony.nestType!.trim(),
+    }.toList()..sort();
+
+    final selected = await showModalBottomSheet<ColonyListFilter>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, updateSheet) {
+          final current = ColonyListFilter(
+            scale: scale,
+            species: species,
+            nestType: nestType,
+            newQueen: newQueen,
+            todo: todo,
+            workerOrder: workerOrder,
+          );
+          final matchCount = colonies
+              .where(
+                (entry) => current.matches(
+                  entry.colony,
+                  entry.workers,
+                  entry.dueTasks.isNotEmpty,
+                ),
+              )
+              .length;
+          Widget group(String title, List<Widget> choices) => Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 6, children: choices),
+              ],
+            ),
+          );
+
+          Widget choice(String label, bool selected, VoidCallback onTap) =>
+              ChoiceChip(
+                label: Text(label),
+                selected: selected,
+                onSelected: (_) => updateSheet(onTap),
+                visualDensity: VisualDensity.compact,
+              );
+
+          return SizedBox(
+            height: MediaQuery.sizeOf(context).height * .78,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '筛选蚁群',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '关闭筛选',
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    children: [
+                      group('规模', [
+                        choice('全部', scale == null, () => scale = null),
+                        for (final value in ColonyScale.values)
+                          choice(
+                            value.label,
+                            scale == value,
+                            () => scale = value,
+                          ),
+                      ]),
+                      group('蚂蚁种类', [
+                        choice('全部', species == null, () => species = null),
+                        for (final value in speciesOptions)
+                          choice(
+                            value,
+                            species == value,
+                            () => species = value,
+                          ),
+                      ]),
+                      group('巢室类别', [
+                        choice('全部', nestType == null, () => nestType = null),
+                        for (final value in nestOptions)
+                          choice(
+                            value,
+                            nestType == value,
+                            () => nestType = value,
+                          ),
+                      ]),
+                      group('新后群', [
+                        choice(
+                          '全部',
+                          newQueen == ColonyNewQueenFilter.all,
+                          () => newQueen = ColonyNewQueenFilter.all,
+                        ),
+                        choice(
+                          '新后群',
+                          newQueen == ColonyNewQueenFilter.newQueen,
+                          () => newQueen = ColonyNewQueenFilter.newQueen,
+                        ),
+                        choice(
+                          '非新后群',
+                          newQueen == ColonyNewQueenFilter.other,
+                          () => newQueen = ColonyNewQueenFilter.other,
+                        ),
+                      ]),
+                      group('是否待办', [
+                        choice(
+                          '全部',
+                          todo == ColonyTodoFilter.all,
+                          () => todo = ColonyTodoFilter.all,
+                        ),
+                        choice(
+                          '今日有待办',
+                          todo == ColonyTodoFilter.due,
+                          () => todo = ColonyTodoFilter.due,
+                        ),
+                        choice(
+                          '今日无待办',
+                          todo == ColonyTodoFilter.none,
+                          () => todo = ColonyTodoFilter.none,
+                        ),
+                      ]),
+                      group('工蚁数量', [
+                        choice(
+                          '手动顺序',
+                          workerOrder == ColonyWorkerOrder.manual,
+                          () => workerOrder = ColonyWorkerOrder.manual,
+                        ),
+                        choice(
+                          '从多到少',
+                          workerOrder == ColonyWorkerOrder.descending,
+                          () => workerOrder = ColonyWorkerOrder.descending,
+                        ),
+                        choice(
+                          '从少到多',
+                          workerOrder == ColonyWorkerOrder.ascending,
+                          () => workerOrder = ColonyWorkerOrder.ascending,
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(
+                              sheetContext,
+                              const ColonyListFilter(),
+                            ),
+                            child: const Text('清除筛选'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () =>
+                                Navigator.pop(sheetContext, current),
+                            child: Text('查看 $matchCount 群'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (selected != null && mounted) setState(() => _filter = selected);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor:
@@ -912,11 +1118,37 @@ class _ColoniesPageState extends State<ColoniesPage> {
         if (snapshot.hasError) {
           return _ErrorState('读取蚁群失败：${snapshot.error}');
         }
-        final colonies = snapshot.data!;
+        final allColonies = snapshot.data!;
         final style = themeController.colonyDisplayStyle;
+        final colonies = _filter.activeCount == 0
+            ? allColonies
+            : allColonies
+                  .where(
+                    (entry) => _filter.matches(
+                      entry.colony,
+                      entry.workers,
+                      entry.dueTasks.isNotEmpty,
+                    ),
+                  )
+                  .toList();
+        if (_filter.workerOrder != ColonyWorkerOrder.manual) {
+          final savedOrder = {
+            for (var i = 0; i < allColonies.length; i++)
+              allColonies[i].colony.id: i,
+          };
+          colonies.sort((first, second) {
+            final count = _filter.compareWorkers(first.workers, second.workers);
+            return count != 0
+                ? count
+                : savedOrder[first.colony.id]!.compareTo(
+                    savedOrder[second.colony.id]!,
+                  );
+          });
+        }
+        final filterActive = _filter.activeCount > 0;
         final canBatchCare =
             colonies.where((entry) => !entry.colony.archived).length > 1;
-        if (colonies.isEmpty) {
+        if (allColonies.isEmpty) {
           return const _EmptyState(
             icon: Icons.hive_outlined,
             title: '还没有蚁群',
@@ -937,91 +1169,115 @@ class _ColoniesPageState extends State<ColoniesPage> {
                 children: [
                   if (themeController.showColonyOverview) ...[
                     if (style == ColonyDisplayStyle.classic)
-                      _ColonyOverviewCard(entries: colonies)
+                      _ColonyOverviewCard(entries: allColonies)
                     else
                       ColonyShowcaseOverview(
-                        count: colonies.length,
+                        count: allColonies.length,
                         queens: _knownColonyTotal(
-                          colonies.map((entry) => entry.queens),
+                          allColonies.map((entry) => entry.queens),
                         ),
                         workers: _knownColonyTotal(
-                          colonies.map((entry) => entry.workers),
+                          allColonies.map((entry) => entry.workers),
                         ),
                       ),
                     const SizedBox(height: 12),
                   ],
-                  if (style == ColonyDisplayStyle.classic)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          if (canBatchCare)
-                            OutlinedButton.icon(
-                              onPressed: () => _batchCare(colonies),
-                              icon: const Icon(Icons.playlist_add_check),
-                              label: const Text('批量养护记录'),
-                            ),
-                          if (colonies.length > 1)
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  left: canBatchCare ? 8 : 0,
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: style == ColonyDisplayStyle.classic ? 8 : 12,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          filterActive
+                              ? '${colonies.length}/${allColonies.length} 群'
+                              : '${allColonies.length} 群',
+                          style: style == ColonyDisplayStyle.classic
+                              ? Theme.of(context).textTheme.bodySmall
+                              : const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 17,
                                 ),
-                                child: Text(
-                                  '长按蚁群卡片可上下拖动排序',
-                                  textAlign: TextAlign.end,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
+                        ),
+                        if (canBatchCare) ...[
+                          const SizedBox(width: 6),
+                          IconButton(
+                            tooltip: '批量养护记录',
+                            onPressed: () => _batchCare(colonies),
+                            icon: const Icon(Icons.playlist_add_check),
+                            iconSize: 20,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 36,
+                              height: 36,
                             ),
+                            padding: EdgeInsets.zero,
+                          ),
                         ],
-                      ),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          Text(
-                            '${colonies.length} 群',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 17,
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: () => _openFilters(allColonies),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 34),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            foregroundColor: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                            backgroundColor: filterActive
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : null,
+                            side: BorderSide(
+                              color: filterActive
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant,
                             ),
                           ),
-                          const Spacer(),
-                          if (canBatchCare)
-                            OutlinedButton.icon(
-                              onPressed: () => _batchCare(colonies),
-                              icon: const Icon(
-                                Icons.playlist_add_check,
-                                size: 18,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                filterActive
+                                    ? Icons.filter_alt
+                                    : Icons.filter_alt_outlined,
+                                size: 17,
                               ),
-                              label: const Text('批量养护'),
-                            ),
-                          if (colonies.length > 1)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 8),
-                              child: Text(
-                                '长按排序',
-                                style: TextStyle(fontSize: 11),
+                              const SizedBox(width: 4),
+                              Text(
+                                filterActive
+                                    ? '筛选 ${_filter.activeCount}'
+                                    : '筛选',
+                                style: const TextStyle(fontSize: 13),
                               ),
-                            ),
-                        ],
-                      ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (colonies.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 72),
+                      child: Text('没有符合条件的蚁群，可重新选择筛选条件'),
                     ),
                 ],
               ),
               itemCount: colonies.length,
               onReorderStart: (_) => _dragging = true,
               onReorderEnd: (_) => _dragging = false,
-              onReorderItem: (oldIndex, newIndex) =>
-                  _reorderColonies(colonies, oldIndex, newIndex),
+              onReorderItem: (oldIndex, newIndex) {
+                if (!filterActive) {
+                  _reorderColonies(colonies, oldIndex, newIndex);
+                }
+              },
               itemBuilder: (context, index) =>
                   ReorderableDelayedDragStartListener(
                     key: ValueKey(colonies[index].colony.id),
                     index: index,
-                    enabled: colonies.length > 1 && !_savingOrder,
+                    enabled:
+                        !filterActive && colonies.length > 1 && !_savingOrder,
                     child: Padding(
                       padding: EdgeInsets.only(
                         bottom: index == colonies.length - 1 ? 0 : 10,
