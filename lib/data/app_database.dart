@@ -932,10 +932,19 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await _applyGrowth(transaction, DateTime.now(), colony.id);
     final previous = await transaction.query(
       'colonies',
-      columns: ['nest_type'],
       where: 'id = ?',
       whereArgs: [colony.id],
     );
+    final original = previous.isEmpty ? null : Colony.fromMap(previous.single);
+    final initialCountsChanged =
+        original != null &&
+        (original.initialEggCount != colony.initialEggCount ||
+            original.initialLarvaCount != colony.initialLarvaCount ||
+            original.initialCocoonCount != colony.initialCocoonCount ||
+            original.initialWorkerCount != colony.initialWorkerCount);
+    final before = initialCountsChanged
+        ? await _growthReplayRecords(transaction, colony.id)
+        : <CareRecord>[];
     final updated = await transaction.update(
       'colonies',
       colony.toMap()..remove('auto_growth_json'),
@@ -944,6 +953,21 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     );
     if (updated == 0) {
       await transaction.insert('colonies', colony.toMap());
+    }
+    if (initialCountsChanged) {
+      final previousColony = original;
+      await _recalculateGrowthEstimates(
+        transaction,
+        colony.id,
+        before,
+        recalculateAll: true,
+        previousInitial: GrowthPopulation(
+          eggs: previousColony.initialEggCount,
+          larvae: previousColony.initialLarvaCount,
+          cocoons: previousColony.initialCocoonCount,
+          workers: previousColony.initialWorkerCount,
+        ),
+      );
     }
     if (previous.isEmpty || previous.single['nest_type'] != colony.nestType) {
       await transaction.update(
@@ -1552,6 +1576,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     List<CareRecord> before, {
     required bool recalculateAll,
     String? correctedId,
+    GrowthPopulation? previousInitial,
   }) async {
     if (!before.any((record) => record.id.startsWith('growth:'))) return;
     final colonyRows = await transaction.query(
@@ -1592,7 +1617,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     final oldRecords = before.where(afterBoundary);
     final newRecords = after.where(afterBoundary);
     final oldBefore = <String, GrowthPopulation>{};
-    var oldPopulation = initial;
+    var oldPopulation = previousInitial ?? initial;
     for (final record in oldRecords) {
       oldBefore[record.id] = oldPopulation;
       oldPopulation = _applyPopulationRecord(oldPopulation, record);

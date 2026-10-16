@@ -73,9 +73,16 @@ class BackupService with BackupLogic {
         null;
   }
 
-  Future<Map<String, dynamic>> uploadBackup(OnlineController online) async {
+  Future<Map<String, dynamic>> uploadBackup(
+    OnlineController online, {
+    required String expectedUserId,
+  }) async {
     final bytes = await createBackupBytes();
-    return online.uploadBackup(Stream<List<int>>.value(bytes), bytes.length);
+    return online.uploadBackup(
+      Stream<List<int>>.value(bytes),
+      bytes.length,
+      expectedUserId: expectedUserId,
+    );
   }
 
   Future<Uint8List> createBackupBytes() async {

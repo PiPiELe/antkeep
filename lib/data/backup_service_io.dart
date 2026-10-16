@@ -156,11 +156,17 @@ class BackupService with BackupLogic {
         null;
   }
 
-  Future<Map<String, dynamic>> uploadBackup(OnlineController online) =>
-      _operation((temporary) async {
-        final file = await _snapshot(temporary, 'upload.zip');
-        return online.uploadBackup(file.openRead(), await file.length());
-      });
+  Future<Map<String, dynamic>> uploadBackup(
+    OnlineController online, {
+    required String expectedUserId,
+  }) => _operation((temporary) async {
+    final file = await _snapshot(temporary, 'upload.zip');
+    return online.uploadBackup(
+      file.openRead(),
+      await file.length(),
+      expectedUserId: expectedUserId,
+    );
+  });
 
   /// Byte APIs remain for callers/tests. The mobile UI uses file APIs exclusively.
   Future<Uint8List> createBackupBytes() => _operation(

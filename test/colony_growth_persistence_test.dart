@@ -446,6 +446,99 @@ void main() {
   });
 
   test(
+    'editing initial counts replays estimates but keeps manual totals',
+    () async {
+      await seed('edited-initial-counts');
+      final firstCycle = start.add(const Duration(days: 1));
+      final secondCycle = start.add(const Duration(days: 2));
+      await db.applyColonyGrowth(
+        now: firstCycle,
+        colonyId: 'edited-initial-counts',
+      );
+      await db.saveRecord(
+        CareRecord(
+          id: 'edited-initial-manual-total',
+          colonyId: 'edited-initial-counts',
+          type: CareRecordType.observation,
+          occurredAt: firstCycle.add(const Duration(hours: 1)),
+          createdAt: firstCycle.add(const Duration(hours: 1)),
+          workerCount: 50,
+        ),
+      );
+      await db.applyColonyGrowth(
+        now: secondCycle,
+        colonyId: 'edited-initial-counts',
+      );
+      final original = (await db.findColony('edited-initial-counts'))!;
+      await db.saveColony(
+        Colony.fromMap({
+          ...original.toMap(),
+          'initial_worker_count': 100,
+          'initial_egg_count': 30,
+        }),
+      );
+      final records = await db.listRecords('edited-initial-counts');
+      final estimates = records
+          .where((record) => record.isAutomaticGrowthEstimate)
+          .toList();
+      expect(estimates.map((record) => record.workerCount), [51, 101]);
+      expect(estimates.last.eggCount, 30);
+      expect(
+        records
+            .singleWhere((record) => record.id == 'edited-initial-manual-total')
+            .workerCount,
+        50,
+      );
+      expect(
+        (await db.findColony('edited-initial-counts'))!
+            .currentWorkerCount(records),
+        51,
+      );
+    },
+  );
+
+  test(
+    'initial count edit rolls back when an old estimate has no rule',
+    () async {
+      await seed('legacy-initial-edit');
+      await db.applyColonyGrowth(
+        now: start.add(const Duration(days: 1)),
+        colonyId: 'legacy-initial-edit',
+      );
+      final snapshot = await db.snapshot();
+      snapshot['care_records'] = [
+        for (final row in snapshot['care_records'] as List)
+          Map<String, Object?>.from(row as Map)..addAll({
+            if (row['colony_id'] == 'legacy-initial-edit')
+              'auto_growth_rule_json': null,
+          }),
+      ];
+      snapshot['colonies'] = [
+        for (final row in snapshot['colonies'] as List)
+          Map<String, Object?>.from(row as Map)..addAll({
+            if (row['id'] == 'legacy-initial-edit') 'auto_growth_json': null,
+          }),
+      ];
+      await db.replaceAll(snapshot);
+      final original = (await db.findColony('legacy-initial-edit'))!;
+      await expectLater(
+        db.saveColony(
+          Colony.fromMap({...original.toMap(), 'initial_worker_count': 100}),
+        ),
+        throwsStateError,
+      );
+      expect(
+        (await db.findColony('legacy-initial-edit'))!.initialWorkerCount,
+        20,
+      );
+      expect(
+        (await db.listRecords('legacy-initial-edit')).single.workerCount,
+        21,
+      );
+    },
+  );
+
+  test(
     'disable settles old periods; re-enable does not catch up disabled time',
     () async {
       await seed('toggle');

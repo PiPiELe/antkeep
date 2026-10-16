@@ -75,6 +75,57 @@ http.Response response(String body, int status) => http.Response.bytes(
 );
 
 void main() {
+  test('backup prepared for one account cannot upload after account switch', () async {
+    final store = MemoryOnlineStore();
+    final uploadTokens = <String?>[];
+    final c = controller(store, (request) async {
+      switch (request.url.path) {
+        case '/api/public/content':
+          return response(snapshot(), 200);
+        case '/api/app/auth/login':
+          final username =
+              (jsonDecode(request.body) as Map<String, dynamic>)['username']
+                  as String;
+          return response(
+            jsonEncode({'token': username, 'user': user(username)}),
+            200,
+          );
+        case '/api/app/check-ins/summary':
+          return response(jsonEncode(summary(0)), 200);
+        case '/api/app/auth/logout':
+          return response('{"ok":true}', 200);
+        case '/api/app/backups':
+          uploadTokens.add(request.headers['authorization']);
+          return response('{"id":"uploaded"}', 201);
+      }
+      throw StateError(request.url.path);
+    });
+    await c.setEnabled(true);
+    await c.login('alice', 'password');
+    final prepared = Completer<void>();
+    final upload = () async {
+      await prepared.future;
+      return c.uploadBackup(
+        Stream<List<int>>.value([1, 2, 3]),
+        3,
+        expectedUserId: 'alice',
+      );
+    }();
+    final rejected = expectLater(upload, throwsA(isA<ApiFailure>()));
+    await c.logout();
+    await c.login('bob', 'password');
+    prepared.complete();
+    await rejected;
+    expect(uploadTokens, isEmpty);
+    await c.uploadBackup(
+      Stream<List<int>>.value([1, 2, 3]),
+      3,
+      expectedUserId: 'bob',
+    );
+    expect(uploadTokens, ['Bearer bob']);
+    c.dispose();
+  });
+
   test(
     'targeted announcement follows login and never enters the content cache',
     () async {
