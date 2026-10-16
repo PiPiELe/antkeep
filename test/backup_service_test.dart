@@ -411,6 +411,31 @@ void main() {
     expect(await database.listAllMilestones(), isEmpty);
   });
 
+  test('milestone photo survives ZIP restore and incremental import', () async {
+    final date = DateTime(2026, 10, 12);
+    await media.restoreFiles({
+      'milestone.jpg': [4, 5, 6],
+    });
+    await database.saveMilestone(
+      Milestone(
+        id: 'photo-milestone',
+        colonyId: 'c',
+        title: '带照片的里程碑',
+        occurredAt: date,
+        createdAt: date,
+        photoPath: 'milestone.jpg',
+      ),
+    );
+    final bytes = await service.createBackupBytes();
+    await database.replaceAll(fixture());
+    await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+    final imported = (await database.listMilestones('c')).single;
+    expect(imported.photoPath, isNot('milestone.jpg'));
+    expect(await media.readImage(imported.photoPath!), [4, 5, 6]);
+    await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);
+    expect(await database.listMilestones('c'), hasLength(1));
+  });
+
   test(
     'wild catch records survive ZIP restore and incremental import',
     () async {

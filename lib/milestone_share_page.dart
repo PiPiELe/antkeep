@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'data/share_image_export.dart';
 import 'data/app_database.dart';
+import 'data/local_media_store.dart';
 import 'domain/milestone.dart';
 import 'domain/models.dart';
 import 'milestone_page.dart';
@@ -13,6 +14,7 @@ import 'milestone_page.dart';
 export 'domain/milestone.dart' show MilestoneArtwork;
 
 const milestonePosterSize = Size(400, 500);
+const milestonePhotoSize = Size(400, 300);
 
 final _artworkFutures = <MilestoneArtwork, Future<ui.Image>>{};
 
@@ -41,18 +43,17 @@ class MilestonePoster extends StatelessWidget {
     this.colony,
     required this.milestone,
     required this.artwork,
+    this.photoBytes,
   });
 
   final Colony? colony;
   final Milestone milestone;
   final MilestoneArtwork artwork;
+  final Uint8List? photoBytes;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    image: true,
-    label:
-        '${colony == null ? '' : '${colony!.name}，'}${milestone.title}的里程碑分享图',
-    child: AspectRatio(
+  Widget build(BuildContext context) {
+    final stone = AspectRatio(
       aspectRatio: milestonePosterSize.aspectRatio,
       child: FutureBuilder<ui.Image>(
         future: loadMilestoneArtwork(artwork),
@@ -68,7 +69,73 @@ class MilestonePoster extends StatelessWidget {
           );
         },
       ),
+    );
+    return Semantics(
+      image: true,
+      label:
+          '${colony == null ? '' : '${colony!.name}，'}${milestone.title}的里程碑分享图',
+      child: photoBytes == null && milestone.photoPath == null
+          ? stone
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                stone,
+                AspectRatio(
+                  aspectRatio: milestonePhotoSize.aspectRatio,
+                  child: photoBytes != null
+                      ? _photoImage(photoBytes!)
+                      : _StoredMilestonePhoto(path: milestone.photoPath!),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+Widget _photoImage(Uint8List bytes) => ColoredBox(
+  color: const Color(0xff251508),
+  child: SizedBox.expand(
+    child: Image.memory(
+      bytes,
+      fit: BoxFit.contain,
+      errorBuilder: (_, _, _) => const Center(child: Text('照片加载失败')),
     ),
+  ),
+);
+
+class _StoredMilestonePhoto extends StatefulWidget {
+  const _StoredMilestonePhoto({required this.path});
+  final String path;
+
+  @override
+  State<_StoredMilestonePhoto> createState() => _StoredMilestonePhotoState();
+}
+
+class _StoredMilestonePhotoState extends State<_StoredMilestonePhoto> {
+  late Future<Uint8List> _bytes = LocalMediaStore.instance.readImage(
+    widget.path,
+  );
+
+  @override
+  void didUpdateWidget(covariant _StoredMilestonePhoto oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      _bytes = LocalMediaStore.instance.readImage(widget.path);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+    future: _bytes,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Center(child: Text('照片加载失败'));
+      }
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return _photoImage(snapshot.data!);
+    },
   );
 }
 
@@ -257,12 +324,38 @@ Future<Uint8List> renderMilestonePng(
   MilestoneArtwork artwork,
 ) async {
   final image = await loadMilestoneArtwork(artwork);
+  ui.Image? photo;
+  if (milestone.photoPath != null) {
+    final bytes = await LocalMediaStore.instance.readImage(
+      milestone.photoPath!,
+    );
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1200);
+    try {
+      photo = (await codec.getNextFrame()).image;
+    } finally {
+      codec.dispose();
+    }
+  }
   final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
   MilestonePosterPainter(
     colony,
     milestone,
     image,
-  ).paint(Canvas(recorder), milestonePosterSize);
+  ).paint(canvas, milestonePosterSize);
+  if (photo != null) {
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 500, 400, 300),
+      Paint()..color = const Color(0xff251508),
+    );
+    paintImage(
+      canvas: canvas,
+      rect: const Rect.fromLTWH(0, 500, 400, 300),
+      image: photo,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    );
+  }
   final picture = recorder.endRecording();
   final scaledRecorder = ui.PictureRecorder();
   Canvas(scaledRecorder)
@@ -271,12 +364,13 @@ Future<Uint8List> renderMilestonePng(
   final scaled = scaledRecorder.endRecording();
   ui.Image? output;
   try {
-    output = await scaled.toImage(1200, 1500);
+    output = await scaled.toImage(1200, photo == null ? 1500 : 2400);
     final data = await output.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) throw StateError('分享图生成失败');
     return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
   } finally {
     output?.dispose();
+    photo?.dispose();
     scaled.dispose();
     picture.dispose();
   }

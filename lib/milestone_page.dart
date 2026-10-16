@@ -1,11 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'data/app_database.dart';
+import 'data/local_media_store.dart';
+import 'data/media_cleanup.dart';
 import 'date_display.dart';
 import 'domain/milestone.dart';
 import 'domain/models.dart';
 import 'milestone_share_page.dart';
+import 'widgets/photo_source_picker.dart';
 
 class MilestonePage extends StatefulWidget {
   const MilestonePage({super.key, required this.colony});
@@ -67,6 +73,13 @@ class _MilestonePageState extends State<MilestonePage> {
     if (confirmed != true || !mounted) return;
     try {
       await AppDatabase.instance.deleteMilestone(milestone);
+      if (milestone.photoPath != null) {
+        await removeUnreferencedMedia(
+          AppDatabase.instance,
+          LocalMediaStore.instance,
+          [milestone.photoPath!],
+        );
+      }
       if (mounted) _reload();
     } catch (error) {
       if (mounted) {
@@ -171,6 +184,35 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
       widget.milestone != null &&
       (_occurredAt.hour != 0 || _occurredAt.minute != 0);
   bool _saving = false;
+  XFile? _selectedPhoto;
+  Uint8List? _selectedPhotoBytes;
+  bool _removePhoto = false;
+
+  Future<void> _pickPhoto() async {
+    final source = await choosePhotoSource(context);
+    if (source == null || !mounted) return;
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+      if (photo == null) return;
+      final bytes = await photo.readAsBytes();
+      if (mounted) {
+        setState(() {
+          _selectedPhoto = photo;
+          _selectedPhotoBytes = bytes;
+          _removePhoto = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('选择照片失败：$error')));
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -241,17 +283,20 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
         widget.colony?.id ?? widget.milestone?.colonyId ?? _selectedColonyId;
     final syncDiary =
         widget.milestone == null && _syncDiary && colonyId != null;
-    final milestone = Milestone(
-      id: widget.milestone?.id ?? const Uuid().v4(),
-      colonyId: colonyId,
-      title: _title.text,
-      note: _note.text.trim().isEmpty ? null : _note.text,
-      occurredAt: _occurredAt,
-      createdAt: widget.milestone?.createdAt ?? DateTime.now(),
-      artwork: _artwork,
-    );
+    String? copiedPhoto;
     try {
-      milestone.validate();
+      final photoPath = _removePhoto ? null : widget.milestone?.photoPath;
+      final draft = Milestone(
+        id: widget.milestone?.id ?? const Uuid().v4(),
+        colonyId: colonyId,
+        title: _title.text,
+        note: _note.text.trim().isEmpty ? null : _note.text,
+        occurredAt: _occurredAt,
+        createdAt: widget.milestone?.createdAt ?? DateTime.now(),
+        artwork: _artwork,
+        photoPath: photoPath,
+      );
+      draft.validate();
       var recalculateAllGrowth = false;
       if (syncDiary) {
         recalculateAllGrowth = await AppDatabase.instance
@@ -279,6 +324,19 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
         }
       }
       setState(() => _saving = true);
+      if (_selectedPhoto != null) {
+        copiedPhoto = await LocalMediaStore.instance.copyImage(_selectedPhoto!);
+      }
+      final milestone = Milestone(
+        id: draft.id,
+        colonyId: draft.colonyId,
+        title: draft.title,
+        note: draft.note,
+        occurredAt: draft.occurredAt,
+        createdAt: draft.createdAt,
+        artwork: draft.artwork,
+        photoPath: copiedPhoto ?? photoPath,
+      );
       if (syncDiary) {
         final title = _title.text.trim();
         final note = _note.text.trim();
@@ -297,8 +355,20 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
       } else {
         await AppDatabase.instance.saveMilestone(milestone);
       }
+      await removeUnreferencedMedia(
+        AppDatabase.instance,
+        LocalMediaStore.instance,
+        [if (widget.milestone?.photoPath != null) widget.milestone!.photoPath!],
+      );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
+      if (copiedPhoto != null) {
+        await removeUnreferencedMedia(
+          AppDatabase.instance,
+          LocalMediaStore.instance,
+          [copiedPhoto],
+        );
+      }
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('保存失败：$error')));
@@ -430,6 +500,37 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           ),
         ),
         const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _saving ? null : _pickPhoto,
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: Text(
+                  _selectedPhotoBytes != null ||
+                          (!_removePhoto && widget.milestone?.photoPath != null)
+                      ? '更换自己的照片'
+                      : '添加自己的照片（可选）',
+                ),
+              ),
+            ),
+            if (_selectedPhotoBytes != null ||
+                (!_removePhoto && widget.milestone?.photoPath != null))
+              IconButton(
+                tooltip: '移除照片',
+                onPressed: _saving
+                    ? null
+                    : () => setState(() {
+                        _selectedPhoto = null;
+                        _selectedPhotoBytes = null;
+                        _removePhoto = true;
+                      }),
+                icon: const Icon(Icons.delete_outline),
+              ),
+          ],
+        ),
+        const Text('照片会放在石刻海报下方，并保存在本机。'),
+        const SizedBox(height: 12),
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
@@ -443,8 +544,12 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
                 occurredAt: _occurredAt,
                 createdAt: widget.milestone?.createdAt ?? DateTime.now(),
                 artwork: _artwork,
+                photoPath: _selectedPhotoBytes == null && !_removePhoto
+                    ? widget.milestone?.photoPath
+                    : null,
               ),
               artwork: _artwork,
+              photoBytes: _selectedPhotoBytes,
             ),
           ),
         ),

@@ -30,6 +30,7 @@ class Milestone {
     required this.createdAt,
     this.note,
     this.artwork = MilestoneArtwork.harvest,
+    this.photoPath,
   });
 
   final String id;
@@ -39,6 +40,7 @@ class Milestone {
   final DateTime createdAt;
   final String? note;
   final MilestoneArtwork artwork;
+  final String? photoPath;
 
   void validate() {
     if (id.isEmpty ||
@@ -46,6 +48,13 @@ class Milestone {
         title.trim().isEmpty ||
         title.trim().length > 80) {
       throw const FormatException('里程碑标题需为 1～80 字。');
+    }
+    if (photoPath != null &&
+        (photoPath!.isEmpty ||
+            photoPath!.contains('..') ||
+            photoPath!.contains('/') ||
+            photoPath!.contains('\\'))) {
+      throw const FormatException('里程碑照片路径无效。');
     }
   }
 
@@ -58,6 +67,7 @@ class Milestone {
       createdAt: DateTime.parse(map['created_at']! as String),
       note: map['note'] as String?,
       artwork: MilestoneArtwork.fromStorage(map['artwork']),
+      photoPath: map['photo_path'] as String?,
     );
     milestone.validate();
     return milestone;
@@ -71,5 +81,6 @@ class Milestone {
     'created_at': createdAt.toIso8601String(),
     'note': note?.trim().isEmpty == true ? null : note?.trim(),
     'artwork': artwork.name,
+    'photo_path': photoPath,
   };
 }

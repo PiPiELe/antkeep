@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:antkeep/domain/milestone.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/milestone_share_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,8 +27,16 @@ void main() {
     occurredAt: date,
     createdAt: date,
   );
+  late Directory mediaDirectory;
 
   setUpAll(() async {
+    mediaDirectory = await Directory.systemTemp.createTemp('milestone-photo-');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (_) async => mediaDirectory.path,
+        );
+    await LocalMediaStore.instance.initialize();
     final font = Platform.environment['ANTKEEP_TEST_FONT'];
     final loader = FontLoader('StoneSerif')
       ..addFont(
@@ -38,6 +48,72 @@ void main() {
     for (final artwork in MilestoneArtwork.values) {
       await loadMilestoneArtwork(artwork);
     }
+  });
+  tearDownAll(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          null,
+        );
+    await mediaDirectory.delete(recursive: true);
+  });
+
+  testWidgets('own photo appears below artwork in exported PNG', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () => LocalMediaStore.instance.restoreFiles({
+        'own.png': base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAEklEQVR4nGP4z8CAB+GTG8HSALfKY52fTcuYAAAAAElFTkSuQmCC',
+        ),
+      }),
+    );
+    final withPhoto = Milestone(
+      id: milestone.id,
+      colonyId: milestone.colonyId,
+      title: milestone.title,
+      note: milestone.note,
+      occurredAt: milestone.occurredAt,
+      createdAt: milestone.createdAt,
+      photoPath: 'own.png',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: MilestonePoster(
+              colony: colony,
+              milestone: withPhoto,
+              artwork: withPhoto.artwork,
+            ),
+          ),
+        ),
+      ),
+    );
+    await _settle(tester);
+    expect(find.byType(Image), findsOneWidget);
+    final bytes = await tester.runAsync(
+      () => renderMilestonePng(colony, withPhoto, withPhoto.artwork),
+    );
+    final codec = await tester.runAsync(() => ui.instantiateImageCodec(bytes!));
+    final frame = await tester.runAsync(() => codec!.getNextFrame());
+    expect(frame!.image.width, 1200);
+    expect(frame.image.height, 2400);
+    final pixels = await tester.runAsync(
+      () => frame.image.toByteData(format: ui.ImageByteFormat.rawRgba),
+    );
+    final offset = (2000 * 1200 + 600) * 4;
+    expect(pixels!.getUint8(offset), 255);
+    expect(pixels.getUint8(offset + 1), 0);
+    expect(pixels.getUint8(offset + 2), 0);
+    final previewDir = Platform.environment['ANTKEEP_MILESTONE_PREVIEW_DIR'];
+    if (previewDir != null) {
+      await tester.runAsync(
+        () => File('$previewDir/user-photo.png').writeAsBytes(bytes!),
+      );
+    }
+    frame.image.dispose();
+    codec!.dispose();
   });
 
   for (final artwork in MilestoneArtwork.values) {

@@ -10,7 +10,7 @@ import 'backup_data.dart';
 
 enum BackupRestoreMode { incremental, overwrite }
 
-const backupVersion = 12;
+const backupVersion = 13;
 
 mixin BackupLogic {
   AppDatabase get database;
@@ -175,6 +175,10 @@ mixin BackupLogic {
         ]);
       }
     }
+    for (final row in added['milestones'] as List? ?? const []) {
+      final photo = row['photo_path'];
+      if (renamed.containsKey(photo)) row['photo_path'] = renamed[photo];
+    }
     return (
       merged,
       {
@@ -198,6 +202,7 @@ mixin BackupLogic {
             manifest['version'] != 9 &&
             manifest['version'] != 10 &&
             manifest['version'] != 11 &&
+            manifest['version'] != 12 &&
             manifest['version'] != backupVersion) ||
         data is! Map<String, dynamic> ||
         data['colonies'] is! List ||

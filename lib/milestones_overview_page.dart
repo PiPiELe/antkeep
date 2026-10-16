@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'data/app_database.dart';
+import 'data/local_media_store.dart';
+import 'data/media_cleanup.dart';
 import 'date_display.dart';
 import 'domain/milestone.dart';
 import 'milestone_page.dart';
@@ -59,6 +61,13 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
     if (confirmed != true || !mounted) return;
     try {
       await AppDatabase.instance.deleteMilestone(milestone);
+      if (milestone.photoPath != null) {
+        await removeUnreferencedMedia(
+          AppDatabase.instance,
+          LocalMediaStore.instance,
+          [milestone.photoPath!],
+        );
+      }
       if (mounted) _reload();
     } catch (error) {
       if (mounted) {

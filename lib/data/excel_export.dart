@@ -46,6 +46,7 @@ class ExcelExport {
     'group_name': '分组',
     'purchase_price_cents': '购入价（分）',
     'photos_json': '照片路径',
+    'photo_path': '里程碑照片路径',
     'cover_photo_path': '封面照片路径',
   };
 
@@ -275,6 +276,11 @@ class ExcelExport {
           in (data[table] as List? ?? const []).cast<Map<String, Object?>>()) {
         row['photos_json'] = '[]';
       }
+    }
+    for (final row
+        in (data['milestones'] as List? ?? const [])
+            .cast<Map<String, Object?>>()) {
+      row['photo_path'] = null;
     }
   }
 

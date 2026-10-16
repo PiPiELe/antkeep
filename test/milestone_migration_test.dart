@@ -74,6 +74,7 @@ void main() {
         (await app.listMilestones('colony')).single.artwork,
         MilestoneArtwork.harvest,
       );
+      expect((await app.listMilestones('colony')).single.photoPath, isNull);
       await app.saveMilestone(
         Milestone(id: 'new', title: '独立里程碑', occurredAt: date, createdAt: date),
       );
@@ -82,7 +83,7 @@ void main() {
       expect((await app.listAllMilestones()).length, 2);
       await app.close();
       final upgraded = await openDatabase(path);
-      expect(await upgraded.getVersion(), 32);
+      expect(await upgraded.getVersion(), 33);
       expect(await upgraded.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       await upgraded.close();
     },

@@ -45,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 32,
+      version: 33,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -309,6 +309,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         'ALTER TABLE inventory_items ADD COLUMN purpose TEXT',
       );
     }
+    if (oldVersion >= 25 && oldVersion < 33) {
+      await database.execute(
+        'ALTER TABLE milestones ADD COLUMN photo_path TEXT',
+      );
+    }
   }
 
   static Future<void> _createMemorialTable(DatabaseExecutor db) async {
@@ -327,7 +332,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await db.execute('''CREATE TABLE milestones (
       id TEXT PRIMARY KEY, colony_id TEXT, title TEXT NOT NULL,
       occurred_at TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL,
-      artwork TEXT NOT NULL DEFAULT 'harvest',
+      artwork TEXT NOT NULL DEFAULT 'harvest', photo_path TEXT,
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
     )''');
     await db.execute(
@@ -1990,6 +1995,10 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       if (photos is String && photos.isNotEmpty) {
         paths.addAll((jsonDecode(photos) as List<dynamic>).cast<String>());
       }
+    }
+    for (final entry in snapshot['milestones'] as List? ?? const []) {
+      final photo = (entry as Map)['photo_path'];
+      if (photo is String && photo.isNotEmpty) paths.add(photo);
     }
     return paths;
   }
