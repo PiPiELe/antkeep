@@ -967,7 +967,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('每月').last);
     await tester.pumpAndSettle();
-    expect(find.byType(DropdownButtonFormField<GrowthPath>), findsNothing);
+    expect(find.byType(DropdownMenu<GrowthPath>), findsNothing);
     expect(find.textContaining('卵 → 幼 → 茧 → 工'), findsOneWidget);
     for (final item in [('卵净增长', '2'), ('茧净增长', '3'), ('工净增长', '1')]) {
       final field = find.widgetWithText(TextFormField, item.$1);
@@ -3055,7 +3055,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: ColonyFormPage()));
-    final selector = find.byType(DropdownButtonFormField<GrowthPath>);
+    final selector = find.byType(DropdownMenu<GrowthPath>);
     await tester.ensureVisible(selector);
     await tester.tap(selector);
     await tester.pumpAndSettle();

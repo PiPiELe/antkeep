@@ -132,7 +132,7 @@ void main() {
           home: const ColonyFormPage(),
         ),
       );
-      final selector = find.byType(DropdownButtonFormField<GrowthPath>);
+      final selector = find.byType(DropdownMenu<GrowthPath>);
       final queen = find.widgetWithText(TextFormField, '蚁后 *');
       await tester.ensureVisible(selector);
       final queenGap =
@@ -166,4 +166,42 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('dark development menu marks its selected option', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(393, 852);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: antKeepTheme(ThemeColor.forest, dark: true),
+        home: const ColonyFormPage(),
+      ),
+    );
+    final selector = find.byType(DropdownMenu<GrowthPath>);
+    await tester.ensureVisible(selector);
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+
+    final selected = find.widgetWithText(
+      MenuItemButton,
+      GrowthPath.eggToCocoonToWorker.label,
+    );
+    expect(selected, findsOneWidget);
+    expect(
+      tester
+          .widget<MenuItemButton>(selected)
+          .style
+          ?.backgroundColor
+          ?.resolve(<WidgetState>{}),
+      isNot(Colors.transparent),
+    );
+    expect(
+      find.descendant(of: selected, matching: find.byIcon(Icons.check)),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

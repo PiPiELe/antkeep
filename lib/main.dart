@@ -2486,21 +2486,62 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             title: '数量',
             hint: '档案起始数量，日记中的死亡数量会从此扣减',
             children: [
-              DropdownButtonFormField<GrowthPath>(
-                isExpanded: true,
-                initialValue: _developmentPath,
-                decoration: const InputDecoration(
-                  labelText: '发育模式',
-                  prefixIcon: Icon(Icons.spa_outlined),
+              DropdownMenu<GrowthPath>(
+                key: const ValueKey('colony-development-path'),
+                initialSelection: _developmentPath,
+                expandedInsets: EdgeInsets.zero,
+                label: const Text('发育模式'),
+                leadingIcon: const Icon(Icons.spa_outlined),
+                trailingIcon: const Icon(Icons.arrow_drop_down),
+                selectedTrailingIcon: const Icon(Icons.arrow_drop_up),
+                selectOnly: true,
+                requestFocusOnTap: false,
+                menuStyle: MenuStyle(
+                  backgroundColor: WidgetStatePropertyAll(
+                    Theme.of(context).brightness == Brightness.light
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.surfaceContainerHigh,
+                  ),
+                  elevation: const WidgetStatePropertyAll(3),
+                  shadowColor: WidgetStatePropertyAll(
+                    Colors.black.withValues(alpha: .18),
+                  ),
+                  padding: const WidgetStatePropertyAll(EdgeInsets.all(8)),
+                  shape: WidgetStatePropertyAll(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                items: [
+                dropdownMenuEntries: [
                   for (final path in GrowthPath.values)
-                    DropdownMenuItem(
+                    DropdownMenuEntry(
                       value: path,
-                      child: Text(path.label, overflow: TextOverflow.ellipsis),
+                      label: path.label,
+                      trailingIcon: _developmentPath == path
+                          ? Icon(
+                              Icons.check,
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          : null,
+                      style: MenuItemButton.styleFrom(
+                        backgroundColor: _developmentPath == path
+                            ? Theme.of(context).colorScheme.primaryContainer
+                                  .withValues(alpha: .45)
+                            : Colors.transparent,
+                        foregroundColor: Theme.of(context)
+                            .colorScheme
+                            .onSurface,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                 ],
-                onChanged: (path) => setState(() => _developmentPath = path!),
+                onSelected: (path) {
+                  if (path != null) setState(() => _developmentPath = path);
+                },
               ),
               const SizedBox(height: 16),
               Row(
