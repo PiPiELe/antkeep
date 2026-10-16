@@ -707,7 +707,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('new queen colonies stay first despite saved order and drags', (
+  testWidgets('new queen colony follows saved order and can be dragged', (
     tester,
   ) async {
     final now = DateTime(2026, 10, 2);
@@ -727,17 +727,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('q'))).dy,
-      lessThan(tester.getTopLeft(find.byKey(const ValueKey('a'))).dy),
+      greaterThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('a'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
     );
 
+    await dragColony(tester, 'q', 'a');
+    expect(themeController.colonyOrder, ['q', 'a', 'b']);
     await dragColony(tester, 'q', 'b');
-    expect(themeController.colonyOrder.first, 'q');
-    await dragColony(tester, 'b', 'q');
-    expect(themeController.colonyOrder.first, 'q');
+    expect(themeController.colonyOrder, ['a', 'b', 'q']);
 
     await themeController.load();
     await tester.pumpWidget(const SizedBox());
@@ -745,11 +745,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('q'))).dy,
-      lessThan(tester.getTopLeft(find.byKey(const ValueKey('a'))).dy),
+      greaterThan(tester.getTopLeft(find.byKey(const ValueKey('a'))).dy),
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('q'))).dy,
-      lessThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
+      greaterThan(tester.getTopLeft(find.byKey(const ValueKey('b'))).dy),
     );
     expect(tester.takeException(), isNull);
   });
@@ -2458,7 +2458,7 @@ void main() {
     );
   }
 
-  testWidgets('colony card keeps new queen first and tags on one row', (
+  testWidgets('colony card keeps new queen tag first and tags on one row', (
     tester,
   ) async {
     final date = DateTime(2026, 9, 1);
