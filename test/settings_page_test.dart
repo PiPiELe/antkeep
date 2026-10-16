@@ -429,6 +429,16 @@ void main() {
     expect(find.text('添加里程碑'), findsOneWidget);
   });
 
+  testWidgets('colony overview tab opens the three sections', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('总览'));
+    await tester.pumpAndSettle();
+    expect(find.text('历史'), findsOneWidget);
+    expect(find.text('现役'), findsOneWidget);
+    expect(find.text('英灵殿'), findsWidgets);
+  });
+
   testWidgets(
     'menu rename settings retain old name on failure and allow retry',
     (tester) async {

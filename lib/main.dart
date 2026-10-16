@@ -14,6 +14,7 @@ import 'colony_growth_page.dart';
 import 'care_tasks_section.dart';
 import 'batch_care_page.dart';
 import 'memorial_page.dart';
+import 'colony_overview_page.dart';
 import 'widgets/skull_icon.dart';
 import 'share_cards_page.dart';
 import 'share_content_page.dart';
@@ -515,6 +516,10 @@ class _HomePageState extends State<HomePage>
         index: _colonyTabs.index,
         children: [
           const ColoniesPage(),
+          ColonyOverviewPage(
+            active:
+                pageIndex == 0 && _colonyTabs.index == ColonyTab.overview.index,
+          ),
           MemorialPage(
             preferences: themeController,
             onOpenColony: (context, id) async {
@@ -525,7 +530,9 @@ class _HomePageState extends State<HomePage>
               );
             },
           ),
-          MilestonesOverviewPage(active: _colonyTabs.index == 2),
+          MilestonesOverviewPage(
+            active: _colonyTabs.index == ColonyTab.milestones.index,
+          ),
         ],
       ),
       const InventoryPage(),

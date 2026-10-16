@@ -910,6 +910,11 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         .toList();
   }
 
+  Future<List<Colony>> listAllColonies() async {
+    await applyColonyGrowth();
+    return (await _db.query('colonies')).map(Colony.fromMap).toList();
+  }
+
   @override
   Future<Colony?> findColony(String id) async {
     await applyColonyGrowth(colonyId: id);
