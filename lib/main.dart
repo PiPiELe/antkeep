@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'colony_display_styles.dart';
 import 'diary_preferences.dart';
 import 'diary_settings_page.dart';
 import 'colony_growth_page.dart';
@@ -540,7 +541,11 @@ class _HomePageState extends State<HomePage>
       const DiscoverPage(),
       const SettingsPage(),
     ];
-    return Scaffold(
+    final showcase =
+        pageIndex == 0 &&
+        _colonyTabs.index == 0 &&
+        themeController.colonyDisplayStyle != ColonyDisplayStyle.classic;
+    final page = Scaffold(
       appBar: AppBar(
         title: pageIndex == 0
             ? NotificationListener<ScrollNotification>(
@@ -697,6 +702,9 @@ class _HomePageState extends State<HomePage>
         ],
       ),
     );
+    return showcase
+        ? Theme(data: antKeepTheme(ThemeColor.amber, dark: true), child: page)
+        : page;
   }
 }
 
@@ -886,6 +894,10 @@ class _ColoniesPageState extends State<ColoniesPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor:
+        themeController.colonyDisplayStyle == ColonyDisplayStyle.classic
+        ? null
+        : colonyShowcaseBackground,
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _newColony,
       icon: const Icon(Icons.add),
@@ -901,6 +913,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
           return _ErrorState('读取蚁群失败：${snapshot.error}');
         }
         final colonies = snapshot.data!;
+        final style = themeController.colonyDisplayStyle;
         final canBatchCare =
             colonies.where((entry) => !entry.colony.archived).length > 1;
         if (colonies.isEmpty) {
@@ -923,35 +936,80 @@ class _ColoniesPageState extends State<ColoniesPage> {
               header: Column(
                 children: [
                   if (themeController.showColonyOverview) ...[
-                    _ColonyOverviewCard(entries: colonies),
+                    if (style == ColonyDisplayStyle.classic)
+                      _ColonyOverviewCard(entries: colonies)
+                    else
+                      ColonyShowcaseOverview(
+                        count: colonies.length,
+                        queens: _knownColonyTotal(
+                          colonies.map((entry) => entry.queens),
+                        ),
+                        workers: _knownColonyTotal(
+                          colonies.map((entry) => entry.workers),
+                        ),
+                      ),
                     const SizedBox(height: 12),
                   ],
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: [
-                        if (canBatchCare)
-                          OutlinedButton.icon(
-                            onPressed: () => _batchCare(colonies),
-                            icon: const Icon(Icons.playlist_add_check),
-                            label: const Text('批量养护记录'),
-                          ),
-                        if (colonies.length > 1)
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.only(
-                                left: canBatchCare ? 8 : 0,
-                              ),
-                              child: Text(
-                                '长按蚁群卡片可上下拖动排序',
-                                textAlign: TextAlign.end,
-                                style: Theme.of(context).textTheme.bodySmall,
+                  if (style == ColonyDisplayStyle.classic)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          if (canBatchCare)
+                            OutlinedButton.icon(
+                              onPressed: () => _batchCare(colonies),
+                              icon: const Icon(Icons.playlist_add_check),
+                              label: const Text('批量养护记录'),
+                            ),
+                          if (colonies.length > 1)
+                            Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  left: canBatchCare ? 8 : 0,
+                                ),
+                                child: Text(
+                                  '长按蚁群卡片可上下拖动排序',
+                                  textAlign: TextAlign.end,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                               ),
                             ),
+                        ],
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${colonies.length} 群',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 17,
+                            ),
                           ),
-                      ],
+                          const Spacer(),
+                          if (canBatchCare)
+                            OutlinedButton.icon(
+                              onPressed: () => _batchCare(colonies),
+                              icon: const Icon(
+                                Icons.playlist_add_check,
+                                size: 18,
+                              ),
+                              label: const Text('批量养护'),
+                            ),
+                          if (colonies.length > 1)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 8),
+                              child: Text(
+                                '长按排序',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
               itemCount: colonies.length,
@@ -968,25 +1026,62 @@ class _ColoniesPageState extends State<ColoniesPage> {
                       padding: EdgeInsets.only(
                         bottom: index == colonies.length - 1 ? 0 : 10,
                       ),
-                      child: _ColonyCard(
-                        colony: colonies[index].colony,
-                        population: colonies[index].population,
-                        queens: colonies[index].queens,
-                        workers: colonies[index].workers,
-                        dueTasks: colonies[index].dueTasks,
-                        onDurationTap: () =>
-                            _editAcquiredOn(colonies[index].colony),
-                        onTap: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ColonyDetailPage(
-                                colonyId: colonies[index].colony.id,
-                              ),
+                      child: style == ColonyDisplayStyle.classic
+                          ? _ColonyCard(
+                              colony: colonies[index].colony,
+                              population: colonies[index].population,
+                              queens: colonies[index].queens,
+                              workers: colonies[index].workers,
+                              dueTasks: colonies[index].dueTasks,
+                              onDurationTap: () =>
+                                  _editAcquiredOn(colonies[index].colony),
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ColonyDetailPage(
+                                      colonyId: colonies[index].colony.id,
+                                    ),
+                                  ),
+                                );
+                                if (mounted) setState(_reload);
+                              },
+                            )
+                          : ColonyShowcaseCard(
+                              style: style,
+                              colony: colonies[index].colony,
+                              population: colonies[index].population,
+                              queens: colonies[index].queens,
+                              workers: colonies[index].workers,
+                              dueTasks: colonies[index].dueTasks,
+                              cover:
+                                  colonies[index].colony.coverPhotoPath == null
+                                  ? null
+                                  : _StoredImage(
+                                      relativePath: colonies[index]
+                                          .colony
+                                          .coverPhotoPath!,
+                                      width: style == ColonyDisplayStyle.compact
+                                          ? 52
+                                          : 60,
+                                      height:
+                                          style == ColonyDisplayStyle.compact
+                                          ? 52
+                                          : 60,
+                                      borderRadius: 99,
+                                    ),
+                              onDurationTap: () =>
+                                  _editAcquiredOn(colonies[index].colony),
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ColonyDetailPage(
+                                      colonyId: colonies[index].colony.id,
+                                    ),
+                                  ),
+                                );
+                                if (mounted) setState(_reload);
+                              },
                             ),
-                          );
-                          if (mounted) setState(_reload);
-                        },
-                      ),
                     ),
                   ),
             ),
@@ -995,6 +1090,14 @@ class _ColoniesPageState extends State<ColoniesPage> {
       },
     ),
   );
+}
+
+String _knownColonyTotal(Iterable<int?> values) {
+  final counts = values.toList();
+  final known = counts.whereType<int>().toList();
+  if (known.isEmpty) return '未知';
+  final total = known.fold<int>(0, (sum, count) => sum + count);
+  return known.length == counts.length ? '$total' : '≥$total';
 }
 
 class _ColonyOverviewCard extends StatelessWidget {
@@ -6646,6 +6749,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _savingEdition = false;
   bool _savingSimpleMode = false;
   bool _savingColonyOverview = false;
+  bool _savingColonyDisplayStyle = false;
 
   @override
   void initState() {
@@ -6678,6 +6782,21 @@ class _SettingsPageState extends State<SettingsPage> {
       if (mounted) _showError(context, error);
     } finally {
       if (mounted) setState(() => _savingColonyOverview = false);
+    }
+  }
+
+  Future<void> _setColonyDisplayStyle(ColonyDisplayStyle style) async {
+    if (_savingColonyDisplayStyle ||
+        themeController.colonyDisplayStyle == style) {
+      return;
+    }
+    setState(() => _savingColonyDisplayStyle = true);
+    try {
+      await themeController.setColonyDisplayStyle(style);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _savingColonyDisplayStyle = false);
     }
   }
 
@@ -6918,6 +7037,27 @@ class _SettingsPageState extends State<SettingsPage> {
             }
           },
         ),
+      ]),
+      _section(context, '蚁群列表风格', [
+        for (final style in ColonyDisplayStyle.values)
+          ListTile(
+            leading: Icon(
+              style == ColonyDisplayStyle.classic
+                  ? Icons.view_agenda_outlined
+                  : style == ColonyDisplayStyle.showcase
+                  ? Icons.dashboard_customize_outlined
+                  : Icons.view_compact_outlined,
+            ),
+            title: Text(style.label),
+            subtitle: Text(style.description),
+            trailing: themeController.colonyDisplayStyle == style
+                ? const Icon(Icons.check_circle)
+                : null,
+            selected: themeController.colonyDisplayStyle == style,
+            onTap: _savingColonyDisplayStyle
+                ? null
+                : () => _setColonyDisplayStyle(style),
+          ),
       ]),
     ],
     SettingsCategory.online => [

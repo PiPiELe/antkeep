@@ -63,6 +63,16 @@ enum ColonyTab {
   final String settingKey;
 }
 
+enum ColonyDisplayStyle {
+  classic('经典', '保留当前蚁群列表样式'),
+  showcase('曜石·舒展', '大号养殖天数与宽松卡片'),
+  compact('曜石·紧凑', '紧凑信息与卡片内待办');
+
+  const ColonyDisplayStyle(this.label, this.description);
+  final String label;
+  final String description;
+}
+
 class AppPreferences extends ChangeNotifier {
   AppPreferences(this.store);
   final AppSettingsStore store;
@@ -81,6 +91,7 @@ class AppPreferences extends ChangeNotifier {
   bool beginner = false;
   bool simpleMode = false;
   bool showColonyOverview = true;
+  ColonyDisplayStyle colonyDisplayStyle = ColonyDisplayStyle.showcase;
   bool memorialGrouped = false;
   bool careRemindersEnabled = false;
   int careReminderMinuteOfDay = 20 * 60;
@@ -144,6 +155,10 @@ class AppPreferences extends ChangeNotifier {
     beginner = values['keeper_experience'] == 'beginner';
     simpleMode = values['simple_mode'] == 'true';
     showColonyOverview = values['show_colony_overview'] != 'false';
+    colonyDisplayStyle = ColonyDisplayStyle.values.firstWhere(
+      (style) => style.name == values['colony_display_style'],
+      orElse: () => ColonyDisplayStyle.showcase,
+    );
     memorialGrouped = values['memorial_grouped'] == 'true';
     careRemindersEnabled = values['care_reminders_enabled'] == 'true';
     careReminderMinuteOfDay =
@@ -233,6 +248,12 @@ class AppPreferences extends ChangeNotifier {
   Future<void> setShowColonyOverview(bool enabled) async {
     await store.writeSettings({'show_colony_overview': enabled.toString()});
     showColonyOverview = enabled;
+    notifyListeners();
+  }
+
+  Future<void> setColonyDisplayStyle(ColonyDisplayStyle style) async {
+    await store.writeSettings({'colony_display_style': style.name});
+    colonyDisplayStyle = style;
     notifyListeners();
   }
 

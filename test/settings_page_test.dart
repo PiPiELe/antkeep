@@ -163,6 +163,24 @@ void main() {
     expect(settings['show_colony_overview'], 'false');
   });
 
+  testWidgets('appearance setting switches and saves colony list style', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    await openCategory(tester, '外观与展示');
+    await tester.scrollUntilVisible(
+      find.text('曜石·紧凑'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('曜石·紧凑'));
+    await tester.pumpAndSettle();
+    expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.compact);
+    expect(settings['colony_display_style'], 'compact');
+  });
+
   testWidgets(
     'settings home groups controls and data actions into five destinations',
     (tester) async {

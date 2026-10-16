@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
+import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/diary_preferences.dart';
 import 'package:antkeep/diary_settings_page.dart';
@@ -213,6 +214,8 @@ void main() {
       rows.clear();
     }
     await themeController.load();
+    // Existing layout regressions below exercise the preserved classic style.
+    await themeController.setColonyDisplayStyle(ColonyDisplayStyle.classic);
   });
 
   tearDown(() {
@@ -716,6 +719,38 @@ void main() {
     expect(hint.left, greaterThanOrEqualTo(button.right));
     expect(hint.top, lessThan(button.bottom));
     expect(hint.bottom, greaterThan(button.top));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('colony list switches between classic and both saved styles', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    await AppDatabase.instance.saveColony(
+      Colony(id: 'styled', name: '样式测试群', createdAt: now, updatedAt: now),
+    );
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('colony-overview-card')), findsOneWidget);
+
+    await themeController.setColonyDisplayStyle(ColonyDisplayStyle.showcase);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('colony-showcase-styled')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('colony-showcase-overview')),
+      findsOneWidget,
+    );
+
+    await themeController.setColonyDisplayStyle(ColonyDisplayStyle.compact);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('colony-compact-styled')), findsOneWidget);
+
+    await themeController.setColonyDisplayStyle(ColonyDisplayStyle.classic);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('colony-overview-card')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -65,4 +65,27 @@ void main() {
       expect(restarted.showColonyOverview, isFalse);
     },
   );
+
+  test('showcase is the default; explicit classic persists and failed writes keep it', () async {
+    final store = _Store();
+    final preferences = AppPreferences(store);
+    await preferences.load();
+    expect(preferences.colonyDisplayStyle, ColonyDisplayStyle.showcase);
+
+    await preferences.setColonyDisplayStyle(ColonyDisplayStyle.classic);
+    final restarted = AppPreferences(store);
+    await restarted.load();
+    expect(restarted.colonyDisplayStyle, ColonyDisplayStyle.classic);
+
+    store.failWrites = true;
+    await expectLater(
+      restarted.setColonyDisplayStyle(ColonyDisplayStyle.compact),
+      throwsStateError,
+    );
+    expect(restarted.colonyDisplayStyle, ColonyDisplayStyle.classic);
+
+    store.values['colony_display_style'] = 'unrecognized';
+    await restarted.load();
+    expect(restarted.colonyDisplayStyle, ColonyDisplayStyle.showcase);
+  });
 }
