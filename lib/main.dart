@@ -764,6 +764,46 @@ class ColoniesPage extends StatefulWidget {
   State<ColoniesPage> createState() => _ColoniesPageState();
 }
 
+Future<bool> _confirmAndDeleteColony(
+  BuildContext context,
+  Colony colony,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('删除蚁群？'),
+      content: Text('确定删除「${colony.name}」吗？该蚁群的日记、里程碑及其他记录将被删除，此操作无法撤销。'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('确认删除'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return false;
+  final records = await AppDatabase.instance.listRecords(colony.id);
+  final oldMedia = <String>{
+    if (colony.coverPhotoPath != null) colony.coverPhotoPath!,
+    for (final record in records) ...record.photos,
+  };
+  await AppDatabase.instance.deleteColony(colony.id);
+  await removeUnreferencedMedia(
+    AppDatabase.instance,
+    LocalMediaStore.instance,
+    oldMedia,
+  );
+  return true;
+}
+
 typedef _ColonyListEntry = ({
   Colony colony,
   GrowthPopulation population,
@@ -892,6 +932,16 @@ class _ColoniesPageState extends State<ColoniesPage> {
     final saved = await Navigator.of(context)
         .push<bool>(MaterialPageRoute(builder: (_) => const ColonyFormPage()));
     if (saved == true && mounted) setState(_reload);
+  }
+
+  Future<void> _deleteColony(Colony colony) async {
+    try {
+      if (await _confirmAndDeleteColony(context, colony) && mounted) {
+        setState(_reload);
+      }
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    }
   }
 
   Future<void> _batchCare(List<_ColonyListEntry> entries) async {
@@ -1333,62 +1383,86 @@ class _ColoniesPageState extends State<ColoniesPage> {
                       padding: EdgeInsets.only(
                         bottom: index == colonies.length - 1 ? 0 : 10,
                       ),
-                      child: style == ColonyDisplayStyle.classic
-                          ? _ColonyCard(
-                              colony: colonies[index].colony,
-                              population: colonies[index].population,
-                              queens: colonies[index].queens,
-                              workers: colonies[index].workers,
-                              dueTasks: colonies[index].dueTasks,
-                              onDurationTap: () =>
-                                  _editAcquiredOn(colonies[index].colony),
-                              onTap: () async {
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ColonyDetailPage(
-                                      colonyId: colonies[index].colony.id,
+                      child: Dismissible(
+                        key: ValueKey('swipe-${colonies[index].colony.id}'),
+                        direction: DismissDirection.startToEnd,
+                        background: Container(
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(
+                            Icons.delete_outline,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onErrorContainer,
+                          ),
+                        ),
+                        confirmDismiss: (_) async {
+                          await _deleteColony(colonies[index].colony);
+                          return false;
+                        },
+                        child: style == ColonyDisplayStyle.classic
+                            ? _ColonyCard(
+                                colony: colonies[index].colony,
+                                population: colonies[index].population,
+                                queens: colonies[index].queens,
+                                workers: colonies[index].workers,
+                                dueTasks: colonies[index].dueTasks,
+                                onDurationTap: () =>
+                                    _editAcquiredOn(colonies[index].colony),
+                                onTap: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ColonyDetailPage(
+                                        colonyId: colonies[index].colony.id,
+                                      ),
                                     ),
-                                  ),
-                                );
-                                if (mounted) setState(_reload);
-                              },
-                            )
-                          : ColonyShowcaseCard(
-                              style: style,
-                              colony: colonies[index].colony,
-                              population: colonies[index].population,
-                              queens: colonies[index].queens,
-                              workers: colonies[index].workers,
-                              dueTasks: colonies[index].dueTasks,
-                              cover:
-                                  colonies[index].colony.coverPhotoPath == null
-                                  ? null
-                                  : _StoredImage(
-                                      relativePath: colonies[index]
-                                          .colony
-                                          .coverPhotoPath!,
-                                      width: style == ColonyDisplayStyle.compact
-                                          ? 52
-                                          : 60,
-                                      height:
-                                          style == ColonyDisplayStyle.compact
-                                          ? 52
-                                          : 60,
-                                      borderRadius: 99,
+                                  );
+                                  if (mounted) setState(_reload);
+                                },
+                              )
+                            : ColonyShowcaseCard(
+                                style: style,
+                                colony: colonies[index].colony,
+                                population: colonies[index].population,
+                                queens: colonies[index].queens,
+                                workers: colonies[index].workers,
+                                dueTasks: colonies[index].dueTasks,
+                                cover:
+                                    colonies[index].colony.coverPhotoPath ==
+                                        null
+                                    ? null
+                                    : _StoredImage(
+                                        relativePath: colonies[index]
+                                            .colony
+                                            .coverPhotoPath!,
+                                        width:
+                                            style == ColonyDisplayStyle.compact
+                                            ? 52
+                                            : 60,
+                                        height:
+                                            style == ColonyDisplayStyle.compact
+                                            ? 52
+                                            : 60,
+                                        borderRadius: 99,
+                                      ),
+                                onDurationTap: () =>
+                                    _editAcquiredOn(colonies[index].colony),
+                                onTap: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ColonyDetailPage(
+                                        colonyId: colonies[index].colony.id,
+                                      ),
                                     ),
-                              onDurationTap: () =>
-                                  _editAcquiredOn(colonies[index].colony),
-                              onTap: () async {
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ColonyDetailPage(
-                                      colonyId: colonies[index].colony.id,
-                                    ),
-                                  ),
-                                );
-                                if (mounted) setState(_reload);
-                              },
-                            ),
+                                  );
+                                  if (mounted) setState(_reload);
+                                },
+                              ),
+                      ),
                     ),
                   ),
             ),
@@ -3318,40 +3392,9 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
     if (_deleting) return;
     setState(() => _deleting = true);
     try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('删除蚁群？'),
-          content: Text('确定删除「${colony.name}」吗？该蚁群的日记、里程碑及其他记录将被删除，此操作无法撤销。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-              ),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('确认删除'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted) return;
-      final records = await AppDatabase.instance.listRecords(colony.id);
-      final oldMedia = <String>{
-        if (colony.coverPhotoPath != null) colony.coverPhotoPath!,
-        for (final record in records) ...record.photos,
-      };
-      await AppDatabase.instance.deleteColony(colony.id);
-      await removeUnreferencedMedia(
-        AppDatabase.instance,
-        LocalMediaStore.instance,
-        oldMedia,
-      );
-      if (mounted) Navigator.of(context).pop(true);
+      if (await _confirmAndDeleteColony(context, colony) && mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (error) {
       if (mounted) _showError(context, error);
     } finally {

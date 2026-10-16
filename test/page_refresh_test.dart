@@ -1242,6 +1242,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('swiping a colony right confirms before deletion', (
+    tester,
+  ) async {
+    final now = DateTime(2026, 10, 16);
+    for (final id in ['待删除', '保留']) {
+      tables['colonies']!.add(
+        Colony(id: id, name: id, createdAt: now, updatedAt: now).toMap(),
+      );
+    }
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    final card = find.byKey(const ValueKey('swipe-待删除'));
+    await tester.drag(card, const Offset(500, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('删除蚁群？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(tables['colonies'], hasLength(2));
+
+    await tester.drag(card, const Offset(500, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+    expect(find.text('待删除'), findsNothing);
+    expect(find.text('保留'), findsOneWidget);
+    expect(tables['colonies']!.single['id'], '保留');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('husbandry duration appears in the list and colony detail', (
     tester,
   ) async {

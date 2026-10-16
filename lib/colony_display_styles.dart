@@ -152,10 +152,21 @@ class ColonyShowcaseToolbar extends StatelessWidget {
       return Row(
         children: [
           Expanded(
+            flex: 3,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: controls,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            flex: 2,
+            child: Text(
+              '卡片右滑删除\n长按滑动排序',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(color: palette.muted, fontSize: 10),
             ),
           ),
           const SizedBox(width: 6),
@@ -180,7 +191,7 @@ class ColonyShowcaseToolbar extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '长按蚁群卡片可上下拖动排序',
+                  '卡片右滑删除，长按拖动排序',
                   textAlign: TextAlign.end,
                   maxLines: 2,
                   style: TextStyle(color: palette.muted, fontSize: 11),

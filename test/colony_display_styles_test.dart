@@ -142,6 +142,9 @@ void main() {
       expect(find.text('2 / 4 群'), findsOneWidget);
       expect(find.text('默认排序'), findsOneWidget);
       expect(find.text('筛选 5'), findsOneWidget);
+      if (style == ColonyDisplayStyle.compact) {
+        expect(find.text('卡片右滑删除\n长按滑动排序'), findsOneWidget);
+      }
       await tester.tap(find.text('筛选 5'));
       expect(filtered, isTrue);
       await tester.tap(find.text('默认排序'));
