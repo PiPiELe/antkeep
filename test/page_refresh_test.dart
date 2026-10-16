@@ -525,6 +525,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('memorial tabs remain fully visible at phone width', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('英灵殿').first);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isFalse);
+    expect(find.text('我的蚁群'), findsOneWidget);
+    expect(find.text('里程碑'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('share selection handles empty data and retries failed loading', (
     tester,
   ) async {

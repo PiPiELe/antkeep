@@ -529,6 +529,13 @@ class _HomePageState extends State<HomePage>
     const titles = ['我的蚁群', '物品', 'DLC 养殖', '发现', '设置'];
     final visiblePages = themeController.simpleMode ? [0, 4] : [0, 1, 2, 3, 4];
     final pageIndex = visiblePages.contains(_index) ? _index : 0;
+    final compactMemorialTabs =
+        pageIndex == 0 &&
+        _colonyTabs.index == ColonyTab.memorial.index &&
+        MediaQuery.sizeOf(context).width >= 380 &&
+        ColonyTab.values.every(
+          (tab) => themeController.colonyTabName(tab) == tab.defaultName,
+        );
     final pages = [
       IndexedStack(
         index: _colonyTabs.index,
@@ -582,10 +589,12 @@ class _HomePageState extends State<HomePage>
                 child: ShaderMask(
                   shaderCallback: (bounds) => LinearGradient(
                     colors: [
-                      _fadeColonyTabsOnLeft ? Colors.transparent : Colors.white,
+                      compactMemorialTabs || !_fadeColonyTabsOnLeft
+                          ? Colors.white
+                          : Colors.transparent,
                       Colors.white,
                       Colors.white,
-                      Colors.transparent,
+                      compactMemorialTabs ? Colors.white : Colors.transparent,
                     ],
                     stops: [
                       0,
@@ -597,16 +606,23 @@ class _HomePageState extends State<HomePage>
                   blendMode: BlendMode.dstIn,
                   child: TabBar(
                     controller: _colonyTabs,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    padding: const EdgeInsets.only(right: 28),
+                    isScrollable: !compactMemorialTabs,
+                    tabAlignment: compactMemorialTabs
+                        ? TabAlignment.fill
+                        : TabAlignment.start,
+                    padding: EdgeInsets.only(
+                      right: compactMemorialTabs ? 0 : 28,
+                    ),
                     // Keep the colony switcher visually separate from page content;
                     // the selected-tab indicator alone was too easy to miss.
                     dividerColor: Theme.of(context).colorScheme.outlineVariant
                         .withValues(alpha: .55),
                     dividerHeight: 1,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    labelStyle: Theme.of(context).textTheme.titleMedium,
+                    labelPadding: EdgeInsets.symmetric(
+                      horizontal: compactMemorialTabs ? 3 : 12,
+                    ),
+                    labelStyle: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontSize: compactMemorialTabs ? 13 : null),
                     onTap: (_) => setState(() {}),
                     tabs: [
                       for (final tab in ColonyTab.values)

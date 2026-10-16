@@ -430,7 +430,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('恢复默认'));
     await tester.pumpAndSettle();
-    expect(find.text('英灵殿'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(TabBar), matching: find.text('英灵殿')),
+      findsOneWidget,
+    );
     expect(find.byTooltip('添加纪念'), findsOneWidget);
     await restarted.load();
     expect(restarted.colonyTabName(ColonyTab.memorial), '英灵殿');

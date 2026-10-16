@@ -53,45 +53,25 @@ class _MemorialKindPainter extends CustomPainter {
 
     switch (kind) {
       case MemorialKind.queen:
+        _paintAnt(canvas, paint);
+        paint.style = PaintingStyle.fill;
         final crown = Path()
-          ..moveTo(4.5, 10)
-          ..lineTo(10.5, 16)
-          ..lineTo(16, 7)
-          ..lineTo(21.5, 16)
-          ..lineTo(27.5, 10)
-          ..lineTo(25, 23)
-          ..lineTo(7, 23)
+          ..moveTo(11, 5)
+          ..lineTo(12, 2)
+          ..lineTo(15, 4)
+          ..lineTo(18, 1)
+          ..lineTo(20, 4)
+          ..lineTo(23, 2)
+          ..lineTo(22, 6)
           ..close();
         canvas.drawPath(crown, paint);
-        canvas.drawLine(const Offset(7, 26), const Offset(25, 26), paint);
-        for (final tip in [
-          const Offset(4.5, 10),
-          const Offset(16, 7),
-          const Offset(27.5, 10),
-        ]) {
-          canvas.drawCircle(tip, 1.2, paint);
-        }
       case MemorialKind.worker:
-        final shield = Path()
-          ..moveTo(16, 4.5)
-          ..lineTo(25, 8)
-          ..lineTo(24, 19)
-          ..quadraticBezierTo(22.5, 24, 16, 28)
-          ..quadraticBezierTo(9.5, 24, 8, 19)
-          ..lineTo(7, 8)
-          ..close();
-        canvas.drawPath(shield, paint);
-        for (final side in [-1.0, 1.0]) {
-          final tip = Offset(16 + side * 6, 9);
-          final hilt = Offset(16 - side * 6, 22);
-          canvas.drawLine(tip, hilt, paint);
-          canvas.drawLine(
-            Offset(16 - side * 4, 17.5),
-            Offset(16 - side * 8, 19.5),
-            paint,
-          );
-          canvas.drawCircle(hilt, 1, paint);
-        }
+        canvas.save();
+        canvas.translate(16, 16);
+        canvas.rotate(-0.65);
+        canvas.translate(-16, -16);
+        _paintAnt(canvas, paint);
+        canvas.restore();
       case MemorialKind.brood:
         final cocoon = Path()
           ..moveTo(16, 6)
@@ -113,16 +93,57 @@ class _MemorialKindPainter extends CustomPainter {
         canvas.drawPath(leaves, paint);
         canvas.drawLine(const Offset(13, 27), const Offset(19, 27), paint);
       case MemorialKind.colony:
-        final monument = Path()
-          ..moveTo(9, 25)
-          ..lineTo(9, 12)
-          ..lineTo(16, 6)
-          ..lineTo(23, 12)
-          ..lineTo(23, 25);
-        canvas.drawPath(monument, paint);
-        canvas.drawLine(const Offset(5, 27), const Offset(27, 27), paint);
+        paint.style = PaintingStyle.fill;
+        for (final center in [
+          const Offset(16, 8),
+          const Offset(10, 20),
+          const Offset(22, 20),
+        ]) {
+          final hexagon = Path();
+          for (var i = 0; i < 6; i++) {
+            final point = Offset(
+              center.dx + [0.0, 5.2, 5.2, 0.0, -5.2, -5.2][i],
+              center.dy + [-6.0, -3.0, 3.0, 6.0, 3.0, -3.0][i],
+            );
+            if (i == 0) {
+              hexagon.moveTo(point.dx, point.dy);
+            } else {
+              hexagon.lineTo(point.dx, point.dy);
+            }
+          }
+          hexagon.close();
+          canvas.drawPath(hexagon, paint);
+        }
     }
     canvas.restore();
+  }
+
+  void _paintAnt(Canvas canvas, Paint paint) {
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 1.7;
+    for (final side in [-1.0, 1.0]) {
+      for (final y in [12.0, 17.0, 21.0]) {
+        canvas.drawLine(
+          Offset(16 + side * 2, y),
+          Offset(16 + side * 8, y - 3),
+          paint,
+        );
+        canvas.drawLine(
+          Offset(16 + side * 8, y - 3),
+          Offset(16 + side * 11, y + 1),
+          paint,
+        );
+      }
+      canvas.drawLine(
+        Offset(16 + side * 2, 9),
+        Offset(16 + side * 7, 6),
+        paint,
+      );
+    }
+    paint.style = PaintingStyle.fill;
+    canvas.drawOval(const Rect.fromLTWH(12.5, 8, 7, 6), paint);
+    canvas.drawOval(const Rect.fromLTWH(13.5, 14, 5, 6), paint);
+    canvas.drawOval(const Rect.fromLTWH(11.5, 20, 9, 10), paint);
   }
 
   @override

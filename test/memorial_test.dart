@@ -696,15 +696,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('最早添加优先'));
     await tester.pumpAndSettle();
-    expect(find.text('最早添加'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilterChip, '按蚁群折叠'));
+    expect(find.text('按时间排序'), findsOneWidget);
+    await tester.tap(find.text('按蚁群折叠'));
     await settle(tester);
     expect(find.text('小小王国'), findsOneWidget);
     expect(find.text('第二窝'), findsOneWidget);
     expect(find.text('未关联蚁群'), findsOneWidget);
-    expect(find.text('纪念 first'), findsNothing);
-    await tester.tap(find.text('小小王国'));
-    await tester.pumpAndSettle();
     expect(find.text('纪念 first'), findsOneWidget);
     expect(find.text('纪念 second'), findsOneWidget);
     await tester.tap(find.byTooltip('折叠小小王国'));
@@ -716,7 +713,7 @@ void main() {
     final restarted = AppPreferences(db);
     await tester.runAsync(restarted.load);
     expect(restarted.memorialGrouped, isTrue);
-    await tester.tap(find.widgetWithText(FilterChip, '按蚁群折叠'));
+    await tester.tap(find.text('按蚁群折叠'));
     await settle(tester);
     expect(find.text('纪念 first'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());

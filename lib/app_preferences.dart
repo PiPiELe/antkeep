@@ -92,7 +92,7 @@ class AppPreferences extends ChangeNotifier {
   bool simpleMode = false;
   bool showColonyOverview = true;
   ColonyDisplayStyle colonyDisplayStyle = ColonyDisplayStyle.showcase;
-  bool memorialGrouped = false;
+  bool memorialGrouped = true;
   bool careRemindersEnabled = false;
   int careReminderMinuteOfDay = 20 * 60;
   AppEdition edition = AppEdition.offline;
@@ -159,7 +159,7 @@ class AppPreferences extends ChangeNotifier {
       (style) => style.name == values['colony_display_style'],
       orElse: () => ColonyDisplayStyle.showcase,
     );
-    memorialGrouped = values['memorial_grouped'] == 'true';
+    memorialGrouped = values['memorial_grouped'] != 'false';
     careRemindersEnabled = values['care_reminders_enabled'] == 'true';
     careReminderMinuteOfDay =
         int.tryParse(values['care_reminder_minute_of_day'] ?? '') ?? 20 * 60;
