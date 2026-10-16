@@ -362,100 +362,108 @@ class _MemorialPageState extends State<MemorialPage> {
                   ),
                 ),
                 const Spacer(),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  runSpacing: 7,
-                  children: [
-                    Material(
-                      color: accent.withValues(alpha: 0.13),
-                      borderRadius: BorderRadius.circular(24),
-                      child: InkWell(
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    runSpacing: 7,
+                    children: [
+                      Material(
+                        color: const Color(0xFFFBE8D5),
                         borderRadius: BorderRadius.circular(24),
-                        onTap: _savingGrouping
-                            ? null
-                            : () => _setGrouped(!_grouped),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  color: _grouped ? accent : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: accent, width: 1.5),
-                                ),
-                                child: _grouped
-                                    ? Icon(
-                                        Icons.check,
-                                        size: 15,
-                                        color: onAccent,
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '按蚁群折叠',
-                                style: TextStyle(
-                                  color: accent,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: stackedControls ? 160 : width * 0.28,
-                      height: 36,
-                      padding: const EdgeInsets.only(left: 13, right: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFCF9),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: colonyNames.containsKey(_selectedColonyId)
-                              ? _selectedColonyId
-                              : '',
-                          isExpanded: true,
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down,
-                            color: Color(0xFF555B68),
-                          ),
-                          dropdownColor: const Color(0xFFFFFCF9),
-                          style: const TextStyle(
-                            color: Color(0xFF202027),
-                            fontSize: 13,
-                          ),
-                          items: [
-                            const DropdownMenuItem(
-                              value: '',
-                              child: Text('全部蚁群'),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: _savingGrouping
+                              ? null
+                              : () => _setGrouped(!_grouped),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
                             ),
-                            for (final entry in colonyNames.entries)
-                              DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(
-                                  entry.value,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: _grouped
+                                        ? accent
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: accent,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: _grouped
+                                      ? Icon(
+                                          Icons.check,
+                                          size: 15,
+                                          color: onAccent,
+                                        )
+                                      : null,
                                 ),
-                              ),
-                          ],
-                          onChanged: (value) =>
-                              setState(() => _selectedColonyId = value ?? ''),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '按蚁群折叠',
+                                  style: const TextStyle(
+                                    color: Color(0xFF79400C),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      Container(
+                        width: stackedControls ? 160 : width * 0.28,
+                        height: 36,
+                        padding: const EdgeInsets.only(left: 13, right: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFCF9),
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: colonyNames.containsKey(_selectedColonyId)
+                                ? _selectedColonyId
+                                : '',
+                            isExpanded: true,
+                            icon: const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Color(0xFF555B68),
+                            ),
+                            dropdownColor: const Color(0xFFFFFCF9),
+                            style: const TextStyle(
+                              color: Color(0xFF202027),
+                              fontSize: 13,
+                            ),
+                            items: [
+                              const DropdownMenuItem(
+                                value: '',
+                                child: Text('全部蚁群'),
+                              ),
+                              for (final entry in colonyNames.entries)
+                                DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(
+                                    entry.value,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) =>
+                                setState(() => _selectedColonyId = value ?? ''),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

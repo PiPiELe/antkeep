@@ -718,4 +718,28 @@ void main() {
     expect(find.text('纪念 first'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('hero controls remain readable and reach the right edge', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: antKeepTheme(ThemeColor.ocean),
+        home: MemorialPage(onOpenColony: (_, _) async {}),
+      ),
+    );
+    await settle(tester);
+    expect(
+      tester.widget<Text>(find.text('按蚁群折叠')).style?.color,
+      const Color(0xFF79400C),
+    );
+    expect(
+      tester.getTopRight(find.byType(DropdownButton<String>)).dx,
+      greaterThan(350),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
