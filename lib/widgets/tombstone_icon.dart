@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 /// A hollow headstone with an ant emblem, drawn in the current theme color.
 class TombstoneIcon extends StatelessWidget {
-  const TombstoneIcon({super.key, this.size = 28});
+  const TombstoneIcon({super.key, this.size = 28, this.color});
   final double size;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -12,7 +13,7 @@ class TombstoneIcon extends StatelessWidget {
     child: CustomPaint(
       size: Size.square(size),
       painter: _TombstonePainter(
-        Theme.of(context).colorScheme.onSurfaceVariant,
+        color ?? Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     ),
   );

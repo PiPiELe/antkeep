@@ -30,6 +30,8 @@ class _MemorialPageState extends State<MemorialPage> {
   final _expandedGroups = <String>{};
   bool _grouped = false;
   bool _savingGrouping = false;
+  bool _newestFirst = true;
+  String _selectedColonyId = '';
 
   @override
   void initState() {
@@ -68,25 +70,109 @@ class _MemorialPageState extends State<MemorialPage> {
   }
 
   Widget _memorialCard(Memorial item, {bool grouped = false}) {
-    final tile = ListTile(
-      contentPadding: const EdgeInsets.all(16),
-      leading: const TombstoneIcon(size: 44),
-      title: Text(item.name),
-      subtitle: Text(
-        '${item.kind.epitaph}\n${item.species ?? item.kind.label} · ${item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!)}',
+    final colors = Theme.of(context).colorScheme;
+    final accent = switch (item.kind) {
+      MemorialKind.queen => const Color(0xFF986A37),
+      MemorialKind.worker => const Color(0xFF645B79),
+      MemorialKind.brood => const Color(0xFF728568),
+      MemorialKind.colony => const Color(0xFF7D5A45),
+    };
+    final label = switch (item.kind) {
+      MemorialKind.queen => '蚁后',
+      MemorialKind.worker => '工蚁',
+      MemorialKind.brood => '幼体',
+      MemorialKind.colony => '蚁群',
+    };
+    return Card(
+      margin: grouped ? EdgeInsets.zero : const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? colors.surface
+          : const Color(0xFFFFFAF6),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(grouped ? 0 : 18),
+        side: grouped
+            ? BorderSide.none
+            : BorderSide(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? colors.outlineVariant
+                    : const Color(0xFFE8D9CB),
+              ),
       ),
-      isThreeLine: true,
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => MemorialDetailPage(
-            memorialId: item.id,
-            onOpenColony: widget.onOpenColony,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => MemorialDetailPage(
+              memorialId: item.id,
+              onOpenColony: widget.onOpenColony,
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 62,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: MemorialKindIcon(
+                    kind: item.kind,
+                    size: 38,
+                    color: accent,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.kind.epitaph,
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(color: accent),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '$label · ${item.species ?? '品种未填写'} · ${item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: colors.onSurfaceVariant),
+                    ),
+                    if (item.farewell?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 9),
+                      Text(
+                        '「${item.farewell!.trim()}」',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+            ],
           ),
         ),
       ),
     );
-    return grouped ? tile : Card(child: tile);
   }
 
   Widget _groupCard(
@@ -104,10 +190,37 @@ class _MemorialPageState extends State<MemorialPage> {
         _expandedGroups.add(group.key);
       }
     });
+    final colors = Theme.of(context).colorScheme;
     return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? colors.surface
+          : const Color(0xFFFFF7F0),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? colors.outlineVariant
+              : const Color(0xFFE8D9CB),
+        ),
+      ),
       child: Column(
         children: [
           ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 7,
+            ),
+            leading: CircleAvatar(
+              backgroundColor: const Color(0xFFB47B43).withValues(alpha: 0.15),
+              child: const MemorialKindIcon(
+                kind: MemorialKind.colony,
+                size: 25,
+                color: Color(0xFF9C673B),
+              ),
+            ),
             title: Text(title),
             subtitle: Text('${group.value.length} 条纪念'),
             trailing: IconButton(
@@ -141,8 +254,125 @@ class _MemorialPageState extends State<MemorialPage> {
     );
   }
 
+  Widget _header(Map<String, String> colonyNames) {
+    final width = MediaQuery.sizeOf(context).width;
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return SizedBox(
+      height: 226 + (width < 350 ? 72 : 0) + (textScale - 1) * 125,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/memorial/memorial-garden-header.png',
+            fit: BoxFit.cover,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFF9F3E9),
+                  Color(0xDDF9F3E9),
+                  Color(0x00F9F3E9),
+                ],
+                stops: [0, 0.48, 0.85],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '英灵殿',
+                  style: TextStyle(
+                    fontSize: 29,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF33281E),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '铭记每一只离去的伙伴，\n它们曾为蚁群付出。',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: Color(0xFF554C43),
+                  ),
+                ),
+                const Spacer(),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilterChip(
+                      label: const Text('按蚁群折叠'),
+                      labelStyle: const TextStyle(color: Color(0xFF523A26)),
+                      selected: _grouped,
+                      onSelected: _savingGrouping ? null : _setGrouped,
+                      avatar: Icon(
+                        _grouped
+                            ? Icons.check_box
+                            : Icons.check_box_outline_blank,
+                        size: 18,
+                        color: const Color(0xFF825529),
+                      ),
+                      backgroundColor: const Color(0xFFFDF9F4),
+                      selectedColor: const Color(0xFFF4D8B9),
+                      side: BorderSide.none,
+                    ),
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 168),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDF9F4),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: colonyNames.containsKey(_selectedColonyId)
+                              ? _selectedColonyId
+                              : '',
+                          isExpanded: true,
+                          style: const TextStyle(
+                            color: Color(0xFF33281E),
+                            fontSize: 14,
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: '',
+                              child: Text('全部蚁群'),
+                            ),
+                            for (final entry in colonyNames.entries)
+                              DropdownMenuItem(
+                                value: entry.key,
+                                child: Text(
+                                  entry.value,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _selectedColonyId = value ?? ''),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.surface
+        : const Color(0xFFFBF6F1),
     floatingActionButton: MenuAnchor(
       alignmentOffset: const Offset(0, 8),
       consumeOutsideTap: true,
@@ -158,12 +388,15 @@ class _MemorialPageState extends State<MemorialPage> {
           child: const Text('整群移入'),
         ),
       ],
-      builder: (context, controller, child) => FloatingActionButton(
+      builder: (context, controller, child) => FloatingActionButton.extended(
         heroTag: 'memorial-add',
         tooltip: '添加纪念',
+        backgroundColor: const Color(0xFFA56933),
+        foregroundColor: Colors.white,
         onPressed: () =>
             controller.isOpen ? controller.close() : controller.open(),
-        child: const TombstoneIcon(size: 28),
+        icon: const TombstoneIcon(size: 25, color: Colors.white),
+        label: const Text('新增纪念'),
       ),
     ),
     body:
@@ -184,66 +417,101 @@ class _MemorialPageState extends State<MemorialPage> {
               return const Center(child: CircularProgressIndicator());
             }
             final data = snapshot.data!;
-            final items = data.memorials;
-            final groupingControl = Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FilterChip(
-                  label: const Text('按蚁群折叠'),
-                  selected: _grouped,
-                  onSelected: _savingGrouping ? null : _setGrouped,
-                ),
-              ),
-            );
-            if (items.isEmpty) {
-              return Column(
-                children: [
-                  groupingControl,
-                  const Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TombstoneIcon(size: 64),
-                            SizedBox(height: 16),
-                            Text('为逝去的小生命留一份纪念'),
-                            SizedBox(height: 8),
-                            Text(
-                              '纪念每一位渺小却不屈、奋战至最后一息的勇士，\n'
-                              '纪念每一位勤勉而坚韧、为族群倾尽一生的君主，\n'
-                              '纪念每一个尚未羽化、便早早沉睡的小小生命，\n'
-                              '纪念每一个曾繁盛如星，终湮没于历史长河的文明。\n\n'
-                              '它们无声地来过，却曾竭尽全力地活着。',
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
+            final allColonyNames = <String, String>{};
+            for (final item in data.memorials) {
+              if (item.colonyId != null) {
+                allColonyNames[item.colonyId!] =
+                    data.colonyNames[item.colonyId!] ?? '已删除的蚁群';
+              }
             }
+            final selected = allColonyNames.containsKey(_selectedColonyId)
+                ? _selectedColonyId
+                : '';
+            final items =
+                data.memorials
+                    .where(
+                      (item) => selected.isEmpty || item.colonyId == selected,
+                    )
+                    .toList()
+                  ..sort(
+                    (a, b) => _newestFirst
+                        ? b.createdAt.compareTo(a.createdAt)
+                        : a.createdAt.compareTo(b.createdAt),
+                  );
             final groups = <String, List<Memorial>>{};
             for (final item in items) {
               groups.putIfAbsent(item.colonyId ?? '', () => []).add(item);
             }
             final grouped = groups.entries.toList();
-            return Column(
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 100),
               children: [
-                groupingControl,
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-                    itemCount: _grouped ? grouped.length : items.length,
-                    itemBuilder: (context, index) => _grouped
-                        ? _groupCard(grouped[index], data.colonyNames)
-                        : _memorialCard(items[index]),
+                _header(allColonyNames),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '共 ${groups.length} 组 · ${items.length} 条纪念',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      PopupMenuButton<bool>(
+                        tooltip: '纪念排序',
+                        initialValue: _newestFirst,
+                        onSelected: (value) =>
+                            setState(() => _newestFirst = value),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: true, child: Text('最新添加优先')),
+                          PopupMenuItem(value: false, child: Text('最早添加优先')),
+                        ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.sort, size: 19),
+                            const SizedBox(width: 5),
+                            Text(_newestFirst ? '最新添加' : '最早添加'),
+                            const Icon(Icons.expand_more, size: 18),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (items.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 70, 28, 20),
+                    child: Column(
+                      children: [
+                        const TombstoneIcon(size: 56),
+                        const SizedBox(height: 16),
+                        Text(
+                          selected.isEmpty ? '为逝去的小生命留一份纪念' : '这个蚁群还没有纪念',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '它们无声地来过，却曾竭尽全力地活着。',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        if (_grouped)
+                          for (final group in grouped)
+                            _groupCard(group, data.colonyNames)
+                        else
+                          for (final item in items) _memorialCard(item),
+                      ],
+                    ),
+                  ),
               ],
             );
           },
@@ -955,6 +1223,9 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('纪念详情')),
+    backgroundColor: Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.surface
+        : const Color(0xFFFBF6F1),
     body: FutureBuilder<_MemorialDetail>(
       future: _detail,
       builder: (context, snapshot) {
@@ -976,54 +1247,133 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
         final ended = detail.related.where(
           (m) => m.kind == MemorialKind.colony,
         );
+        final colors = Theme.of(context).colorScheme;
+        final borderColor = Theme.of(context).brightness == Brightness.dark
+            ? colors.outlineVariant
+            : const Color(0xFFE8D9CB);
         Widget paragraph(String title, String? value) => value == null
             ? const SizedBox.shrink()
             : Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 6),
-                    Text(value),
-                  ],
+                padding: const EdgeInsets.only(top: 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? colors.surface
+                        : const Color(0xFFFFFAF6),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(value),
+                    ],
+                  ),
                 ),
               );
         final content = ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           children: [
-            const Center(child: TombstoneIcon(size: 80)),
-            const SizedBox(height: 16),
-            Center(
-              child: Text(
-                item.name,
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                height: 195,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      'assets/memorial/memorial-garden-header.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.centerRight,
+                    ),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [Color(0xB5362519), Color(0x00362519)],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      bottom: 14,
+                      child: Text(
+                        item.kind.epitaph,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                item.kind.epitaph,
-                style: Theme.of(context).textTheme.titleMedium,
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? colors.surface
+                    : const Color(0xFFFFFAF6),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: const Color(0xFFB47B43)
+                            .withValues(alpha: 0.15),
+                        child: MemorialKindIcon(
+                          kind: item.kind,
+                          size: 25,
+                          color: const Color(0xFF9C673B),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 13),
+                  Text(
+                    '${item.kind.label} · ${item.species ?? '品种未填写'}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: colors.onSurfaceVariant),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                '${item.kind.label} · ${item.species ?? '品种未填写'}',
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Center(
-              child: Text(
-                item.diedOn == null ? '日期未填写' : chineseDate(item.diedOn!),
-              ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
+            const SizedBox(height: 12),
+            FilledButton.icon(
               icon: const Icon(Icons.ios_share),
               label: const Text('生成纪念分享图'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: const Color(0xFFA56933),
+                foregroundColor: Colors.white,
+              ),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => MemorialSharePage(memorial: item),
@@ -1032,17 +1382,16 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
             ),
             paragraph('留给它的话', item.farewell),
             if (colony != null) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               Card(
                 margin: EdgeInsets.zero,
                 elevation: 0,
-                color: Colors.transparent,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? colors.surface
+                    : const Color(0xFFFFFAF6),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  side: BorderSide(
-                    color: Theme.of(context).colorScheme.outline
-                        .withValues(alpha: 0.55),
-                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: borderColor),
                 ),
                 child: ListTile(
                   title: Text('关联蚁群 · ${colony.name}'),
@@ -1071,7 +1420,7 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
               Text('同一蚁群的纪念', style: Theme.of(context).textTheme.titleMedium),
               for (final related in detail.related)
                 ListTile(
-                  leading: const TombstoneIcon(),
+                  leading: MemorialKindIcon(kind: related.kind, size: 28),
                   title: Text(related.name),
                   subtitle: Text(
                     '${related.kind.label} · ${related.diedOn == null ? '日期未填写' : chineseDate(related.diedOn!)}',
@@ -1110,72 +1459,7 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
               ),
           ],
         );
-        final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
-        final isQueen = item.kind == MemorialKind.queen;
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: IgnorePointer(
-                child: ExcludeSemantics(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ClipRect(
-                        child: FractionalTranslation(
-                          translation: isQueen
-                              ? const Offset(0, 0.22)
-                              : Offset.zero,
-                          child: Opacity(
-                            opacity: 0.45,
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: FractionallySizedBox(
-                                widthFactor: 1,
-                                heightFactor: 1,
-                                child: Image.asset(
-                                  memorialArtworkAsset(item.kind),
-                                  fit: BoxFit.cover,
-                                  alignment: Alignment.bottomCenter,
-                                  errorBuilder: (_, _, _) =>
-                                      const SizedBox.shrink(),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: isQueen
-                                ? [
-                                    backgroundColor,
-                                    backgroundColor.withValues(alpha: 0.96),
-                                    backgroundColor.withValues(alpha: 0.15),
-                                    backgroundColor.withValues(alpha: 0.24),
-                                  ]
-                                : [
-                                    backgroundColor,
-                                    backgroundColor.withValues(alpha: 0.9),
-                                    backgroundColor.withValues(alpha: 0.45),
-                                    backgroundColor.withValues(alpha: 0.15),
-                                  ],
-                            stops: isQueen
-                                ? const [0, 0.45, 0.7, 1]
-                                : const [0, 0.28, 0.7, 1],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            content,
-          ],
-        );
+        return content;
       },
     ),
   );

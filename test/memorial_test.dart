@@ -614,7 +614,7 @@ void main() {
   testWidgets(
     'memorial list refreshes on archive and restore at narrow width',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(360, 800));
+      await tester.binding.setSurfaceSize(const Size(320, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         MaterialApp(
@@ -682,6 +682,21 @@ void main() {
     );
     await settle(tester);
     expect(find.text('纪念 first'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('第二窝').last);
+    await settle(tester);
+    expect(find.text('纪念 third'), findsOneWidget);
+    expect(find.text('纪念 first'), findsNothing);
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部蚁群').last);
+    await settle(tester);
+    await tester.tap(find.byTooltip('纪念排序'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('最早添加优先'));
+    await tester.pumpAndSettle();
+    expect(find.text('最早添加'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilterChip, '按蚁群折叠'));
     await settle(tester);
     expect(find.text('小小王国'), findsOneWidget);

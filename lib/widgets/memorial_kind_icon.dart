@@ -4,25 +4,31 @@ import '../domain/memorial.dart';
 
 /// A small line illustration for the selected memorial type.
 class MemorialKindIcon extends StatelessWidget {
-  const MemorialKindIcon({super.key, required this.kind, this.size = 40});
+  const MemorialKindIcon({
+    super.key,
+    required this.kind,
+    this.size = 40,
+    this.color,
+  });
 
   final MemorialKind kind;
   final double size;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => Semantics(
     label: switch (kind) {
-      MemorialKind.queen => '王冠',
-      MemorialKind.worker => '盾牌双剑',
-      MemorialKind.brood => '叶片托茧',
-      MemorialKind.colony => '纪念碑',
+      MemorialKind.queen => '蚁后纪念',
+      MemorialKind.worker => '工蚁纪念',
+      MemorialKind.brood => '幼体纪念',
+      MemorialKind.colony => '蚁群纪念',
     },
     image: true,
     child: CustomPaint(
       size: Size.square(size),
       painter: _MemorialKindPainter(
         kind,
-        Theme.of(context).colorScheme.onSurfaceVariant,
+        color ?? Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     ),
   );
