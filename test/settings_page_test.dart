@@ -149,6 +149,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('appearance setting controls colony overview card', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    await openCategory(tester, '外观与展示');
+    final overview = find.widgetWithText(SwitchListTile, '蚁群总览卡片');
+    expect(tester.widget<SwitchListTile>(overview).value, isTrue);
+    await tester.tap(overview);
+    await tester.pumpAndSettle();
+    expect(themeController.showColonyOverview, isFalse);
+    expect(settings['show_colony_overview'], 'false');
+  });
+
   testWidgets(
     'settings home groups controls and data actions into five destinations',
     (tester) async {

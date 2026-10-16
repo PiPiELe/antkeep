@@ -43,4 +43,26 @@ void main() {
       expect(preferences.simpleMode, isTrue);
     }
   });
+
+  test(
+    'colony overview visibility defaults on and persists after save',
+    () async {
+      final store = _Store();
+      final preferences = AppPreferences(store);
+      await preferences.load();
+      expect(preferences.showColonyOverview, isTrue);
+
+      await preferences.setShowColonyOverview(false);
+      final restarted = AppPreferences(store);
+      await restarted.load();
+      expect(restarted.showColonyOverview, isFalse);
+
+      store.failWrites = true;
+      await expectLater(
+        restarted.setShowColonyOverview(true),
+        throwsStateError,
+      );
+      expect(restarted.showColonyOverview, isFalse);
+    },
+  );
 }

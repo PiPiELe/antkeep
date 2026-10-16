@@ -756,8 +756,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
     if (mounted && !_savingOrder && !_dragging) setState(_reload);
   }
 
+  void _refreshDisplay() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    themeController.removeListener(_refreshDisplay);
     _memorialChanges?.cancel();
     _growthTimer?.cancel();
     _growthLifecycle?.dispose();
@@ -767,6 +772,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
   @override
   void initState() {
     super.initState();
+    themeController.addListener(_refreshDisplay);
     _reload();
     _memorialChanges = AppDatabase.instance.memorialChanges.listen(
       (_) => _refreshGrowth(),
@@ -907,29 +913,39 @@ class _ColoniesPageState extends State<ColoniesPage> {
             child: ReorderableListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               buildDefaultDragHandles: false,
-              header: Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  children: [
-                    if (canBatchCare)
-                      OutlinedButton.icon(
-                        onPressed: () => _batchCare(colonies),
-                        icon: const Icon(Icons.playlist_add_check),
-                        label: const Text('批量养护记录'),
-                      ),
-                    if (colonies.length > 1)
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(left: canBatchCare ? 8 : 0),
-                          child: Text(
-                            '长按蚁群卡片可上下拖动排序',
-                            textAlign: TextAlign.end,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                      ),
+              header: Column(
+                children: [
+                  if (themeController.showColonyOverview) ...[
+                    _ColonyOverviewCard(entries: colonies),
+                    const SizedBox(height: 12),
                   ],
-                ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        if (canBatchCare)
+                          OutlinedButton.icon(
+                            onPressed: () => _batchCare(colonies),
+                            icon: const Icon(Icons.playlist_add_check),
+                            label: const Text('批量养护记录'),
+                          ),
+                        if (colonies.length > 1)
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                left: canBatchCare ? 8 : 0,
+                              ),
+                              child: Text(
+                                '长按蚁群卡片可上下拖动排序',
+                                textAlign: TextAlign.end,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               itemCount: colonies.length,
               onReorderStart: (_) => _dragging = true,
@@ -972,6 +988,79 @@ class _ColoniesPageState extends State<ColoniesPage> {
       },
     ),
   );
+}
+
+class _ColonyOverviewCard extends StatelessWidget {
+  const _ColonyOverviewCard({required this.entries});
+
+  final List<_ColonyListEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final queenCount = entries.where((entry) => entry.queens != null).length;
+    final workerCount = entries.where((entry) => entry.workers != null).length;
+    final queens = entries.fold<int>(
+      0,
+      (sum, entry) => sum + (entry.queens ?? 0),
+    );
+    final workers = entries.fold<int>(
+      0,
+      (sum, entry) => sum + (entry.workers ?? 0),
+    );
+    final theme = Theme.of(context);
+
+    Widget metric(String label, String value) => Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 22,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 11,
+              height: 1.1,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+
+    String total(int count, int known) => known == entries.length
+        ? '$count'
+        : known == 0
+        ? '未知'
+        : '≥$count';
+
+    return Card(
+      key: const ValueKey('colony-overview-card'),
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: antKeepCardBorder(theme.colorScheme),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          children: [
+            metric('蚁群总数', '${entries.length}'),
+            metric('蚁后总数', total(queens, queenCount)),
+            metric('工蚁总数', total(workers, workerCount)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ColonyCard extends StatelessWidget {
@@ -6549,6 +6638,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _savingEdition = false;
   bool _savingSimpleMode = false;
+  bool _savingColonyOverview = false;
 
   @override
   void initState() {
@@ -6569,6 +6659,18 @@ class _SettingsPageState extends State<SettingsPage> {
       if (mounted) _showError(context, error);
     } finally {
       if (mounted) setState(() => _savingSimpleMode = false);
+    }
+  }
+
+  Future<void> _setColonyOverview(bool enabled) async {
+    if (_savingColonyOverview) return;
+    setState(() => _savingColonyOverview = true);
+    try {
+      await themeController.setShowColonyOverview(enabled);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _savingColonyOverview = false);
     }
   }
 
@@ -6723,6 +6825,13 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: const Text('只展示蚁群、日常记录和设置；关闭后恢复全部功能入口，已有数据保留'),
           value: themeController.simpleMode,
           onChanged: _savingSimpleMode ? null : _setSimpleMode,
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.analytics_outlined),
+          title: const Text('蚁群总览卡片'),
+          subtitle: const Text('在我的蚁群顶部显示蚁群、蚁后和工蚁总数'),
+          value: themeController.showColonyOverview,
+          onChanged: _savingColonyOverview ? null : _setColonyOverview,
         ),
         for (final tab in ColonyTab.values)
           ListTile(

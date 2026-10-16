@@ -659,6 +659,48 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('colony overview sums known counts and follows visibility', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime(2026, 10, 16);
+    await AppDatabase.instance.saveColony(
+      Colony(
+        id: 'known',
+        name: '已知蚁群',
+        queenCount: 2,
+        initialWorkerCount: 10,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await AppDatabase.instance.saveColony(
+      Colony(id: 'unknown', name: '未知蚁群', createdAt: now, updatedAt: now),
+    );
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('蚁群总览'), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('colony-overview-card'))).height,
+      lessThanOrEqualTo(70),
+    );
+    expect(find.text('蚁群总数'), findsOneWidget);
+    expect(find.text('蚁后总数'), findsOneWidget);
+    expect(find.text('工蚁总数'), findsOneWidget);
+    expect(find.text('≥2'), findsOneWidget);
+    expect(find.text('≥10'), findsOneWidget);
+
+    await themeController.setShowColonyOverview(false);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('colony-overview-card')), findsNothing);
+    expect(find.text('已知蚁群'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('drag hint sits beside batch care at phone width', (
     tester,
   ) async {
