@@ -1,5 +1,6 @@
 import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/domain/colony_growth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -112,4 +113,57 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+    'development menu overlays the counts and nest picker keeps selection',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(393, 852);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: antKeepTheme(ThemeColor.forest),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(1.3)),
+            child: child!,
+          ),
+          home: const ColonyFormPage(),
+        ),
+      );
+      final selector = find.byType(DropdownButtonFormField<GrowthPath>);
+      final queen = find.widgetWithText(TextFormField, '蚁后 *');
+      await tester.ensureVisible(selector);
+      final queenGap =
+          tester.getTopLeft(queen).dy - tester.getBottomLeft(selector).dy;
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(queen).dy - tester.getBottomLeft(selector).dy,
+        closeTo(queenGap, .01),
+      );
+      await tester.tap(find.text(GrowthPath.eggToWorker.label).last);
+      await tester.pumpAndSettle();
+
+      final specialized = find.text('特化');
+      await tester.scrollUntilVisible(
+        specialized,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(specialized);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextFormField, '特化数量'), findsOneWidget);
+
+      final nest = find.widgetWithText(TextFormField, '巢体类型（可选）');
+      await tester.ensureVisible(nest);
+      await tester.tap(nest);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, '亚克力巢'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(nest).initialValue, '亚克力巢');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
