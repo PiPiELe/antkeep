@@ -170,12 +170,12 @@ void main() {
     await tester.pumpAndSettle();
     await openCategory(tester, '外观与展示');
     await tester.scrollUntilVisible(
-      find.text('曜石·紧凑'),
+      find.text('紧凑'),
       250,
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('曜石·紧凑'));
+    await tester.tap(find.text('紧凑'));
     await tester.pumpAndSettle();
     expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.compact);
     expect(settings['colony_display_style'], 'compact');

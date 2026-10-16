@@ -542,10 +542,6 @@ class _HomePageState extends State<HomePage>
       const DiscoverPage(),
       const SettingsPage(),
     ];
-    final showcase =
-        pageIndex == 0 &&
-        _colonyTabs.index == 0 &&
-        themeController.colonyDisplayStyle != ColonyDisplayStyle.classic;
     final page = Scaffold(
       appBar: AppBar(
         title: pageIndex == 0
@@ -703,9 +699,7 @@ class _HomePageState extends State<HomePage>
         ],
       ),
     );
-    return showcase
-        ? Theme(data: antKeepTheme(ThemeColor.amber, dark: true), child: page)
-        : page;
+    return page;
   }
 }
 
@@ -1098,12 +1092,25 @@ class _ColoniesPageState extends State<ColoniesPage> {
     if (selected != null && mounted) setState(() => _filter = selected);
   }
 
+  void _setWorkerOrder(ColonyWorkerOrder order) {
+    setState(
+      () => _filter = ColonyListFilter(
+        scale: _filter.scale,
+        species: _filter.species,
+        nestType: _filter.nestType,
+        newQueen: _filter.newQueen,
+        todo: _filter.todo,
+        workerOrder: order,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor:
         themeController.colonyDisplayStyle == ColonyDisplayStyle.classic
         ? null
-        : colonyShowcaseBackground,
+        : colonyShowcaseBackground(context),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _newColony,
       icon: const Icon(Icons.add),
@@ -1182,81 +1189,105 @@ class _ColoniesPageState extends State<ColoniesPage> {
                       ),
                     const SizedBox(height: 12),
                   ],
-                  Padding(
-                    padding: EdgeInsets.only(
-                      bottom: style == ColonyDisplayStyle.classic ? 8 : 12,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          filterActive
-                              ? '${colonies.length}/${allColonies.length} 群'
-                              : '${allColonies.length} 群',
-                          style: style == ColonyDisplayStyle.classic
-                              ? Theme.of(context).textTheme.bodySmall
-                              : const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 17,
-                                ),
-                        ),
-                        if (canBatchCare) ...[
-                          const SizedBox(width: 6),
-                          IconButton(
-                            tooltip: '批量养护记录',
-                            onPressed: () => _batchCare(colonies),
-                            icon: const Icon(Icons.playlist_add_check),
-                            iconSize: 20,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 36,
-                              height: 36,
+                  if (style != ColonyDisplayStyle.classic)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: ColonyShowcaseToolbar(
+                        style: style,
+                        visibleCount: colonies.length,
+                        totalCount: allColonies.length,
+                        filterCount:
+                            _filter.activeCount -
+                            (_filter.workerOrder == ColonyWorkerOrder.manual
+                                ? 0
+                                : 1),
+                        workerOrder: _filter.workerOrder,
+                        canBatchCare: canBatchCare,
+                        onBatchCare: () => _batchCare(colonies),
+                        onWorkerOrder: _setWorkerOrder,
+                        onFilter: () => _openFilters(allColonies),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: style == ColonyDisplayStyle.classic ? 8 : 12,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            filterActive
+                                ? '${colonies.length}/${allColonies.length} 群'
+                                : '${allColonies.length} 群',
+                            style: style == ColonyDisplayStyle.classic
+                                ? Theme.of(context).textTheme.bodySmall
+                                : const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 17,
+                                  ),
+                          ),
+                          if (canBatchCare) ...[
+                            const SizedBox(width: 6),
+                            IconButton(
+                              tooltip: '批量养护记录',
+                              onPressed: () => _batchCare(colonies),
+                              icon: const Icon(Icons.playlist_add_check),
+                              iconSize: 20,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 36,
+                                height: 36,
+                              ),
+                              padding: EdgeInsets.zero,
                             ),
-                            padding: EdgeInsets.zero,
+                          ],
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: () => _openFilters(allColonies),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 34),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              foregroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .primary,
+                              backgroundColor: filterActive
+                                  ? Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer
+                                  : null,
+                              side: BorderSide(
+                                color: filterActive
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  filterActive
+                                      ? Icons.filter_alt
+                                      : Icons.filter_alt_outlined,
+                                  size: 17,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  filterActive
+                                      ? '筛选 ${_filter.activeCount}'
+                                      : '筛选',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () => _openFilters(allColonies),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(0, 34),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            foregroundColor: Theme.of(context)
-                                .colorScheme
-                                .primary,
-                            backgroundColor: filterActive
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : null,
-                            side: BorderSide(
-                              color: filterActive
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context)
-                                        .colorScheme
-                                        .outlineVariant,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                filterActive
-                                    ? Icons.filter_alt
-                                    : Icons.filter_alt_outlined,
-                                size: 17,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                filterActive
-                                    ? '筛选 ${_filter.activeCount}'
-                                    : '筛选',
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
                   if (colonies.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 72),

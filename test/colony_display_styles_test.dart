@@ -2,6 +2,7 @@ import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/colony_display_styles.dart';
 import 'package:antkeep/domain/care_task.dart';
 import 'package:antkeep/domain/colony_growth.dart';
+import 'package:antkeep/domain/colony_list_filter.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -101,4 +102,86 @@ void main() {
       );
     }
   }
+
+  for (final style in [
+    ColonyDisplayStyle.showcase,
+    ColonyDisplayStyle.compact,
+  ]) {
+    testWidgets('${style.label} toolbar exposes count, sort and filters', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      ColonyWorkerOrder? selectedOrder;
+      var filtered = false;
+      var batched = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: antKeepTheme(ThemeColor.amber, dark: true),
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ColonyShowcaseToolbar(
+                style: style,
+                visibleCount: 2,
+                totalCount: 4,
+                filterCount: 5,
+                workerOrder: ColonyWorkerOrder.manual,
+                canBatchCare: true,
+                onBatchCare: () => batched = true,
+                onWorkerOrder: (value) => selectedOrder = value,
+                onFilter: () => filtered = true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 4 群'), findsOneWidget);
+      expect(find.text('默认排序'), findsOneWidget);
+      expect(find.text('筛选 5'), findsOneWidget);
+      await tester.tap(find.text('筛选 5'));
+      expect(filtered, isTrue);
+      await tester.tap(find.text('默认排序'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('工蚁多到少'));
+      await tester.pumpAndSettle();
+      expect(selectedOrder, ColonyWorkerOrder.descending);
+      if (style == ColonyDisplayStyle.showcase) {
+        await tester.tap(find.text('批量养护记录'));
+        expect(batched, isTrue);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('showcase layout follows the selected light color theme', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: antKeepTheme(ThemeColor.amber),
+        home: Scaffold(
+          body: ColonyShowcaseCard(
+            style: ColonyDisplayStyle.showcase,
+            colony: colony,
+            population: const GrowthPopulation(workers: 235),
+            queens: 2,
+            workers: 235,
+            dueTasks: const [],
+            onTap: () {},
+            onDurationTap: () {},
+          ),
+        ),
+      ),
+    );
+    final name = tester.widget<Text>(find.text('一号群 · 黑金弓背蚁'));
+    expect(
+      name.style?.color,
+      antKeepTheme(ThemeColor.amber).colorScheme.onSurface,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

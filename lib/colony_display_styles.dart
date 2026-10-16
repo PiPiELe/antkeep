@@ -3,15 +3,204 @@ import 'package:flutter/material.dart';
 import 'app_preferences.dart';
 import 'domain/care_task.dart';
 import 'domain/colony_growth.dart';
+import 'domain/colony_list_filter.dart';
 import 'domain/models.dart';
 
-const colonyShowcaseBackground = Color(0xff090e14);
-const _panel = Color(0xff111a25);
-const _line = Color(0xff304157);
-const _muted = Color(0xffadbbce);
+Color colonyShowcaseBackground(BuildContext context) =>
+    Theme.of(context).colorScheme.surface;
+
+class _ShowcasePalette {
+  const _ShowcasePalette(this.context);
+
+  final BuildContext context;
+  ColorScheme get scheme => Theme.of(context).colorScheme;
+  bool get dark => scheme.brightness == Brightness.dark;
+  Color get foreground => scheme.onSurface;
+  Color get muted => dark ? const Color(0xffadbbce) : scheme.onSurfaceVariant;
+  Color get panel =>
+      dark ? const Color(0xff111a25) : scheme.surfaceContainerLow;
+  Color get inset => dark ? const Color(0xff1b2531) : scheme.surfaceContainer;
+  Color get line => dark ? const Color(0xff304157) : scheme.outlineVariant;
+}
+
 const _orange = Color(0xffff823d);
 const _blue = Color(0xff4ca7ff);
 const _green = Color(0xff35dfa5);
+
+class ColonyShowcaseToolbar extends StatelessWidget {
+  const ColonyShowcaseToolbar({
+    super.key,
+    required this.style,
+    required this.visibleCount,
+    required this.totalCount,
+    required this.filterCount,
+    required this.workerOrder,
+    required this.canBatchCare,
+    required this.onBatchCare,
+    required this.onWorkerOrder,
+    required this.onFilter,
+  });
+
+  final ColonyDisplayStyle style;
+  final int visibleCount;
+  final int totalCount;
+  final int filterCount;
+  final ColonyWorkerOrder workerOrder;
+  final bool canBatchCare;
+  final VoidCallback onBatchCare;
+  final ValueChanged<ColonyWorkerOrder> onWorkerOrder;
+  final VoidCallback onFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = style == ColonyDisplayStyle.compact;
+    final palette = _ShowcasePalette(context);
+    final accent = compact ? _green : _blue;
+    final count = Text(
+      '$visibleCount / $totalCount 群',
+      maxLines: 1,
+      style: TextStyle(
+        color: palette.foreground,
+        fontSize: compact ? 14 : 16,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    final sort = PopupMenuButton<String>(
+      tooltip: '排序方式',
+      onSelected: (value) {
+        if (value == 'batch') {
+          onBatchCare();
+        } else {
+          onWorkerOrder(ColonyWorkerOrder.values.byName(value));
+        }
+      },
+      itemBuilder: (_) => [
+        for (final order in ColonyWorkerOrder.values)
+          PopupMenuItem(
+            value: order.name,
+            child: Text(_workerOrderLabel(order)),
+          ),
+        if (compact && canBatchCare)
+          const PopupMenuItem(value: 'batch', child: Text('批量养护记录')),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sort_rounded, color: palette.foreground, size: 19),
+            const SizedBox(width: 5),
+            Text(
+              _workerOrderLabel(workerOrder),
+              maxLines: 1,
+              style: TextStyle(color: palette.foreground, fontSize: 13),
+            ),
+            const SizedBox(width: 2),
+            Icon(Icons.keyboard_arrow_down, color: palette.muted, size: 18),
+          ],
+        ),
+      ),
+    );
+    final filter = OutlinedButton.icon(
+      onPressed: onFilter,
+      icon: Icon(
+        filterCount == 0 ? Icons.filter_alt_outlined : Icons.filter_alt,
+        size: 19,
+      ),
+      label: Text(filterCount == 0 ? '筛选' : '筛选 $filterCount'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: palette.dark ? accent : palette.scheme.primary,
+        backgroundColor: compact && palette.dark
+            ? _green.withValues(alpha: .16)
+            : null,
+        side: BorderSide(
+          color: palette.dark ? accent.withValues(alpha: .75) : palette.line,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        minimumSize: const Size(0, 38),
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+    final controls = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 0 : 3,
+      ),
+      decoration: _panelDecoration(context, inset: true),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          count,
+          const SizedBox(width: 10),
+          SizedBox(height: 25, child: VerticalDivider(color: palette.line)),
+          if (compact)
+            sort
+          else ...[
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: sort,
+              ),
+            ),
+            filter,
+          ],
+        ],
+      ),
+    );
+    if (compact) {
+      return Row(
+        children: [
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: controls,
+            ),
+          ),
+          const SizedBox(width: 6),
+          filter,
+        ],
+      );
+    }
+    return Column(
+      children: [
+        if (canBatchCare) ...[
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: onBatchCare,
+                icon: const Icon(Icons.playlist_add_check_rounded),
+                label: const Text('批量养护记录'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: palette.foreground,
+                  side: BorderSide(color: palette.muted),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '长按蚁群卡片可上下拖动排序',
+                  textAlign: TextAlign.end,
+                  maxLines: 2,
+                  style: TextStyle(color: palette.muted, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        SizedBox(width: double.infinity, child: controls),
+      ],
+    );
+  }
+}
+
+String _workerOrderLabel(ColonyWorkerOrder order) => switch (order) {
+  ColonyWorkerOrder.manual => '默认排序',
+  ColonyWorkerOrder.descending => '工蚁多到少',
+  ColonyWorkerOrder.ascending => '工蚁少到多',
+};
 
 class ColonyShowcaseOverview extends StatelessWidget {
   const ColonyShowcaseOverview({
@@ -29,7 +218,7 @@ class ColonyShowcaseOverview extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     key: const ValueKey('colony-showcase-overview'),
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
-    decoration: _panelDecoration(),
+    decoration: _panelDecoration(context),
     child: Row(
       children: [
         _OverviewMetric(
@@ -90,8 +279,8 @@ class _OverviewMetric extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: _ShowcasePalette(context).foreground,
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
                   ),
@@ -101,7 +290,10 @@ class _OverviewMetric extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: _muted, fontSize: 11),
+                style: TextStyle(
+                  color: _ShowcasePalette(context).muted,
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -168,7 +360,7 @@ class ColonyShowcaseCard extends StatelessWidget {
 
     return Container(
       key: ValueKey('colony-${style.name}-${colony.id}'),
-      decoration: _panelDecoration(accent: accent),
+      decoration: _panelDecoration(context, accent: accent),
       clipBehavior: Clip.antiAlias,
       child: Material(
         color: Colors.transparent,
@@ -179,52 +371,53 @@ class ColonyShowcaseCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    cover == null
-                        ? _ColonyAvatar(color: accent, size: compact ? 52 : 60)
-                        : ClipOval(
-                            child: SizedBox.square(
-                              dimension: compact ? 52 : 60,
-                              child: cover,
+                if (!compact)
+                  Stack(
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 105),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _Identity(
+                              colony: colony,
+                              cover: cover,
+                              accent: accent,
+                              description: description,
+                              compact: false,
                             ),
-                          ),
-                    const SizedBox(width: 13),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            colony.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: compact ? 21 : 23,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          if (description.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              description,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _muted,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                          if (compact) ...[
                             const SizedBox(height: 8),
-                            _Tags(colony: colony, workers: workers),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 108),
+                              child: _Tags(colony: colony, workers: workers),
+                            ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    if (compact) ...[
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: _LargeDuration(
+                          days: days,
+                          onTap: days == null ? onDurationTap : null,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _Identity(
+                          colony: colony,
+                          cover: cover,
+                          accent: accent,
+                          description: description,
+                          compact: true,
+                          workers: workers,
+                        ),
+                      ),
                       const SizedBox(width: 6),
                       _DurationPill(
                         days: days,
@@ -232,24 +425,11 @@ class ColonyShowcaseCard extends StatelessWidget {
                         color: accent,
                       ),
                     ],
-                  ],
-                ),
-                if (!compact) ...[
-                  const SizedBox(height: 10),
-                  _Tags(colony: colony, workers: workers),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _LargeDuration(
-                      days: days,
-                      onTap: days == null ? onDurationTap : null,
-                    ),
                   ),
-                ],
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: _panelDecoration(inset: true),
+                  decoration: _panelDecoration(context, inset: true),
                   child: Row(
                     children: [
                       for (final metric in metrics)
@@ -268,7 +448,7 @@ class ColonyShowcaseCard extends StatelessWidget {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(11),
-                    decoration: _panelDecoration(inset: true),
+                    decoration: _panelDecoration(context, inset: true),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -280,10 +460,10 @@ class ColonyShowcaseCard extends StatelessWidget {
                               size: 18,
                             ),
                             const SizedBox(width: 6),
-                            const Text(
+                            Text(
                               '今日待办',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: _ShowcasePalette(context).foreground,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -293,9 +473,9 @@ class ColonyShowcaseCard extends StatelessWidget {
                               style: const TextStyle(color: _orange),
                             ),
                             const Spacer(),
-                            const Icon(
+                            Icon(
                               Icons.chevron_right,
-                              color: _muted,
+                              color: _ShowcasePalette(context).muted,
                               size: 19,
                             ),
                           ],
@@ -318,7 +498,10 @@ class ColonyShowcaseCard extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(
                             dueTasks.map((task) => task.type.label).join(' · '),
-                            style: const TextStyle(color: _muted, fontSize: 12),
+                            style: TextStyle(
+                              color: _ShowcasePalette(context).muted,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ],
@@ -334,28 +517,105 @@ class ColonyShowcaseCard extends StatelessWidget {
   }
 }
 
+class _Identity extends StatelessWidget {
+  const _Identity({
+    required this.colony,
+    required this.cover,
+    required this.accent,
+    required this.description,
+    required this.compact,
+    this.workers,
+  });
+
+  final Colony colony;
+  final Widget? cover;
+  final Color accent;
+  final String description;
+  final bool compact;
+  final int? workers;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = compact ? 52.0 : 60.0;
+    final palette = _ShowcasePalette(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        cover == null
+            ? _ColonyAvatar(color: accent, size: size)
+            : ClipOval(
+                child: SizedBox.square(dimension: size, child: cover),
+              ),
+        const SizedBox(width: 13),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                colony.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: palette.foreground,
+                  fontSize: compact ? 21 : 23,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: palette.muted, fontSize: 13),
+                ),
+              ],
+              if (compact) ...[
+                const SizedBox(height: 8),
+                _Tags(colony: colony, workers: workers),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 IconData _taskIcon(CareTaskType type) => switch (type) {
   CareTaskType.feeding => Icons.restaurant_rounded,
   CareTaskType.watering => Icons.water_drop_rounded,
   CareTaskType.cleaning => Icons.cleaning_services_rounded,
 };
 
-BoxDecoration _panelDecoration({Color? accent, bool inset = false}) =>
-    BoxDecoration(
-      gradient: inset
-          ? null
-          : const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xff1a222d), _panel, Color(0xff0d1722)],
-            ),
-      color: inset ? const Color(0xff1b2531) : null,
-      borderRadius: BorderRadius.circular(inset ? 14 : 22),
-      border: Border.all(
-        color: accent?.withValues(alpha: .6) ?? _line,
-        width: 1,
-      ),
-    );
+BoxDecoration _panelDecoration(
+  BuildContext context, {
+  Color? accent,
+  bool inset = false,
+}) {
+  final palette = _ShowcasePalette(context);
+  return BoxDecoration(
+    gradient: inset
+        ? null
+        : LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: palette.dark
+                ? const [
+                    Color(0xff1a222d),
+                    Color(0xff111a25),
+                    Color(0xff0d1722),
+                  ]
+                : [palette.panel, palette.panel, palette.scheme.surface],
+          ),
+    color: inset ? palette.inset : null,
+    borderRadius: BorderRadius.circular(inset ? 14 : 22),
+    border: Border.all(
+      color: accent?.withValues(alpha: .6) ?? palette.line,
+      width: 1,
+    ),
+  );
+}
 
 class _ColonyAvatar extends StatelessWidget {
   const _ColonyAvatar({required this.color, required this.size});
@@ -391,18 +651,22 @@ class _DurationPill extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
       decoration: BoxDecoration(
-        border: Border.all(color: _line),
+        border: Border.all(color: _ShowcasePalette(context).line),
         borderRadius: BorderRadius.circular(99),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.schedule_rounded, color: _muted, size: 15),
+          Icon(
+            Icons.schedule_rounded,
+            color: _ShowcasePalette(context).muted,
+            size: 15,
+          ),
           const SizedBox(width: 4),
           Text(
             days == null ? '补入手日期' : '已养 $days天',
             style: TextStyle(
-              color: days == null ? _muted : color,
+              color: days == null ? _ShowcasePalette(context).muted : color,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -422,7 +686,10 @@ class _LargeDuration extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     child: days == null
-        ? const Text('补充入手日期 ›', style: TextStyle(color: _muted))
+        ? Text(
+            '补充入手日期 ›',
+            style: TextStyle(color: _ShowcasePalette(context).muted),
+          )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -451,8 +718,8 @@ class _LargeDuration extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         '$days',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: _ShowcasePalette(context).foreground,
                           fontSize: 65,
                           height: .9,
                           fontWeight: FontWeight.w800,
@@ -460,9 +727,12 @@ class _LargeDuration extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 4),
-                    child: Text('天', style: TextStyle(color: _muted)),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    child: Text(
+                      '天',
+                      style: TextStyle(color: _ShowcasePalette(context).muted),
+                    ),
                   ),
                 ],
               ),
@@ -489,7 +759,9 @@ class _PopulationMetric extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: label == '蚁后' ? const Color(0xffffc66b) : _muted,
+            color: label == '蚁后'
+                ? const Color(0xffffc66b)
+                : _ShowcasePalette(context).muted,
             size: 15,
           ),
           const SizedBox(width: 2),
@@ -498,8 +770,8 @@ class _PopulationMetric extends StatelessWidget {
               fit: BoxFit.scaleDown,
               child: Text(
                 count?.toString() ?? '—',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: _ShowcasePalette(context).foreground,
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                 ),
@@ -511,7 +783,13 @@ class _PopulationMetric extends StatelessWidget {
       const SizedBox(height: 2),
       FittedBox(
         fit: BoxFit.scaleDown,
-        child: Text(label, style: const TextStyle(color: _muted, fontSize: 11)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: _ShowcasePalette(context).muted,
+            fontSize: 11,
+          ),
+        ),
       ),
     ],
   );

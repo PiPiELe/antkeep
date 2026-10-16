@@ -65,8 +65,8 @@ enum ColonyTab {
 
 enum ColonyDisplayStyle {
   classic('经典', '保留当前蚁群列表样式'),
-  showcase('曜石·舒展', '大号养殖天数与宽松卡片'),
-  compact('曜石·紧凑', '紧凑信息与卡片内待办');
+  showcase('舒展', '大号养殖天数与宽松卡片'),
+  compact('紧凑', '紧凑信息与卡片内待办');
 
   const ColonyDisplayStyle(this.label, this.description);
   final String label;
@@ -345,12 +345,26 @@ ThemeData antKeepTheme(
     );
   }
   final monochrome = color == ThemeColor.white;
+  if (dark && !monochrome) {
+    // Keep the chosen accent, while giving every dark color theme a neutral
+    // shell that matches the dark content surfaces.
+    scheme = scheme.copyWith(
+      surface: const Color(0xff090e14),
+      surfaceContainerLowest: const Color(0xff090e14),
+      surfaceContainerLow: const Color(0xff101923),
+      surfaceContainer: const Color(0xff141e29),
+      surfaceContainerHigh: const Color(0xff1b2734),
+      surfaceContainerHighest: const Color(0xff243140),
+      surfaceTint: Colors.transparent,
+      outlineVariant: const Color(0xff304157),
+    );
+  }
   final theme = ThemeData(
     colorScheme: scheme,
     scaffoldBackgroundColor: monochrome
         ? scheme.surface
         : dark
-        ? const Color(0xff0d0f0d)
+        ? scheme.surface
         : null,
     appBarTheme: monochrome
         ? AppBarTheme(
@@ -358,12 +372,21 @@ ThemeData antKeepTheme(
             surfaceTintColor: Colors.transparent,
           )
         : dark
-        ? const AppBarTheme(backgroundColor: Color(0xff121512))
+        ? const AppBarTheme(
+            backgroundColor: Color(0xff090e14),
+            surfaceTintColor: Colors.transparent,
+          )
         : null,
     cardColor: monochrome
         ? scheme.surfaceContainerLow
         : dark
-        ? const Color(0xff181c18)
+        ? scheme.surfaceContainerLow
+        : null,
+    navigationBarTheme: dark && !monochrome
+        ? const NavigationBarThemeData(
+            backgroundColor: Color(0xff0e151d),
+            surfaceTintColor: Colors.transparent,
+          )
         : null,
     cardTheme: CardThemeData(
       shape: RoundedRectangleBorder(
