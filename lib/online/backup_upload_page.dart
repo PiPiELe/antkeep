@@ -74,6 +74,7 @@ class _BackupUploadPageState extends State<BackupUploadPage> {
 
   Future<void> _upload() async {
     if (_uploading || _loadedUser == null) return;
+    final confirmedUserId = _loadedUser!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -96,6 +97,10 @@ class _BackupUploadPageState extends State<BackupUploadPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
+    if (widget.controller.user?.id != confirmedUserId) {
+      setState(() => _message = '账号状态已变化，请重新确认备份上传。');
+      return;
+    }
     setState(() {
       _uploading = true;
       _message = null;
@@ -104,7 +109,7 @@ class _BackupUploadPageState extends State<BackupUploadPage> {
       await BackupService(
         AppDatabase.instance,
         LocalMediaStore.instance,
-      ).uploadBackup(widget.controller);
+      ).uploadBackup(widget.controller, expectedUserId: confirmedUserId);
       if (!mounted) return;
       final refreshed = await _reload();
       if (mounted) {
@@ -116,7 +121,9 @@ class _BackupUploadPageState extends State<BackupUploadPage> {
       if (mounted) {
         setState(
           () => _message = error is ApiFailure
-              ? '${error.message} 如连接中断，请刷新记录确认是否已保存。'
+              ? error.message.startsWith('账号状态已变化')
+                    ? error.message
+                    : '${error.message} 如连接中断，请刷新记录确认是否已保存。'
               : '上传结果未确认：$error。请刷新记录确认是否已保存。',
         );
       }

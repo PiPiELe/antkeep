@@ -326,16 +326,17 @@ class OnlineController extends ChangeNotifier {
 
   Future<Map<String, dynamic>> uploadBackup(
     Stream<List<int>> bytes,
-    int length,
-  ) async {
+    int length, {
+    required String expectedUserId,
+  }) async {
     final token = _token;
-    if (!enabled || token == null || user == null) {
-      throw const ApiFailure('请先开启在线模式并登录账号。');
+    if (!enabled || token == null || user?.id != expectedUserId) {
+      throw const ApiFailure('账号状态已变化，请重新确认备份上传。');
     }
     final result = jsonDecode(
       await api.uploadBackup(bytes, length, token: token),
     ) as Map<String, dynamic>;
-    if (!enabled || _token != token) {
+    if (!enabled || _token != token || user?.id != expectedUserId) {
       throw const ApiFailure('账号状态已变化，请重新打开备份页面确认上传结果。');
     }
     return result;
