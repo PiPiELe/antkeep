@@ -149,10 +149,14 @@ class ChoicePickerSheet extends StatefulWidget {
     required this.title,
     required this.options,
     this.searchOptions = const {},
+    this.selectedValue,
+    this.optionIcons = const {},
   });
   final String title;
   final List<String> options;
   final Map<String, String> searchOptions;
+  final String? selectedValue;
+  final Map<String, IconData> optionIcons;
 
   @override
   State<ChoicePickerSheet> createState() => ChoicePickerSheetState();
@@ -204,7 +208,7 @@ class ChoicePickerSheetState extends State<ChoicePickerSheet> {
               const SizedBox(height: 12),
               TextField(
                 controller: _query,
-                autofocus: true,
+                autofocus: widget.optionIcons.isEmpty,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search),
@@ -245,6 +249,21 @@ class ChoicePickerSheetState extends State<ChoicePickerSheet> {
                         itemCount: options.length,
                         separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (context, index) => ListTile(
+                          leading:
+                              widget.optionIcons[options[index].value] == null
+                              ? null
+                              : Icon(
+                                  widget.optionIcons[options[index].value],
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                          tileColor:
+                              widget.selectedValue == options[index].value
+                              ? Theme.of(context).colorScheme.primaryContainer
+                                    .withValues(alpha: .45)
+                              : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           title: Text(options[index].value),
                           subtitle:
                               options[index].category != null ||
@@ -259,7 +278,11 @@ class ChoicePickerSheetState extends State<ChoicePickerSheet> {
                                   ].join(' · '),
                                 )
                               : null,
-                          trailing: const Icon(Icons.chevron_right),
+                          trailing: Icon(
+                            widget.selectedValue == options[index].value
+                                ? Icons.check
+                                : Icons.chevron_right,
+                          ),
                           onTap: () => Navigator.pop(context, (
                             value: options[index].value,
                             isSearchResult: options[index].category != null,

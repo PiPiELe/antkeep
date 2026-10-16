@@ -82,6 +82,22 @@ const _nestTypeOptions = [
   '饭盒',
 ];
 
+const _nestTypeIcons = <String, IconData>{
+  '试管巢': Icons.science_outlined,
+  '平面巢': Icons.crop_landscape,
+  '折叠巢': Icons.layers_outlined,
+  '石膏巢': Icons.terrain_outlined,
+  '亚克力巢': Icons.view_in_ar_outlined,
+  '沙土巢': Icons.landscape_outlined,
+  '木巢': Icons.forest_outlined,
+  '加气砖巢': Icons.grid_view_outlined,
+  '生态缸巢': Icons.spa_outlined,
+  '3D 打印巢': Icons.view_in_ar,
+  '酱料杯': Icons.local_drink_outlined,
+  '自制巢': Icons.handyman_outlined,
+  '饭盒': Icons.inventory_2_outlined,
+};
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -2310,56 +2326,113 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
     }
   }
 
+  ThemeData _fieldTheme() => Theme.of(context).copyWith(
+    inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(9),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(9),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 1.5,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+    ),
+  );
+
   Widget _section({
     required IconData icon,
     required String title,
     String? hint,
     Widget? action,
+    Color? iconColor,
     required List<Widget> children,
   }) => Card(
+    margin: EdgeInsets.zero,
     clipBehavior: Clip.antiAlias,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-              if (hint != null) ...[
+    elevation: 2,
+    shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: .12),
+    color: Theme.of(context).brightness == Brightness.light
+        ? Colors.white
+        : Theme.of(context).colorScheme.surfaceContainerLow,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(
+        color: Theme.of(context).colorScheme.outlineVariant
+            .withValues(alpha: .4),
+      ),
+    ),
+    child: Theme(
+      data: _fieldTheme(),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  icon,
+                  color: iconColor ?? Theme.of(context).colorScheme.primary,
+                  size: 26,
+                ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    hint,
-                    textAlign: TextAlign.right,
-                    style: Theme.of(context).textTheme.bodySmall
-                        ?.copyWith(fontSize: 10, height: 1.2),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
+                if (hint != null) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      hint,
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(fontSize: 10, height: 1.2),
+                    ),
+                  ),
+                ],
+                if (action != null) ...[const Spacer(), action],
               ],
-              if (action != null) ...[const Spacer(), action],
-            ],
-          ),
-          const SizedBox(height: 14),
-          ...children,
-        ],
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
       ),
     ),
   );
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.colony == null ? '新入手蚁群' : '编辑蚁群')),
+    backgroundColor: Theme.of(context).brightness == Brightness.light
+        ? const Color(0xfffafaf8)
+        : Theme.of(context).colorScheme.surface,
+    appBar: AppBar(
+      centerTitle: true,
+      title: Text(widget.colony == null ? '新入手蚁群' : '编辑蚁群'),
+    ),
     bottomNavigationBar: SafeArea(
       top: false,
       maintainBottomViewPadding: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: FilledButton(
+        child: FilledButton.icon(
           onPressed: _saving ? null : _save,
-          child: Text(_saving ? '保存中…' : '保存蚁群'),
+          icon: const Icon(Icons.save_outlined),
+          label: Text(_saving ? '保存中…' : '保存蚁群'),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape: const StadiumBorder(),
+          ),
         ),
       ),
     ),
@@ -2378,7 +2451,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
             children: [
               _SearchableChoiceField(
                 label: '品种分类/细分种类',
-                hintText: '点击选择或搜索品种',
+                hintText: '品种分类 / 细分种类',
                 value: [?_speciesFamily, ?_selectedSpecies].join(' / '),
                 options: speciesOptions.keys.toList(),
                 searchOptions: {
@@ -2394,7 +2467,8 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 controller: _name,
                 decoration: const InputDecoration(
                   labelText: '蚁群昵称 *',
-                  hintText: '例如：红土一号',
+                  hintText: '例如：小黑、第一群',
+                  prefixIcon: Icon(Icons.edit_outlined),
                 ),
                 validator: (value) =>
                     _textOrNull(value ?? '') == null ? '请填写一个昵称' : null,
@@ -2404,16 +2478,23 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           const SizedBox(height: 12),
           _section(
             icon: Icons.bar_chart_outlined,
+            iconColor: const Color(0xff5285bb),
             title: '数量',
             hint: '档案起始数量，日记中的死亡数量会从此扣减',
             children: [
               DropdownButtonFormField<GrowthPath>(
                 isExpanded: true,
                 initialValue: _developmentPath,
-                decoration: const InputDecoration(labelText: '发育模式'),
+                decoration: const InputDecoration(
+                  labelText: '发育模式',
+                  prefixIcon: Icon(Icons.spa_outlined),
+                ),
                 items: [
                   for (final path in GrowthPath.values)
-                    DropdownMenuItem(value: path, child: Text(path.label)),
+                    DropdownMenuItem(
+                      value: path,
+                      child: Text(path.label, overflow: TextOverflow.ellipsis),
+                    ),
                 ],
                 onChanged: (path) => setState(() => _developmentPath = path!),
               ),
@@ -2430,6 +2511,16 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         labelText: widget.colony == null ? '蚁后 *' : '蚁后',
+                        hintText: '请输入数量',
+                        hintStyle: const TextStyle(fontSize: 12),
+                        prefixIcon: const Icon(
+                          Icons.star_rounded,
+                          color: Color(0xffe58f2a),
+                          size: 20,
+                        ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 36,
+                        ),
                       ),
                     ),
                   ),
@@ -2443,6 +2534,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         labelText: widget.colony == null ? '工蚁 *' : '工蚁',
+                        hintText: '请输入数量',
+                        hintStyle: const TextStyle(fontSize: 12),
+                        prefixIcon: const Icon(Icons.groups_rounded, size: 20),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 36,
+                        ),
                       ),
                     ),
                   ),
@@ -2458,7 +2555,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: '卵',
-                        hintText: '可选',
+                        hintText: '请输入数量',
+                        hintStyle: TextStyle(fontSize: 12),
+                        prefixIcon: Icon(Icons.circle, size: 18),
+                        prefixIconConstraints: BoxConstraints(minWidth: 36),
                       ),
                     ),
                   ),
@@ -2470,7 +2570,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: '蛹茧',
-                        hintText: '可选',
+                        hintText: '请输入数量',
+                        hintStyle: TextStyle(fontSize: 12),
+                        prefixIcon: Icon(Icons.bug_report_outlined, size: 20),
+                        prefixIconConstraints: BoxConstraints(minWidth: 36),
                       ),
                     ),
                   ),
@@ -2483,57 +2586,100 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: '幼虫',
-                  hintText: '可选，暂无请填 0',
+                  hintText: '请输入数量',
+                  prefixIcon: Icon(Icons.bug_report_outlined),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '工蚁填 0 表示从新后开始养',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _showSpecialized,
-                    onChanged: (value) =>
-                        setState(() => _showSpecialized = value ?? false),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer
+                      .withValues(alpha: .45),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: .18),
                   ),
-                  const Text('特化'),
-                  if (_showSpecialized) ...[
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    InkWell(
+                      onTap: () =>
+                          setState(() => _showSpecialized = !_showSpecialized),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: _showSpecialized,
+                            onChanged: (value) => setState(
+                              () => _showSpecialized = value ?? false,
+                            ),
+                          ),
+                          const Text('特化'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              '该蚁群中包含特化蚁（如兵蚁、工蚁亚型等）',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_showSpecialized) ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
                         controller: _specialized,
                         validator: (value) =>
                             value == null || value.trim().isEmpty
                             ? '请输入特化数量'
                             : _validateCount(value),
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '特化数量'),
+                        decoration: const InputDecoration(
+                          labelText: '特化数量',
+                          hintText: '请输入数量',
+                          prefixIcon: Icon(Icons.bug_report_outlined),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           _section(
             icon: Icons.home_outlined,
+            iconColor: const Color(0xffe9933a),
             title: '巢体',
             children: [
               _SearchableChoiceField(
                 label: '巢体类型（可选）',
-                hintText: '点击搜索或选择巢体类型',
+                hintText: '选择巢体类型',
                 value: _selectedNest,
                 options: _nestTypeOptions,
+                optionIcons: _nestTypeIcons,
                 onSelected: (nest) => setState(() => _selectedNest = nest),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Card(
+            margin: EdgeInsets.zero,
+            elevation: 2,
+            shadowColor: Theme.of(context).colorScheme.shadow
+                .withValues(alpha: .12),
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.white
+                : Theme.of(context).colorScheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant
+                    .withValues(alpha: .4),
+              ),
+            ),
             clipBehavior: Clip.antiAlias,
             child: ExpansionTile(
               controller: _environmentExpansion,
@@ -2545,8 +2691,10 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
               ),
               title: Text(
                 '环境预警（可选）',
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
+              subtitle: const Text('设置温湿度等环境提醒'),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               children: [
                 Row(
@@ -2652,6 +2800,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           const SizedBox(height: 12),
           _section(
             icon: Icons.receipt_long_outlined,
+            iconColor: const Color(0xff9574bd),
             title: '来源与补充信息',
             children: [
               TextFormField(
@@ -2659,6 +2808,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                 decoration: InputDecoration(
                   labelText: '来源（可选）',
                   hintText: '商户 / 地点 / 赠送人',
+                  prefixIcon: const Icon(Icons.shopping_cart_outlined),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2714,6 +2864,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                         textStyle: const TextStyle(fontSize: 12),
+                        minimumSize: const Size(0, 56),
                       ),
                       icon: const Icon(Icons.calendar_today_outlined, size: 16),
                       label: Text(
@@ -2741,6 +2892,7 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                         textStyle: const TextStyle(fontSize: 12),
+                        minimumSize: const Size(0, 56),
                       ),
                       icon: const Icon(Icons.photo_outlined, size: 16),
                       label: Text(
@@ -2879,6 +3031,7 @@ class _SearchableChoiceField extends StatelessWidget {
     required this.onSelected,
     this.searchOptions = const {},
     this.onSearchSelected,
+    this.optionIcons = const {},
   });
 
   final String label;
@@ -2888,6 +3041,7 @@ class _SearchableChoiceField extends StatelessWidget {
   final ValueChanged<String> onSelected;
   final Map<String, String> searchOptions;
   final ValueChanged<String>? onSearchSelected;
+  final Map<String, IconData> optionIcons;
 
   Future<void> _openPicker(BuildContext context) async {
     final picked =
@@ -2899,6 +3053,8 @@ class _SearchableChoiceField extends StatelessWidget {
             title: label,
             options: options,
             searchOptions: searchOptions,
+            selectedValue: value,
+            optionIcons: optionIcons,
           ),
         );
     if (picked == null || !context.mounted) return;
@@ -2918,7 +3074,8 @@ class _SearchableChoiceField extends StatelessWidget {
     decoration: InputDecoration(
       labelText: label,
       hintText: hintText,
-      suffixIcon: const Icon(Icons.search),
+      prefixIcon: const Icon(Icons.search),
+      suffixIcon: const Icon(Icons.chevron_right),
     ),
   );
 }
