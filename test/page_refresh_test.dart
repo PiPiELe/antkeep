@@ -3352,6 +3352,56 @@ void main() {
     expect(find.text('5 元蚁巢 · 已购入'), findsOneWidget);
   });
 
+  testWidgets('existing aggregate adds a new size from its own card', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tables['inventory_items']!.add(
+      InventoryItem(
+        id: 'existing-tray',
+        name: '铝制喂食盘',
+        groupName: '喂食盘',
+        purchased: false,
+        createdAt: DateTime.now(),
+      ).toMap(),
+    );
+    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('喂食盘'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('添加规格'));
+    await tester.pumpAndSettle();
+    expect(find.text('所属物品：喂食盘'), findsOneWidget);
+    expect(find.text('一级物品名称'), findsNothing);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '子物品（每行一个）'),
+      '铝制喂食盘',
+    );
+    await tester.tap(find.text('添加'));
+    await tester.pumpAndSettle();
+    expect(find.text('该规格已存在'), findsOneWidget);
+    expect(tables['inventory_items'], hasLength(1));
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '子物品（每行一个）'),
+      '陶瓷喂食盘',
+    );
+    await tester.tap(find.text('添加'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tables['inventory_items'], hasLength(2));
+    expect(
+      tables['inventory_items']!.singleWhere(
+        (row) => row['name'] == '陶瓷喂食盘',
+      )['group_name'],
+      '喂食盘',
+    );
+    expect(find.text('新规格已添加到「推荐」'), findsOneWidget);
+    expect(find.textContaining('陶瓷喂食盘'), findsWidgets);
+  });
+
   testWidgets('inventory purchase changes refresh immediately', (tester) async {
     await AppDatabase.instance.saveInventoryItem(
       InventoryItem(

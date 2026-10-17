@@ -6026,9 +6026,16 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  Future<void> _addItem() async {
-    var itemName = '';
-    var isGroup = false;
+  Future<void> _addItem({String? groupName}) async {
+    final existingNames = groupName == null
+        ? <String>{}
+        : (await _items)
+              .where((item) => item.groupLabel == groupName)
+              .map((item) => item.childLabel)
+              .toSet();
+    if (!mounted) return;
+    var itemName = groupName ?? '';
+    var isGroup = groupName != null;
     var childNames = '';
     var purpose = '';
     String? validationError;
@@ -6039,28 +6046,35 @@ class _InventoryPageState extends State<InventoryPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('新增物品'),
+          title: Text(groupName == null ? '新增物品' : '添加规格'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('聚合物品'),
-                  subtitle: const Text('一级名称下包含多个可单独添加的子物品'),
-                  value: isGroup,
-                  onChanged: (value) => setDialogState(() {
-                    isGroup = value;
-                    validationError = null;
-                  }),
-                ),
-                TextField(
-                  onChanged: (value) => itemName = value,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: isGroup ? '一级物品名称' : '物品名称',
+                if (groupName == null)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('聚合物品'),
+                    subtitle: const Text('一级名称下包含多个可单独添加的子物品'),
+                    value: isGroup,
+                    onChanged: (value) => setDialogState(() {
+                      isGroup = value;
+                      validationError = null;
+                    }),
                   ),
-                ),
+                if (groupName != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('所属物品：$groupName'),
+                  )
+                else
+                  TextField(
+                    onChanged: (value) => itemName = value,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: isGroup ? '一级物品名称' : '物品名称',
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 TextField(
                   onChanged: (value) => purpose = value,
@@ -6079,7 +6093,11 @@ class _InventoryPageState extends State<InventoryPage> {
                       hintText: '干巢\n湿巢\n中活动区',
                     ),
                   ),
-                  const Text('有效期设置应用于各子物品；同名一级物品可继续追加子物品。'),
+                  Text(
+                    groupName == null
+                        ? '有效期设置应用于各子物品；已有物品请在卡片中添加规格。'
+                        : '只填写新规格，每行一个；有效期设置应用于这些规格。',
+                  ),
                 ],
                 if (validationError != null)
                   Text(
@@ -6154,13 +6172,16 @@ class _InventoryPageState extends State<InventoryPage> {
                     : <String>[];
                 if (name.isEmpty ||
                     (isGroup && children.isEmpty) ||
-                    children.toSet().length != children.length) {
+                    children.toSet().length != children.length ||
+                    children.any(existingNames.contains)) {
                   setDialogState(
                     () => validationError = name.isEmpty
                         ? '请填写物品名称'
                         : children.isEmpty
                         ? '请至少填写一个子物品'
-                        : '子物品名称不能重复',
+                        : children.toSet().length != children.length
+                        ? '子物品名称不能重复'
+                        : '该规格已存在',
                   );
                   return;
                 }
@@ -6183,7 +6204,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   ),
                 );
               },
-              child: const Text('新增'),
+              child: Text(groupName == null ? '新增' : '添加'),
             ),
           ],
         ),
@@ -6209,7 +6230,13 @@ class _InventoryPageState extends State<InventoryPage> {
           item.children.map(createItem).toList(),
         );
       }
-      if (mounted) setState(_reload);
+      if (mounted) {
+        setState(_reload);
+        if (groupName != null) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('新规格已添加到「推荐」')));
+        }
+      }
     } catch (error) {
       if (mounted) _showError(context, error);
     }
@@ -6218,7 +6245,7 @@ class _InventoryPageState extends State<InventoryPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     floatingActionButton: FloatingActionButton.extended(
-      onPressed: _addItem,
+      onPressed: () => _addItem(),
       icon: const Icon(Icons.add),
       label: const Text('新增物品'),
     ),
@@ -6320,7 +6347,21 @@ class _InventoryPageState extends State<InventoryPage> {
                 subtitle: Text(
                   group.value.map((item) => item.childLabel).join(' · '),
                 ),
-                children: group.value.map(_itemTile).toList(),
+                children: [
+                  ...group.value.map(_itemTile),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _purchasing
+                          ? null
+                          : () => _addItem(
+                              groupName: group.value.first.groupLabel,
+                            ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('添加规格'),
+                    ),
+                  ),
+                ],
               ),
             )
           else
