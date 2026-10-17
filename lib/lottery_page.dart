@@ -2,7 +2,12 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'lottery_visuals.dart';
+
+part 'lottery_page_layout.dart';
 
 enum _LotteryMode { wheel, direct }
 
@@ -34,7 +39,7 @@ double wheelTurnsForSelectedIndex({
   required int itemCount,
   double rotationTurns = 3,
 }) {
-  final selectedCenter = (selectedIndex + 0.5) / itemCount;
+  final selectedCenter = selectedIndex / itemCount;
   return (currentTurns + rotationTurns + selectedCenter).roundToDouble() -
       selectedCenter;
 }
@@ -47,7 +52,7 @@ class LotteryPage extends StatefulWidget {
 }
 
 class _LotteryPageState extends State<LotteryPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _durationOptions = [4, 6, 8, 10];
   static const _durationKey = 'lottery_wheel_seconds';
   static const _speedKey = 'lottery_wheel_speed';
@@ -58,19 +63,21 @@ class _LotteryPageState extends State<LotteryPage>
   // Match the previous 3 turns / 6 seconds and original 5 turns / 2.2 seconds.
   static const _turnsPerSecond = {1: 0.25, 2: 0.5, 3: 5 / 2.2};
   late final AnimationController _spinController;
+  late final AnimationController _confettiController;
   Animation<double> _rotation = const AlwaysStoppedAnimation(0);
   SharedPreferences? _preferences;
-  var _spinSeconds = 6;
+  var _spinSeconds = 4;
   var _spinSpeed = 2;
-  var _directSeconds = 6;
+  var _directSeconds = 4;
   var _directSpeed = 2;
   var _settingsReady = false;
   var _savingSettings = false;
-  final _startController = TextEditingController();
-  final _endController = TextEditingController();
+  final _startController = TextEditingController(text: '1');
+  final _endController = TextEditingController(text: '100');
   final _random = Random();
   var _mode = _LotteryMode.wheel;
-  var _wheelNumbers = const <int>[];
+  var _wheelNumbers = List<int>.generate(100, (index) => index + 1);
+  var _wheelGenerated = false;
   var _wheelTurns = 0.0;
   var _isSpinning = false;
   var _pauseMode = _PauseMode.automatic;
@@ -87,13 +94,17 @@ class _LotteryPageState extends State<LotteryPage>
   void initState() {
     super.initState();
     _spinController = AnimationController(vsync: this);
+    _confettiController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
     _loadSettings();
   }
 
   Future<void> _loadSettings() async {
-    var seconds = 6;
+    var seconds = 4;
     var speed = 2;
-    var directSeconds = 6;
+    var directSeconds = 4;
     var directSpeed = 2;
     try {
       _preferences = await SharedPreferences.getInstance();
@@ -149,6 +160,7 @@ class _LotteryPageState extends State<LotteryPage>
   @override
   void dispose() {
     _spinController.dispose();
+    _confettiController.dispose();
     _rollingTimer?.cancel();
     _pauseTimer?.cancel();
     _startController.dispose();
@@ -194,6 +206,7 @@ class _LotteryPageState extends State<LotteryPage>
     setState(() {
       _error = null;
       _result = null;
+      _wheelGenerated = true;
       _wheelNumbers = shuffledLotteryRange(
         range.start,
         range.start + range.count - 1,
@@ -204,9 +217,19 @@ class _LotteryPageState extends State<LotteryPage>
 
   Future<void> _spinWheel() async {
     if (_isDrawing || !_settingsReady || _savingSettings) return;
-    if (_wheelNumbers.isEmpty) {
-      setState(() => _error = '请先生成转盘。');
-      return;
+    final range = _validatedRange();
+    if (range == null) return;
+    if (_wheelNumbers.length != range.count ||
+        _wheelNumbers.any(
+          (number) =>
+              number < range.start || number >= range.start + range.count,
+        )) {
+      _wheelNumbers = shuffledLotteryRange(
+        range.start,
+        range.start + range.count - 1,
+        random: _random,
+      );
+      _wheelGenerated = true;
     }
 
     final selectedIndex = _random.nextInt(_wheelNumbers.length);
@@ -238,6 +261,7 @@ class _LotteryPageState extends State<LotteryPage>
       _isSpinning = false;
       _result = _wheelNumbers[selectedIndex];
     });
+    _confettiController.forward(from: 0);
   }
 
   void _drawDirect() {
@@ -273,358 +297,20 @@ class _LotteryPageState extends State<LotteryPage>
     });
   }
 
-  Widget _lotterySettingDropdown({
-    required String label,
-    required String preferenceKey,
-    required int value,
-    required Map<int, String> options,
-    bool available = true,
-  }) {
-    final enabled =
-        available && !_isDrawing && _settingsReady && !_savingSettings;
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        isDense: true,
-        enabled: enabled,
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          key: ValueKey(preferenceKey),
-          value: value,
-          isExpanded: true,
-          isDense: true,
-          items: [
-            for (final option in options.entries)
-              DropdownMenuItem(value: option.key, child: Text(option.value)),
-          ],
-          onChanged: enabled
-              ? (value) => _saveSetting(preferenceKey, value)
-              : null,
-        ),
-      ),
-    );
+  void _selectMode(_LotteryMode mode) {
+    setState(() {
+      _mode = mode;
+      _error = null;
+      _result = null;
+    });
+  }
+
+  void _selectPauseMode(_PauseMode mode) {
+    setState(() => _pauseMode = mode);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isWheel = _mode == _LotteryMode.wheel;
-    final wheelDiameter = min(MediaQuery.sizeOf(context).width - 32, 420.0);
-    final resultDiameter =
-        wheelDiameter *
-        (0.30 + max(0, (_result?.toString().length ?? 0) - 3) * 0.025).clamp(
-          0.30,
-          0.46,
-        );
-    return Scaffold(
-      appBar: AppBar(title: const Text('数字抽奖')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            '选定一个数字范围，随机抽出幸运数字。',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 20),
-          SegmentedButton<_LotteryMode>(
-            segments: const [
-              ButtonSegment(
-                value: _LotteryMode.wheel,
-                icon: Icon(Icons.casino_outlined),
-                label: Text('转盘抽奖'),
-              ),
-              ButtonSegment(
-                value: _LotteryMode.direct,
-                icon: Icon(Icons.numbers_outlined),
-                label: Text('数字跳动'),
-              ),
-            ],
-            selected: {_mode},
-            onSelectionChanged: _isDrawing
-                ? null
-                : (selection) {
-                    setState(() {
-                      _mode = selection.first;
-                      _error = null;
-                      _result = null;
-                    });
-                  },
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _lotterySettingDropdown(
-                  label: isWheel ? '旋转时长' : '跳动时长',
-                  available: isWheel || _pauseMode == _PauseMode.automatic,
-                  preferenceKey: isWheel ? _durationKey : _directDurationKey,
-                  value: isWheel ? _spinSeconds : _directSeconds,
-                  options: {
-                    for (final seconds in _durationOptions)
-                      seconds: '$seconds 秒',
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _lotterySettingDropdown(
-                  label: isWheel ? '转速' : '跳动速度',
-                  preferenceKey: isWheel ? _speedKey : _directSpeedKey,
-                  value: isWheel ? _spinSpeed : _directSpeed,
-                  options: _speedOptions,
-                ),
-              ),
-            ],
-          ),
-          if (_mode == _LotteryMode.direct) ...[
-            const SizedBox(height: 16),
-            SegmentedButton<_PauseMode>(
-              segments: const [
-                ButtonSegment(value: _PauseMode.automatic, label: Text('自动暂停')),
-                ButtonSegment(value: _PauseMode.manual, label: Text('手动暂停')),
-              ],
-              selected: {_pauseMode},
-              onSelectionChanged: _isRolling
-                  ? null
-                  : (selection) => setState(() {
-                      _pauseMode = selection.first;
-                    }),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _pauseMode == _PauseMode.automatic
-                  ? '开始后数字持续随机跳动，$_directSeconds 秒后自动暂停。'
-                  : '手动模式不限制时长，点击暂停确定结果。',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _startController,
-                  enabled: !_isDrawing,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                  ),
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: '起始数字',
-                  ),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Text('至'),
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _endController,
-                  enabled: !_isDrawing,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                  ),
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: '结束数字',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (_mode == _LotteryMode.wheel) ...[
-            const SizedBox(height: 10),
-            Text(
-              '转盘支持 2–100 个数字；每次都会随机打乱数字位置。',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: _mode == _LotteryMode.wheel
-                ? (_isSpinning ? null : _generateWheel)
-                : _isRolling
-                ? (_pauseMode == _PauseMode.manual ? _pauseDirect : null)
-                : (_settingsReady && !_savingSettings ? _drawDirect : null),
-            icon: Icon(
-              _mode == _LotteryMode.wheel
-                  ? Icons.cached_rounded
-                  : _isRolling
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
-            ),
-            label: Text(
-              _mode == _LotteryMode.wheel
-                  ? '生成转盘'
-                  : _isRolling
-                  ? (_pauseMode == _PauseMode.manual ? '暂停' : '数字跳动中…')
-                  : '开始抽奖',
-            ),
-          ),
-          if (_mode == _LotteryMode.wheel) ...[
-            const SizedBox(height: 28),
-            Center(
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  RotationTransition(
-                    key: const ValueKey('lottery-rotation'),
-                    turns: _rotation,
-                    child: CustomPaint(
-                      key: const ValueKey('lottery-wheel'),
-                      size: Size.square(wheelDiameter),
-                      painter: _LotteryWheelPainter(
-                        numbers: _wheelNumbers,
-                        colorScheme: Theme.of(context).colorScheme,
-                        labelStyle: Theme.of(context).textTheme.bodySmall!,
-                      ),
-                    ),
-                  ),
-                  if (_result != null)
-                    SizedBox.square(
-                      dimension: resultDiameter,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.3, end: 1),
-                        duration: const Duration(milliseconds: 420),
-                        curve: Curves.easeOutBack,
-                        builder: (context, scale, child) =>
-                            Transform.scale(scale: scale, child: child),
-                        child: Container(
-                          key: const ValueKey('lottery-wheel-result'),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primaryContainer,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 2,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '抽中数字',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
-                                  ),
-                                ),
-                              ),
-                              Flexible(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    '$_result',
-                                    key: const ValueKey('lottery-number'),
-                                    style: TextStyle(
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    top: -22,
-                    child: Icon(
-                      Icons.arrow_drop_down,
-                      size: 44,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _wheelNumbers.isEmpty ? '输入范围后转动转盘。' : '转盘数字已随机打乱。',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (_wheelNumbers.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _isSpinning || !_settingsReady || _savingSettings
-                    ? null
-                    : _spinWheel,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: Text(_isSpinning ? '转盘转动中…' : '转动转盘'),
-              ),
-            ],
-          ],
-          if (_mode == _LotteryMode.direct &&
-              (_result != null || _isRolling)) ...[
-            const SizedBox(height: 24),
-            Card(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Text(
-                      _isRolling ? '随机跳动中' : '抽中数字',
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    const SizedBox(height: 6),
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.65, end: 1),
-                      duration: const Duration(milliseconds: 320),
-                      curve: Curves.easeOutBack,
-                      builder: (context, scale, child) =>
-                          Transform.scale(scale: scale, child: child),
-                      child: Text(
-                        '${_isRolling ? _rollingNumber : _result}',
-                        key: const ValueKey('lottery-number'),
-                        style: Theme.of(context).textTheme.displayLarge
-                            ?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 76,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildLotteryPage(context);
 }
 
 class _LotteryWheelPainter extends CustomPainter {
@@ -645,20 +331,20 @@ class _LotteryWheelPainter extends CustomPainter {
     final fill = Paint()..style = PaintingStyle.fill;
     final border = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = numbers.length > 20 ? 0.6 : 2
-      ..color = colorScheme.outlineVariant;
+      ..strokeWidth = numbers.length > 20 ? 0.55 : 1.3
+      ..color = const Color(0xFF142540);
 
     if (numbers.isEmpty) {
-      fill.color = colorScheme.surfaceContainerHighest;
+      fill.color = const Color(0xFF122747);
       canvas.drawCircle(center, radius, fill);
       canvas.drawCircle(center, radius, border);
-      _paintText(canvas, '等待抽奖', center, colorScheme.onSurfaceVariant, 20);
+      _paintText(canvas, '待抽奖', center, lotteryText, 20);
       return;
     }
 
     final sweep = 2 * pi / numbers.length;
     for (var index = 0; index < numbers.length; index++) {
-      final startAngle = -pi / 2 + index * sweep;
+      final startAngle = -pi / 2 - sweep / 2 + index * sweep;
       fill.color = _segmentColor(index, numbers.length);
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
@@ -695,9 +381,8 @@ class _LotteryWheelPainter extends CustomPainter {
         canvas.restore();
       }
     }
-    fill.color = colorScheme.surface;
-    canvas.drawCircle(center, radius * 0.16, fill);
-    canvas.drawCircle(center, radius * 0.16, border);
+    fill.color = const Color(0xFF071425);
+    canvas.drawCircle(center, radius * 0.15, fill);
   }
 
   void _paintRadialLabel(
@@ -713,7 +398,7 @@ class _LotteryWheelPainter extends CustomPainter {
         text: '${numbers[index]}',
         style: labelStyle.copyWith(
           color: _labelColor(index),
-          fontSize: 14,
+          fontSize: 13,
           height: 1,
           fontWeight: FontWeight.bold,
         ),
@@ -744,14 +429,11 @@ class _LotteryWheelPainter extends CustomPainter {
     painter.dispose();
   }
 
-  Color _labelColor(int index) =>
-      _segmentColor(index, numbers.length).computeLuminance() > 0.4
-      ? Colors.black87
-      : Colors.white;
+  Color _labelColor(int index) => Colors.white;
 
   Color _segmentColor(int index, int count) {
-    final hue = (index * 360 / count + 330) % 360;
-    return HSLColor.fromAHSL(1, hue, 0.67, 0.52).toColor();
+    final hue = (index * 360 / count + 350) % 360;
+    return HSLColor.fromAHSL(1, hue, 0.88, 0.54).toColor();
   }
 
   void _paintText(
