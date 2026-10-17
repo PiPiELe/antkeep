@@ -34,6 +34,40 @@ class _MemorialPageState extends State<MemorialPage> {
   bool _newestFirst = true;
   String _selectedColonyId = '';
 
+  ColorFilter _footerFilter(Color background, Brightness brightness) {
+    if (brightness == Brightness.light) {
+      return ColorFilter.mode(background, BlendMode.multiply);
+    }
+    final value = background.toARGB32();
+    final red = ((value >> 16) & 0xff).toDouble();
+    final green = ((value >> 8) & 0xff).toDouble();
+    final blue = (value & 0xff).toDouble();
+    // White in the artwork becomes the chosen surface; the engraved details
+    // become a restrained warm highlight on dark surfaces.
+    return ColorFilter.matrix([
+      -0.4485,
+      -0.8805,
+      -0.171,
+      0,
+      red + 382.5,
+      -0.381,
+      -0.7485,
+      -0.1455,
+      0,
+      green + 325.5,
+      -0.3135,
+      -0.6165,
+      -0.120,
+      0,
+      blue + 268.5,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -491,63 +525,85 @@ class _MemorialPageState extends State<MemorialPage> {
           child: const Text('整群移入'),
         ),
       ],
-      builder: (context, controller, child) => Tooltip(
-        message: '添加纪念',
-        child: Material(
-          color: Theme.of(context).colorScheme.primary,
-          elevation: 8,
-          shadowColor: const Color(0x70472A17),
-          borderRadius: BorderRadius.circular(13),
-          child: InkWell(
+      builder: (context, controller, child) {
+        final theme = Theme.of(context);
+        final primary = theme.colorScheme.primary;
+        final buttonColor = Color.lerp(
+          primary,
+          Colors.black,
+          theme.brightness == Brightness.dark ? 0.48 : 0.12,
+        )!;
+        return Tooltip(
+          message: '添加纪念',
+          child: Material(
+            color: buttonColor,
+            elevation: 4,
+            shadowColor: const Color(0x40472A17),
             borderRadius: BorderRadius.circular(13),
-            onTap: () =>
-                controller.isOpen ? controller.close() : controller.open(),
-            child: SizedBox(
-              width: 64,
-              height: 64,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 31,
-                    height: 30,
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          left: 0,
-                          bottom: 0,
-                          child: TombstoneIcon(
-                            size: 26,
-                            color: Theme.of(context).colorScheme.onPrimary,
-                          ),
+            clipBehavior: Clip.antiAlias,
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.lerp(buttonColor, Colors.white, 0.14)!,
+                    Color.lerp(buttonColor, Colors.black, 0.18)!,
+                  ],
+                ),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(13),
+                onTap: () =>
+                    controller.isOpen ? controller.close() : controller.open(),
+                child: SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 31,
+                        height: 30,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              left: 0,
+                              bottom: 0,
+                              child: TombstoneIcon(
+                                size: 26,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Icon(
+                                Icons.add,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Icon(
-                            Icons.add,
-                            size: 14,
-                            color: Theme.of(context).colorScheme.onPrimary,
-                          ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '新增纪念',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 1),
-                  Text(
-                    '新增纪念',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     ),
     body:
         FutureBuilder<
@@ -604,14 +660,14 @@ class _MemorialPageState extends State<MemorialPage> {
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: ColorFiltered(
-                        colorFilter: ColorFilter.mode(
+                        colorFilter: _footerFilter(
                           Theme.of(context).scaffoldBackgroundColor,
-                          BlendMode.multiply,
+                          Theme.of(context).brightness,
                         ),
                         child: Image.asset(
                           'assets/memorial/memorial-render-footer.png',
                           width: double.infinity,
-                          height: 190,
+                          height: 110,
                           fit: BoxFit.cover,
                           alignment: Alignment.bottomCenter,
                         ),
