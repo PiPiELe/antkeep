@@ -90,6 +90,9 @@ flutter:
     - assets/overview/
     - assets/milestone/
     - assets/images/default-ant-cover.png
+    - assets/images/lottery-night-background.png
+    - assets/images/lottery-result-wait.png
+    - assets/images/lottery-result-win.png
 
   fonts:
     - family: StoneSerif

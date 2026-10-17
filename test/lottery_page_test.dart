@@ -27,7 +27,7 @@ void main() {
       itemCount: itemCount,
     );
     final selectedCenter =
-        -pi / 2 + (selectedIndex + 0.5) * 2 * pi / itemCount + 2 * pi * turns;
+        -pi / 2 + selectedIndex * 2 * pi / itemCount + 2 * pi * turns;
 
     expect(cos(selectedCenter), closeTo(0, 0.000001));
     expect(sin(selectedCenter), closeTo(-1, 0.000001));
@@ -91,7 +91,7 @@ void main() {
     final result = displayedNumber(tester);
     await tester.pump(const Duration(seconds: 5));
     expect(displayedNumber(tester), result);
-    expect(find.text('开始抽奖'), findsOneWidget);
+    expect(find.text('重新抽取'), findsOneWidget);
   });
 
   testWidgets('manual draw waits for pause and can start another draw', (
@@ -110,7 +110,7 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     expect(displayedNumber(tester), number);
 
-    await tester.tap(find.text('开始抽奖'));
+    await tester.tap(find.text('重新抽取'));
     await tester.pump();
     expect(find.text('抽中数字'), findsNothing);
     expect(find.text('随机跳动中'), findsOneWidget);
@@ -212,7 +212,7 @@ void main() {
               find.byKey(const ValueKey('lottery_wheel_seconds')),
             )
             .value,
-        6,
+        4,
       );
       expect(
         tester
@@ -258,6 +258,28 @@ void main() {
     expect(find.textContaining('2 到 100 个数字'), findsOneWidget);
   });
 
+  testWidgets('edited range is used when spinning without regenerating', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: LotteryPage()));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '7');
+    await tester.enterText(find.byType(TextField).at(1), '8');
+    tester.testTextInput.hide();
+    final start = find.text('开始转动', skipOffstage: false);
+    await tester.tap(start);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.pump();
+    final number = tester.widget<Text>(
+      find.byKey(const ValueKey('lottery-number'), skipOffstage: false),
+    );
+    expect(int.parse(number.data!), inInclusiveRange(7, 8));
+  });
+
   testWidgets('wheel draw shows a shuffled wheel and selected number', (
     tester,
   ) async {
@@ -292,7 +314,7 @@ void main() {
                 find.byKey(const ValueKey('lottery_wheel_seconds')),
               )
               .value,
-          6,
+          4,
         );
         await tester.tap(find.byKey(const ValueKey('lottery_wheel_seconds')));
         await tester.pumpAndSettle();
@@ -307,9 +329,14 @@ void main() {
         await tester.ensureVisible(find.text('生成转盘'));
         await tester.tap(find.text('生成转盘'));
         await tester.pump();
-        await tester.scrollUntilVisible(find.text('转动转盘'), 200);
+        await tester.scrollUntilVisible(
+          find.text('开始转动', skipOffstage: false),
+          200,
+        );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('转动转盘'));
+        await tester.ensureVisible(find.text('开始转动', skipOffstage: false));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('开始转动', skipOffstage: false));
         await tester.pump();
         expect(find.text('转盘转动中…'), findsOneWidget);
         expect(find.text('抽中数字'), findsNothing);
@@ -318,7 +345,7 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
         await tester.pump(const Duration(milliseconds: 16));
         await tester.pump();
-        expect(find.text('转动转盘'), findsOneWidget);
+        expect(find.text('再次转动', skipOffstage: false), findsOneWidget);
         await tester.scrollUntilVisible(
           find.byKey(const ValueKey('lottery-wheel-result')),
           -200,
@@ -339,18 +366,20 @@ void main() {
 
         // A second draw must use the same duration and clear the old result.
         await tester.scrollUntilVisible(
-          find.text('转动转盘'),
+          find.text('再次转动', skipOffstage: false),
           200,
           scrollable: find.byType(Scrollable).first,
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('转动转盘'));
+        await tester.ensureVisible(find.text('再次转动', skipOffstage: false));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('再次转动', skipOffstage: false));
         await tester.pump();
         expect(find.text('抽中数字'), findsNothing);
         await tester.pump(Duration(seconds: seconds));
         await tester.pump(const Duration(milliseconds: 16));
         await tester.pump();
-        expect(find.text('转动转盘'), findsOneWidget);
+        expect(find.text('再次转动', skipOffstage: false), findsOneWidget);
         await tester.scrollUntilVisible(
           find.byKey(const ValueKey('lottery-wheel-result')),
           -200,
@@ -390,11 +419,16 @@ void main() {
     await tester.ensureVisible(find.text('生成转盘'));
     await tester.tap(find.text('生成转盘'));
     await tester.pump();
-    await tester.scrollUntilVisible(find.text('转动转盘'), 200);
+    await tester.scrollUntilVisible(
+      find.text('开始转动', skipOffstage: false),
+      200,
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('转动转盘'));
+    await tester.ensureVisible(find.text('开始转动', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('开始转动', skipOffstage: false));
     await tester.pump();
-    expect(find.text('转盘转动中…'), findsOneWidget);
+    expect(find.text('转盘转动中…', skipOffstage: false), findsOneWidget);
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     await tester.pump(const Duration(seconds: 10));
     expect(tester.takeException(), isNull);
@@ -416,7 +450,8 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), '4');
       await tester.tap(find.text('生成转盘'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('转动转盘'));
+      await tester.ensureVisible(find.text('开始转动', skipOffstage: false));
+      await tester.tap(find.text('开始转动', skipOffstage: false));
       await tester.pump();
       expect(tester.widget<DropdownButton<int>>(duration).onChanged, isNull);
       expect(tester.widget<DropdownButton<int>>(speed).onChanged, isNull);
