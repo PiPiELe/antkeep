@@ -11,6 +11,8 @@ import 'date_display.dart';
 import 'domain/milestone.dart';
 import 'domain/models.dart';
 import 'milestone_share_page.dart';
+import 'milestone_artwork_gallery_page.dart';
+import 'widgets/milestone_design.dart';
 import 'widgets/photo_source_picker.dart';
 
 class MilestonePage extends StatefulWidget {
@@ -52,109 +54,67 @@ class _MilestonePageState extends State<MilestonePage> {
     if (mounted) _reload();
   }
 
-  Future<void> _delete(Milestone milestone) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除里程碑？'),
-        content: Text('确定删除「${milestone.title}」吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await AppDatabase.instance.deleteMilestone(milestone);
-      if (milestone.photoPath != null) {
-        await removeUnreferencedMedia(
-          AppDatabase.instance,
-          LocalMediaStore.instance,
-          [milestone.photoPath!],
-        );
-      }
-      if (mounted) _reload();
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('删除失败：$error')));
-      }
-    }
-  }
-
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('${widget.colony.name} · 里程碑')),
-    bottomNavigationBar: widget.colony.archived
-        ? null
-        : SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                onPressed: () => _edit(),
-                icon: const Icon(Icons.add),
-                label: const Text('添加里程碑'),
+  Widget build(BuildContext context) => Theme(
+    data: MilestoneDesign.theme(context),
+    child: Scaffold(
+      appBar: AppBar(title: Text('${widget.colony.name} · 里程碑')),
+      bottomNavigationBar: widget.colony.archived
+          ? null
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: FilledButton.icon(
+                  onPressed: () => _edit(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('添加里程碑'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: MilestoneDesign.parchment,
+                    foregroundColor: MilestoneDesign.background,
+                    minimumSize: const Size(0, 48),
+                  ),
+                ),
               ),
             ),
-          ),
-    body: FutureBuilder<List<Milestone>>(
-      future: _milestones,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('加载失败：${snapshot.error}'));
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final milestones = snapshot.data!;
-        if (milestones.isEmpty) {
-          return const Center(child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。'));
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          itemCount: milestones.length,
-          itemBuilder: (context, index) {
-            final milestone = milestones[index];
-            return Card(
-              child: ListTile(
-                leading: const Icon(Icons.flag_outlined),
-                title: Text(milestone.title),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${chineseDate(milestone.occurredAt)}'
-                      '${milestone.occurredAt.hour == 0 && milestone.occurredAt.minute == 0 ? '' : ' ${TimeOfDay.fromDateTime(milestone.occurredAt).format(context)}'}',
-                    ),
-                    if (milestone.note?.isNotEmpty == true)
-                      Text(
-                        milestone.note!,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
+      body: FutureBuilder<List<Milestone>>(
+        future: _milestones,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('加载失败：${snapshot.error}'));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final milestones = snapshot.data!;
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 120),
+            children: [
+              const Text(
+                '记录重要的时刻\n让每一个值得铭记的瞬间，都被永远铭刻',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: MilestoneDesign.muted,
+                  height: 1.55,
                 ),
-                onTap: () => _preview(milestone),
-                trailing: widget.colony.archived
-                    ? null
-                    : IconButton(
-                        tooltip: '删除里程碑',
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _delete(milestone),
-                      ),
               ),
-            );
-          },
-        );
-      },
+              const SizedBox(height: 10),
+              const MilestoneHero(),
+              const SizedBox(height: 14),
+              if (milestones.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。')),
+                ),
+              for (final milestone in milestones)
+                MilestoneListCard(
+                  milestone: milestone,
+                  onTap: () => _preview(milestone),
+                ),
+            ],
+          );
+        },
+      ),
     ),
   );
 }
@@ -174,7 +134,6 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
   final _note = TextEditingController();
   Future<List<Colony>>? _colonies;
   String? _selectedColonyId;
-  Colony? _selectedColony;
   bool _syncDiary = false;
   late MilestoneArtwork _artwork =
       widget.milestone?.artwork ?? MilestoneArtwork.harvest;
@@ -187,6 +146,24 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
   XFile? _selectedPhoto;
   Uint8List? _selectedPhotoBytes;
   bool _removePhoto = false;
+  late String _artworkFilter = widget.milestone?.artwork.category ?? '全部';
+
+  Future<void> _openGallery() async {
+    final selected = await Navigator.of(context).push<MilestoneArtwork>(
+      MaterialPageRoute(
+        builder: (_) => MilestoneArtworkGalleryPage(selected: _artwork),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _artwork = selected;
+        _artworkFilter = selected.category;
+      });
+    }
+  }
+
+  bool _inArtworkFilter(MilestoneArtwork artwork) =>
+      _artworkFilter == '全部' || artwork.category == _artworkFilter;
 
   Future<void> _pickPhoto() async {
     final source = await choosePhotoSource(context);
@@ -379,183 +356,224 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.milestone == null ? '添加里程碑' : '编辑里程碑')),
-    bottomNavigationBar: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FilledButton.icon(
-          onPressed: _saving ? null : _save,
-          icon: const Icon(Icons.save_outlined),
-          label: Text(_saving ? '保存中…' : '保存里程碑'),
+  Widget build(BuildContext context) => Theme(
+    data: MilestoneDesign.theme(context),
+    child: Scaffold(
+      appBar: AppBar(
+        title: Text(widget.milestone == null ? '添加里程碑' : '编辑里程碑'),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _save,
+            child: const Text('完成'),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: const Icon(Icons.save_outlined),
+            label: Text(_saving ? '保存中…' : '保存里程碑'),
+            style: FilledButton.styleFrom(
+              backgroundColor: MilestoneDesign.parchment,
+              foregroundColor: MilestoneDesign.background,
+              minimumSize: const Size(0, 48),
+            ),
+          ),
         ),
       ),
-    ),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        TextField(
-          controller: _title,
-          maxLength: 80,
-          decoration: const InputDecoration(labelText: '里程碑标题'),
-          onChanged: (_) => setState(() {}),
-        ),
-        if (_colonies != null)
-          FutureBuilder<List<Colony>>(
-            future: _colonies,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Text('加载蚁群失败：${snapshot.error}');
-              }
-              if (!snapshot.hasData) {
-                return const LinearProgressIndicator();
-              }
-              return DropdownButtonFormField<String?>(
-                initialValue: _selectedColonyId,
-                decoration: const InputDecoration(labelText: '关联蚁群（可选）'),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('不关联蚁群'),
-                  ),
-                  for (final colony in snapshot.data!)
-                    DropdownMenuItem<String?>(
-                      value: colony.id,
-                      child: Text(colony.name),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          TextField(
+            controller: _title,
+            maxLength: 80,
+            decoration: const InputDecoration(
+              labelText: '里程碑标题',
+              hintText: '填写里程碑标题',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          if (_colonies != null)
+            FutureBuilder<List<Colony>>(
+              future: _colonies,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Text('加载蚁群失败：${snapshot.error}');
+                }
+                if (!snapshot.hasData) {
+                  return const LinearProgressIndicator();
+                }
+                return DropdownButtonFormField<String?>(
+                  initialValue: _selectedColonyId,
+                  decoration: const InputDecoration(labelText: '关联蚁群（可选）'),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('不关联蚁群'),
                     ),
-                ],
-                onChanged: _saving
-                    ? null
-                    : (value) => setState(() {
-                        _selectedColonyId = value;
-                        _selectedColony = value == null
-                            ? null
-                            : snapshot.data!.firstWhere(
-                                (colony) => colony.id == value,
-                              );
-                        if (value == null) _syncDiary = false;
-                      }),
-              );
-            },
-          ),
-        if (widget.milestone == null &&
-            (widget.colony != null || _selectedColonyId != null))
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('同步一条蚁群日记'),
-            subtitle: const Text('保存为观察日记，记录里程碑标题和说明。'),
-            value: _syncDiary,
-            onChanged: _saving
-                ? null
-                : (value) => setState(() => _syncDiary = value ?? false),
-          ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _saving ? null : _pickDate,
-          icon: const Icon(Icons.calendar_today_outlined),
-          label: Text('发生日期：${chineseDate(_occurredAt)}'),
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('记录具体时间'),
-          value: _hasTime,
-          onChanged: _saving ? null : _setTime,
-        ),
-        if (_hasTime)
+                    for (final colony in snapshot.data!)
+                      DropdownMenuItem<String?>(
+                        value: colony.id,
+                        child: Text(colony.name),
+                      ),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() {
+                          _selectedColonyId = value;
+                          if (value == null) _syncDiary = false;
+                        }),
+                );
+              },
+            ),
+          if (widget.milestone == null &&
+              (widget.colony != null || _selectedColonyId != null))
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('同步一条蚁群日记'),
+              subtitle: const Text('保存为观察日记，记录里程碑标题和说明。'),
+              value: _syncDiary,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _syncDiary = value ?? false),
+            ),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: _saving ? null : () => _setTime(true),
-            icon: const Icon(Icons.schedule),
-            label: Text(
-              '具体时间：${TimeOfDay.fromDateTime(_occurredAt).format(context)}',
+            onPressed: _saving ? null : _pickDate,
+            icon: const Icon(Icons.calendar_today_outlined),
+            label: Text('发生日期：${chineseDate(_occurredAt)}'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('记录具体时间'),
+            value: _hasTime,
+            onChanged: _saving ? null : _setTime,
+          ),
+          if (_hasTime)
+            OutlinedButton.icon(
+              onPressed: _saving ? null : () => _setTime(true),
+              icon: const Icon(Icons.schedule),
+              label: Text(
+                '具体时间：${TimeOfDay.fromDateTime(_occurredAt).format(context)}',
+              ),
+            ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _note,
+            maxLength: 2000,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: '里程碑描述（可选）',
+              hintText: '记录值得铭记的故事',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 20),
+          Text('选择石刻画面', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 42,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final category in const [
+                  '全部',
+                  '种群发展',
+                  '战斗征程',
+                  '文明建设',
+                  '特殊事件',
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: _artworkFilter == category,
+                      selectedColor: const Color(0xff87a4cf),
+                      onSelected: (_) =>
+                          setState(() => _artworkFilter = category),
+                    ),
+                  ),
+              ],
             ),
           ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _note,
-          maxLength: 2000,
-          maxLines: 5,
-          decoration: const InputDecoration(labelText: '里程碑说明（可选）'),
-          onChanged: (_) => setState(() {}),
-        ),
-        const SizedBox(height: 20),
-        Text('选择石刻画面', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final artwork in MilestoneArtwork.values) ...[
-                ChoiceChip(
-                  label: Text(artwork.label),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 108,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: MilestoneArtwork.displayOrder
+                  .where(_inArtworkFilter)
+                  .length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final artwork = MilestoneArtwork.displayOrder
+                    .where(_inArtworkFilter)
+                    .elementAt(index);
+                return MilestoneArtworkTile(
+                  artwork: artwork,
                   selected: _artwork == artwork,
-                  onSelected: _saving
-                      ? null
-                      : (_) => setState(() => _artwork = artwork),
+                  onTap: () => setState(() => _artwork = artwork),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _openGallery,
+            icon: const Icon(Icons.grid_view_outlined),
+            label: const Text('浏览全部石刻画面'),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : _pickPhoto,
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: Text(
+                    _selectedPhotoBytes != null ||
+                            (!_removePhoto &&
+                                widget.milestone?.photoPath != null)
+                        ? '更换自己的照片'
+                        : '添加自己的照片（可选）',
+                  ),
                 ),
-                if (artwork != MilestoneArtwork.values.last)
-                  const SizedBox(width: 8),
-              ],
+              ),
+              if (_selectedPhotoBytes != null ||
+                  (!_removePhoto && widget.milestone?.photoPath != null))
+                IconButton(
+                  tooltip: '移除照片',
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() {
+                          _selectedPhoto = null;
+                          _selectedPhotoBytes = null;
+                          _removePhoto = true;
+                        }),
+                  icon: const Icon(Icons.delete_outline),
+                ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _saving ? null : _pickPhoto,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: Text(
-                  _selectedPhotoBytes != null ||
-                          (!_removePhoto && widget.milestone?.photoPath != null)
-                      ? '更换自己的照片'
-                      : '添加自己的照片（可选）',
-                ),
+          const Text('照片会放在石刻海报下方，并保存在本机。'),
+          const SizedBox(height: 12),
+          const Text('预览效果', style: TextStyle(color: MilestoneDesign.muted)),
+          const SizedBox(height: 7),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 160,
+              child: Image.asset(
+                _artwork.assetPath,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
               ),
-            ),
-            if (_selectedPhotoBytes != null ||
-                (!_removePhoto && widget.milestone?.photoPath != null))
-              IconButton(
-                tooltip: '移除照片',
-                onPressed: _saving
-                    ? null
-                    : () => setState(() {
-                        _selectedPhoto = null;
-                        _selectedPhotoBytes = null;
-                        _removePhoto = true;
-                      }),
-                icon: const Icon(Icons.delete_outline),
-              ),
-          ],
-        ),
-        const Text('照片会放在石刻海报下方，并保存在本机。'),
-        const SizedBox(height: 12),
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: MilestonePoster(
-              colony: widget.colony ?? _selectedColony,
-              milestone: Milestone(
-                id: widget.milestone?.id ?? 'preview',
-                colonyId: widget.colony?.id ?? _selectedColonyId,
-                title: _title.text.trim().isEmpty ? '里程碑标题' : _title.text,
-                note: _note.text.trim().isEmpty ? null : _note.text,
-                occurredAt: _occurredAt,
-                createdAt: widget.milestone?.createdAt ?? DateTime.now(),
-                artwork: _artwork,
-                photoPath: _selectedPhotoBytes == null && !_removePhoto
-                    ? widget.milestone?.photoPath
-                    : null,
-              ),
-              artwork: _artwork,
-              photoBytes: _selectedPhotoBytes,
             ),
           ),
-        ),
-        const SizedBox(height: 24),
-        const Text('里程碑本身不参与日记和数量统计；若同步观察日记，新增的日记会计入篇数。'),
-      ],
+        ],
+      ),
     ),
   );
 }

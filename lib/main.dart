@@ -29,6 +29,7 @@ import 'flight_observation_page.dart';
 import 'wild_catch_page.dart';
 import 'milestone_page.dart';
 import 'milestones_overview_page.dart';
+import 'widgets/milestone_design.dart';
 import 'milestone_share_page.dart';
 import 'species_encyclopedia_page.dart';
 import 'population_analysis_page.dart';
@@ -529,6 +530,8 @@ class _HomePageState extends State<HomePage>
     const titles = ['我的蚁群', '物品', 'DLC 养殖', '发现', '设置'];
     final visiblePages = themeController.simpleMode ? [0, 4] : [0, 1, 2, 3, 4];
     final pageIndex = visiblePages.contains(_index) ? _index : 0;
+    final showingMilestonePage =
+        pageIndex == 0 && _colonyTabs.index == ColonyTab.milestones.index;
     final compactMemorialTabs =
         pageIndex == 0 &&
         _colonyTabs.index == ColonyTab.memorial.index &&
@@ -571,7 +574,23 @@ class _HomePageState extends State<HomePage>
     ];
     final page = Scaffold(
       appBar: AppBar(
-        title: pageIndex == 0
+        backgroundColor: showingMilestonePage
+            ? MilestoneDesign.background
+            : null,
+        foregroundColor: showingMilestonePage ? Colors.white : null,
+        centerTitle: showingMilestonePage,
+        leading: showingMilestonePage
+            ? IconButton(
+                tooltip: '返回我的蚁群',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(
+                  () => _colonyTabs.index = ColonyTab.colonies.index,
+                ),
+              )
+            : null,
+        title: showingMilestonePage
+            ? const Text('里程碑')
+            : pageIndex == 0
             ? NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification.depth != 0 ||
@@ -639,7 +658,14 @@ class _HomePageState extends State<HomePage>
               )
             : Text(titles[pageIndex]),
         actions: [
-          if (!themeController.simpleMode)
+          if (showingMilestonePage)
+            TextButton.icon(
+              onPressed: () =>
+                  setState(() => _colonyTabs.index = ColonyTab.overview.index),
+              icon: const Icon(Icons.analytics_outlined),
+              label: const Text('统计'),
+            ),
+          if (!showingMilestonePage && !themeController.simpleMode)
             TextButton.icon(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -649,13 +675,14 @@ class _HomePageState extends State<HomePage>
               icon: const Icon(Icons.show_chart),
               label: const Text('分析'),
             ),
-          IconButton(
-            tooltip: '分享',
-            icon: const Icon(Icons.ios_share_outlined),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const ShareContentPage())),
-          ),
+          if (!showingMilestonePage)
+            IconButton(
+              tooltip: '分享',
+              icon: const Icon(Icons.ios_share_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ShareContentPage()),
+              ),
+            ),
         ],
       ),
       body: Column(
