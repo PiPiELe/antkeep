@@ -106,12 +106,13 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
                       const Text(
                         '记录重要的时刻\n让每一个值得铭记的瞬间，都被永远铭刻',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: MilestoneDesign.muted,
-                          height: 1.55,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xffd6cbc0),
+                          height: 1.6,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 16),
                       const MilestoneHero(),
                       const SizedBox(height: 14),
                       Row(

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
+import 'package:antkeep/milestones_overview_page.dart';
 import 'package:antkeep/online/app_update.dart';
 import 'package:antkeep/online/runtime.dart';
 import 'package:flutter/material.dart';
@@ -444,10 +445,32 @@ void main() {
   testWidgets('milestone tab opens the overview', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: HomePage()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('里程碑'));
+    await tester.tap(
+      find.descendant(of: find.byType(TabBar), matching: find.text('里程碑')),
+    );
     await tester.pumpAndSettle();
+    expect(find.byType(TabBar), findsOneWidget);
+    expect(find.byTooltip('返回我的蚁群'), findsNothing);
+    expect(find.byTooltip('分享'), findsOneWidget);
+    final intro = tester.widget<Text>(find.text('记录重要的时刻\n让每一个值得铭记的瞬间，都被永远铭刻'));
+    expect(intro.style?.fontSize, 18);
+    await tester.scrollUntilVisible(
+      find.text('还没有里程碑，添加一个值得铭记的成长节点吧。'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(MilestonesOverviewPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.text('还没有里程碑，添加一个值得铭记的成长节点吧。'), findsOneWidget);
     expect(find.text('添加里程碑'), findsOneWidget);
+    await tester.tap(
+      find.descendant(of: find.byType(TabBar), matching: find.text('总览')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('历史'), findsOneWidget);
   });
 
   testWidgets('colony overview tab opens the three sections', (tester) async {
