@@ -5,6 +5,37 @@ import 'package:flutter_test/flutter_test.dart';
 import 'onboarding_test.dart' show MemorySettings;
 
 void main() {
+  test(
+    'interface style defaults to current and persists independently',
+    () async {
+      final store = MemorySettings();
+      final preferences = AppPreferences(store);
+      await preferences.load();
+      expect(preferences.interfaceStyle, InterfaceStyle.current);
+      await preferences.setInterfaceStyle(InterfaceStyle.classic);
+      await preferences.setThemeColor(ThemeColor.mistBlue);
+      final restarted = AppPreferences(store);
+      await restarted.load();
+      expect(restarted.interfaceStyle, InterfaceStyle.classic);
+      expect(restarted.themeColor, ThemeColor.mistBlue);
+      store.values['interface_style'] = 'unknown';
+      await restarted.load();
+      expect(restarted.interfaceStyle, InterfaceStyle.current);
+    },
+  );
+
+  test('failed interface style save leaves the previous choice', () async {
+    final store = MemorySettings();
+    final preferences = AppPreferences(store);
+    await preferences.setInterfaceStyle(InterfaceStyle.classic);
+    store.failWrites = true;
+    await expectLater(
+      preferences.setInterfaceStyle(InterfaceStyle.current),
+      throwsStateError,
+    );
+    expect(preferences.interfaceStyle, InterfaceStyle.classic);
+  });
+
   test('theme and font persist independently across restarts', () async {
     final store = MemorySettings();
     final preferences = AppPreferences(store);
@@ -66,6 +97,19 @@ void main() {
     expect(dark.brightness, Brightness.dark);
     expect(dark.cardColor, const Color(0xff242424));
     expect(dark.colorScheme.surfaceContainerLow, dark.cardColor);
+  });
+
+  test('classic style restores the 1.0.10 dark surfaces', () {
+    final classic = antKeepTheme(
+      ThemeColor.forest,
+      dark: true,
+      interfaceStyle: InterfaceStyle.classic,
+    );
+    final current = antKeepTheme(ThemeColor.forest, dark: true);
+    expect(classic.scaffoldBackgroundColor, const Color(0xff0d0f0d));
+    expect(classic.appBarTheme.backgroundColor, const Color(0xff121512));
+    expect(classic.cardColor, const Color(0xff181c18));
+    expect(current.scaffoldBackgroundColor, const Color(0xff090e14));
   });
 
   test('cards have visible outlines across light and dark themes', () {

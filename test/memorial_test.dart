@@ -336,6 +336,35 @@ void main() {
     }
   }
 
+  testWidgets('classic interface opens the 1.0.10 memorial screens', (
+    tester,
+  ) async {
+    final preferences = AppPreferences(db);
+    await tester.runAsync(() async {
+      await db.saveMemorial(memorial('classic', MemorialKind.worker));
+      await preferences.setMemorialGrouped(false);
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            InterfaceStyleScope(style: InterfaceStyle.classic, child: child!),
+        home: MemorialPage(
+          preferences: preferences,
+          onOpenColony: (_, _) async {},
+        ),
+      ),
+    );
+    await settle(tester);
+    expect(find.text('纪念 classic'), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right), findsWidgets);
+    await tester.tap(find.text('纪念 classic'));
+    await settle(tester);
+    expect(find.text('纪念详情'), findsOneWidget);
+    expect(find.text('生成纪念分享图'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   Future<void> tapVisible(WidgetTester tester, String text) async {
     FocusManager.instance.primaryFocus?.unfocus();
     await settle(tester);

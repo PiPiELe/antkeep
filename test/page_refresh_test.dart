@@ -2737,7 +2737,13 @@ void main() {
         updatedAt: date,
       ),
     );
-    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            InterfaceStyleScope(style: InterfaceStyle.classic, child: child!),
+        home: const ColoniesPage(),
+      ),
+    );
     await tester.pumpAndSettle();
     for (final text in ['1 蚁后', '10 工蚁', '5 卵', '2 茧']) {
       expect(find.text(text), findsOneWidget);

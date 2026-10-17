@@ -164,6 +164,29 @@ void main() {
     expect(settings['show_colony_overview'], 'false');
   });
 
+  testWidgets('appearance setting switches and saves the interface style', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    await openCategory(tester, '外观与展示');
+    await tester.dragUntilVisible(
+      find.text('1.0.10 经典界面'),
+      find.byType(ListView).last,
+      const Offset(0, -250),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1.0.10 经典界面'));
+    await tester.pumpAndSettle();
+    expect(themeController.interfaceStyle, InterfaceStyle.classic);
+    expect(settings['interface_style'], 'classic');
+    failWrites = true;
+    await tester.tap(find.text('新版界面'));
+    await tester.pumpAndSettle();
+    expect(themeController.interfaceStyle, InterfaceStyle.classic);
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
   testWidgets('appearance setting switches and saves colony list style', (
     tester,
   ) async {

@@ -23,6 +23,35 @@ enum ThemeColor {
   final Color color;
 }
 
+enum InterfaceStyle {
+  current('新版界面', '当前版本的界面布局'),
+  classic('1.0.10 经典界面', '主要页面沿用 1.0.10 布局');
+
+  const InterfaceStyle(this.label, this.description);
+  final String label;
+  final String description;
+}
+
+class InterfaceStyleScope extends InheritedWidget {
+  const InterfaceStyleScope({
+    super.key,
+    required this.style,
+    required super.child,
+  });
+
+  final InterfaceStyle style;
+
+  static InterfaceStyle of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<InterfaceStyleScope>()
+          ?.style ??
+      InterfaceStyle.current;
+
+  @override
+  bool updateShouldNotify(InterfaceStyleScope oldWidget) =>
+      style != oldWidget.style;
+}
+
 enum FontColor {
   theme('跟随主题', null, null),
   ink('墨黑', Color(0xff000000), Color(0xfff5f5f5)),
@@ -98,6 +127,7 @@ class AppPreferences extends ChangeNotifier {
   AppEdition edition = AppEdition.offline;
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
+  InterfaceStyle interfaceStyle = InterfaceStyle.current;
   FontColor fontColor = FontColor.theme;
   List<String> _colonyOrder = const [];
   List<String> get colonyOrder => _colonyOrder;
@@ -179,6 +209,10 @@ class AppPreferences extends ChangeNotifier {
       (color) => color.name == values['theme_color'],
       orElse: () => ThemeColor.forest,
     );
+    interfaceStyle = InterfaceStyle.values.firstWhere(
+      (style) => style.name == values['interface_style'],
+      orElse: () => InterfaceStyle.current,
+    );
     fontColor = FontColor.values.firstWhere(
       (color) => color.name == values['font_color'],
       orElse: () => FontColor.theme,
@@ -216,6 +250,12 @@ class AppPreferences extends ChangeNotifier {
   Future<void> setThemeColor(ThemeColor color) async {
     await store.writeSettings({'theme_color': color.name});
     themeColor = color;
+    notifyListeners();
+  }
+
+  Future<void> setInterfaceStyle(InterfaceStyle style) async {
+    await store.writeSettings({'interface_style': style.name});
+    interfaceStyle = style;
     notifyListeners();
   }
 
@@ -294,6 +334,7 @@ ThemeData antKeepTheme(
   ThemeColor color, {
   bool dark = false,
   FontColor fontColor = FontColor.theme,
+  InterfaceStyle interfaceStyle = InterfaceStyle.current,
 }) {
   var scheme = ColorScheme.fromSeed(
     seedColor: dark && color == ThemeColor.forest
@@ -345,7 +386,9 @@ ThemeData antKeepTheme(
     );
   }
   final monochrome = color == ThemeColor.white;
-  if (dark && !monochrome) {
+  final classicDark =
+      dark && !monochrome && interfaceStyle == InterfaceStyle.classic;
+  if (dark && !monochrome && !classicDark) {
     // Keep the chosen accent, while giving every dark color theme a neutral
     // shell that matches the dark content surfaces.
     scheme = scheme.copyWith(
@@ -364,7 +407,9 @@ ThemeData antKeepTheme(
     scaffoldBackgroundColor: monochrome
         ? scheme.surface
         : dark
-        ? scheme.surface
+        ? classicDark
+              ? const Color(0xff0d0f0d)
+              : scheme.surface
         : null,
     appBarTheme: monochrome
         ? AppBarTheme(
@@ -372,17 +417,21 @@ ThemeData antKeepTheme(
             surfaceTintColor: Colors.transparent,
           )
         : dark
-        ? const AppBarTheme(
-            backgroundColor: Color(0xff090e14),
-            surfaceTintColor: Colors.transparent,
-          )
+        ? classicDark
+              ? const AppBarTheme(backgroundColor: Color(0xff121512))
+              : const AppBarTheme(
+                  backgroundColor: Color(0xff090e14),
+                  surfaceTintColor: Colors.transparent,
+                )
         : null,
     cardColor: monochrome
         ? scheme.surfaceContainerLow
         : dark
-        ? scheme.surfaceContainerLow
+        ? classicDark
+              ? const Color(0xff181c18)
+              : scheme.surfaceContainerLow
         : null,
-    navigationBarTheme: dark && !monochrome
+    navigationBarTheme: dark && !monochrome && !classicDark
         ? const NavigationBarThemeData(
             backgroundColor: Color(0xff0e151d),
             surfaceTintColor: Colors.transparent,

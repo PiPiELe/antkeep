@@ -66,6 +66,8 @@ import 'widgets/justified_label.dart';
 import 'widgets/photo_source_picker.dart';
 import 'widgets/photo_save_preview.dart';
 
+part 'main_ui_legacy.dart';
+
 const _nestTypeOptions = [
   '试管巢',
   '平面巢',
@@ -327,14 +329,20 @@ class _AntKeepAppState extends State<AntKeepApp> {
         supportedLocales: const [Locale('zh', 'CN')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         debugShowCheckedModeBanner: false,
+        builder: (context, child) => InterfaceStyleScope(
+          style: themeController.interfaceStyle,
+          child: child!,
+        ),
         theme: antKeepTheme(
           themeController.themeColor,
           fontColor: themeController.fontColor,
+          interfaceStyle: themeController.interfaceStyle,
         ),
         darkTheme: antKeepTheme(
           themeController.themeColor,
           dark: true,
           fontColor: themeController.fontColor,
+          interfaceStyle: themeController.interfaceStyle,
         ),
         themeMode: themeController.themeMode,
         home: themeController.onboardingCompleted
@@ -530,6 +538,7 @@ class _HomePageState extends State<HomePage>
     final visiblePages = themeController.simpleMode ? [0, 4] : [0, 1, 2, 3, 4];
     final pageIndex = visiblePages.contains(_index) ? _index : 0;
     final compactMemorialTabs =
+        themeController.interfaceStyle == InterfaceStyle.current &&
         pageIndex == 0 &&
         _colonyTabs.index == ColonyTab.memorial.index &&
         MediaQuery.sizeOf(context).width >= 380 &&
@@ -1191,10 +1200,98 @@ class _ColoniesPageState extends State<ColoniesPage> {
     );
   }
 
+  Widget _buildLegacyColonyList(
+    BuildContext context,
+    List<_ColonyListEntry> colonies,
+  ) {
+    final canBatchCare =
+        colonies.where((entry) => !entry.colony.archived).length > 1;
+    if (colonies.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.hive_outlined,
+        title: '还没有蚁群',
+        message: '新入手时建立一窝蚁群，再独立记录投喂、环境、数量和照片。',
+      );
+    }
+    return AbsorbPointer(
+      absorbing: _savingOrder,
+      child: RefreshIndicator(
+        onRefresh: () async {
+          setState(_reload);
+          await _colonies;
+        },
+        child: ReorderableListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+          buildDefaultDragHandles: false,
+          header: Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                if (canBatchCare)
+                  OutlinedButton.icon(
+                    onPressed: () => _batchCare(colonies),
+                    icon: const Icon(Icons.playlist_add_check),
+                    label: const Text('批量养护记录'),
+                  ),
+                if (colonies.length > 1)
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: canBatchCare ? 8 : 0),
+                      child: Text(
+                        '长按蚁群卡片可上下拖动排序',
+                        textAlign: TextAlign.end,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          itemCount: colonies.length,
+          onReorderStart: (_) => _dragging = true,
+          onReorderEnd: (_) => _dragging = false,
+          onReorderItem: (oldIndex, newIndex) =>
+              _reorderColonies(colonies, oldIndex, newIndex),
+          itemBuilder: (context, index) {
+            final entry = colonies[index];
+            return ReorderableDelayedDragStartListener(
+              key: ValueKey(entry.colony.id),
+              index: index,
+              enabled: colonies.length > 1 && !_savingOrder,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: index == colonies.length - 1 ? 0 : 10,
+                ),
+                child: _ColonyCard(
+                  colony: entry.colony,
+                  population: entry.population,
+                  queens: entry.queens,
+                  workers: entry.workers,
+                  dueTasks: entry.dueTasks,
+                  onDurationTap: () => _editAcquiredOn(entry.colony),
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            ColonyDetailPage(colonyId: entry.colony.id),
+                      ),
+                    );
+                    if (mounted) setState(_reload);
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor:
-        themeController.colonyDisplayStyle == ColonyDisplayStyle.classic
+        InterfaceStyleScope.of(context) == InterfaceStyle.classic ||
+            themeController.colonyDisplayStyle == ColonyDisplayStyle.classic
         ? null
         : colonyShowcaseBackground(context),
     floatingActionButton: FloatingActionButton.extended(
@@ -1212,6 +1309,9 @@ class _ColoniesPageState extends State<ColoniesPage> {
           return _ErrorState('读取蚁群失败：${snapshot.error}');
         }
         final allColonies = snapshot.data!;
+        if (InterfaceStyleScope.of(context) == InterfaceStyle.classic) {
+          return _buildLegacyColonyList(context, allColonies);
+        }
         final style = themeController.colonyDisplayStyle;
         final colonies = _filter.activeCount == 0
             ? allColonies
@@ -1591,6 +1691,7 @@ class _ColonyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final classic = InterfaceStyleScope.of(context) == InterfaceStyle.classic;
     final numberStyle = TextStyle(
       color: theme.colorScheme.onSurface,
       fontWeight: FontWeight.w700,
@@ -1775,6 +1876,20 @@ class _ColonyCard extends StatelessWidget {
                   );
                 },
               ),
+              if (classic && dueText != null) ...[
+                Text(
+                  dueText,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Divider(height: 1, color: antKeepDividerColor(theme.colorScheme)),
               const SizedBox(height: 12),
               Row(
@@ -1808,7 +1923,7 @@ class _ColonyCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (dueText != null) ...[
+              if (!classic && dueText != null) ...[
                 const SizedBox(height: 8),
                 Divider(
                   height: 1,
@@ -1994,6 +2109,7 @@ class ColonyFormPage extends StatefulWidget {
 }
 
 class _ColonyFormPageState extends State<ColonyFormPage> {
+  void _refreshLegacy(VoidCallback update) => setState(update);
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _source = TextEditingController();
@@ -2506,7 +2622,12 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
   );
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) =>
+      InterfaceStyleScope.of(context) == InterfaceStyle.classic
+      ? _buildLegacyForm(context)
+      : _buildCurrentForm(context);
+
+  Widget _buildCurrentForm(BuildContext context) => Scaffold(
     backgroundColor: Theme.of(context).brightness == Brightness.light
         ? const Color(0xfffafaf8)
         : Theme.of(context).colorScheme.surface,
@@ -7336,6 +7457,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _savingEdition = false;
+  bool _savingInterfaceStyle = false;
   bool _savingSimpleMode = false;
   bool _savingColonyOverview = false;
   bool _savingColonyDisplayStyle = false;
@@ -7359,6 +7481,20 @@ class _SettingsPageState extends State<SettingsPage> {
       if (mounted) _showError(context, error);
     } finally {
       if (mounted) setState(() => _savingSimpleMode = false);
+    }
+  }
+
+  Future<void> _setInterfaceStyle(InterfaceStyle style) async {
+    if (_savingInterfaceStyle || themeController.interfaceStyle == style) {
+      return;
+    }
+    setState(() => _savingInterfaceStyle = true);
+    try {
+      await themeController.setInterfaceStyle(style);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _savingInterfaceStyle = false);
     }
   }
 
@@ -7461,7 +7597,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _categoryTile(BuildContext context, SettingsCategory category) {
     final subtitle = switch (category) {
       SettingsCategory.appearance =>
-        '${themeController.themeColor.label} · ${themeController.simpleMode ? '简化模式' : '完整模式'}',
+        '${themeController.interfaceStyle.label} · ${themeController.themeColor.label}',
       SettingsCategory.online =>
         '${themeController.edition.label} · ${onlineController.user?.username ?? '账号与公共资料'}',
       SettingsCategory.reminders =>
@@ -7541,13 +7677,14 @@ class _SettingsPageState extends State<SettingsPage> {
           value: themeController.simpleMode,
           onChanged: _savingSimpleMode ? null : _setSimpleMode,
         ),
-        SwitchListTile(
-          secondary: const Icon(Icons.analytics_outlined),
-          title: const Text('蚁群总览卡片'),
-          subtitle: const Text('在我的蚁群顶部显示蚁群、蚁后和工蚁总数'),
-          value: themeController.showColonyOverview,
-          onChanged: _savingColonyOverview ? null : _setColonyOverview,
-        ),
+        if (themeController.interfaceStyle == InterfaceStyle.current)
+          SwitchListTile(
+            secondary: const Icon(Icons.analytics_outlined),
+            title: const Text('蚁群总览卡片'),
+            subtitle: const Text('在我的蚁群顶部显示蚁群、蚁后和工蚁总数'),
+            value: themeController.showColonyOverview,
+            onChanged: _savingColonyOverview ? null : _setColonyOverview,
+          ),
         for (final tab in ColonyTab.values)
           ListTile(
             leading: const Icon(Icons.edit_outlined),
@@ -7627,27 +7764,47 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
       ]),
-      _section(context, '蚁群列表风格', [
-        for (final style in ColonyDisplayStyle.values)
+      _section(context, '界面样式', [
+        for (final style in InterfaceStyle.values)
           ListTile(
             leading: Icon(
-              style == ColonyDisplayStyle.classic
-                  ? Icons.view_agenda_outlined
-                  : style == ColonyDisplayStyle.showcase
-                  ? Icons.dashboard_customize_outlined
-                  : Icons.view_compact_outlined,
+              style == InterfaceStyle.current
+                  ? Icons.auto_awesome_outlined
+                  : Icons.history_outlined,
             ),
             title: Text(style.label),
             subtitle: Text(style.description),
-            trailing: themeController.colonyDisplayStyle == style
+            selected: themeController.interfaceStyle == style,
+            trailing: themeController.interfaceStyle == style
                 ? const Icon(Icons.check_circle)
                 : null,
-            selected: themeController.colonyDisplayStyle == style,
-            onTap: _savingColonyDisplayStyle
+            onTap: _savingInterfaceStyle
                 ? null
-                : () => _setColonyDisplayStyle(style),
+                : () => _setInterfaceStyle(style),
           ),
       ]),
+      if (themeController.interfaceStyle == InterfaceStyle.current)
+        _section(context, '蚁群列表风格', [
+          for (final style in ColonyDisplayStyle.values)
+            ListTile(
+              leading: Icon(
+                style == ColonyDisplayStyle.classic
+                    ? Icons.view_agenda_outlined
+                    : style == ColonyDisplayStyle.showcase
+                    ? Icons.dashboard_customize_outlined
+                    : Icons.view_compact_outlined,
+              ),
+              title: Text(style.label),
+              subtitle: Text(style.description),
+              trailing: themeController.colonyDisplayStyle == style
+                  ? const Icon(Icons.check_circle)
+                  : null,
+              selected: themeController.colonyDisplayStyle == style,
+              onTap: _savingColonyDisplayStyle
+                  ? null
+                  : () => _setColonyDisplayStyle(style),
+            ),
+        ]),
     ],
     SettingsCategory.online => [
       _section(context, '资料模式与账号', [

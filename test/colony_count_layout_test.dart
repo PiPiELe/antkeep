@@ -6,6 +6,29 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('classic interface restores the 1.0.10 colony form', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: antKeepTheme(ThemeColor.forest),
+        home: const InterfaceStyleScope(
+          style: InterfaceStyle.classic,
+          child: ColonyFormPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(DropdownButtonFormField<GrowthPath>), findsOneWidget);
+    expect(find.byType(DropdownMenu<GrowthPath>), findsNothing);
+    expect(find.widgetWithText(FilledButton, '保存蚁群'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scale in [1.0, 1.3]) {
     testWidgets('count labels fit on a narrow screen at text scale $scale', (
       tester,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'app_preferences.dart';
 import 'data/share_image_export.dart';
 import 'data/app_database.dart';
 import 'data/local_media_store.dart';
@@ -15,6 +16,8 @@ import 'date_display.dart';
 import 'widgets/milestone_design.dart';
 
 export 'domain/milestone.dart' show MilestoneArtwork;
+
+part 'milestone_share_page_legacy.dart';
 
 const milestonePosterSize = Size(400, 500);
 const milestonePhotoSize = Size(400, 300);
@@ -524,7 +527,12 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
+  Widget build(BuildContext context) =>
+      InterfaceStyleScope.of(context) == InterfaceStyle.classic
+      ? _buildClassicShare(context)
+      : _buildCurrentShare(context);
+
+  Widget _buildCurrentShare(BuildContext context) => Theme(
     data: MilestoneDesign.theme(context),
     child: Scaffold(
       appBar: AppBar(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'app_preferences.dart';
 import 'data/app_database.dart';
+import 'date_display.dart';
 import 'domain/milestone.dart';
 import 'milestone_page.dart';
 import 'milestone_share_page.dart';
@@ -67,8 +69,126 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
     }
   }
 
+  Future<void> _delete(Milestone milestone) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除里程碑？'),
+        content: Text('确定删除「${milestone.title}」吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await AppDatabase.instance.deleteMilestone(milestone);
+      if (mounted) _reload();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('删除失败：$error')));
+      }
+    }
+  }
+
+  Widget _buildClassic(BuildContext context) => Column(
+    children: [
+      Expanded(
+        child: FutureBuilder(
+          future: _items,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(child: Text('加载里程碑失败：${snapshot.error}'));
+            }
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final items = snapshot.data!;
+            if (items.isEmpty) {
+              return const Center(child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。'));
+            }
+            return RefreshIndicator(
+              onRefresh: () async {
+                _reload();
+                await _items;
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final milestone = item.milestone;
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.flag_outlined),
+                      title: Text(milestone.title),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${item.colonyName == null ? '独立里程碑' : item.colonyName!} · ${chineseDate(milestone.occurredAt)}',
+                          ),
+                          if (milestone.note?.isNotEmpty == true)
+                            Text(
+                              milestone.note!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                      trailing: milestone.colonyId == null
+                          ? PopupMenuButton<String>(
+                              tooltip: '里程碑操作',
+                              onSelected: (_) => _delete(milestone),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('删除里程碑'),
+                                ),
+                              ],
+                            )
+                          : const Icon(Icons.chevron_right),
+                      onTap: () => _preview(milestone),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
+      SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _add,
+              icon: const Icon(Icons.add),
+              label: const Text('添加里程碑'),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
   @override
-  Widget build(BuildContext context) => Theme(
+  Widget build(BuildContext context) =>
+      InterfaceStyleScope.of(context) == InterfaceStyle.classic
+      ? _buildClassic(context)
+      : _buildCurrent(context);
+
+  Widget _buildCurrent(BuildContext context) => Theme(
     data: MilestoneDesign.theme(context),
     child: ColoredBox(
       color: MilestoneDesign.background,

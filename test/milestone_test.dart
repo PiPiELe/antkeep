@@ -1,11 +1,13 @@
 import 'dart:io';
 
+import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/backup_data.dart';
 import 'package:antkeep/domain/milestone.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/milestone_page.dart';
+import 'package:antkeep/milestone_share_page.dart';
 import 'package:antkeep/widgets/milestone_design.dart';
 import 'package:antkeep/milestones_overview_page.dart';
 import 'package:flutter/material.dart';
@@ -569,4 +571,45 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('classic interface opens the 1.0.10 milestone screens', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await db.saveColony(colony);
+      await db.saveMilestone(
+        Milestone(
+          id: 'classic-ui-milestone',
+          colonyId: colony.id,
+          title: '经典里程碑',
+          occurredAt: date,
+          createdAt: date,
+        ),
+      );
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            InterfaceStyleScope(style: InterfaceStyle.classic, child: child!),
+        home: MilestonePage(colony: colony),
+      ),
+    );
+    await settleDatabase(tester);
+    expect(find.byIcon(Icons.flag_outlined), findsWidgets);
+    expect(find.byType(MilestoneHero), findsNothing);
+    await tester.tap(find.text('经典里程碑'));
+    await settleDatabase(tester);
+    expect(find.text('石刻预览'), findsOneWidget);
+    await tester.tap(find.byTooltip('编辑里程碑'));
+    await settleDatabase(tester);
+    expect(find.text('里程碑说明（可选）'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byType(MilestonePoster),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byType(MilestonePoster), findsWidgets);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

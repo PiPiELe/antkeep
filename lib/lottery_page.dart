@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_preferences.dart';
 import 'lottery_visuals.dart';
 
 part 'lottery_page_layout.dart';
+part 'lottery_page_legacy_layout.dart';
 
 enum _LotteryMode { wheel, direct }
 
@@ -53,6 +55,7 @@ class LotteryPage extends StatefulWidget {
 
 class _LotteryPageState extends State<LotteryPage>
     with TickerProviderStateMixin {
+  void _refreshLegacy(VoidCallback update) => setState(update);
   static const _durationOptions = [4, 6, 8, 10];
   static const _durationKey = 'lottery_wheel_seconds';
   static const _speedKey = 'lottery_wheel_speed';
@@ -233,12 +236,20 @@ class _LotteryPageState extends State<LotteryPage>
     }
 
     final selectedIndex = _random.nextInt(_wheelNumbers.length);
-    final targetTurns = wheelTurnsForSelectedIndex(
-      currentTurns: _wheelTurns,
-      selectedIndex: selectedIndex,
-      itemCount: _wheelNumbers.length,
-      rotationTurns: _spinSeconds * _turnsPerSecond[_spinSpeed]!,
-    );
+    final rotationTurns = _spinSeconds * _turnsPerSecond[_spinSpeed]!;
+    final targetTurns =
+        InterfaceStyleScope.of(context) == InterfaceStyle.classic
+        ? (_wheelTurns +
+                      rotationTurns +
+                      (selectedIndex + 0.5) / _wheelNumbers.length)
+                  .roundToDouble() -
+              (selectedIndex + 0.5) / _wheelNumbers.length
+        : wheelTurnsForSelectedIndex(
+            currentTurns: _wheelTurns,
+            selectedIndex: selectedIndex,
+            itemCount: _wheelNumbers.length,
+            rotationTurns: rotationTurns,
+          );
     _spinController.duration = Duration(seconds: _spinSeconds);
     _rotation = Tween<double>(
       begin: _wheelTurns,
@@ -310,7 +321,10 @@ class _LotteryPageState extends State<LotteryPage>
   }
 
   @override
-  Widget build(BuildContext context) => _buildLotteryPage(context);
+  Widget build(BuildContext context) =>
+      InterfaceStyleScope.of(context) == InterfaceStyle.classic
+      ? _buildLegacyLotteryPage(context)
+      : _buildLotteryPage(context);
 }
 
 class _LotteryWheelPainter extends CustomPainter {

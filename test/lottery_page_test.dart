@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:antkeep/app_preferences.dart';
 import 'package:antkeep/lottery_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets('classic interface keeps the 1.0.10 lottery layout', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: InterfaceStyleScope(
+          style: InterfaceStyle.classic,
+          child: LotteryPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('选定一个数字范围，随机抽出幸运数字。'), findsOneWidget);
+    expect(find.text('生成转盘'), findsOneWidget);
+    expect(find.text('输入范围后转动转盘。'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).at(0), '1');
+    await tester.enterText(find.byType(TextField).at(1), '6');
+    await tester.tap(find.text('生成转盘'));
+    await tester.pump();
+    expect(find.text('转盘数字已随机打乱。'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   test('wheel range is shuffled and retains every number', () {
     expect(
       shuffledLotteryRange(1, 6, random: Random(4)),

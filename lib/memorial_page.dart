@@ -12,6 +12,8 @@ import 'domain/models.dart';
 import 'widgets/memorial_kind_icon.dart';
 import 'widgets/tombstone_icon.dart';
 
+part 'memorial_page_legacy.dart';
+
 typedef OpenMemorialColony = Future<void> Function(BuildContext, String);
 
 class MemorialPage extends StatefulWidget {
@@ -24,6 +26,7 @@ class MemorialPage extends StatefulWidget {
 }
 
 class _MemorialPageState extends State<MemorialPage> {
+  void _refreshLegacy(VoidCallback update) => setState(update);
   late Future<({List<Memorial> memorials, Map<String, String> colonyNames})>
   _items;
   StreamSubscription<void>? _changes;
@@ -508,7 +511,12 @@ class _MemorialPageState extends State<MemorialPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) =>
+      InterfaceStyleScope.of(context) == InterfaceStyle.classic
+      ? _buildLegacy(context)
+      : _buildCurrent(context);
+
+  Widget _buildCurrent(BuildContext context) => Scaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     floatingActionButton: MenuAnchor(
       alignmentOffset: const Offset(0, 8),
@@ -1374,6 +1382,7 @@ typedef _MemorialDetail = ({
 });
 
 class _MemorialDetailPageState extends State<MemorialDetailPage> {
+  void _refreshLegacy(VoidCallback update) => setState(update);
   late Future<_MemorialDetail> _detail;
   bool _busy = false;
 
@@ -1463,7 +1472,12 @@ class _MemorialDetailPageState extends State<MemorialDetailPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) =>
+      InterfaceStyleScope.of(context) == InterfaceStyle.classic
+      ? _buildLegacyDetail(context)
+      : _buildCurrentDetail(context);
+
+  Widget _buildCurrentDetail(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('纪念详情')),
     backgroundColor: Theme.of(context).brightness == Brightness.dark
         ? Theme.of(context).colorScheme.surface
