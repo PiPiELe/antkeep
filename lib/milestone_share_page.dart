@@ -7,9 +7,12 @@ import 'package:share_plus/share_plus.dart';
 import 'data/share_image_export.dart';
 import 'data/app_database.dart';
 import 'data/local_media_store.dart';
+import 'data/media_cleanup.dart';
 import 'domain/milestone.dart';
 import 'domain/models.dart';
 import 'milestone_page.dart';
+import 'date_display.dart';
+import 'widgets/milestone_design.dart';
 
 export 'domain/milestone.dart' show MilestoneArtwork;
 
@@ -406,6 +409,43 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
   late Colony? _colony = widget.colony;
   bool _busy = false;
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除里程碑？'),
+        content: Text('确定删除「${_milestone.title}」吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await AppDatabase.instance.deleteMilestone(_milestone);
+      if (_milestone.photoPath != null) {
+        await removeUnreferencedMedia(
+          AppDatabase.instance,
+          LocalMediaStore.instance,
+          [_milestone.photoPath!],
+        );
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('删除失败：$error')));
+      }
+    }
+  }
+
   Future<void> _edit() async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -484,68 +524,138 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('石刻预览'),
-      actions: [
-        if (_colony?.archived != true)
-          IconButton(
-            tooltip: '编辑里程碑',
-            onPressed: _busy ? null : _edit,
-            icon: const Icon(Icons.edit_outlined),
-          ),
-      ],
-    ),
-    bottomNavigationBar: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Builder(
-                builder: (buttonContext) => FilledButton.icon(
+  Widget build(BuildContext context) => Theme(
+    data: MilestoneDesign.theme(context),
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('里程碑详情'),
+        actions: [
+          if (_colony?.archived != true)
+            IconButton(
+              tooltip: '编辑里程碑',
+              onPressed: _busy ? null : _edit,
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          if (_colony?.archived != true)
+            PopupMenuButton<String>(
+              tooltip: '更多操作',
+              onSelected: (value) {
+                if (value == 'delete') _delete();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'delete', child: Text('删除里程碑')),
+              ],
+            ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Builder(
+                  builder: (buttonContext) => FilledButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => _export(buttonContext, share: true),
+                    icon: const Icon(Icons.share_outlined),
+                    label: Text(_busy ? '生成中…' : '转发分享'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: MilestoneDesign.surface,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Builder(
+                builder: (buttonContext) => OutlinedButton.icon(
                   onPressed: _busy
                       ? null
-                      : () => _export(buttonContext, share: true),
-                  icon: const Icon(Icons.share_outlined),
-                  label: Text(_busy ? '生成中…' : '转发分享'),
+                      : () => _export(buttonContext, share: false),
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text('保存图片'),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: MilestoneDesign.parchment,
+                    foregroundColor: MilestoneDesign.background,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: MilestonePoster(
+                  colony: _colony,
+                  milestone: _milestone,
+                  artwork: _milestone.artwork,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            Builder(
-              builder: (buttonContext) => OutlinedButton.icon(
-                onPressed: _busy
-                    ? null
-                    : () => _export(buttonContext, share: false),
-                icon: const Icon(Icons.download_outlined),
-                label: const Text('保存图片'),
+            const SizedBox(height: 14),
+            Container(
+              decoration: MilestoneDesign.panel(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _detailRow(
+                    Icons.calendar_today_outlined,
+                    '发生日期',
+                    chineseDate(_milestone.occurredAt),
+                  ),
+                  const SizedBox(height: 12),
+                  _detailRow(
+                    Icons.schedule_outlined,
+                    '记录时间',
+                    '${chineseDate(_milestone.createdAt)} ${TimeOfDay.fromDateTime(_milestone.createdAt).format(context)}',
+                  ),
+                  if (_milestone.note?.isNotEmpty == true) ...[
+                    const SizedBox(height: 12),
+                    _detailRow(Icons.notes_outlined, '描述', _milestone.note!),
+                  ],
+                ],
               ),
             ),
           ],
         ),
       ),
     ),
-    body: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
-              child: MilestonePoster(
-                colony: _colony,
-                milestone: _milestone,
-                artwork: _milestone.artwork,
+  );
+
+  Widget _detailRow(IconData icon, String label, String value) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, color: MilestoneDesign.muted, size: 18),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: MilestoneDesign.muted,
+                fontSize: 12,
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          const Text('说明较长时，分享图显示摘要；里程碑原文仍完整保留。'),
-        ],
+            Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ],
+        ),
       ),
-    ),
+    ],
   );
 }

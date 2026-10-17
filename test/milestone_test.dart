@@ -6,6 +6,7 @@ import 'package:antkeep/domain/milestone.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/milestone_page.dart';
+import 'package:antkeep/widgets/milestone_design.dart';
 import 'package:antkeep/milestones_overview_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -325,28 +326,23 @@ void main() {
       250,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(
-      tester
-          .widget<SingleChildScrollView>(
-            find
-                .ancestor(
-                  of: find.text('种群发展'),
-                  matching: find.byType(SingleChildScrollView),
-                )
-                .first,
-          )
-          .scrollDirection,
-      Axis.horizontal,
-    );
+    expect(find.byType(MilestoneArtworkTile), findsWidgets);
     await tester.ensureVisible(find.text('勇士狩猎-软体昆虫'));
     await tester.tap(find.text('勇士狩猎-软体昆虫'));
     await tester.tap(find.text('保存里程碑'));
     await settle();
+    await tester.scrollUntilVisible(
+      find.text('首批工蚁羽化'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -160));
+    await tester.pumpAndSettle();
     expect(find.text('首批工蚁羽化'), findsOneWidget);
 
     await tester.tap(find.text('首批工蚁羽化'));
     await settle();
-    expect(find.text('石刻预览'), findsOneWidget);
+    expect(find.text('里程碑详情'), findsOneWidget);
     expect(find.text('选择石刻画面'), findsNothing);
     await tester.tap(find.byTooltip('编辑里程碑'));
     await settle();
@@ -354,7 +350,7 @@ void main() {
     await tester.enterText(find.widgetWithText(TextField, '里程碑标题'), '首次羽化');
     await tester.tap(find.text('保存里程碑'));
     await settle();
-    expect(find.text('石刻预览'), findsOneWidget);
+    expect(find.text('里程碑详情'), findsOneWidget);
     await tester.pageBack();
     await settle();
     expect(find.text('首次羽化'), findsOneWidget);
@@ -406,12 +402,17 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 10)),
         );
       }
+      await tester.scrollUntilVisible(
+        find.text('第二蚁群搬家'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('第二蚁群搬家'), findsOneWidget);
-      expect(find.textContaining('第二蚁群 ·'), findsOneWidget);
+      expect(find.text('2026年10月13日'), findsOneWidget);
       await tester.tap(find.text('第二蚁群搬家'));
       for (
         var frame = 0;
-        frame < 80 && find.text('石刻预览').evaluate().isEmpty;
+        frame < 80 && find.text('里程碑详情').evaluate().isEmpty;
         frame++
       ) {
         await tester.pump(const Duration(milliseconds: 50));
@@ -419,7 +420,7 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 10)),
         );
       }
-      expect(find.text('石刻预览'), findsOneWidget);
+      expect(find.text('里程碑详情'), findsOneWidget);
       expect(find.byTooltip('编辑里程碑'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.runAsync(() => db.deleteColony(secondColony.id));
@@ -446,8 +447,12 @@ void main() {
     await tester.enterText(find.widgetWithText(TextField, '里程碑标题'), '独立节点');
     await tester.tap(find.text('保存里程碑'));
     await settleDatabase(tester);
+    await tester.scrollUntilVisible(
+      find.text('独立节点'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('独立节点'), findsOneWidget);
-    expect(find.textContaining('独立里程碑 ·'), findsOneWidget);
     expect(
       (await tester.runAsync(() => db.listAllMilestones()))!
           .singleWhere((item) => item.milestone.title == '独立节点')
@@ -480,7 +485,7 @@ void main() {
     await settleDatabase(tester);
     await tester.tap(find.widgetWithText(CheckboxListTile, '同步一条蚁群日记'));
     await tester.enterText(find.widgetWithText(TextField, '里程碑标题'), '首批羽化');
-    await tester.enterText(find.widgetWithText(TextField, '里程碑说明（可选）'), '工蚁诞生');
+    await tester.enterText(find.widgetWithText(TextField, '里程碑描述（可选）'), '工蚁诞生');
     await tester.tap(find.text('保存里程碑'));
     await settleDatabase(tester);
     final milestones = await tester.runAsync(

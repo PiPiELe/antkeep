@@ -5,12 +5,53 @@ enum MilestoneArtwork {
   battle('种群之战', 'colony-battle.jpg'),
   brood('卵幼铺底', 'brood-nursery.jpg'),
   emergence('破茧新生', 'cocoon-emergence.jpg'),
-  firstWorker('文明第一步', 'first-worker.jpg');
+  firstWorker('文明第一步', 'first-worker.jpg'),
+  afterRain('雨后出行', 'after-rain.png'),
+  guardHome('守护家园', 'guard-home.png'),
+  abundantHarvest('资源丰收', 'abundant-harvest.png'),
+  colonyExpansion('群落扩张', 'colony-expansion.png'),
+  flourishingBrood('繁衍昌盛', 'flourishing-brood.png'),
+  crossingDanger('跨越险途', 'crossing-danger.png'),
+  sunMoon('日月同辉', 'sun-moon.png'),
+  legacy('传承之路', 'legacy.png');
 
   const MilestoneArtwork(this.label, this.fileName);
   final String label;
   final String fileName;
+  static const displayOrder = <MilestoneArtwork>[
+    brood,
+    emergence,
+    firstWorker,
+    battle,
+    hunt,
+    beetleHunt,
+    harvest,
+    afterRain,
+    crossingDanger,
+    guardHome,
+    abundantHarvest,
+    colonyExpansion,
+    flourishingBrood,
+    sunMoon,
+    legacy,
+  ];
   String get assetPath => 'assets/milestone/$fileName';
+  String get category => switch (this) {
+    MilestoneArtwork.brood ||
+    MilestoneArtwork.emergence ||
+    MilestoneArtwork.firstWorker ||
+    MilestoneArtwork.flourishingBrood => '种群发展',
+    MilestoneArtwork.hunt ||
+    MilestoneArtwork.beetleHunt ||
+    MilestoneArtwork.battle ||
+    MilestoneArtwork.guardHome ||
+    MilestoneArtwork.crossingDanger => '战斗征程',
+    MilestoneArtwork.harvest ||
+    MilestoneArtwork.abundantHarvest ||
+    MilestoneArtwork.colonyExpansion ||
+    MilestoneArtwork.legacy => '文明建设',
+    MilestoneArtwork.afterRain || MilestoneArtwork.sunMoon => '特殊事件',
+  };
 
   static MilestoneArtwork fromStorage(Object? value) {
     if (value == null) return MilestoneArtwork.harvest;
