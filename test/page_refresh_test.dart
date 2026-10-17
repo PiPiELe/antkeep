@@ -525,19 +525,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('memorial tabs remain fully visible at phone width', (
+  testWidgets('colony tab labels keep their size when switching pages', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const MaterialApp(home: HomePage()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('英灵殿').first);
-    await tester.pumpAndSettle();
-    expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isFalse);
-    expect(find.text('我的蚁群'), findsOneWidget);
-    expect(find.text('里程碑'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    const labels = ['我的蚁群', '总览', '英灵殿', '里程碑'];
+    Finder tab(String label) =>
+        find.descendant(of: find.byType(TabBar), matching: find.text(label));
+    final sizes = {
+      for (final label in labels) label: tester.getSize(tab(label)),
+    };
+    for (final label in labels) {
+      await tester.ensureVisible(tab(label));
+      await tester.tap(tab(label));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isTrue);
+      for (final label in labels) {
+        expect(tester.getSize(tab(label)), sizes[label]);
+      }
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('share selection handles empty data and retries failed loading', (

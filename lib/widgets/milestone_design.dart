@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../domain/milestone.dart';
@@ -220,47 +222,125 @@ class MilestoneHero extends StatelessWidget {
   const MilestoneHero({super.key});
 
   @override
-  Widget build(BuildContext context) => AspectRatio(
-    aspectRatio: 1.3,
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'assets/milestone/milestone-hero.png',
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-          ),
-          const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '微小的生命\n也能书写伟大的篇章',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'StoneSerif',
-                    fontSize: 21,
-                    color: Color(0xff352414),
-                    height: 1.5,
-                    fontWeight: FontWeight.w700,
-                  ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final scale = MediaQuery.textScalerOf(context).scale(18) / 18;
+      return SizedBox(
+        height: constraints.maxWidth / 1.12 + (scale - 1).clamp(0, 2) * 100,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Fade the artwork itself so every edge meets the page surface.
+            ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (bounds) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.white,
+                  Colors.white,
+                  Colors.transparent,
+                ],
+                stops: [0, .16, .78, 1],
+              ).createShader(bounds),
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.transparent,
+                    Colors.white,
+                    Colors.white,
+                    Colors.transparent,
+                  ],
+                  stops: [0, .08, .92, 1],
+                ).createShader(bounds),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Image.asset(
+                        'assets/milestone/milestone-hero.png',
+                        fit: BoxFit.cover,
+                        color: const Color(0x99000000),
+                        colorBlendMode: BlendMode.darken,
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: constraints.maxWidth / 1.3,
+                      child: ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (bounds) => const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.white],
+                          stops: [0, .22],
+                        ).createShader(bounds),
+                        child: Image.asset(
+                          'assets/milestone/milestone-hero.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 8),
-                Text(
-                  '— ANTKEEP —',
-                  style: TextStyle(
-                    fontSize: 9,
-                    letterSpacing: 2,
-                    color: Color(0xff574027),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
-    ),
+            const Positioned(
+              top: 10,
+              left: 20,
+              right: 20,
+              child: Text(
+                '记录重要的时刻\n让每一个值得铭记的瞬间，都被永远铭刻',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xffd6cbc0),
+                  height: 1.6,
+                  shadows: [Shadow(color: Colors.black87, blurRadius: 8)],
+                ),
+              ),
+            ),
+            Align(
+              alignment: const Alignment(0, .15),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 36),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '微小的生命\n也能书写伟大的篇章',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'StoneSerif',
+                        fontSize: 21,
+                        color: Color(0xff352414),
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '— ANTKEEP —',
+                      style: TextStyle(
+                        fontSize: 9,
+                        letterSpacing: 2,
+                        color: Color(0xff574027),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
   );
 }

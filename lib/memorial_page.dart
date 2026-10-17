@@ -475,10 +475,11 @@ class _MemorialPageState extends State<MemorialPage> {
                               color: Color(0xFF555B68),
                             ),
                             dropdownColor: const Color(0xFFFFFCF9),
-                            style: const TextStyle(
-                              color: Color(0xFF202027),
-                              fontSize: 13,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: const Color(0xFF202027),
+                                  fontSize: 13,
+                                ),
                             items: [
                               const DropdownMenuItem(
                                 value: '',
@@ -667,17 +668,31 @@ class _MemorialPageState extends State<MemorialPage> {
                   child: IgnorePointer(
                     child: Align(
                       alignment: Alignment.bottomCenter,
-                      child: ColorFiltered(
-                        colorFilter: _footerFilter(
-                          Theme.of(context).scaffoldBackgroundColor,
-                          Theme.of(context).brightness,
-                        ),
-                        child: Image.asset(
-                          'assets/memorial/memorial-render-footer.png',
-                          width: double.infinity,
-                          height: 110,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.bottomCenter,
+                      child: ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (bounds) => const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Color(0x40ffffff),
+                            Color(0xccffffff),
+                            Colors.white,
+                          ],
+                          stops: [0, .35, .7, 1],
+                        ).createShader(bounds),
+                        child: ColorFiltered(
+                          colorFilter: _footerFilter(
+                            Theme.of(context).scaffoldBackgroundColor,
+                            Theme.of(context).brightness,
+                          ),
+                          child: Image.asset(
+                            'assets/memorial/memorial-render-footer.png',
+                            width: double.infinity,
+                            height: MediaQuery.sizeOf(context).width / 2,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.bottomCenter,
+                          ),
                         ),
                       ),
                     ),

@@ -221,55 +221,53 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
                     await _items;
                   },
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+                    padding: EdgeInsets.zero,
                     children: [
-                      const Text(
-                        '记录重要的时刻\n让每一个值得铭记的瞬间，都被永远铭刻',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xffd6cbc0),
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
                       const MilestoneHero(),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          ChoiceChip(
-                            label: Text('全部 ${allItems.length}'),
-                            selected: _all,
-                            selectedColor: const Color(0xff87a4cf),
-                            onSelected: (_) => setState(() => _all = true),
-                          ),
-                          const SizedBox(width: 6),
-                          ChoiceChip(
-                            label: Text('我的里程碑 ${allItems.length}'),
-                            selected: !_all,
-                            selectedColor: const Color(0xff87a4cf),
-                            onSelected: (_) => setState(() => _all = false),
-                          ),
-                          const Spacer(),
-                          ActionChip(
-                            label: const Text('按时间'),
-                            avatar: const Icon(Icons.schedule, size: 16),
-                            onPressed: () =>
-                                setState(() => _newestFirst = !_newestFirst),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      if (items.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。')),
+                      for (final child in <Widget>[
+                        Row(
+                          children: [
+                            ChoiceChip(
+                              label: Text('全部 ${allItems.length}'),
+                              selected: _all,
+                              selectedColor: const Color(0xff87a4cf),
+                              onSelected: (_) => setState(() => _all = true),
+                            ),
+                            const SizedBox(width: 6),
+                            ChoiceChip(
+                              label: Text('我的里程碑 ${allItems.length}'),
+                              selected: !_all,
+                              selectedColor: const Color(0xff87a4cf),
+                              onSelected: (_) => setState(() => _all = false),
+                            ),
+                            const Spacer(),
+                            ActionChip(
+                              label: const Text('按时间'),
+                              avatar: const Icon(Icons.schedule, size: 16),
+                              onPressed: () =>
+                                  setState(() => _newestFirst = !_newestFirst),
+                            ),
+                          ],
                         ),
-                      for (final item in items)
-                        MilestoneListCard(
-                          milestone: item.milestone,
-                          onTap: () => _preview(item.milestone),
+                        const SizedBox(height: 10),
+                        if (items.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(
+                              child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。'),
+                            ),
+                          ),
+                        for (final item in items)
+                          MilestoneListCard(
+                            milestone: item.milestone,
+                            onTap: () => _preview(item.milestone),
+                          ),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: child,
                         ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 );

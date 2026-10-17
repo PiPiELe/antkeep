@@ -194,30 +194,26 @@ class _MilestonePageState extends State<MilestonePage> {
           }
           final milestones = snapshot.data!;
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 120),
+            padding: EdgeInsets.zero,
             children: [
-              const Text(
-                '记录重要的时刻\n让每一个值得铭记的瞬间，都被永远铭刻',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xffd6cbc0),
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 16),
               const MilestoneHero(),
-              const SizedBox(height: 14),
-              if (milestones.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。')),
+              for (final child in <Widget>[
+                if (milestones.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: Text('还没有里程碑，添加一个值得铭记的成长节点吧。')),
+                  ),
+                for (final milestone in milestones)
+                  MilestoneListCard(
+                    milestone: milestone,
+                    onTap: () => _preview(milestone),
+                  ),
+              ])
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: child,
                 ),
-              for (final milestone in milestones)
-                MilestoneListCard(
-                  milestone: milestone,
-                  onTap: () => _preview(milestone),
-                ),
+              const SizedBox(height: 120),
             ],
           );
         },
