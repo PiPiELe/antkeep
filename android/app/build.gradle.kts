@@ -45,6 +45,13 @@ android {
             else "${flutter.versionName}.$testRevision"
     }
 
+    // Flutter's ARM-only target still includes some transitive x86_64 libraries.
+    if (project.findProperty("target-platform")?.toString()?.split(",")?.toSet() ==
+        setOf("android-arm", "android-arm64")
+    ) {
+        packaging.jniLibs.excludes.add("lib/x86_64/**")
+    }
+
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {
