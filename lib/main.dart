@@ -8237,7 +8237,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ListTile(
           leading: const Icon(Icons.qr_code_2_outlined),
           title: const Text('交流群二维码'),
-          subtitle: const Text('微信、抖音交流群'),
+          subtitle: const Text('微信、抖音交流群与抖音联系'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const CommunityGroupsPage()),
