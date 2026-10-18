@@ -109,6 +109,11 @@ void main() {
     await tester.tap(find.text('外观与展示'));
     await tester.pumpAndSettle();
     Future<void> choose(String label) async {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
       await Scrollable.ensureVisible(
         tester.element(find.text(label)),
         alignment: 0.5,

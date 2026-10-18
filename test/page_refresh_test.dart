@@ -112,6 +112,16 @@ void main() {
               final filter = RegExp(r'WHERE (\w+) = \?')
                   .firstMatch(sql)
                   ?.group(1);
+              if (table == 'inventory_items' && sql.contains('hidden = 1')) {
+                return tables[table]!
+                    .where(
+                      (row) =>
+                          row['hidden'] == 1 &&
+                          (row['group_name'] ?? '') == arguments[0] &&
+                          row['name'] == arguments[1],
+                    )
+                    .toList();
+              }
               return tables[table]!
                   .where(
                     (row) => filter == null || row[filter] == arguments.first,
@@ -2067,10 +2077,8 @@ void main() {
           MaterialApp(
             key: UniqueKey(),
             theme: antKeepTheme(ThemeColor.forest),
-            builder: (context, child) => InterfaceStyleScope(
-              style: interface,
-              child: child!,
-            ),
+            builder: (context, child) =>
+                InterfaceStyleScope(style: interface, child: child!),
             home: const ColoniesPage(),
           ),
         );
@@ -2127,7 +2135,10 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(tester.widget<TextFormField>(price).controller!.text, previousPrice);
+      expect(
+        tester.widget<TextFormField>(price).controller!.text,
+        previousPrice,
+      );
       await tester.enterText(price, value);
       await tapSave(tester, '保存蚁群');
       expect(
@@ -3460,99 +3471,98 @@ void main() {
     expect(find.text('还没有记录'), findsNothing);
   });
 
+  Future<void> openInventory(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> inventoryTap(WidgetTester tester, String text) async {
+    final target = find.text(text).last;
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> inventoryEnter(
+    WidgetTester tester,
+    String hint,
+    String value,
+  ) async {
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) => widget is TextField && widget.decoration?.hintText == hint,
+      ),
+      value,
+    );
+    await tester.pumpAndSettle();
+  }
+
   testWidgets(
     'new inventory items appear immediately and cancellation adds nothing',
     (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('新增物品'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, '物品名称'), '测试新增物品');
-      await tester.tap(
-        find.byType(DropdownButtonFormField<InventoryExpiryType>),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('按购入后保质期').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextFormField, '保质期（月）'), '6');
-      await tester.tap(find.text('新增'));
-      await tester.pumpAndSettle();
+      await openInventory(tester);
+      await inventoryTap(tester, '新增物品');
+      await inventoryEnter(tester, '例如：EPP 泡沫箱', '测试新增物品');
+      await inventoryTap(tester, '支持有效期管理');
+      await inventoryTap(tester, '保存物品');
       expect(tester.takeException(), isNull);
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(find.byType(SnackBar), findsNothing);
       expect(find.text('测试新增物品'), findsOneWidget);
-      await tester.tap(find.text('新增物品'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, '物品名称'), '取消的物品');
-      await tester.tap(find.text('取消'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
+      expect(find.text('有效期可选'), findsOneWidget);
+      await inventoryTap(tester, '新增物品');
+      await inventoryEnter(tester, '例如：EPP 泡沫箱', '取消的物品');
+      await inventoryTap(tester, '取消');
       expect(find.text('取消的物品'), findsNothing);
       expect(tables['inventory_items'], hasLength(1));
-      expect(tables['inventory_items']!.single['shelf_life_months'], 6);
+      expect(tables['inventory_items']!.single['supports_expiry'], 1);
+      expect(tables['inventory_items']!.single['purchased'], 0);
     },
   );
 
-  testWidgets('aggregate items expand and purchase children independently', (
+  testWidgets('aggregate items expand and acquire children independently', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('新增物品'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('聚合物品'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, '一级物品名称'), '5 元蚁巢');
-    await tester.tap(find.text('新增'));
-    await tester.pumpAndSettle();
-    expect(find.text('请至少填写一个子物品'), findsOneWidget);
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '子物品（每行一个）'),
-      '干巢\n干巢',
-    );
-    await tester.tap(find.text('新增'));
-    await tester.pumpAndSettle();
-    expect(find.text('子物品名称不能重复'), findsOneWidget);
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '子物品（每行一个）'),
-      '干巢\n湿巢\n中活动区',
-    );
-    await tester.tap(find.text('新增'));
-    await tester.pumpAndSettle();
+    await openInventory(tester);
+    await inventoryTap(tester, '新增物品');
+    await inventoryEnter(tester, '例如：EPP 泡沫箱', '5 元蚁巢');
+    for (final spec in ['干巢', '湿巢']) {
+      await inventoryTap(tester, '添加规格');
+      await inventoryEnter(tester, '例如：20cm、30cm、加厚型', spec);
+      await inventoryTap(tester, '保存规格');
+    }
+    await inventoryTap(tester, '保存物品');
     expect(tester.takeException(), isNull);
     expect(tables['inventory_items'], hasLength(3));
-    expect(
-      tables['inventory_items']!.every((row) => row['group_name'] == '5 元蚁巢'),
-      isTrue,
-    );
     expect(find.text('推荐 (1)'), findsOneWidget);
-    await tester.tap(find.text('5 元蚁巢'));
-    await tester.pumpAndSettle();
     expect(find.text('干巢'), findsOneWidget);
-    expect(find.text('湿巢'), findsOneWidget);
-    expect(find.text('中活动区'), findsOneWidget);
-    await tester.tap(find.text('干巢'));
+    final acquire = find.byTooltip('添加入手 干巢');
+    await tester.ensureVisible(acquire);
+    await tester.tap(acquire);
     await tester.pumpAndSettle();
-    expect(find.text('5 元蚁巢 · 干巢'), findsOneWidget);
-    await tester.tap(find.text('添加'));
-    await tester.pumpAndSettle();
+    await inventoryTap(tester, '保存记录');
     expect(
       tables['inventory_items']!
           .where((row) => row['purchased'] == 1)
           .single['name'],
       '干巢',
     );
-    expect(find.text('已购 (1)'), findsOneWidget);
-    expect(find.text('5 元蚁巢 · 已购入'), findsOneWidget);
+    expect(find.text('已入手 (1)'), findsOneWidget);
+    expect(find.text('已入手 · 1 批'), findsOneWidget);
+    expect(
+      InventoryItem.fromMap(
+        tables['inventory_items']!.singleWhere((row) => row['name'] == '湿巢'),
+      ).records,
+      isEmpty,
+    );
   });
 
   testWidgets('existing aggregate adds a new size from its own card', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
     tables['inventory_items']!.add(
       InventoryItem(
         id: 'existing-tray',
@@ -3562,28 +3572,15 @@ void main() {
         createdAt: DateTime.now(),
       ).toMap(),
     );
-    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('喂食盘'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('添加规格'));
-    await tester.pumpAndSettle();
-    expect(find.text('所属物品：喂食盘'), findsOneWidget);
-    expect(find.text('一级物品名称'), findsNothing);
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '子物品（每行一个）'),
-      '铝制喂食盘',
-    );
-    await tester.tap(find.text('添加'));
-    await tester.pumpAndSettle();
+    await openInventory(tester);
+    await inventoryTap(tester, '喂食盘');
+    await inventoryTap(tester, '添加规格');
+    await inventoryEnter(tester, '例如：20cm、30cm、加厚型', '铝制喂食盘');
+    await inventoryTap(tester, '保存规格');
     expect(find.text('该规格已存在'), findsOneWidget);
     expect(tables['inventory_items'], hasLength(1));
-    await tester.enterText(
-      find.widgetWithText(TextFormField, '子物品（每行一个）'),
-      '陶瓷喂食盘',
-    );
-    await tester.tap(find.text('添加'));
-    await tester.pumpAndSettle();
+    await inventoryEnter(tester, '例如：20cm、30cm、加厚型', '陶瓷喂食盘');
+    await inventoryTap(tester, '保存规格');
     expect(tester.takeException(), isNull);
     expect(tables['inventory_items'], hasLength(2));
     expect(
@@ -3592,11 +3589,13 @@ void main() {
       )['group_name'],
       '喂食盘',
     );
-    expect(find.text('新规格已添加到「推荐」'), findsOneWidget);
-    expect(find.textContaining('陶瓷喂食盘'), findsWidgets);
+    expect(find.text('陶瓷喂食盘'), findsOneWidget);
+    expect(find.text('已入手 (0)'), findsOneWidget);
   });
 
-  testWidgets('inventory purchase changes refresh immediately', (tester) async {
+  testWidgets('inventory acquisition changes refresh immediately', (
+    tester,
+  ) async {
     await AppDatabase.instance.saveInventoryItem(
       InventoryItem(
         id: 'test-item',
@@ -3605,24 +3604,24 @@ void main() {
         createdAt: DateTime.now(),
       ),
     );
-    await tester.pumpWidget(const MaterialApp(home: InventoryPage()));
-    await tester.pumpAndSettle();
-    expect(find.text('点击添加'), findsOneWidget);
-    await tester.tap(find.text('测试物品'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, '数量（选填）'), '5');
-    await tester.tap(find.text('添加'));
-    await tester.pumpAndSettle();
+    await openInventory(tester);
+    await inventoryTap(tester, '测试物品');
+    await inventoryTap(tester, '直接记录入手');
+    await tester.enterText(find.byType(TextFormField).first, '5');
+    await inventoryTap(tester, '保存记录');
     expect(tester.takeException(), isNull);
-    expect(find.text('已购 (1)'), findsOneWidget);
+    expect(find.text('已入手 (1)'), findsOneWidget);
     expect(find.text('推荐 (1)'), findsOneWidget);
+    await inventoryTap(tester, '已入手 (1)');
     expect(find.text('测试物品'), findsOneWidget);
-    expect(find.text('已购入'), findsOneWidget);
-    expect(find.text('暂时没有推荐的物品。'), findsNothing);
-    await tester.tap(find.text('已购 (1)'));
-    await tester.pumpAndSettle();
-    expect(find.text('已购入'), findsOneWidget);
-    expect(find.textContaining('数量：'), findsNothing);
+    expect(find.text('数量 5'), findsOneWidget);
+    expect(
+      InventoryItem.fromMap(tables['inventory_items']!.single)
+          .records
+          .single
+          .quantity,
+      5,
+    );
   });
 
   testWidgets(

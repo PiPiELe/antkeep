@@ -66,12 +66,7 @@ List<PopulationPoint> colonyPopulationForecast(
       records
           .where((r) => r.colonyId == colony.id && !r.occurredAt.isAfter(now))
           .toList()
-        ..sort((a, b) {
-          final time = a.occurredAt.compareTo(b.occurredAt);
-          if (time != 0) return time;
-          final created = a.createdAt.compareTo(b.createdAt);
-          return created != 0 ? created : a.id.compareTo(b.id);
-        });
+        ..sort(CareRecord.comparePopulationOrder);
   int? valid(int? value) => value != null && value >= 0 ? value : null;
   var eggs = valid(colony.initialEggCount);
   var cocoons = valid(colony.initialCocoonCount);

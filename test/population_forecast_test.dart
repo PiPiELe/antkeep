@@ -2,6 +2,7 @@ import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/models.dart';
 import 'package:antkeep/domain/population_analysis.dart';
 import 'package:antkeep/domain/population_forecast.dart';
+import 'package:antkeep/domain/share_card_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -32,6 +33,39 @@ void main() {
       cocoons: cocoons,
       workers: workers,
     ),
+  );
+
+  test(
+    'same-time backfill agrees across current, forecast and share counts',
+    () {
+      final current = colony(larvae: 0);
+      final records = [
+        CareRecord(
+          id: 'growth:a:1',
+          colonyId: 'a',
+          type: CareRecordType.observation,
+          occurredAt: now,
+          createdAt: now,
+          note: '自动扩充（估算）',
+          workerCount: 21,
+        ),
+        CareRecord(
+          id: 'manual',
+          colonyId: 'a',
+          type: CareRecordType.observation,
+          occurredAt: now,
+          createdAt: now.add(const Duration(hours: 1)),
+          workerCount: 20,
+        ),
+      ];
+      expect(current.currentWorkerCount(records), 21);
+      expect(
+        colonyPopulationForecast(current, records, now: now).first.count,
+        21,
+      );
+      expect(shareSnapshot(current, records, now).workers.value, 21);
+      expect(shareSnapshot(current, records, now).workers.estimated, isTrue);
+    },
   );
 
   test('horizon never exceeds one calendar month, including month-end and leap years', () {

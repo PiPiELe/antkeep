@@ -889,6 +889,16 @@ void main() {
       await applicationDatabasePath(),
     );
     await raw.execute('ALTER TABLE inventory_items DROP COLUMN purpose');
+    for (final column in [
+      'hidden',
+      'category',
+      'icon_key',
+      'supports_expiry',
+      'spec_note',
+      'batches_json',
+    ]) {
+      await raw.execute('ALTER TABLE inventory_items DROP COLUMN $column');
+    }
     await raw.execute('ALTER TABLE milestones DROP COLUMN artwork');
     await raw.execute('DROP TABLE wild_catch_records');
     await raw.execute('''CREATE TABLE wild_catch_records (
@@ -930,6 +940,16 @@ void main() {
       await applicationDatabasePath(),
     );
     await raw.execute('ALTER TABLE inventory_items DROP COLUMN purpose');
+    for (final column in [
+      'hidden',
+      'category',
+      'icon_key',
+      'supports_expiry',
+      'spec_note',
+      'batches_json',
+    ]) {
+      await raw.execute('ALTER TABLE inventory_items DROP COLUMN $column');
+    }
     await raw.execute('ALTER TABLE milestones DROP COLUMN artwork');
     await raw.execute('DROP TABLE wild_catch_records');
     await raw.execute('''CREATE TABLE wild_catch_records (
@@ -961,6 +981,16 @@ void main() {
       await applicationDatabasePath(),
     );
     await raw.execute('ALTER TABLE inventory_items DROP COLUMN purpose');
+    for (final column in [
+      'hidden',
+      'category',
+      'icon_key',
+      'supports_expiry',
+      'spec_note',
+      'batches_json',
+    ]) {
+      await raw.execute('ALTER TABLE inventory_items DROP COLUMN $column');
+    }
     await raw.execute('ALTER TABLE milestones DROP COLUMN artwork');
     await raw.execute('DROP TABLE wild_catch_records');
     await raw.execute('''CREATE TABLE wild_catch_records (

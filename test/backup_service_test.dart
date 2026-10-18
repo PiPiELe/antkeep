@@ -447,6 +447,16 @@ void main() {
         WildCatchRecord(
           id: 'wild-catch',
           caughtAt: date,
+          startedAt: date,
+          endedAt: date,
+          events: [
+            WildCatchEvent(
+              at: date,
+              action: '照片',
+              detail: '添加照片',
+              photoPaths: ['wild.jpg', 'removed.jpg'],
+            ),
+          ],
           place: '山脚',
           photos: const ['wild.jpg'],
           species: const [
@@ -472,6 +482,14 @@ void main() {
       final imported = (await database.listWildCatchRecords()).single;
       expect(imported.photos, hasLength(1));
       expect(imported.photos.single, isNot('wild.jpg'));
+      expect(imported.events.single.photoPaths, [
+        imported.photos.single,
+        'removed.jpg',
+      ]);
+      expect(
+        imported.events.single.photoPaths.where(imported.photos.contains),
+        imported.photos,
+      );
       expect(await media.readImage(imported.photos.single), [4, 5, 6]);
       expect(imported.species.first.colonies, hasLength(2));
       await service.restoreBytes(bytes, mode: BackupRestoreMode.incremental);

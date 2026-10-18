@@ -21,6 +21,19 @@ final items = [
     createdAt: DateTime(2026, 10, 1),
     quantity: 0,
     purchasePriceCents: 1234,
+    purpose: '补充水分',
+    category: '喂食',
+    iconKey: 'box',
+    supportsExpiry: true,
+    specNote: '本地规格',
+    batches: [
+      InventoryBatch(
+        id: 'batch',
+        quantity: 0,
+        acquiredAt: DateTime(2026, 10, 1),
+        costCents: 1234,
+      ),
+    ],
   ),
   InventoryItem(
     id: 'tube',
@@ -145,7 +158,22 @@ void main() {
     final upload = h.uploads.single;
     expect(upload.headers['Authorization'], 'Bearer secret-session');
     final body = jsonDecode(upload.body) as Map<String, dynamic>;
-    expect(body['items'], [items.first.toMap()]);
+    expect(body['items'], [
+      {
+        'id': 'liquid',
+        'name': '营养液',
+        'group_name': null,
+        'purpose': '补充水分',
+        'purchased': 1,
+        'quantity': 0,
+        'purchase_price_cents': 1234,
+        'expiry_type': 'none',
+        'shelf_life_months': null,
+        'purchased_at': null,
+        'expires_at': null,
+        'created_at': '2026-10-01T00:00:00.000',
+      },
+    ]);
     expect(body['code'], 'UPLOAD01');
     expect(body['operationId'], isA<String>());
     expect((await h.live.inventoryPushStatus())['pushedToday'], true);

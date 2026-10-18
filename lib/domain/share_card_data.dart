@@ -55,12 +55,7 @@ ShareSnapshot shareSnapshot(
       records
           .where((r) => r.colonyId == colony.id && !r.occurredAt.isAfter(at))
           .toList()
-        ..sort((a, b) {
-          final time = a.occurredAt.compareTo(b.occurredAt);
-          if (time != 0) return time;
-          final created = a.createdAt.compareTo(b.createdAt);
-          return created != 0 ? created : a.id.compareTo(b.id);
-        });
+        ..sort(CareRecord.comparePopulationOrder);
   for (final record in sorted) {
     final queens = values['蚁后']!.value;
     if (queens != null && record.queenDeaths > 0) {
@@ -69,8 +64,17 @@ ShareSnapshot shareSnapshot(
         recordedAt: record.occurredAt,
       );
     }
+    final previousWorkers = values['工蚁']!;
+    if (record.workerCount != null || record.workerDeaths > 0) {
+      values['工蚁'] = ShareQuantity(
+        record.workerCountAfter(previousWorkers.value),
+        estimated: record.workerCount != null
+            ? isEstimatedRecord(record)
+            : previousWorkers.estimated,
+        recordedAt: record.occurredAt,
+      );
+    }
     final entries = {
-      '工蚁': record.workerCount,
       '卵': record.eggCount,
       '幼虫': record.larvaCount,
       '茧': record.pupaCount,

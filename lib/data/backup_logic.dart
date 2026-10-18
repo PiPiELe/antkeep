@@ -174,6 +174,19 @@ mixin BackupLogic {
           for (final source in jsonDecode(photos) as List) renamed[source]!,
         ]);
       }
+      final events = row['events_json'];
+      if (events is String && events.isNotEmpty) {
+        row['events_json'] = jsonEncode([
+          for (final event in jsonDecode(events) as List)
+            {
+              ...event as Map,
+              'photo_paths': [
+                for (final source in event['photo_paths'] as List? ?? const [])
+                  renamed[source] ?? source,
+              ],
+            },
+        ]);
+      }
     }
     for (final row in added['milestones'] as List? ?? const []) {
       final photo = row['photo_path'];

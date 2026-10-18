@@ -31,6 +31,48 @@ void main() {
     photos: photos,
   );
 
+  test(
+    'worker deaths preserve unknown and estimated counts and explicit totals',
+    () {
+      final at = DateTime(2026, 9, 2);
+      CareRecord death(String id, int amount, {int? total}) => CareRecord(
+        id: id,
+        colonyId: colony.id,
+        type: CareRecordType.mortality,
+        occurredAt: at,
+        createdAt: at,
+        workerMortalityCount: amount,
+        workerCount: total,
+      );
+      expect(shareSnapshot(colony, [death('d', 3)], at).workers.value, 2);
+      expect(shareSnapshot(colony, [death('d', 30)], at).workers.value, 0);
+      expect(
+        shareSnapshot(colony, [death('d', 3, total: 8)], at).workers.value,
+        8,
+      );
+      final unknown = Colony(id: 'c', name: '未知', createdAt: at, updatedAt: at);
+      expect(shareSnapshot(unknown, [death('d', 3)], at).workers.value, isNull);
+      final estimated = shareSnapshot(colony, [
+        record(
+          'growth:c:1',
+          DateTime(2026, 9, 1),
+          workers: 10,
+          note: '自动扩充（估算）',
+        ),
+        death('d', 3),
+      ], at).workers;
+      expect(estimated.value, 7);
+      expect(estimated.estimated, isTrue);
+      final month = ShareMonth(
+        colony,
+        [death('d', 3)],
+        DateTime(2026, 9),
+        DateTime(2026, 10),
+      );
+      expect(month.change, '工蚁 -3');
+    },
+  );
+
   test('snapshots keep latest per stage, zero differs from unknown and future excluded', () {
     final snapshot = shareSnapshot(colony, [
       record('2', DateTime(2026, 9, 3), eggs: 0),

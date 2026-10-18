@@ -366,7 +366,24 @@ class OnlineController extends ChangeNotifier {
     return _authenticatedRequest(
       '/api/app/inventory-pushes',
       body: {
-        'items': items.map((item) => item.toMap()).toList(),
+        // Keep the upload contract independent of local database columns.
+        'items': [
+          for (final item in items)
+            {
+              'id': item.id,
+              'name': item.name,
+              'group_name': item.groupName,
+              'purpose': item.purpose,
+              'purchased': item.purchased ? 1 : 0,
+              'quantity': item.quantity,
+              'purchase_price_cents': item.purchasePriceCents,
+              'expiry_type': item.expiryType.storageValue,
+              'shelf_life_months': item.shelfLifeMonths,
+              'purchased_at': item.purchasedAt?.toIso8601String(),
+              'expires_at': item.expiresAt?.toIso8601String(),
+              'created_at': item.createdAt.toIso8601String(),
+            },
+        ],
         'code': code,
         'operationId': operationId,
       },
