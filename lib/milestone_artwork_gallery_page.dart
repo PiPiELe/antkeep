@@ -46,7 +46,7 @@ class _MilestoneArtworkGalleryPageState
                     labelStyle: TextStyle(
                       color: _filter == filter
                           ? MilestoneDesign.background
-                          : Colors.white,
+                          : MilestoneDesign.textColor(context),
                     ),
                   );
                 },

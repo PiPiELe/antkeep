@@ -674,7 +674,10 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           ),
           const Text('照片会放在石刻海报下方，并保存在本机。'),
           const SizedBox(height: 12),
-          const Text('预览效果', style: TextStyle(color: MilestoneDesign.muted)),
+          Text(
+            '预览效果',
+            style: TextStyle(color: MilestoneDesign.mutedColor(context)),
+          ),
           const SizedBox(height: 7),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),

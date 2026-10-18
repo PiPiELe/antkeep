@@ -571,8 +571,8 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
                     icon: const Icon(Icons.share_outlined),
                     label: Text(_busy ? '生成中…' : '转发分享'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: MilestoneDesign.surface,
-                      foregroundColor: Colors.white,
+                      backgroundColor: MilestoneDesign.surfaceColor(context),
+                      foregroundColor: MilestoneDesign.textColor(context),
                     ),
                   ),
                 ),
@@ -612,7 +612,7 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
             ),
             const SizedBox(height: 14),
             Container(
-              decoration: MilestoneDesign.panel(),
+              decoration: MilestoneDesign.panel(context),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,7 +644,7 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
   Widget _detailRow(IconData icon, String label, String value) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Icon(icon, color: MilestoneDesign.muted, size: 18),
+      Icon(icon, color: MilestoneDesign.mutedColor(context), size: 18),
       const SizedBox(width: 12),
       Expanded(
         child: Column(
@@ -652,14 +652,17 @@ class _MilestoneSharePageState extends State<MilestoneSharePage> {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: MilestoneDesign.muted,
+              style: TextStyle(
+                color: MilestoneDesign.mutedColor(context),
                 fontSize: 12,
               ),
             ),
             Text(
               value,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: TextStyle(
+                color: MilestoneDesign.textColor(context),
+                fontSize: 14,
+              ),
             ),
           ],
         ),

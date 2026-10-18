@@ -191,7 +191,7 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
   Widget _buildCurrent(BuildContext context) => Theme(
     data: MilestoneDesign.theme(context),
     child: ColoredBox(
-      color: MilestoneDesign.background,
+      color: MilestoneDesign.backgroundColor(context),
       child: Column(
         children: [
           Expanded(
@@ -225,7 +225,10 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
                     children: [
                       const MilestoneHero(),
                       for (final child in <Widget>[
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             ChoiceChip(
                               label: Text('全部 ${allItems.length}'),
@@ -233,14 +236,12 @@ class _MilestonesOverviewPageState extends State<MilestonesOverviewPage> {
                               selectedColor: const Color(0xff87a4cf),
                               onSelected: (_) => setState(() => _all = true),
                             ),
-                            const SizedBox(width: 6),
                             ChoiceChip(
                               label: Text('我的里程碑 ${allItems.length}'),
                               selected: !_all,
                               selectedColor: const Color(0xff87a4cf),
                               onSelected: (_) => setState(() => _all = false),
                             ),
-                            const Spacer(),
                             ActionChip(
                               label: const Text('按时间'),
                               avatar: const Icon(Icons.schedule, size: 16),
