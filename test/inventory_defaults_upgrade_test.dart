@@ -66,9 +66,48 @@ void main() {
         )''');
           await db.execute('''CREATE UNIQUE INDEX inventory_name_in_group
           ON inventory_items(COALESCE(group_name, ''), name)''');
-          await db.insert('inventory_items', cotton.toMap()..remove('purpose'));
-          await db.insert('inventory_items', custom.toMap()..remove('purpose'));
-          await db.insert('inventory_items', tube.toMap()..remove('purpose'));
+          await db.insert(
+            'inventory_items',
+            cotton.toMap()..removeWhere(
+              (key, _) => const {
+                'purpose',
+                'category',
+                'icon_key',
+                'supports_expiry',
+                'spec_note',
+                'batches_json',
+                'hidden',
+              }.contains(key),
+            ),
+          );
+          await db.insert(
+            'inventory_items',
+            custom.toMap()..removeWhere(
+              (key, _) => const {
+                'purpose',
+                'category',
+                'icon_key',
+                'supports_expiry',
+                'spec_note',
+                'batches_json',
+                'hidden',
+              }.contains(key),
+            ),
+          );
+          await db.insert(
+            'inventory_items',
+            tube.toMap()..removeWhere(
+              (key, _) => const {
+                'purpose',
+                'category',
+                'icon_key',
+                'supports_expiry',
+                'spec_note',
+                'batches_json',
+                'hidden',
+              }.contains(key),
+            ),
+          );
         },
       );
       await old.close();

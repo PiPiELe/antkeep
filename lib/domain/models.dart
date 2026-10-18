@@ -44,7 +44,8 @@ class Colony {
   final int? purchasePriceCents;
 
   String? get purchasePriceText => formatPurchasePrice(purchasePriceCents);
-  ColonyPriceTier? get priceTier => ColonyPriceTier.fromCents(purchasePriceCents);
+  ColonyPriceTier? get priceTier =>
+      ColonyPriceTier.fromCents(purchasePriceCents);
   final int? queenCount;
   final int? specializedCount;
   final bool showSpecialized;
@@ -350,6 +351,12 @@ class InventoryItem {
     this.purchasePriceCents,
     this.groupName,
     this.purpose,
+    this.category,
+    this.iconKey,
+    this.supportsExpiry,
+    this.specNote,
+    this.batches,
+    this.hidden = false,
   });
 
   final String id;
@@ -364,6 +371,63 @@ class InventoryItem {
   final int? purchasePriceCents;
   final String? groupName;
   final String? purpose;
+  final bool hidden;
+  final String? category;
+  final String? iconKey;
+  final bool? supportsExpiry;
+  final String? specNote;
+  // Null denotes a legacy row; an empty list denotes no acquisition records.
+  final List<InventoryBatch>? batches;
+
+  String get productName => groupLabel ?? name;
+  bool get allowsExpiry =>
+      supportsExpiry ?? expiryType != InventoryExpiryType.none;
+  String get categoryLabel => category ?? defaultInventoryCategory(productName);
+  List<InventoryBatch> get records =>
+      batches ??
+      [
+        if (purchased)
+          InventoryBatch(
+            id: 'legacy-$id',
+            quantity: quantity,
+            costCents: purchasePriceCents,
+            acquiredAt: purchasedAt,
+            expiresAt: effectiveExpiryDate(),
+            note: purpose,
+          ),
+      ];
+
+  InventoryItem withRecords(List<InventoryBatch> records) {
+    final dates =
+        records
+            .where((r) => r.quantity != 0 && r.expiresAt != null)
+            .map((r) => r.expiresAt!)
+            .toList()
+          ..sort();
+    final acquired =
+        records
+            .where((r) => r.acquiredAt != null)
+            .map((r) => r.acquiredAt!)
+            .toList()
+          ..sort();
+    final costs = records.where((r) => r.costCents != null).toList();
+    return InventoryItem.fromMap({
+      ...toMap(),
+      'batches_json': jsonEncode(records.map((r) => r.toMap()).toList()),
+      'supports_expiry': allowsExpiry ? 1 : 0,
+      'purchased': records.isEmpty ? 0 : 1,
+      'quantity': records.isEmpty || records.any((r) => r.quantity == null)
+          ? null
+          : records.fold<int>(0, (sum, r) => sum + r.quantity!),
+      'purchase_price_cents': costs.isEmpty
+          ? null
+          : costs.fold<int>(0, (sum, r) => sum + r.costCents!),
+      'purchased_at': acquired.isEmpty ? null : acquired.last.toIso8601String(),
+      'expiry_type': dates.isEmpty ? 'none' : 'fixed_date',
+      'expires_at': dates.isEmpty ? null : dates.first.toIso8601String(),
+      'shelf_life_months': null,
+    });
+  }
 
   String? get groupLabel =>
       groupName ??
@@ -410,6 +474,16 @@ class InventoryItem {
     purchasePriceCents: map['purchase_price_cents'] as int?,
     groupName: map['group_name'] as String?,
     purpose: map['purpose'] as String?,
+    hidden: map['hidden'] == 1,
+    category: map['category'] as String?,
+    iconKey: map['icon_key'] as String?,
+    supportsExpiry: map['supports_expiry'] == null
+        ? null
+        : map['supports_expiry'] == 1,
+    specNote: map['spec_note'] as String?,
+    batches: map['batches_json'] == null
+        ? null
+        : InventoryBatch.decode(map['batches_json'] as String),
   );
 
   Map<String, Object?> toMap() => {
@@ -425,7 +499,117 @@ class InventoryItem {
     'purchase_price_cents': purchasePriceCents,
     'group_name': groupName,
     'purpose': purpose,
+    'hidden': hidden ? 1 : 0,
+    'category': category,
+    'icon_key': iconKey,
+    'supports_expiry': supportsExpiry == null
+        ? null
+        : supportsExpiry!
+        ? 1
+        : 0,
+    'spec_note': specNote,
+    'batches_json': batches == null
+        ? null
+        : jsonEncode(batches!.map((r) => r.toMap()).toList()),
   };
+}
+
+const inventoryCategories = ['喂食', '工具', '环境', '巢室', '生活', '其他'];
+
+String defaultInventoryCategory(String name) {
+  if (RegExp('喂食|营养|色素|喂水').hasMatch(name)) return '喂食';
+  if (RegExp('恒温|泡沫|温湿|防逃|小灯').hasMatch(name)) return '环境';
+  if (RegExp('巢|试管|离心管|软管|海绵').hasMatch(name)) return '巢室';
+  if (RegExp('棉|玻璃纸').hasMatch(name)) return '生活';
+  return '工具';
+}
+
+class InventoryBatch {
+  const InventoryBatch({
+    required this.id,
+    required this.quantity,
+    required this.acquiredAt,
+    this.costCents,
+    this.expiresAt,
+    this.note,
+  });
+  final String id;
+  final int? quantity;
+  final DateTime? acquiredAt;
+  final int? costCents;
+  final DateTime? expiresAt;
+  final String? note;
+
+  // Date-only expiry: a batch remains valid throughout its expiry day.
+  int? daysRemaining([DateTime? now]) {
+    if (expiresAt == null || quantity == 0) return null;
+    final today = now ?? DateTime.now();
+    return DateTime.utc(
+      expiresAt!.year,
+      expiresAt!.month,
+      expiresAt!.day,
+    ).difference(DateTime.utc(today.year, today.month, today.day)).inDays;
+  }
+
+  bool isExpired([DateTime? now]) => (daysRemaining(now) ?? 0) < 0;
+  bool isExpiring([DateTime? now]) {
+    final days = daysRemaining(now);
+    return days != null && days >= 0 && days <= 7;
+  }
+
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'quantity': quantity,
+    'acquired_at': acquiredAt?.toIso8601String(),
+    'cost_cents': costCents,
+    'expires_at': expiresAt?.toIso8601String(),
+    'note': note,
+  };
+  factory InventoryBatch.fromMap(Map<String, dynamic> map) {
+    final batch = InventoryBatch(
+      id: map['id'] as String,
+      quantity: map['quantity'] as int?,
+      costCents: map['cost_cents'] as int?,
+      acquiredAt: _dateOrNull(map['acquired_at']),
+      expiresAt: _dateOrNull(map['expires_at']),
+      note: map['note'] as String?,
+    );
+    if (batch.id.isEmpty ||
+        (batch.quantity ?? 0) < 0 ||
+        (batch.costCents ?? 0) < 0 ||
+        (batch.note?.length ?? 0) > 200) {
+      throw const FormatException('入手记录格式无效');
+    }
+    return batch;
+  }
+  static List<InventoryBatch> decode(String source) {
+    final ids = <String>{};
+    final records = (jsonDecode(source) as List)
+        .map(
+          (entry) =>
+              InventoryBatch.fromMap(Map<String, dynamic>.from(entry as Map)),
+        )
+        .toList();
+    if (records.any((r) => !ids.add(r.id))) {
+      throw const FormatException('入手记录 ID 重复');
+    }
+    return records;
+  }
+}
+
+bool inventoryMatches(String query, Iterable<String?> values) {
+  final needle = query.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  if (needle.isEmpty) return true;
+  return values.any((value) {
+    final text = (value ?? '').toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    var index = 0;
+    for (final char in needle.runes) {
+      index = text.indexOf(String.fromCharCode(char), index);
+      if (index < 0) return false;
+      index++;
+    }
+    return true;
+  });
 }
 
 enum InventoryExpiryType {

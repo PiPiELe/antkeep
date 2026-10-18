@@ -36,6 +36,7 @@ void main() {
         path,
         version: 31,
         onCreate: (db, _) async {
+          await db.execute('CREATE TABLE milestones (id TEXT PRIMARY KEY)');
           await db.execute('''CREATE TABLE inventory_items (
           id TEXT PRIMARY KEY, name TEXT NOT NULL, group_name TEXT,
           purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,

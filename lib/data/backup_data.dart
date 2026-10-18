@@ -180,6 +180,8 @@ class BackupData {
                 'archived',
                 'show_specialized',
                 'purchased',
+                'supports_expiry',
+                'hidden',
                 'record_type',
                 'feeder_type',
                 'expiry_type',

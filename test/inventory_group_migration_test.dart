@@ -66,7 +66,13 @@ void main() {
             'inventory_items',
             legacy.toMap()
               ..remove('group_name')
-              ..remove('purpose'),
+              ..remove('purpose')
+              ..remove('category')
+              ..remove('icon_key')
+              ..remove('supports_expiry')
+              ..remove('spec_note')
+              ..remove('batches_json')
+              ..remove('hidden'),
           );
         },
       );

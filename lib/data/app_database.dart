@@ -45,7 +45,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 33,
+      version: 34,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -313,6 +313,20 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       await database.execute(
         'ALTER TABLE milestones ADD COLUMN photo_path TEXT',
       );
+    }
+    if (oldVersion >= 13 && oldVersion < 34) {
+      for (final column in [
+        'hidden INTEGER NOT NULL DEFAULT 0',
+        'category TEXT',
+        'icon_key TEXT',
+        'supports_expiry INTEGER CHECK (supports_expiry IN (0, 1))',
+        'spec_note TEXT',
+        'batches_json TEXT',
+      ]) {
+        await database.execute(
+          'ALTER TABLE inventory_items ADD COLUMN $column',
+        );
+      }
     }
   }
 
@@ -874,6 +888,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   static Future<void> _createInventoryTable(DatabaseExecutor executor) async {
     await executor.execute('''CREATE TABLE inventory_items (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, group_name TEXT, purpose TEXT,
+        hidden INTEGER NOT NULL DEFAULT 0, category TEXT, icon_key TEXT, supports_expiry INTEGER CHECK (supports_expiry IN (0, 1)),
+        spec_note TEXT, batches_json TEXT,
         purchased INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
         expiry_type TEXT NOT NULL DEFAULT 'none', shelf_life_months INTEGER,
         purchased_at TEXT, expires_at TEXT,
@@ -1765,6 +1781,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
 
   Future<List<InventoryItem>> listInventory() async => (await _db.query(
     'inventory_items',
+    where: 'hidden = 0',
     orderBy: 'purchased ASC, name COLLATE NOCASE ASC',
   )).map(InventoryItem.fromMap).toList();
 
@@ -1789,6 +1806,117 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       for (final item in items) {
         await transaction.insert('inventory_items', item.toMap());
       }
+    });
+  }
+
+  /// Catalog edits are atomic and never replace acquisition records.
+  Future<void> saveInventoryCatalog(List<InventoryItem> items) async {
+    await _db.transaction((txn) async {
+      for (final item in items) {
+        final rows = await txn.query(
+          'inventory_items',
+          where: 'id = ?',
+          whereArgs: [item.id],
+        );
+        if (rows.isEmpty) {
+          final hidden = await txn.query(
+            'inventory_items',
+            where: "hidden = 1 AND COALESCE(group_name, '') = ? AND name = ?",
+            whereArgs: [item.groupName ?? '', item.name],
+          );
+          if (hidden.isEmpty) {
+            await txn.insert('inventory_items', item.toMap());
+          } else {
+            await txn.update(
+              'inventory_items',
+              {...item.toMap(), 'id': hidden.single['id'], 'hidden': 0},
+              where: 'id = ?',
+              whereArgs: [hidden.single['id']],
+            );
+          }
+        } else {
+          final current = InventoryItem.fromMap(rows.single);
+          await txn.update(
+            'inventory_items',
+            {
+              'name': item.name, 'group_name': item.groupName,
+              'purpose': item.purpose, 'category': item.categoryLabel,
+              'icon_key': item.iconKey,
+              'supports_expiry': item.allowsExpiry ? 1 : 0,
+              'spec_note': item.specNote,
+              // Materialize legacy dates before changing the catalog capability.
+              'batches_json': jsonEncode(
+                current.records.map((r) => r.toMap()).toList(),
+              ),
+            },
+            where: 'id = ?',
+            whereArgs: [item.id],
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> saveInventoryBatch(
+    String itemId,
+    InventoryBatch record, {
+    InventoryItem? newItem,
+  }) => _changeInventoryBatch(itemId, record.id, record, newItem: newItem);
+
+  Future<void> deleteInventoryBatch(String itemId, String recordId) =>
+      _changeInventoryBatch(itemId, recordId, null);
+
+  Future<void> _changeInventoryBatch(
+    String itemId,
+    String recordId,
+    InventoryBatch? record, {
+    InventoryItem? newItem,
+  }) async {
+    if (record != null) InventoryBatch.fromMap(record.toMap());
+    await _db.transaction((txn) async {
+      final rows = await txn.query(
+        'inventory_items',
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+      if (rows.isEmpty && newItem == null) throw StateError('物品已不存在，请刷新后重试');
+      final item = rows.isEmpty ? newItem! : InventoryItem.fromMap(rows.single);
+      if (rows.isEmpty) await txn.insert('inventory_items', item.toMap());
+      final records = [...item.records];
+      final index = records.indexWhere((r) => r.id == recordId);
+      if (record == null) {
+        records.removeWhere((r) => r.id == recordId);
+      } else if (index < 0) {
+        records.add(record);
+      } else {
+        records[index] = record;
+      }
+      await txn.update(
+        'inventory_items',
+        item.withRecords(records).toMap(),
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+    });
+  }
+
+  Future<void> deleteInventorySpec(String itemId) async {
+    await _db.transaction((txn) async {
+      final rows = await txn.query(
+        'inventory_items',
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+      if (rows.isEmpty) return;
+      if (InventoryItem.fromMap(rows.single).records.isNotEmpty) {
+        throw StateError('该规格已有入手记录，请先处理关联记录');
+      }
+      await txn.update(
+        'inventory_items',
+        {'hidden': 1},
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
     });
   }
 

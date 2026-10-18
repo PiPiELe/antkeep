@@ -89,6 +89,7 @@ flutter:
     - assets/memorial/
     - assets/overview/
     - assets/milestone/
+    - assets/images/inventory-placeholder.png
     - assets/images/default-ant-cover.png
     - assets/images/lottery-night-background.png
     - assets/images/lottery-result-wait.png
