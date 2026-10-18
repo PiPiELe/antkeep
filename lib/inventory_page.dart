@@ -4,11 +4,15 @@ import 'package:uuid/uuid.dart';
 import 'data/app_database.dart';
 import 'domain/models.dart';
 import 'domain/purchase_price.dart';
+import 'online/content.dart';
+import 'online/online_controller.dart';
+import 'online/runtime.dart';
 
 part 'inventory_sheets.dart';
 
 class InventoryPage extends StatefulWidget {
-  const InventoryPage({super.key});
+  const InventoryPage({super.key, this.controller});
+  final OnlineController? controller;
   @override
   State<InventoryPage> createState() => _InventoryPageState();
 }
@@ -38,7 +42,15 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Future<void> _editProduct(List<InventoryItem>? items) async {
-    final changed = await _sheet<String>(context, _ItemEditor(items: items));
+    final changed = await _sheet<String>(
+      context,
+      _ItemEditor(
+        items: items,
+        templates: (widget.controller ?? onlineController).content.templates
+            .where((template) => template.enabled)
+            .toList(),
+      ),
+    );
     if (changed != null && mounted) {
       setState(() {
         _expanded = changed;
@@ -77,6 +89,7 @@ class _InventoryPageState extends State<InventoryPage> {
       category: group.first.categoryLabel,
       iconKey: group.first.iconKey,
       supportsExpiry: group.first.allowsExpiry,
+      shelfLifeMonths: group.first.shelfLifeMonths,
     ),
   );
 

@@ -200,8 +200,9 @@ Future<bool> _confirmDelete(BuildContext context, String message) async =>
     true;
 
 class _ItemEditor extends StatefulWidget {
-  const _ItemEditor({this.items});
+  const _ItemEditor({this.items, this.templates = const []});
   final List<InventoryItem>? items;
+  final List<ItemTemplate> templates;
   @override
   State<_ItemEditor> createState() => _ItemEditorState();
 }
@@ -220,6 +221,14 @@ class _ItemEditorState extends State<_ItemEditor> {
       : _itemIcon(widget.items!.first);
   late bool _expiry = widget.items?.first.allowsExpiry ?? false;
   final _newSpecs = <({String name, String? note})>[];
+  ItemTemplate? _template;
+  String? _templateUnit;
+  int? get _months => _template?.months ?? widget.items?.first.shelfLifeMonths;
+  List<({String name, String? note})> get _draftSpecs => [
+    if (_templateUnit != null && !_newSpecs.any((s) => s.name == _templateUnit))
+      (name: _templateUnit!, note: null),
+    ..._newSpecs,
+  ];
   bool _busy = false;
   String? _error;
   @override
@@ -227,6 +236,52 @@ class _ItemEditorState extends State<_ItemEditor> {
     _name.dispose();
     _purpose.dispose();
     super.dispose();
+  }
+
+  Future<void> _chooseTemplate() async {
+    final selected = await showDialog<ItemTemplate>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('选择物品模板'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 360),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: widget.templates.length,
+              itemBuilder: (context, index) {
+                final template = widget.templates[index];
+                return ListTile(
+                  title: Text(template.name),
+                  subtitle: Text(
+                    '${template.category} · ${template.unit} · '
+                    '${template.months == null ? '无默认有效期' : '保质期 ${template.months} 个月'}',
+                  ),
+                  onTap: () => Navigator.pop(context, template),
+                );
+              },
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _template = selected;
+      _name.text = selected.name;
+      _category = inventoryCategories.contains(selected.category)
+          ? selected.category
+          : defaultInventoryCategory(selected.name);
+      _expiry = selected.months != null;
+      _templateUnit = selected.unit;
+    });
   }
 
   Future<void> _chooseIcon() async {
@@ -242,7 +297,7 @@ class _ItemEditorState extends State<_ItemEditor> {
       context,
       _SpecEditor(
         draftNames: {
-          ..._newSpecs.map((s) => s.name),
+          ..._draftSpecs.map((s) => s.name),
           ...?widget.items
               ?.where((i) => i.groupLabel != null)
               .map((i) => i.childLabel),
@@ -275,6 +330,7 @@ class _ItemEditorState extends State<_ItemEditor> {
               name: name,
               purchased: false,
               createdAt: DateTime.now(),
+              shelfLifeMonths: _months,
             ),
           ];
       final items = [
@@ -288,7 +344,7 @@ class _ItemEditorState extends State<_ItemEditor> {
             'icon_key': _icon,
             'supports_expiry': _expiry ? 1 : 0,
           }),
-        for (final spec in _newSpecs)
+        for (final spec in _draftSpecs)
           InventoryItem(
             id: const Uuid().v4(),
             name: spec.name,
@@ -297,6 +353,7 @@ class _ItemEditorState extends State<_ItemEditor> {
             category: _category,
             iconKey: _icon,
             supportsExpiry: _expiry,
+            shelfLifeMonths: _months,
             specNote: spec.note,
             purchased: false,
             createdAt: DateTime.now(),
@@ -332,6 +389,15 @@ class _ItemEditorState extends State<_ItemEditor> {
                   : '调整物品资料；已有入手记录与历史有效期会保留。',
               size: 11,
             ),
+            if (widget.items == null && widget.templates.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _chooseTemplate,
+                icon: const Icon(Icons.playlist_add, size: 18),
+                label: const Text('从模板填写'),
+              ),
+              _muted(context, '可选；填入名称、分类、单位规格和默认保质期。', size: 10),
+            ],
             const SizedBox(height: 18),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -368,7 +434,7 @@ class _ItemEditorState extends State<_ItemEditor> {
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _name,
-                        maxLength: 50,
+                        maxLength: 200,
                         decoration: const InputDecoration(
                           hintText: '例如：EPP 泡沫箱',
                           counterText: '',
@@ -426,10 +492,13 @@ class _ItemEditorState extends State<_ItemEditor> {
             Wrap(
               spacing: 6,
               children: [
-                for (final spec in _newSpecs)
+                for (final spec in _draftSpecs)
                   InputChip(
                     label: Text(spec.name),
-                    onDeleted: () => setState(() => _newSpecs.remove(spec)),
+                    onDeleted: () => setState(() {
+                      if (spec.name == _templateUnit) _templateUnit = null;
+                      _newSpecs.remove(spec);
+                    }),
                   ),
               ],
             ),
@@ -454,6 +523,12 @@ class _ItemEditorState extends State<_ItemEditor> {
               value: _expiry,
               onChanged: (value) => setState(() => _expiry = value),
             ),
+            if (_expiry && _months != null)
+              _muted(
+                context,
+                '默认保质期 $_months 个月；新增入手时预填到期日期，可修改或关闭。',
+                size: 10,
+              ),
             _muted(context, '每批入手均可不填写有效期。关闭此项不会清除历史记录的到期时间。', size: 10),
           ],
         ),
@@ -560,6 +635,7 @@ class _SpecEditorState extends State<_SpecEditor> {
             purpose: base.purpose,
             iconKey: base.iconKey,
             supportsExpiry: base.allowsExpiry,
+            shelfLifeMonths: base.shelfLifeMonths,
           );
       final updated = InventoryItem.fromMap({
         ...spec.toMap(),
@@ -709,7 +785,10 @@ class _RecordEditorState extends State<_RecordEditor> {
   late DateTime? _acquired = widget.record == null
       ? DateTime.now()
       : widget.record!.acquiredAt;
-  late DateTime? _expires = widget.record?.expiresAt;
+  late DateTime? _expires = widget.record == null
+      ? widget.item.suggestedExpiryDate(_acquired!)
+      : widget.record!.expiresAt;
+  late bool _defaultExpiry = widget.record == null && _expires != null;
   late bool _expiryEnabled = _expires != null;
   bool _busy = false;
   String? _error;
@@ -733,8 +812,12 @@ class _RecordEditorState extends State<_RecordEditor> {
       setState(() {
         if (expiry) {
           _expires = chosen;
+          _defaultExpiry = false;
         } else {
           _acquired = chosen;
+          if (_defaultExpiry) {
+            _expires = widget.item.suggestedExpiryDate(chosen);
+          }
         }
       });
     }

@@ -425,7 +425,6 @@ class InventoryItem {
       'purchased_at': acquired.isEmpty ? null : acquired.last.toIso8601String(),
       'expiry_type': dates.isEmpty ? 'none' : 'fixed_date',
       'expires_at': dates.isEmpty ? null : dates.first.toIso8601String(),
-      'shelf_life_months': null,
     });
   }
 
@@ -444,6 +443,11 @@ class InventoryItem {
   String get fullName => groupName == null ? name : '$groupName · $name';
 
   String? get purchasePriceText => formatPurchasePrice(purchasePriceCents);
+
+  DateTime? suggestedExpiryDate(DateTime acquiredAt) =>
+      allowsExpiry && shelfLifeMonths != null
+      ? _addMonths(acquiredAt, shelfLifeMonths!)
+      : null;
 
   DateTime? effectiveExpiryDate() => switch (expiryType) {
     InventoryExpiryType.none => null,
