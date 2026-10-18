@@ -841,6 +841,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
   bool _editingAcquiredOn = false;
   bool _savingOrder = false;
   bool _dragging = false;
+  bool _switchingInterfaceStyle = false;
 
   StreamSubscription<void>? _memorialChanges;
   Timer? _growthTimer;
@@ -979,6 +980,61 @@ class _ColoniesPageState extends State<ColoniesPage> {
       ),
     );
     if (saved == true && mounted) setState(_reload);
+  }
+
+  Future<void> _switchToCurrentInterface() async {
+    if (_switchingInterfaceStyle) return;
+    setState(() => _switchingInterfaceStyle = true);
+    try {
+      await themeController.setInterfaceStyle(InterfaceStyle.current);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _switchingInterfaceStyle = false);
+    }
+  }
+
+  Widget _buildClassicUpgradeBanner(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      color: scheme.primaryContainer,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _switchingInterfaceStyle ? null : _switchToCurrentInterface,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_outlined,
+                color: scheme.onPrimaryContainer,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '新版界面已发布',
+                  style: TextStyle(
+                    color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                _switchingInterfaceStyle ? '切换中…' : '点击使用',
+                style: TextStyle(color: scheme.onPrimaryContainer),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: scheme.onPrimaryContainer,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openFilters(List<_ColonyListEntry> colonies) async {
@@ -1308,7 +1364,12 @@ class _ColoniesPageState extends State<ColoniesPage> {
         }
         final allColonies = snapshot.data!;
         if (InterfaceStyleScope.of(context) == InterfaceStyle.classic) {
-          return _buildLegacyColonyList(context, allColonies);
+          return Column(
+            children: [
+              _buildClassicUpgradeBanner(context),
+              Expanded(child: _buildLegacyColonyList(context, allColonies)),
+            ],
+          );
         }
         final style = themeController.colonyDisplayStyle;
         final colonies = _filter.activeCount == 0

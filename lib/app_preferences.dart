@@ -25,7 +25,7 @@ enum ThemeColor {
 
 enum InterfaceStyle {
   current('新版界面', '当前版本的界面布局'),
-  classic('1.0.10 经典界面', '主要页面沿用 1.0.10 布局');
+  classic('经典界面', '主要页面沿用 1.0.10 布局');
 
   const InterfaceStyle(this.label, this.description);
   final String label;

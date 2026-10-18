@@ -222,6 +222,50 @@ void main() {
     themeController.simpleMode = false;
   });
 
+  testWidgets('classic home announcement switches to the current interface', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await themeController.setInterfaceStyle(InterfaceStyle.classic);
+    await tester.pumpWidget(
+      AnimatedBuilder(
+        animation: themeController,
+        builder: (context, _) => MaterialApp(
+          builder: (context, child) => InterfaceStyleScope(
+            style: themeController.interfaceStyle,
+            child: child!,
+          ),
+          home: const ColoniesPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('还没有蚁群'), findsOneWidget);
+    expect(find.text('新版界面已发布'), findsOneWidget);
+
+    failOrderWrite = true;
+    await tester.tap(find.text('点击使用'));
+    await tester.pumpAndSettle();
+    expect(themeController.interfaceStyle, InterfaceStyle.classic);
+    expect(find.text('新版界面已发布'), findsOneWidget);
+    expect(find.byType(SnackBar), findsOneWidget);
+
+    failOrderWrite = false;
+    await tester.tap(find.text('点击使用'));
+    await tester.pumpAndSettle();
+    expect(themeController.interfaceStyle, InterfaceStyle.current);
+    expect(find.text('新版界面已发布'), findsNothing);
+    expect(
+      tables['app_settings']!.singleWhere(
+        (row) => row['setting_key'] == 'interface_style',
+      )['setting_value'],
+      'current',
+    );
+  });
+
   for (final archived in [false, true]) {
     testWidgets(
       'diary presets preserve records and allow full detail, archived=$archived',
