@@ -128,7 +128,7 @@ class AppPreferences extends ChangeNotifier {
   AppEdition edition = AppEdition.offline;
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
-  InterfaceStyle interfaceStyle = InterfaceStyle.current;
+  InterfaceStyle interfaceStyle = InterfaceStyle.classic;
   FontColor fontColor = FontColor.theme;
   List<String> _colonyOrder = const [];
   List<String> get colonyOrder => _colonyOrder;
@@ -233,7 +233,7 @@ class AppPreferences extends ChangeNotifier {
     );
     interfaceStyle = InterfaceStyle.values.firstWhere(
       (style) => style.name == values['interface_style'],
-      orElse: () => InterfaceStyle.current,
+      orElse: () => InterfaceStyle.classic,
     );
     fontColor = FontColor.values.firstWhere(
       (color) => color.name == values['font_color'],

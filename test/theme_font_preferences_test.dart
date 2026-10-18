@@ -6,21 +6,21 @@ import 'onboarding_test.dart' show MemorySettings;
 
 void main() {
   test(
-    'interface style defaults to current and persists independently',
+    'interface style defaults to classic and persists independently',
     () async {
       final store = MemorySettings();
       final preferences = AppPreferences(store);
       await preferences.load();
-      expect(preferences.interfaceStyle, InterfaceStyle.current);
-      await preferences.setInterfaceStyle(InterfaceStyle.classic);
+      expect(preferences.interfaceStyle, InterfaceStyle.classic);
+      await preferences.setInterfaceStyle(InterfaceStyle.current);
       await preferences.setThemeColor(ThemeColor.mistBlue);
       final restarted = AppPreferences(store);
       await restarted.load();
-      expect(restarted.interfaceStyle, InterfaceStyle.classic);
+      expect(restarted.interfaceStyle, InterfaceStyle.current);
       expect(restarted.themeColor, ThemeColor.mistBlue);
       store.values['interface_style'] = 'unknown';
       await restarted.load();
-      expect(restarted.interfaceStyle, InterfaceStyle.current);
+      expect(restarted.interfaceStyle, InterfaceStyle.classic);
     },
   );
 

@@ -240,7 +240,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await themeController.setInterfaceStyle(InterfaceStyle.classic);
+    expect(themeController.interfaceStyle, InterfaceStyle.classic);
     await tester.pumpWidget(
       AnimatedBuilder(
         animation: themeController,

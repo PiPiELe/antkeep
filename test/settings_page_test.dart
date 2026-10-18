@@ -158,6 +158,7 @@ void main() {
   testWidgets('appearance setting controls colony overview card', (
     tester,
   ) async {
+    await themeController.setInterfaceStyle(InterfaceStyle.current);
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
     await openCategory(tester, '外观与展示');
@@ -172,6 +173,7 @@ void main() {
   testWidgets('appearance setting switches and saves the interface style', (
     tester,
   ) async {
+    expect(themeController.interfaceStyle, InterfaceStyle.classic);
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
     await openCategory(tester, '外观与展示');
@@ -181,6 +183,10 @@ void main() {
       const Offset(0, -250),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.text('新版界面'));
+    await tester.pumpAndSettle();
+    expect(themeController.interfaceStyle, InterfaceStyle.current);
+    expect(settings['interface_style'], 'current');
     await tester.tap(find.text('经典界面'));
     await tester.pumpAndSettle();
     expect(themeController.interfaceStyle, InterfaceStyle.classic);
@@ -195,6 +201,7 @@ void main() {
   testWidgets('appearance setting switches and saves colony list style', (
     tester,
   ) async {
+    await themeController.setInterfaceStyle(InterfaceStyle.current);
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
     await openCategory(tester, '外观与展示');
