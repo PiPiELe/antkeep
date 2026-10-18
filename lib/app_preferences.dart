@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'diary_preferences.dart';
+import 'domain/colony_tag.dart';
 
 abstract class AppSettingsStore {
   Future<Map<String, String>> readSettings();
@@ -132,6 +133,18 @@ class AppPreferences extends ChangeNotifier {
   List<String> _colonyOrder = const [];
   List<String> get colonyOrder => _colonyOrder;
 
+  List<ColonyTag> _colonyTagOrder = ColonyTag.values;
+  List<ColonyTag> get colonyTagOrder => _colonyTagOrder;
+
+  Future<void> setColonyTagOrder(Iterable<ColonyTag> tags) async {
+    final order = ColonyTag.normalizeOrder(tags.map((tag) => tag.name));
+    await store.writeSettings({
+      'colony_tag_order': jsonEncode(order.map((tag) => tag.name).toList()),
+    });
+    _colonyTagOrder = order;
+    notifyListeners();
+  }
+
   Future<void> setColonyOrder(Iterable<String> ids) async {
     final order = List<String>.unmodifiable(ids.toSet());
     await store.writeSettings({'colony_order': jsonEncode(order)});
@@ -173,6 +186,15 @@ class AppPreferences extends ChangeNotifier {
       }
     } on FormatException {
       // Invalid local ordering must not prevent loading the other preferences.
+    }
+    _colonyTagOrder = ColonyTag.values;
+    try {
+      final order = jsonDecode(values['colony_tag_order'] ?? '[]');
+      if (order is List) {
+        _colonyTagOrder = ColonyTag.normalizeOrder(order);
+      }
+    } on FormatException {
+      // Invalid tag ordering must not prevent opening local records.
     }
     _colonyTabNames.clear();
     for (final tab in ColonyTab.values) {

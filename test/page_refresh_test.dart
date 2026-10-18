@@ -10,6 +10,7 @@ import 'package:antkeep/colony_growth_page.dart';
 import 'package:antkeep/domain/colony_growth.dart';
 import 'package:antkeep/domain/care_task.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/domain/colony_tag.dart';
 import 'package:antkeep/domain/memorial.dart';
 import 'package:antkeep/domain/share_card_data.dart';
 import 'package:antkeep/share_content_page.dart';
@@ -1963,6 +1964,126 @@ void main() {
     expect(find.text('测试蚁群二'), findsOneWidget);
   });
 
+  testWidgets('saved tag order applies to all list and detail styles', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    tables['colonies']!.add(
+      Colony(
+        id: 'tag-order',
+        name: '排序测试',
+        source: '野采（测试）',
+        nestType: '试管巢',
+        initialWorkerCount: 0,
+        purchasePriceCents: 10000,
+        createdAt: now,
+        updatedAt: now,
+      ).toMap(),
+    );
+    const order = [
+      ColonyTag.price,
+      ColonyTag.nestType,
+      ColonyTag.wildCatch,
+      ColonyTag.scale,
+      ColonyTag.newQueen,
+    ];
+    final labels = {'百元级', '试管巢', '野采', '小群', '新后群'};
+    List<String> visibleLabels() => find
+        .byWidgetPredicate(
+          (widget) => widget is Text && labels.contains(widget.data),
+        )
+        .evaluate()
+        .map((element) => (element.widget as Text).data!)
+        .toList();
+    for (final display in ColonyDisplayStyle.values) {
+      for (final interface in InterfaceStyle.values) {
+        await themeController.setColonyDisplayStyle(display);
+        await tester.pumpWidget(
+          MaterialApp(
+            key: UniqueKey(),
+            builder: (context, child) =>
+                InterfaceStyleScope(style: interface, child: child!),
+            home: const ColoniesPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await themeController.setColonyTagOrder(order);
+        await tester.pumpAndSettle();
+        // The classic list also has a separate nest description above the badges.
+        expect(visibleLabels().where((label) => label != '试管巢').toList(), [
+          '百元级',
+          '野采',
+          '小群',
+          '新后群',
+        ]);
+        await tester.tap(find.text('排序测试'));
+        await tester.pumpAndSettle();
+        expect(visibleLabels(), ['百元级', '试管巢', '野采', '小群', '新后群']);
+        await themeController.setColonyTagOrder(ColonyTag.values);
+        await tester.pumpAndSettle();
+        expect(visibleLabels(), ['新后群', '野采', '小群', '试管巢', '百元级']);
+        expect(tester.takeException(), isNull);
+      }
+    }
+  });
+
+  testWidgets('appearance settings opens colony tag management', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SettingsPage(category: SettingsCategory.appearance),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await revealSetting(tester, find.text('蚁群标签展示管理'));
+    await tester.tap(find.text('蚁群标签展示管理'));
+    await tester.pumpAndSettle();
+    expect(find.text('恢复默认顺序'), findsOneWidget);
+    expect(find.byType(ReorderableDragStartListener), findsNWidgets(5));
+  });
+
+  testWidgets('price-only colonies show tags in every list and detail style', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final now = DateTime.now();
+    tables['colonies']!.add(
+      Colony(
+        id: 'price-only',
+        name: '价格标签测试',
+        purchasePriceCents: 10000,
+        createdAt: now,
+        updatedAt: now,
+      ).toMap(),
+    );
+    for (final display in ColonyDisplayStyle.values) {
+      for (final interface in InterfaceStyle.values) {
+        await themeController.setColonyDisplayStyle(display);
+        await tester.pumpWidget(
+          MaterialApp(
+            key: UniqueKey(),
+            theme: antKeepTheme(ThemeColor.forest),
+            builder: (context, child) => InterfaceStyleScope(
+              style: interface,
+              child: child!,
+            ),
+            home: const ColoniesPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('百元级'), findsOneWidget);
+        await tester.tap(find.text('价格标签测试'));
+        await tester.pumpAndSettle();
+        expect(find.text('百元级'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    }
+  });
+
   testWidgets('colony purchase prices validate, save, edit and clear', (
     tester,
   ) async {
@@ -1986,10 +2107,19 @@ void main() {
     await tester.enterText(price, '19.99');
     await tapSave(tester, '保存蚁群');
     expect(tables['colonies']!.single['purchase_price_cents'], 1999);
+    expect(find.text('十元级'), findsOneWidget);
     await tester.tap(find.text('购入价测试'));
     await tester.pumpAndSettle();
     expect(find.text('¥19.99'), findsOneWidget);
-    for (final value in ['0', '']) {
+    expect(find.text('十元级'), findsOneWidget);
+    var previousPrice = '19.99';
+    for (final (value, label) in [
+      ('100', '百元级'),
+      ('1000', '千元级'),
+      ('10000', '万元级'),
+      ('0', null),
+      ('', null),
+    ]) {
       await tester.tap(find.byTooltip('编辑蚁群'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
@@ -1997,17 +2127,21 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(
-        tester.widget<TextFormField>(price).controller!.text,
-        value == '0' ? '19.99' : '0.00',
-      );
+      expect(tester.widget<TextFormField>(price).controller!.text, previousPrice);
       await tester.enterText(price, value);
       await tapSave(tester, '保存蚁群');
       expect(
         tables['colonies']!.single['purchase_price_cents'],
-        value.isEmpty ? null : 0,
+        value.isEmpty ? null : int.parse(value) * 100,
       );
-      expect(find.text('¥0.00'), value.isEmpty ? findsNothing : findsOneWidget);
+      previousPrice = value.isEmpty ? '' : '$value.00';
+      for (final tier in ['十元级', '百元级', '千元级', '万元级']) {
+        expect(find.text(tier), tier == label ? findsOneWidget : findsNothing);
+      }
+      expect(
+        find.text('¥$previousPrice'),
+        value.isEmpty ? findsNothing : findsOneWidget,
+      );
     }
   });
 

@@ -5,6 +5,8 @@ import 'domain/care_task.dart';
 import 'domain/colony_growth.dart';
 import 'domain/colony_list_filter.dart';
 import 'domain/models.dart';
+import 'domain/colony_tag.dart';
+import 'widgets/colony_price_badge.dart';
 
 Color colonyShowcaseBackground(BuildContext context) =>
     Theme.of(context).colorScheme.surface;
@@ -324,11 +326,13 @@ class ColonyShowcaseCard extends StatelessWidget {
     required this.workers,
     required this.dueTasks,
     this.cover,
+    this.tagOrder = ColonyTag.values,
     required this.onTap,
     required this.onDurationTap,
   });
 
   final ColonyDisplayStyle style;
+  final List<ColonyTag> tagOrder;
   final Colony colony;
   final GrowthPopulation population;
   final int? queens;
@@ -391,6 +395,7 @@ class ColonyShowcaseCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _Identity(
+                              tagOrder: tagOrder,
                               colony: colony,
                               cover: cover,
                               accent: accent,
@@ -400,7 +405,11 @@ class ColonyShowcaseCard extends StatelessWidget {
                             const SizedBox(height: 8),
                             Padding(
                               padding: const EdgeInsets.only(right: 108),
-                              child: _Tags(colony: colony, workers: workers),
+                              child: _Tags(
+                                colony: colony,
+                                workers: workers,
+                                order: tagOrder,
+                              ),
                             ),
                           ],
                         ),
@@ -421,6 +430,7 @@ class ColonyShowcaseCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _Identity(
+                          tagOrder: tagOrder,
                           colony: colony,
                           cover: cover,
                           accent: accent,
@@ -536,8 +546,10 @@ class _Identity extends StatelessWidget {
     required this.description,
     required this.compact,
     this.workers,
+    required this.tagOrder,
   });
 
+  final List<ColonyTag> tagOrder;
   final Colony colony;
   final Widget? cover;
   final Color accent;
@@ -583,7 +595,7 @@ class _Identity extends StatelessWidget {
               ],
               if (compact) ...[
                 const SizedBox(height: 8),
-                _Tags(colony: colony, workers: workers),
+                _Tags(colony: colony, workers: workers, order: tagOrder),
               ],
             ],
           ),
@@ -853,22 +865,30 @@ class _AntPainter extends CustomPainter {
 }
 
 class _Tags extends StatelessWidget {
-  const _Tags({required this.colony, required this.workers});
+  const _Tags({required this.colony, required this.workers, required this.order});
   final Colony colony;
   final int? workers;
+  final List<ColonyTag> order;
 
   @override
   Widget build(BuildContext context) {
     final scale = ColonyScale.fromWorkerCount(workers);
-    final tags = <Widget>[
+    final available = <ColonyTag, Widget>{
       if (colony.isNewQueenColony)
-        const _Tag(
+        ColonyTag.newQueen: const _Tag(
           '新后群',
           Color(0xffffbc59),
           icon: Icons.workspace_premium_rounded,
         ),
-      if (colony.isWildCatch) const _Tag('野采', _green, icon: Icons.eco_rounded),
-      if (scale != null) _Tag(scale.label, _blue, icon: Icons.groups_rounded),
+      if (colony.isWildCatch)
+        ColonyTag.wildCatch: const _Tag('野采', _green, icon: Icons.eco_rounded),
+      if (scale != null)
+        ColonyTag.scale: _Tag(scale.label, _blue, icon: Icons.groups_rounded),
+      if (colony.priceTier case final tier?)
+        ColonyTag.price: ColonyPriceBadge(tier: tier),
+    };
+    final tags = <Widget>[
+      for (final tag in order) ?available[tag],
     ];
     if (tags.isEmpty) return const SizedBox.shrink();
     return SingleChildScrollView(

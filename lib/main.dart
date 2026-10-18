@@ -58,6 +58,9 @@ import 'domain/mortality_analysis.dart';
 import 'domain/colony_growth.dart';
 import 'domain/population_analysis.dart';
 import 'domain/purchase_price.dart';
+import 'widgets/colony_price_badge.dart';
+import 'domain/colony_tag.dart';
+import 'colony_tag_settings_page.dart';
 import 'domain/beginner_care_notice.dart';
 import 'domain/species_profile.dart';
 import 'widgets/species_picker.dart';
@@ -1600,6 +1603,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
                                 },
                               )
                             : ColonyShowcaseCard(
+                                tagOrder: themeController.colonyTagOrder,
                                 style: style,
                                 colony: colonies[index].colony,
                                 population: colonies[index].population,
@@ -1775,7 +1779,10 @@ class _ColonyCard extends StatelessWidget {
       colony.nestType,
     ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
     final hasTags =
-        colony.isWildCatch || colony.isNewQueenColony || workers != null;
+        colony.isWildCatch ||
+        colony.isNewQueenColony ||
+        workers != null ||
+        colony.priceTier != null;
     final dueText = dueTasks.isEmpty
         ? null
         : '今日待办：${dueTasks.map((task) => task.type.label).join('、')}';
@@ -2047,42 +2054,41 @@ class _ColonyTags extends StatelessWidget {
             const Text('👑', style: TextStyle(fontSize: 12)),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall
-                ?.copyWith(color: color, fontWeight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: color, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
     );
+    final available = <ColonyTag, Widget>{
+      if (colony.isNewQueenColony)
+        ColonyTag.newQueen: badge('新后群', scheme.primary, crown: true),
+      if (colony.isWildCatch) ColonyTag.wildCatch: badge('野采', scheme.tertiary),
+      if (scale != null) ColonyTag.scale: badge(scale.label, color),
+      if (showNestType && colony.nestType?.isNotEmpty == true)
+        ColonyTag.nestType: badge(colony.nestType!, scheme.onSurfaceVariant),
+      if (colony.priceTier case final tier?)
+        ColonyTag.price: ColonyPriceBadge(tier: tier),
+    };
+    final badges = <Widget>[
+      for (final tag in themeController.colonyTagOrder) ?available[tag],
+    ];
+    if (!scrollable && !singleLine) {
+      return Wrap(spacing: 8, runSpacing: 6, children: badges);
+    }
     final tags = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (colony.isNewQueenColony) ...[
-          badge('新后群', scheme.primary, crown: true),
-          if (colony.isWildCatch ||
-              scale != null ||
-              (showNestType && colony.nestType?.isNotEmpty == true))
-            const SizedBox(width: 8),
+        for (var index = 0; index < badges.length; index++) ...[
+          if (index > 0) const SizedBox(width: 8),
+          badges[index],
         ],
-        if (colony.isWildCatch) ...[
-          badge('野采', scheme.tertiary),
-          if (scale != null ||
-              (showNestType && colony.nestType?.isNotEmpty == true))
-            const SizedBox(width: 8),
-        ],
-        if (scale != null) badge(scale.label, color),
-        if (scale != null &&
-            showNestType &&
-            colony.nestType?.isNotEmpty == true)
-          const SizedBox(width: 8),
-        if (showNestType && colony.nestType?.isNotEmpty == true)
-          if (scrollable || singleLine)
-            badge(colony.nestType!, scheme.onSurfaceVariant)
-          else
-            Flexible(child: badge(colony.nestType!, scheme.onSurfaceVariant)),
       ],
     );
     if (!scrollable) return tags;
@@ -4316,6 +4322,7 @@ class _ColonyProfileSummary extends StatelessWidget {
       if (colony.isWildCatch ||
           colony.isNewQueenColony ||
           workers != null ||
+          colony.priceTier != null ||
           colony.nestType?.isNotEmpty == true) ...[
         const SizedBox(height: 10),
         if (singleLine)
@@ -7744,6 +7751,17 @@ class _SettingsPageState extends State<SettingsPage> {
             value: themeController.showColonyOverview,
             onChanged: _savingColonyOverview ? null : _setColonyOverview,
           ),
+        ListTile(
+          leading: const Icon(Icons.reorder),
+          title: const Text('蚁群标签展示管理'),
+          subtitle: const Text('调整标签展示顺序，适用于列表与详情'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ColonyTagSettingsPage(preferences: themeController),
+            ),
+          ),
+        ),
         for (final tab in ColonyTab.values)
           ListTile(
             leading: const Icon(Icons.edit_outlined),

@@ -3,6 +3,29 @@ import 'package:antkeep/domain/purchase_price.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('colony price tiers use exact cent boundaries', () {
+    for (final entry in <int?, ColonyPriceTier?>{
+      null: null,
+      -1: null,
+      0: null,
+      999: null,
+      1000: ColonyPriceTier.tens,
+      9999: ColonyPriceTier.tens,
+      10000: ColonyPriceTier.hundreds,
+      99999: ColonyPriceTier.hundreds,
+      100000: ColonyPriceTier.thousands,
+      999999: ColonyPriceTier.thousands,
+      1000000: ColonyPriceTier.tenThousands,
+      9007199254740991: ColonyPriceTier.tenThousands,
+    }.entries) {
+      expect(
+        ColonyPriceTier.fromCents(entry.key),
+        entry.value,
+        reason: '${entry.key} cents',
+      );
+    }
+  });
+
   test('yuan is converted to exact cents and formatted with two decimals', () {
     for (final entry in {
       '0': 0,

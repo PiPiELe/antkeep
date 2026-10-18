@@ -44,6 +44,7 @@ class Colony {
   final int? purchasePriceCents;
 
   String? get purchasePriceText => formatPurchasePrice(purchasePriceCents);
+  ColonyPriceTier? get priceTier => ColonyPriceTier.fromCents(purchasePriceCents);
   final int? queenCount;
   final int? specializedCount;
   final bool showSpecialized;

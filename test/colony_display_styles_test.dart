@@ -15,6 +15,7 @@ void main() {
     species: '黑金弓背蚁',
     nestType: '试管巢',
     acquiredOn: now.subtract(const Duration(days: 44)),
+    purchasePriceCents: 1000000,
     queenCount: 2,
     initialWorkerCount: 235,
     initialEggCount: 8,
@@ -90,6 +91,7 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          expect(find.text('万元级'), findsOneWidget);
           expect(find.text('蚁群总数'), findsOneWidget);
           expect(find.text('一号群 · 黑金弓背蚁'), findsOneWidget);
           expect(find.text('今日待办'), findsOneWidget);
