@@ -7,6 +7,7 @@ import 'domain/colony_list_filter.dart';
 import 'domain/models.dart';
 import 'domain/colony_tag.dart';
 import 'widgets/colony_price_badge.dart';
+import 'widgets/fading_horizontal_scroll.dart';
 
 Color colonyShowcaseBackground(BuildContext context) =>
     Theme.of(context).colorScheme.surface;
@@ -417,9 +418,55 @@ class ColonyShowcaseCard extends StatelessWidget {
                       Positioned(
                         right: 0,
                         bottom: 0,
-                        child: _LargeDuration(
-                          days: days,
-                          onTap: days == null ? onDurationTap : null,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: ShaderMask(
+                                  blendMode: BlendMode.dstIn,
+                                  shaderCallback: (bounds) => LinearGradient(
+                                    colors: const [
+                                      Colors.transparent,
+                                      Colors.white,
+                                      Colors.white,
+                                    ],
+                                    stops: [
+                                      0,
+                                      (20 / bounds.width).clamp(0, 1),
+                                      1,
+                                    ],
+                                  ).createShader(bounds),
+                                  child: ShaderMask(
+                                    blendMode: BlendMode.dstIn,
+                                    shaderCallback: (bounds) => LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: const [
+                                        Colors.transparent,
+                                        Colors.white,
+                                        Colors.white,
+                                      ],
+                                      stops: [
+                                        0,
+                                        (20 / bounds.height).clamp(0, 1),
+                                        1,
+                                      ],
+                                    ).createShader(bounds),
+                                    child: ColoredBox(
+                                      color: _ShowcasePalette(context).panel,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 20, top: 20),
+                              child: _LargeDuration(
+                                days: days,
+                                onTap: days == null ? onDurationTap : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -865,7 +912,11 @@ class _AntPainter extends CustomPainter {
 }
 
 class _Tags extends StatelessWidget {
-  const _Tags({required this.colony, required this.workers, required this.order});
+  const _Tags({
+    required this.colony,
+    required this.workers,
+    required this.order,
+  });
   final Colony colony;
   final int? workers;
   final List<ColonyTag> order;
@@ -887,12 +938,9 @@ class _Tags extends StatelessWidget {
       if (colony.priceTier case final tier?)
         ColonyTag.price: ColonyPriceBadge(tier: tier),
     };
-    final tags = <Widget>[
-      for (final tag in order) ?available[tag],
-    ];
+    final tags = <Widget>[for (final tag in order) ?available[tag]];
     if (tags.isEmpty) return const SizedBox.shrink();
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return FadingHorizontalScroll(
       child: Row(
         children: [
           for (final tag in tags)

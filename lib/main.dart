@@ -61,6 +61,7 @@ import 'domain/colony_growth.dart';
 import 'domain/population_analysis.dart';
 import 'domain/purchase_price.dart';
 import 'widgets/colony_price_badge.dart';
+import 'widgets/fading_horizontal_scroll.dart';
 import 'domain/colony_tag.dart';
 import 'colony_tag_settings_page.dart';
 import 'domain/beginner_care_notice.dart';
@@ -2177,77 +2178,7 @@ class _ColonyTags extends StatelessWidget {
       ],
     );
     if (!scrollable) return tags;
-    return ShaderMask(
-      shaderCallback: (bounds) => const LinearGradient(
-        colors: [Colors.white, Colors.white, Colors.transparent],
-        stops: [0, .88, 1],
-      ).createShader(bounds),
-      blendMode: BlendMode.dstIn,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: tags,
-      ),
-    );
-  }
-}
-
-class _FadingHorizontalScroll extends StatefulWidget {
-  const _FadingHorizontalScroll({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_FadingHorizontalScroll> createState() =>
-      _FadingHorizontalScrollState();
-}
-
-class _FadingHorizontalScrollState extends State<_FadingHorizontalScroll> {
-  final _controller = ScrollController();
-  bool _hasMoreRight = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(_updateFade);
-  }
-
-  void _updateFade() {
-    if (!mounted || !_controller.hasClients) return;
-    final position = _controller.position;
-    final hasMoreRight = position.maxScrollExtent > position.pixels + .5;
-    if (hasMoreRight != _hasMoreRight) {
-      setState(() => _hasMoreRight = hasMoreRight);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFade());
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (bounds) {
-        final fadeStart = (1 - 28 / bounds.width).clamp(0.0, 1.0);
-        return LinearGradient(
-          colors: [
-            Colors.white,
-            Colors.white,
-            _hasMoreRight ? Colors.transparent : Colors.white,
-          ],
-          stops: [0, fadeStart, 1],
-        ).createShader(bounds);
-      },
-      child: SingleChildScrollView(
-        controller: _controller,
-        scrollDirection: Axis.horizontal,
-        child: widget.child,
-      ),
-    );
+    return FadingHorizontalScroll(child: tags);
   }
 }
 
@@ -4352,7 +4283,7 @@ class _ColonyProfileSummary extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: singleLine
-                ? _FadingHorizontalScroll(
+                ? FadingHorizontalScroll(
                     child: Text(
                       value,
                       maxLines: 1,
@@ -4411,7 +4342,7 @@ class _ColonyProfileSummary extends StatelessWidget {
           colony.nestType?.isNotEmpty == true) ...[
         const SizedBox(height: 10),
         if (singleLine)
-          _FadingHorizontalScroll(
+          FadingHorizontalScroll(
             child: _ColonyTags(
               colony: colony,
               workers: workers,
