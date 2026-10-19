@@ -113,26 +113,56 @@ void main() {
     }
   });
 
-  test(
-    'installed revision parsing does not relax published policy validation',
-    () {
-      expect(AppVersion.parseInstalled('1.0.8').toString(), '1.0.8');
-      expect(AppVersion.parseInstalled('1.0.8.99').toString(), '1.0.8');
-      for (final invalid in [
-        '1.0.8.0',
-        '1.0.8.01',
-        '1.0.8.100',
-        '1.0.8.beta',
-        '1.0.8.1.1',
-      ]) {
-        expect(() => AppVersion.parseInstalled(invalid), throwsFormatException);
-      }
+  test('optimization revisions preserve display and compare numerically', () {
+    expect(AppVersion.parseInstalled('1.0.11.01').toString(), '1.0.11.01');
+    final ordered = ['1.0.11', '1.0.11.01', '1.0.11.2', '1.0.11.10', '1.0.12'];
+    for (var i = 1; i < ordered.length; i++) {
       expect(
-        () => AppUpdatePolicy.decode(policy(latest: '1.0.8.1')),
-        throwsFormatException,
+        AppVersion.parse(ordered[i])
+            .compareTo(AppVersion.parse(ordered[i - 1])),
+        greaterThan(0),
       );
-    },
-  );
+    }
+    expect(
+      AppVersion.parse('1.0.11.01').compareTo(AppVersion.parse('1.0.11.1')),
+      0,
+    );
+    expect(
+      AppUpdatePolicy.decode(policy(latest: '1.0.11.01')).latestVersion
+          .toString(),
+      '1.0.11.01',
+    );
+    for (final invalid in [
+      '1.0.11.beta',
+      '1.0.11.1.1',
+      '1.0.11.',
+      '1.0.11.-1',
+      '1.0.11.2147483648',
+    ]) {
+      expect(() => AppVersion.parseInstalled(invalid), throwsFormatException);
+    }
+  });
+
+  test('optimization policies support optional and required updates', () async {
+    for (final entry in [
+      ('1.0.11', '1.0.11.01', null, AppUpdateAvailability.optional),
+      ('1.0.11.01', '1.0.11.1', null, AppUpdateAvailability.none),
+      ('1.0.11.01', '1.0.11.02', '1.0.11.02', AppUpdateAvailability.required),
+      ('1.0.11.10', '1.0.11.02', null, AppUpdateAvailability.none),
+      ('1.0.11.99', '1.0.12', null, AppUpdateAvailability.optional),
+    ]) {
+      final updates = controller(
+        respond: (_) async =>
+            response(policy(latest: entry.$2, minimum: entry.$3), 200),
+        currentVersion: () async => entry.$1,
+      );
+      await updates.setOnline(true);
+      await updates.check(manual: true);
+      expect(updates.error, isNull);
+      expect(updates.availability, entry.$4);
+      updates.dispose();
+    }
+  });
 
   test('installed 1.0.3 detects the published 1.0.4 policy', () async {
     final updates = controller(
@@ -214,7 +244,7 @@ void main() {
         calls++;
         expect(request.method, 'GET');
         expect(request.url.path, '/api/public/app-update/android');
-        expect(request.url.hasQuery, isFalse);
+        expect(request.url.queryParameters, {'versionFormat': '4'});
         expect(request.headers.containsKey('authorization'), isFalse);
         expect(request.body, isEmpty);
         return response(policy(), 200);
