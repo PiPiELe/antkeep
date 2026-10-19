@@ -38,11 +38,11 @@ android {
         // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
         // flag during build.
         versionCode = flutter.versionCode
-        // The final two versionCode digits hold the optional test revision.
+        // The final two versionCode digits hold the optional optimization revision.
         // Pub keeps a three-part version; Android displays the fourth part.
-        val testRevision = flutter.versionCode % 100
-        versionName = if (testRevision == 0) flutter.versionName
-            else "${flutter.versionName}.$testRevision"
+        val optimizationRevision = flutter.versionCode % 100
+        versionName = if (optimizationRevision == 0) flutter.versionName
+            else "${flutter.versionName}.${optimizationRevision.toString().padStart(2, '0')}"
     }
 
     // Flutter's ARM-only target still includes some transitive x86_64 libraries.

@@ -1,33 +1,34 @@
 import 'dart:convert';
 
 class AppVersion implements Comparable<AppVersion> {
-  const AppVersion(this.major, this.minor, this.patch);
+  const AppVersion(this.major, this.minor, this.patch, [this.revision]);
   final int major, minor, patch;
+  final String? revision;
 
   factory AppVersion.parse(String value) {
-    final match = RegExp(r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')
-        .firstMatch(value);
-    if (match == null) throw const FormatException('版本号必须为三段数字');
+    final match = RegExp(
+      r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.([0-9]+))?$',
+    ).firstMatch(value);
+    if (match == null) throw const FormatException('版本号必须为三段或四段数字');
     try {
+      for (final part in value.split('.')) {
+        if (int.parse(part) > 2147483647) {
+          throw const FormatException('版本号超出支持范围');
+        }
+      }
       return AppVersion(
         int.parse(match.group(1)!),
         int.parse(match.group(2)!),
         int.parse(match.group(3)!),
+        match.group(4),
       );
     } on FormatException {
       throw const FormatException('版本号超出支持范围');
     }
   }
 
-  // Android test builds append a revision (1-99) to the release version.
-  // Published update policies remain three-part release versions.
-  factory AppVersion.parseInstalled(String value) {
-    final parts = value.split('.');
-    if (parts.length == 4 && RegExp(r'^[1-9]\d?$').hasMatch(parts.last)) {
-      return AppVersion.parse(parts.take(3).join('.'));
-    }
-    return AppVersion.parse(value);
-  }
+  // Formal releases have three parts; optimization updates add a revision.
+  factory AppVersion.parseInstalled(String value) => AppVersion.parse(value);
 
   @override
   int compareTo(AppVersion other) {
@@ -35,6 +36,7 @@ class AppVersion implements Comparable<AppVersion> {
       (major, other.major),
       (minor, other.minor),
       (patch, other.patch),
+      (int.parse(revision ?? '0'), int.parse(other.revision ?? '0')),
     ]) {
       final result = pair.$1.compareTo(pair.$2);
       if (result != 0) return result;
@@ -43,7 +45,8 @@ class AppVersion implements Comparable<AppVersion> {
   }
 
   @override
-  String toString() => '$major.$minor.$patch';
+  String toString() =>
+      '$major.$minor.$patch${revision == null ? '' : '.$revision'}';
 }
 
 class AppUpdateApk {

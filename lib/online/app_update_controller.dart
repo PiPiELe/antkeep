@@ -73,7 +73,7 @@ class AppUpdateController extends ChangeNotifier {
     try {
       final token = online ? sessionToken?.call() : null;
       final raw = await api.request(
-        '/api/public/app-update/android',
+        '/api/public/app-update/android?versionFormat=4',
         token: token,
       );
       final candidate = AppUpdatePolicy.decode(raw);
