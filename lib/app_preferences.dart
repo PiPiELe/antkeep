@@ -96,7 +96,8 @@ enum ColonyTab {
 enum ColonyDisplayStyle {
   classic('经典', '保留当前蚁群列表样式'),
   showcase('舒展', '大号养殖天数与宽松卡片'),
-  compact('紧凑', '紧凑信息与卡片内待办');
+  compact('紧凑', '紧凑信息与卡片内待办'),
+  dense('密集型', '图片、数量与养护信息横向密集排列');
 
   const ColonyDisplayStyle(this.label, this.description);
   final String label;

@@ -215,6 +215,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.compact);
     expect(settings['colony_display_style'], 'compact');
+    await tester.ensureVisible(find.text('密集型'));
+    await tester.tap(find.text('密集型'));
+    await tester.pumpAndSettle();
+    expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.dense);
+    expect(settings['colony_display_style'], 'dense');
   });
 
   testWidgets(

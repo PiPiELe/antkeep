@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
 import 'colony_display_styles.dart';
+import 'colony_dense_layout.dart';
 import 'diary_preferences.dart';
 import 'diary_settings_page.dart';
 import 'colony_growth_page.dart';
@@ -576,9 +577,37 @@ class _HomePageState extends State<HomePage>
       const DiscoverPage(),
       const SettingsPage(),
     ];
+    final denseHeader =
+        pageIndex == 0 &&
+        themeController.interfaceStyle == InterfaceStyle.current &&
+        themeController.colonyDisplayStyle == ColonyDisplayStyle.dense;
     final page = Scaffold(
       appBar: AppBar(
-        title: pageIndex == 0
+        titleSpacing: denseHeader ? 0 : null,
+        toolbarHeight: denseHeader ? 46 : null,
+        title: denseHeader
+            ? ColonyDenseTabs(
+                labels: [
+                  for (final tab in ColonyTab.values)
+                    themeController.colonyTabName(tab),
+                ],
+                selectedIndex: _colonyTabs.index,
+                onSelected: (index) =>
+                    setState(() => _colonyTabs.index = index),
+                onRename: (index) =>
+                    _renameColonyTab(context, ColonyTab.values[index]),
+                onShare: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ShareContentPage()),
+                ),
+                onAnalysis: themeController.simpleMode
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PopulationAnalysisPage(),
+                        ),
+                      ),
+              )
+            : pageIndex == 0
             ? NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification.depth != 0 ||
@@ -651,25 +680,27 @@ class _HomePageState extends State<HomePage>
                 ),
               )
             : Text(titles[pageIndex]),
-        actions: [
-          if (!themeController.simpleMode)
-            TextButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const PopulationAnalysisPage(),
+        actions: denseHeader
+            ? []
+            : [
+                if (!themeController.simpleMode)
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PopulationAnalysisPage(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.show_chart),
+                    label: const Text('分析'),
+                  ),
+                IconButton(
+                  tooltip: '分享',
+                  icon: const Icon(Icons.ios_share_outlined),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ShareContentPage()),
+                  ),
                 ),
-              ),
-              icon: const Icon(Icons.show_chart),
-              label: const Text('分析'),
-            ),
-          IconButton(
-            tooltip: '分享',
-            icon: const Icon(Icons.ios_share_outlined),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const ShareContentPage())),
-          ),
-        ],
+              ],
       ),
       body: Column(
         children: [
@@ -839,6 +870,7 @@ typedef _ColonyListEntry = ({
   int? queens,
   int? workers,
   List<CareTask> dueTasks,
+  List<CareRecord> records,
 });
 
 class _ColoniesPageState extends State<ColoniesPage> {
@@ -904,6 +936,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
         final population = colony.currentPopulation(records);
         return (
           colony: colony,
+          records: records,
           population: population,
           queens: colony.currentQueenCount(records),
           workers: population.workers,
@@ -1354,11 +1387,15 @@ class _ColoniesPageState extends State<ColoniesPage> {
             themeController.colonyDisplayStyle == ColonyDisplayStyle.classic
         ? null
         : colonyShowcaseBackground(context),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _newColony,
-      icon: const Icon(Icons.add),
-      label: const Text('蚁群'),
-    ),
+    floatingActionButton:
+        themeController.colonyDisplayStyle == ColonyDisplayStyle.dense &&
+            InterfaceStyleScope.of(context) != InterfaceStyle.classic
+        ? null
+        : FloatingActionButton.extended(
+            onPressed: _newColony,
+            icon: const Icon(Icons.add),
+            label: const Text('蚁群'),
+          ),
     body: FutureBuilder<List<_ColonyListEntry>>(
       future: _colonies,
       builder: (context, snapshot) {
@@ -1402,6 +1439,51 @@ class _ColoniesPageState extends State<ColoniesPage> {
                     savedOrder[second.colony.id]!,
                   );
           });
+        }
+        if (style == ColonyDisplayStyle.dense) {
+          return ColonyDenseList(
+            entries: [
+              for (final entry in colonies)
+                DenseColonyEntry(
+                  colony: entry.colony,
+                  population: entry.population,
+                  queens: entry.queens,
+                  records: entry.records,
+                  tagOrder: themeController.colonyTagOrder,
+                  dueFeeding: entry.dueTasks.any(
+                    (task) => task.type == CareTaskType.feeding,
+                  ),
+                  cover: entry.colony.coverPhotoPath == null
+                      ? null
+                      : _StoredImage(
+                          relativePath: entry.colony.coverPhotoPath!,
+                          width: 70,
+                          height: 74,
+                          borderRadius: 6,
+                        ),
+                ),
+            ],
+            onAdd: _newColony,
+            onFilter: () => _openFilters(allColonies),
+            onRefresh: () async {
+              setState(_reload);
+              await _colonies;
+            },
+            onOpen: (colony) async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ColonyDetailPage(colonyId: colony.id),
+                ),
+              );
+              if (mounted) setState(_reload);
+            },
+            onDuration: _editAcquiredOn,
+            onDelete: _deleteColony,
+            onReorder: _filter.activeCount == 0
+                ? (oldIndex, newIndex) =>
+                      _reorderColonies(colonies, oldIndex, newIndex)
+                : null,
+          );
         }
         final filterActive = _filter.activeCount > 0;
         final canBatchCare =
