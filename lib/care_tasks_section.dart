@@ -266,7 +266,8 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                                 ],
                               ),
                       ),
-                      if (!widget.colony.archived)
+                      if (!widget.colony.archived &&
+                          task.isDue(DateTime.now()))
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(

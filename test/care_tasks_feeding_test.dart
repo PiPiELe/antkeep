@@ -255,6 +255,9 @@ void main() {
             .lastCompletedOn,
         isNotNull,
       );
+      expect(find.text('快速完成'), findsNothing);
+      expect(find.text('完成并记日记'), findsNothing);
+      expect(find.text('顺延至明天'), findsNothing);
     },
   );
 
@@ -320,6 +323,9 @@ void main() {
     await settleDatabase(tester);
 
     expect(find.textContaining('下次'), findsOneWidget);
+    expect(quickButton, findsNothing);
+    expect(journalButton, findsNothing);
+    expect(postponeButton, findsNothing);
     expect(
       (await tester.runAsync(() => database.listCareTasks()))!
           .single
@@ -330,6 +336,65 @@ void main() {
       await tester.runAsync(() => database.listRecords('colony')),
       isEmpty,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('only due tasks show actions in a mixed care schedule', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final today = DateUtils.dateOnly(now);
+    final colony = Colony(
+      id: 'colony',
+      name: '测试蚁群',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await tester.runAsync(() async {
+      for (final type in CareTaskType.values) {
+        await database.saveCareTask(
+          CareTask(
+            id: type.storageValue,
+            colonyId: colony.id,
+            type: type,
+            intervalDays: type.index + 1,
+            nextDueOn: today.add(Duration(days: type.index)),
+          ),
+        );
+      }
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: CareTasksSection(
+              colony: colony,
+              onRecord: (_) async => false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await settleDatabase(tester);
+    await tester.tap(find.byTooltip('展开养护待办'));
+    await settleDatabase(tester);
+
+    expect(find.text('快速完成'), findsOneWidget);
+    expect(find.text('完成并记日记'), findsOneWidget);
+    expect(find.text('顺延至明天'), findsOneWidget);
+    expect(find.textContaining('下次'), findsNWidgets(2));
+
+    await tester.tap(find.text('快速完成'));
+    await settleDatabase(tester);
+
+    expect(find.text('快速完成'), findsNothing);
+    expect(find.text('完成并记日记'), findsNothing);
+    expect(find.text('顺延至明天'), findsNothing);
+    expect(find.textContaining('下次'), findsNWidgets(3));
+    for (final type in CareTaskType.values) {
+      expect(find.text(type.label), findsOneWidget);
+    }
+    expect(find.byTooltip('待办操作'), findsNWidgets(3));
     expect(tester.takeException(), isNull);
   });
 }
