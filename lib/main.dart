@@ -877,6 +877,7 @@ typedef _ColonyListEntry = ({
 class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
   ColonyListFilter _filter = const ColonyListFilter();
+  final _colonySearch = TextEditingController();
   bool _editingAcquiredOn = false;
   bool _savingOrder = false;
   bool _dragging = false;
@@ -896,6 +897,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
 
   @override
   void dispose() {
+    _colonySearch.dispose();
     themeController.removeListener(_refreshDisplay);
     _memorialChanges?.cancel();
     _growthTimer?.cancel();
@@ -1416,15 +1418,24 @@ class _ColoniesPageState extends State<ColoniesPage> {
           );
         }
         final style = themeController.colonyDisplayStyle;
-        final colonies = _filter.activeCount == 0
+        final query = style == ColonyDisplayStyle.classic
+            ? _colonySearch.text.trim().toLowerCase()
+            : '';
+        final colonies = _filter.activeCount == 0 && query.isEmpty
             ? allColonies
             : allColonies
                   .where(
-                    (entry) => _filter.matches(
-                      entry.colony,
-                      entry.workers,
-                      entry.dueTasks.isNotEmpty,
-                    ),
+                    (entry) =>
+                        _filter.matches(
+                          entry.colony,
+                          entry.workers,
+                          entry.dueTasks.isNotEmpty,
+                        ) &&
+                        (query.isEmpty ||
+                            entry.colony.name.toLowerCase().contains(query) ||
+                            (entry.colony.species ?? '').toLowerCase().contains(
+                              query,
+                            )),
                   )
                   .toList();
         if (_filter.workerOrder != ColonyWorkerOrder.manual) {
@@ -1487,6 +1498,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
           );
         }
         final filterActive = _filter.activeCount > 0;
+        final canReorder = !filterActive && query.isEmpty;
         final canBatchCare =
             colonies.where((entry) => !entry.colony.archived).length > 1;
         if (allColonies.isEmpty) {
@@ -1550,31 +1562,90 @@ class _ColoniesPageState extends State<ColoniesPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _colonySearch,
+                              onChanged: (_) => setState(() {}),
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: '搜索蚁群…',
+                                isDense: true,
+                                filled: true,
+                                fillColor: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest,
+                                prefixIcon: const Icon(Icons.search, size: 20),
+                                prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 32,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 10,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: 22,
+                            child: VerticalDivider(width: 12),
+                          ),
                           Text(
                             filterActive
                                 ? '${colonies.length}/${allColonies.length} 群'
-                                : '${allColonies.length} 群',
-                            style: style == ColonyDisplayStyle.classic
-                                ? Theme.of(context).textTheme.bodySmall
-                                : const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 17,
-                                  ),
+                                : '${colonies.length} 群',
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          if (canBatchCare) ...[
-                            const SizedBox(width: 6),
-                            IconButton(
-                              tooltip: '批量养护记录',
-                              onPressed: () => _batchCare(colonies),
-                              icon: const Icon(Icons.playlist_add_check),
-                              iconSize: 20,
-                              constraints: const BoxConstraints.tightFor(
-                                width: 36,
-                                height: 36,
+                          SizedBox(
+                            height: 22,
+                            child: VerticalDivider(width: 12),
+                          ),
+                          PopupMenuButton<String>(
+                            tooltip: '排序',
+                            onSelected: (value) {
+                              if (value == 'batch') {
+                                _batchCare(colonies);
+                              } else {
+                                _setWorkerOrder(
+                                  ColonyWorkerOrder.values.byName(value),
+                                );
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              for (final order in ColonyWorkerOrder.values)
+                                PopupMenuItem(
+                                  value: order.name,
+                                  child: Text(switch (order) {
+                                    ColonyWorkerOrder.manual => '默认排序',
+                                    ColonyWorkerOrder.descending => '工蚁多到少',
+                                    ColonyWorkerOrder.ascending => '工蚁少到多',
+                                  }),
+                                ),
+                              if (canBatchCare)
+                                const PopupMenuItem(
+                                  value: 'batch',
+                                  child: Text('批量养护记录'),
+                                ),
+                            ],
+                            child: const SizedBox(
+                              width: 38,
+                              height: 40,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.sort, size: 20),
+                                  Icon(Icons.expand_more, size: 16),
+                                ],
                               ),
-                              padding: EdgeInsets.zero,
                             ),
-                          ],
+                          ),
                           const SizedBox(width: 8),
                           OutlinedButton(
                             onPressed: () => _openFilters(allColonies),
@@ -1625,7 +1696,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
                   if (colonies.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 72),
-                      child: Text('没有符合条件的蚁群，可重新选择筛选条件'),
+                      child: Text('没有符合条件的蚁群，可修改搜索或筛选条件'),
                     ),
                 ],
               ),
@@ -1633,7 +1704,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
               onReorderStart: (_) => _dragging = true,
               onReorderEnd: (_) => _dragging = false,
               onReorderItem: (oldIndex, newIndex) {
-                if (!filterActive) {
+                if (canReorder) {
                   _reorderColonies(colonies, oldIndex, newIndex);
                 }
               },
@@ -1641,8 +1712,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
                   ReorderableDelayedDragStartListener(
                     key: ValueKey(colonies[index].colony.id),
                     index: index,
-                    enabled:
-                        !filterActive && colonies.length > 1 && !_savingOrder,
+                    enabled: canReorder && colonies.length > 1 && !_savingOrder,
                     child: Padding(
                       padding: EdgeInsets.only(
                         bottom: index == colonies.length - 1 ? 0 : 10,
@@ -1765,30 +1835,50 @@ class _ColonyOverviewCard extends StatelessWidget {
     );
     final theme = Theme.of(context);
 
-    Widget metric(String label, String value) => Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w700,
-              fontSize: 22,
-              height: 1.1,
-            ),
+    Widget metric(String label, String value, IconData icon, Color color) =>
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 15,
+                backgroundColor: color.withValues(alpha: .14),
+                child: Icon(icon, size: 20, color: color),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        value,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 22,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 11,
-              height: 1.1,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+        );
 
     String total(int count, int known) => known == entries.length
         ? '$count'
@@ -1809,9 +1899,26 @@ class _ColonyOverviewCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(
           children: [
-            metric('蚁群总数', '${entries.length}'),
-            metric('蚁后总数', total(queens, queenCount)),
-            metric('工蚁总数', total(workers, workerCount)),
+            metric(
+              '蚁群总数',
+              '${entries.length}',
+              Icons.pest_control,
+              Colors.blue,
+            ),
+            const SizedBox(height: 30, child: VerticalDivider(width: 12)),
+            metric(
+              '蚁后总数',
+              total(queens, queenCount),
+              Icons.workspace_premium,
+              Colors.pink,
+            ),
+            const SizedBox(height: 30, child: VerticalDivider(width: 12)),
+            metric(
+              '工蚁总数',
+              total(workers, workerCount),
+              Icons.groups,
+              Colors.green,
+            ),
           ],
         ),
       ),

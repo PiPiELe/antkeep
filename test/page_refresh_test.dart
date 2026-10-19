@@ -742,6 +742,78 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final dark in [false, true]) {
+    testWidgets(
+      'classic search toolbar filters and sorts at 320px dark=$dark',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final now = DateTime.now();
+        for (final (id, name, species, workers) in [
+          ('a', '巴巴特斯', '红胡须蚁', 1),
+          ('b', '淡色箭蚁', '淡色箭蚁', 24),
+        ]) {
+          await AppDatabase.instance.saveColony(
+            Colony(
+              id: id,
+              name: name,
+              species: species,
+              initialWorkerCount: workers,
+              queenCount: 1,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+        }
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(
+              brightness: dark ? Brightness.dark : Brightness.light,
+            ),
+            home: const ColoniesPage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('2 群'), findsOneWidget);
+        final search = find.widgetWithText(TextField, '搜索蚁群…');
+        expect(
+          tester.getCenter(search).dy,
+          closeTo(tester.getCenter(find.text('筛选')).dy, 2),
+        );
+        await tester.enterText(search, ' 红胡须 ');
+        await tester.pumpAndSettle();
+        expect(find.text('巴巴特斯'), findsOneWidget);
+        expect(find.text('淡色箭蚁'), findsNothing);
+        expect(find.text('1 群'), findsOneWidget);
+        expect(
+          tester
+              .widget<ReorderableDelayedDragStartListener>(
+                find.byType(ReorderableDelayedDragStartListener),
+              )
+              .enabled,
+          isFalse,
+        );
+        await tester.enterText(search, '不存在');
+        await tester.pumpAndSettle();
+        expect(find.text('0 群'), findsOneWidget);
+        await tester.enterText(search, '');
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('排序'));
+        await tester.pumpAndSettle();
+        expect(find.text('批量养护记录'), findsOneWidget);
+        await tester.tap(find.text('工蚁多到少'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getTopLeft(find.text('淡色箭蚁').first).dy,
+          lessThan(tester.getTopLeft(find.text('巴巴特斯')).dy),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('colony overview sums known counts and follows visibility', (
     tester,
   ) async {
@@ -784,15 +856,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('filter and batch care share one row at phone width', (
-    tester,
-  ) async {
+  testWidgets('filter and sort share one row at phone width', (tester) async {
     tester.view.physicalSize = const Size(320, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await showSortableColonies(tester);
-    final batch = tester.getRect(find.byTooltip('批量养护记录'));
+    final batch = tester.getRect(find.byTooltip('排序'));
     final filter = tester.getRect(find.widgetWithText(OutlinedButton, '筛选'));
     expect(filter.width, lessThan(100));
     expect(filter.left, greaterThanOrEqualTo(batch.right));
