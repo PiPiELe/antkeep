@@ -42,7 +42,7 @@ android {
         // Pub keeps a three-part version; Android displays the fourth part.
         val testRevision = flutter.versionCode % 100
         versionName = if (testRevision == 0) flutter.versionName
-            else "${flutter.versionName}.$testRevision"
+            else "${flutter.versionName}.${testRevision.toString().padStart(2, '0')}"
     }
 
     // Flutter's ARM-only target still includes some transitive x86_64 libraries.
