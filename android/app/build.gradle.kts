@@ -42,7 +42,7 @@ android {
         // Pub keeps a three-part version; Android displays the fourth part.
         val optimizationRevision = flutter.versionCode % 100
         versionName = if (optimizationRevision == 0) flutter.versionName
-            else "${flutter.versionName}.${optimizationRevision.toString().padStart(2, '0')}"
+            else "${flutter.versionName}.$optimizationRevision"
 
     }
 
