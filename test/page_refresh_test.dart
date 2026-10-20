@@ -1864,6 +1864,76 @@ void main() {
     });
   }
 
+  for (final dark in [false, true]) {
+    for (final width in [320.0, 440.0]) {
+      testWidgets('current detail fits $width dark=$dark and searches diary', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(width, 800);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await themeController.setInterfaceStyle(InterfaceStyle.current);
+        addTearDown(
+          () => themeController.setInterfaceStyle(InterfaceStyle.classic),
+        );
+        final now = DateTime.now();
+        tables['colonies']!.add(
+          Colony(
+            id: 'new-detail',
+            name: '黑金大爆发',
+            species: '弓背蚁 Camponotus sp.',
+            acquiredOn: now.subtract(const Duration(days: 126)),
+            source: '朋友赠送',
+            queenCount: 1,
+            initialWorkerCount: 214,
+            createdAt: now,
+            updatedAt: now,
+          ).toMap(),
+        );
+        await AppDatabase.instance.saveRecord(
+          CareRecord(
+            id: 'new-record',
+            colonyId: 'new-detail',
+            workerCount: 220,
+            eggCount: 68,
+            larvaCount: 32,
+            pupaCount: 18,
+            type: CareRecordType.observation,
+            occurredAt: now,
+            createdAt: now,
+            note: '第一次卵幼铺底',
+          ),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: antKeepTheme(ThemeColor.forest, dark: dark),
+            home: const ColonyDetailPage(colonyId: 'new-detail'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('已养殖 126 天'), findsOneWidget);
+        expect(find.text('购入价格'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await revealDetail(tester, find.byKey(const ValueKey('diary-search')));
+        await tester.enterText(
+          find.byKey(const ValueKey('diary-search')),
+          '不存在的记录',
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('没有符合条件的日记'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const ValueKey('diary-search')),
+          '卵幼',
+        );
+        await tester.pumpAndSettle();
+        await revealDetail(tester, find.text('第一次卵幼铺底'));
+        expect(find.text('第一次卵幼铺底'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets(
     'phone detail keeps the cover beside duration and actions usable',
     (tester) async {
