@@ -10,8 +10,10 @@ class CareTasksSection extends StatefulWidget {
     super.key,
     required this.colony,
     required this.onRecord,
+    this.compact = false,
   });
 
+  final bool compact;
   final Colony colony;
   final Future<bool> Function(CareTask task) onRecord;
 
@@ -22,7 +24,7 @@ class CareTasksSection extends StatefulWidget {
 class _CareTasksSectionState extends State<CareTasksSection> {
   late Future<List<CareTask>> _tasks = _load();
   bool _busy = false;
-  bool _expanded = false;
+  late bool _expanded = widget.compact;
 
   Future<List<CareTask>> _load() =>
       AppDatabase.instance.listCareTasks(colonyId: widget.colony.id);
@@ -183,6 +185,20 @@ class _CareTasksSectionState extends State<CareTasksSection> {
 
   @override
   Widget build(BuildContext context) => Card(
+    margin: widget.compact ? const EdgeInsets.symmetric(vertical: 5) : null,
+    elevation: widget.compact ? 0 : null,
+    color: widget.compact
+        ? Theme.of(context).colorScheme.surfaceContainerLow
+        : null,
+    shape: widget.compact
+        ? RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant
+                  .withValues(alpha: .5),
+            ),
+          )
+        : null,
     child: Padding(
       padding: EdgeInsets.symmetric(
         horizontal: 14,
@@ -201,7 +217,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '养护待办',
+                      widget.compact ? '养护待办 (${tasks.length})' : '养护待办',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
@@ -238,102 +254,188 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                 )
               else
                 for (final task in tasks)
-                  Column(
-                    children: [
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(task.type.label),
-                        subtitle: Text(
-                          '${task.isDue(DateTime.now()) ? '已到期' : '下次'} ${_date(task.nextDueOn)} · 每 ${task.intervalDays} 天',
+                  if (widget.compact)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: .4),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        trailing: widget.colony.archived
-                            ? null
-                            : PopupMenuButton<String>(
-                                tooltip: '待办操作',
-                                onSelected: (value) {
-                                  if (value == 'edit') _edit(tasks, task);
-                                  if (value == 'delete') _delete(task);
-                                },
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('编辑计划'),
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                          ),
+                          leading: Checkbox(
+                            value: false,
+                            onChanged:
+                                widget.colony.archived ||
+                                    _busy ||
+                                    !task.isDue(DateTime.now())
+                                ? null
+                                : (_) => _change(
+                                    () => AppDatabase.instance.completeCareTask(
+                                      task.id,
+                                    ),
                                   ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('删除计划'),
+                          ),
+                          title: Text(task.type.label),
+                          subtitle: Text(
+                            task.isDue(DateTime.now())
+                                ? '今天 · 待完成'
+                                : '${task.nextDueOn.difference(DateUtils.dateOnly(DateTime.now())).inDays} 天后',
+                          ),
+                          onTap: widget.colony.archived || _busy
+                              ? null
+                              : () => _edit(tasks, task),
+                          trailing: PopupMenuButton<String>(
+                            enabled: !widget.colony.archived && !_busy,
+                            onSelected: (value) async {
+                              if (value == 'edit') _edit(tasks, task);
+                              if (value == 'delete') _delete(task);
+                              if (value == 'postpone') {
+                                _change(
+                                  () => AppDatabase.instance.postponeCareTask(
+                                    task,
                                   ),
-                                ],
-                              ),
-                      ),
-                      if (!widget.colony.archived &&
-                          task.isDue(DateTime.now()))
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              FilledButton.tonalIcon(
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                  iconSize: 16,
-                                  visualDensity: VisualDensity.compact,
+                                );
+                              }
+                              if (value == 'record' &&
+                                  await widget.onRecord(task) &&
+                                  mounted) {
+                                _reload();
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              if (task.isDue(DateTime.now())) ...[
+                                const PopupMenuItem(
+                                  value: 'record',
+                                  child: Text('完成并记日记'),
                                 ),
-                                onPressed: _busy
-                                    ? null
-                                    : () => _change(
-                                        () => AppDatabase.instance
-                                            .completeCareTask(task.id),
-                                      ),
-                                icon: const Icon(Icons.check),
-                                label: const Text('快速完成'),
-                              ),
-                              const SizedBox(width: 4),
-                              FilledButton.tonalIcon(
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                  iconSize: 16,
-                                  visualDensity: VisualDensity.compact,
+                                const PopupMenuItem(
+                                  value: 'postpone',
+                                  child: Text('顺延至明天'),
                                 ),
-                                onPressed: _busy
-                                    ? null
-                                    : () async {
-                                        if (await widget.onRecord(task) &&
-                                            mounted) {
-                                          _reload();
-                                        }
-                                      },
-                                icon: const Icon(Icons.check),
-                                label: const Text('完成并记日记'),
+                              ],
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Text('编辑计划'),
                               ),
-                              const SizedBox(width: 4),
-                              TextButton(
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                onPressed: _busy || !task.isDue(DateTime.now())
-                                    ? null
-                                    : () => _change(
-                                        () => AppDatabase.instance
-                                            .postponeCareTask(task),
-                                      ),
-                                child: const Text('顺延至明天'),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('删除计划'),
                               ),
                             ],
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(Icons.chevron_right, size: 18),
+                            ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                    )
+                  else
+                    Column(
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(task.type.label),
+                          subtitle: Text(
+                            '${task.isDue(DateTime.now()) ? '已到期' : '下次'} ${_date(task.nextDueOn)} · 每 ${task.intervalDays} 天',
+                          ),
+                          trailing: widget.colony.archived
+                              ? null
+                              : PopupMenuButton<String>(
+                                  tooltip: '待办操作',
+                                  onSelected: (value) {
+                                    if (value == 'edit') _edit(tasks, task);
+                                    if (value == 'delete') _delete(task);
+                                  },
+                                  itemBuilder: (_) => const [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('编辑计划'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('删除计划'),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                        if (!widget.colony.archived &&
+                            task.isDue(DateTime.now()))
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FilledButton.tonalIcon(
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12),
+                                    iconSize: 16,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _change(
+                                          () => AppDatabase.instance
+                                              .completeCareTask(task.id),
+                                        ),
+                                  icon: const Icon(Icons.check),
+                                  label: const Text('快速完成'),
+                                ),
+                                const SizedBox(width: 4),
+                                FilledButton.tonalIcon(
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12),
+                                    iconSize: 16,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  onPressed: _busy
+                                      ? null
+                                      : () async {
+                                          if (await widget.onRecord(task) &&
+                                              mounted) {
+                                            _reload();
+                                          }
+                                        },
+                                  icon: const Icon(Icons.check),
+                                  label: const Text('完成并记日记'),
+                                ),
+                                const SizedBox(width: 4),
+                                TextButton(
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  onPressed:
+                                      _busy || !task.isDue(DateTime.now())
+                                      ? null
+                                      : () => _change(
+                                          () => AppDatabase.instance
+                                              .postponeCareTask(task),
+                                        ),
+                                  child: const Text('顺延至明天'),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
             ],
           );
         },

@@ -75,6 +75,7 @@ import 'widgets/photo_save_preview.dart';
 export 'inventory_page.dart' show InventoryPage;
 
 part 'main_ui_legacy.dart';
+part 'colony_detail_current.dart';
 
 const _nestTypeOptions = [
   '试管巢',
@@ -3594,6 +3595,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
   bool _deleting = false;
   bool _editingAcquiredOn = false;
   String _diaryTypeFilter = '';
+  String _diarySearch = '';
   _DiaryTimeFilter _diaryTimeFilter = _DiaryTimeFilter.all;
   DateTimeRange? _diaryDateRange;
   DiaryDisplay get _display => themeController.diary.display;
@@ -3817,12 +3819,18 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         );
       }
       final colony = detail!.colony!;
+      final modern = themeController.interfaceStyle == InterfaceStyle.current;
       final today = DateUtils.dateOnly(DateTime.now());
       final showingMilestones = _diaryTypeFilter == 'milestone';
       final visibleDiaryRecords = detail.records
           .where(
             (record) =>
                 !showingMilestones &&
+                (!modern ||
+                    _diarySearch.isEmpty ||
+                    '${record.type.label} ${record.note ?? ''}'
+                        .toLowerCase()
+                        .contains(_diarySearch.toLowerCase())) &&
                 (_diaryTypeFilter.isEmpty ||
                     record.type.storageValue == _diaryTypeFilter) &&
                 _matchesDiaryTime(record.occurredAt, today),
@@ -3830,7 +3838,15 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
           .toList();
       final visibleMilestones = showingMilestones
           ? detail.milestones
-                .where((item) => _matchesDiaryTime(item.occurredAt, today))
+                .where(
+                  (item) =>
+                      _matchesDiaryTime(item.occurredAt, today) &&
+                      (!modern ||
+                          _diarySearch.isEmpty ||
+                          '${item.title} ${item.note ?? ''}'
+                              .toLowerCase()
+                              .contains(_diarySearch.toLowerCase())),
+                )
                 .toList()
           : <Milestone>[];
       final diaryCountLabel = showingMilestones
@@ -3838,7 +3854,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
           : _diaryTypeFilter.isEmpty && _diaryTimeFilter == _DiaryTimeFilter.all
           ? '${detail.records.length} 条记录'
           : '${visibleDiaryRecords.length} / ${detail.records.length} 条记录';
-      final compactAppBar = MediaQuery.sizeOf(context).width < 400;
+      final compactAppBar = modern || MediaQuery.sizeOf(context).width < 400;
       Future<void> addRecord() async {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute(builder: (_) => RecordFormPage(colony: colony)),
@@ -3855,7 +3871,24 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
 
       return Scaffold(
         appBar: AppBar(
-          title: Text(colony.name),
+          title: modern
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      colony.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      colony.species ?? '未填写品种',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                )
+              : Text(colony.name),
           actions: [
             IconButton(
               tooltip: '生成分享图',
@@ -3909,11 +3942,29 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 color: Theme.of(context).colorScheme.error,
                 onPressed: _deleting ? null : () => _deleteColony(colony),
               ),
-            if (!colony.archived && compactAppBar)
+            if ((!colony.archived || modern) && compactAppBar)
               PopupMenuButton<String>(
                 tooltip: '更多操作',
                 enabled: !_deleting,
                 onSelected: (action) async {
+                  if (action == 'nest' ||
+                      action == 'winter' ||
+                      action == 'milestone' ||
+                      action == 'species') {
+                    final species = colony.species?.trim() ?? '';
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => switch (action) {
+                          'nest' => NestHistoryPage(colony: colony),
+                          'winter' => WinterCyclePage(colony: colony),
+                          'milestone' => MilestonePage(colony: colony),
+                          _ => SpeciesEncyclopediaPage(initialQuery: species),
+                        },
+                      ),
+                    );
+                    if (mounted) setState(_reload);
+                    return;
+                  }
                   if (action == 'delete') {
                     await _deleteColony(colony);
                     return;
@@ -3928,9 +3979,21 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                     Navigator.of(context).pop(true);
                   }
                 },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'memorial', child: Text('移入英灵殿')),
-                  PopupMenuItem(value: 'delete', child: Text('删除蚁群')),
+                itemBuilder: (context) => [
+                  if (modern) ...[
+                    const PopupMenuItem(value: 'nest', child: Text('巢体履历')),
+                    const PopupMenuItem(value: 'winter', child: Text('越冬周期')),
+                    const PopupMenuItem(value: 'milestone', child: Text('里程碑')),
+                    if (!themeController.simpleMode)
+                      const PopupMenuItem(value: 'species', child: Text('百科')),
+                  ],
+                  if (!colony.archived) ...[
+                    const PopupMenuItem(
+                      value: 'memorial',
+                      child: Text('移入英灵殿'),
+                    ),
+                    const PopupMenuItem(value: 'delete', child: Text('删除蚁群')),
+                  ],
                 ],
               ),
           ],
@@ -3951,74 +4014,84 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            _ColonyProfileSummary(
-              colony: colony,
-              workers: colony.currentWorkerCount(detail.records),
-              records: detail.records,
-              onDurationTap: colony.archived
-                  ? null
-                  : () => _editAcquiredOn(colony),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: shortcutStyle,
-                    icon: const Icon(Icons.home_work_outlined),
-                    label: const Text(
-                      '巢体履历',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            if (modern)
+              _CurrentColonyProfile(
+                colony: colony,
+                records: detail.records,
+                onDurationTap: colony.archived
+                    ? null
+                    : () => _editAcquiredOn(colony),
+              )
+            else
+              _ColonyProfileSummary(
+                colony: colony,
+                workers: colony.currentWorkerCount(detail.records),
+                records: detail.records,
+                onDurationTap: colony.archived
+                    ? null
+                    : () => _editAcquiredOn(colony),
+              ),
+            if (!modern)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: shortcutStyle,
+                      icon: const Icon(Icons.home_work_outlined),
+                      label: const Text(
+                        '巢体履历',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: () async {
+                        await Navigator.of(context).push<void>(
+                          MaterialPageRoute(
+                            builder: (_) => NestHistoryPage(colony: colony),
+                          ),
+                        );
+                        if (mounted) setState(_reload);
+                      },
                     ),
-                    onPressed: () async {
-                      await Navigator.of(context).push<void>(
-                        MaterialPageRoute(
-                          builder: (_) => NestHistoryPage(colony: colony),
-                        ),
-                      );
-                      if (mounted) setState(_reload);
-                    },
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: shortcutStyle,
-                    icon: const Icon(Icons.ac_unit),
-                    label: const Text(
-                      '越冬周期',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => WinterCyclePage(colony: colony),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: shortcutStyle,
+                      icon: const Icon(Icons.ac_unit),
+                      label: const Text(
+                        '越冬周期',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => WinterCyclePage(colony: colony),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: shortcutStyle,
-                    icon: const Icon(Icons.flag_outlined),
-                    label: const Text(
-                      '里程碑',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: shortcutStyle,
+                      icon: const Icon(Icons.flag_outlined),
+                      label: const Text(
+                        '里程碑',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => MilestonePage(colony: colony),
+                          ),
+                        );
+                        if (mounted) setState(_reload);
+                      },
                     ),
-                    onPressed: () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => MilestonePage(colony: colony),
-                        ),
-                      );
-                      if (mounted) setState(_reload);
-                    },
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             if (colony.targetTemperatureLower != null ||
                 colony.targetTemperature != null ||
                 colony.targetHumidityLower != null ||
@@ -4028,6 +4101,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
             ],
             const SizedBox(height: 4),
             CareTasksSection(
+              compact: modern,
               colony: colony,
               onRecord: (task) async {
                 final saved = await Navigator.of(context).push<bool>(
@@ -4040,45 +4114,81 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               },
             ),
             const SizedBox(height: 4),
-            _PopulationTimeline(
-              colony: colony,
-              records: detail.records,
-              includeBrood: _includeBrood,
-              expanded: _populationExpanded,
-              showForecast: _showForecast,
-              forecastHorizon: _forecastHorizon,
-              onConfigureGrowth: themeController.simpleMode || colony.archived
-                  ? null
-                  : () async {
-                      final saved = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => ColonyGrowthPage(colony: colony),
-                        ),
-                      );
-                      if (saved == true && mounted) {
-                        await _updateDisplay(_display.copyWith(forecast: true));
-                        if (mounted) setState(_reload);
-                      }
-                    },
-              onOpenSettings: () => _settings(colony),
-              onAdjustBoundary: colony.archived
-                  ? null
-                  : (record) => _editRecord(colony, record),
-              onExpandedChanged: (value) =>
-                  _updateDisplay(_display.copyWith(populationExpanded: value)),
-            ),
-            const SizedBox(height: 4),
-            WorkerMortalityAnalysisCard(
-              key: const ValueKey('colony-mortality-analysis'),
-              expanded: _mortalityExpanded,
-              onExpandedChanged: (value) =>
-                  _updateDisplay(_display.copyWith(mortalityExpanded: value)),
-              points: dailyWorkerMortality(
-                colony.id,
-                detail.records,
-                now: DateTime.now(),
+            if (modern)
+              _CurrentPopulationPanel(
+                colony: colony,
+                records: detail.records,
+                details: _PopulationTimeline(
+                  colony: colony,
+                  records: detail.records,
+                  includeBrood: _includeBrood,
+                  expanded: true,
+                  onExpandedChanged: (_) {},
+                  showForecast: _showForecast,
+                  onOpenSettings: () => _settings(colony),
+                  forecastHorizon: _forecastHorizon,
+                  onAdjustBoundary: colony.archived
+                      ? null
+                      : (record) => _editRecord(colony, record),
+                  onConfigureGrowth:
+                      themeController.simpleMode || colony.archived
+                      ? null
+                      : () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute<bool>(
+                              builder: (_) => ColonyGrowthPage(colony: colony),
+                            ),
+                          );
+                          if (mounted) setState(_reload);
+                        },
+                ),
+              )
+            else
+              _PopulationTimeline(
+                colony: colony,
+                records: detail.records,
+                includeBrood: _includeBrood,
+                expanded: _populationExpanded,
+                showForecast: _showForecast,
+                forecastHorizon: _forecastHorizon,
+                onConfigureGrowth: themeController.simpleMode || colony.archived
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => ColonyGrowthPage(colony: colony),
+                          ),
+                        );
+                        if (saved == true && mounted) {
+                          await _updateDisplay(
+                            _display.copyWith(forecast: true),
+                          );
+                          if (mounted) setState(_reload);
+                        }
+                      },
+                onOpenSettings: () => _settings(colony),
+                onAdjustBoundary: colony.archived
+                    ? null
+                    : (record) => _editRecord(colony, record),
+                onExpandedChanged: (value) => _updateDisplay(
+                  _display.copyWith(populationExpanded: value),
+                ),
               ),
-            ),
+            const SizedBox(height: 4),
+            if (modern)
+              _CurrentMortalityPanel(records: detail.records, colony: colony)
+            else
+              WorkerMortalityAnalysisCard(
+                key: const ValueKey('colony-mortality-analysis'),
+                expanded: _mortalityExpanded,
+                onExpandedChanged: (value) =>
+                    _updateDisplay(_display.copyWith(mortalityExpanded: value)),
+                points: dailyWorkerMortality(
+                  colony.id,
+                  detail.records,
+                  now: DateTime.now(),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
               child: Column(
@@ -4094,7 +4204,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '养蚁日记',
+                          modern ? '养蚁日记 (${detail.records.length})' : '养蚁日记',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
@@ -4141,8 +4251,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       ),
                     ],
                   ),
-                  if (detail.records.isNotEmpty ||
-                      detail.milestones.isNotEmpty) ...[
+                  if (modern)
+                    _CurrentDiaryFilters(
+                      type: _diaryTypeFilter,
+                      timeLabel: _diaryTimeLabel,
+                      onType: (value) =>
+                          setState(() => _diaryTypeFilter = value),
+                      onTime: _selectDiaryTime,
+                      onSearch: (value) =>
+                          setState(() => _diarySearch = value.trim()),
+                    ),
+                  if (!modern &&
+                      (detail.records.isNotEmpty ||
+                          detail.milestones.isNotEmpty)) ...[
                     const SizedBox(height: 6),
                     Text(
                       '$diaryCountLabel'
@@ -4260,13 +4381,16 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   ),
                 ),
               );
+              final displayedCard = modern
+                  ? _CurrentDiaryCard(record: record, details: card)
+                  : card;
               return colony.archived
-                  ? card
+                  ? displayedCard
                   : DiaryRecordActions(
                       key: ValueKey(record.id),
                       onEdit: () => _editRecord(colony, record),
                       onDelete: () => _deleteRecord(record),
-                      child: card,
+                      child: displayedCard,
                     );
             }),
             for (final milestone in visibleMilestones)
