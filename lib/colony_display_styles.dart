@@ -33,7 +33,6 @@ const _green = Color(0xff35dfa5);
 class ColonyShowcaseToolbar extends StatelessWidget {
   const ColonyShowcaseToolbar({
     super.key,
-    required this.style,
     required this.visibleCount,
     required this.totalCount,
     required this.filterCount,
@@ -44,7 +43,6 @@ class ColonyShowcaseToolbar extends StatelessWidget {
     required this.onFilter,
   });
 
-  final ColonyDisplayStyle style;
   final int visibleCount;
   final int totalCount;
   final int filterCount;
@@ -56,15 +54,13 @@ class ColonyShowcaseToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = style == ColonyDisplayStyle.compact;
     final palette = _ShowcasePalette(context);
-    final accent = compact ? _green : _blue;
     final count = Text(
       '$visibleCount / $totalCount 群',
       maxLines: 1,
       style: TextStyle(
         color: palette.foreground,
-        fontSize: compact ? 14 : 16,
+        fontSize: 14,
         fontWeight: FontWeight.w800,
       ),
     );
@@ -83,7 +79,7 @@ class ColonyShowcaseToolbar extends StatelessWidget {
             value: order.name,
             child: Text(_workerOrderLabel(order)),
           ),
-        if (compact && canBatchCare)
+        if (canBatchCare)
           const PopupMenuItem(value: 'batch', child: Text('批量养护记录')),
       ],
       child: Padding(
@@ -112,12 +108,10 @@ class ColonyShowcaseToolbar extends StatelessWidget {
       ),
       label: Text(filterCount == 0 ? '筛选' : '筛选 $filterCount'),
       style: OutlinedButton.styleFrom(
-        foregroundColor: palette.dark ? accent : palette.scheme.primary,
-        backgroundColor: compact && palette.dark
-            ? _green.withValues(alpha: .16)
-            : null,
+        foregroundColor: palette.dark ? _green : palette.scheme.primary,
+        backgroundColor: palette.dark ? _green.withValues(alpha: .16) : null,
         side: BorderSide(
-          color: palette.dark ? accent.withValues(alpha: .75) : palette.line,
+          color: palette.dark ? _green.withValues(alpha: .75) : palette.line,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 10),
         minimumSize: const Size(0, 38),
@@ -125,10 +119,7 @@ class ColonyShowcaseToolbar extends StatelessWidget {
       ),
     );
     final controls = Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 10,
-        vertical: compact ? 0 : 3,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: _panelDecoration(context, inset: true),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -136,75 +127,32 @@ class ColonyShowcaseToolbar extends StatelessWidget {
           count,
           const SizedBox(width: 10),
           SizedBox(height: 25, child: VerticalDivider(color: palette.line)),
-          if (compact)
-            sort
-          else ...[
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: sort,
-              ),
-            ),
-            filter,
-          ],
+          sort,
         ],
       ),
     );
-    if (compact) {
-      return Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: controls,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            flex: 2,
-            child: Text(
-              '卡片右滑删除\n长按滑动排序',
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              style: TextStyle(color: palette.muted, fontSize: 10),
-            ),
-          ),
-          const SizedBox(width: 6),
-          filter,
-        ],
-      );
-    }
-    return Column(
+    return Row(
       children: [
-        if (canBatchCare) ...[
-          Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: onBatchCare,
-                icon: const Icon(Icons.playlist_add_check_rounded),
-                label: const Text('批量养护记录'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.foreground,
-                  side: BorderSide(color: palette.muted),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '卡片右滑删除，长按拖动排序',
-                  textAlign: TextAlign.end,
-                  maxLines: 2,
-                  style: TextStyle(color: palette.muted, fontSize: 11),
-                ),
-              ),
-            ],
+        Expanded(
+          flex: 3,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: controls,
           ),
-          const SizedBox(height: 10),
-        ],
-        SizedBox(width: double.infinity, child: controls),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 2,
+          child: Text(
+            '卡片右滑删除\n长按滑动排序',
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: TextStyle(color: palette.muted, fontSize: 10),
+          ),
+        ),
+        const SizedBox(width: 6),
+        filter,
       ],
     );
   }

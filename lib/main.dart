@@ -1665,7 +1665,6 @@ class _ColoniesPageState extends State<ColoniesPage> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: ColonyShowcaseToolbar(
-                        style: style,
                         visibleCount: colonies.length,
                         totalCount: allColonies.length,
                         filterCount:
