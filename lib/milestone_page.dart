@@ -681,13 +681,9 @@ class _MilestoneFormPageState extends State<MilestoneFormPage> {
           const SizedBox(height: 7),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              height: 160,
-              child: Image.asset(
-                _artwork.assetPath,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
+            child: AspectRatio(
+              aspectRatio: milestonePosterSize.aspectRatio,
+              child: Image.asset(_artwork.assetPath, fit: BoxFit.contain),
             ),
           ),
         ],
