@@ -40,12 +40,16 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   final _memorialChanges = StreamController<void>.broadcast();
   Stream<void> get memorialChanges => _memorialChanges.stream;
 
+  final _careTaskChanges = StreamController<void>.broadcast();
+  Stream<void> get careTaskChanges => _careTaskChanges.stream;
+  void _notifyCareTasks() => _careTaskChanges.add(null);
+
   Future<void> open() async {
     if (_database != null) return;
     initializeDatabaseFactory();
     _database = await openDatabase(
       await applicationDatabasePath(),
-      version: 34,
+      version: 35,
       onConfigure: (database) => database.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
@@ -80,7 +84,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       worker_mortality_count INTEGER CHECK (worker_mortality_count BETWEEN 0 AND 1000000),
       queen_mortality_count INTEGER CHECK (queen_mortality_count BETWEEN 0 AND 1000000),
       auto_growth_rule_json TEXT,
-      feeding_food TEXT, feeding_amount TEXT, feeding_response TEXT,
+      feeding_category TEXT, feeding_food TEXT, feeding_amount TEXT, feeding_response TEXT,
       feeding_leftovers INTEGER CHECK (feeding_leftovers IN (0, 1)),
       photos_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL,
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
@@ -104,6 +108,22 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 35) {
+      await database.execute(
+        'ALTER TABLE care_records ADD COLUMN feeding_category TEXT',
+      );
+      if (oldVersion >= 21) {
+        await database.execute(
+          'ALTER TABLE care_tasks ADD COLUMN last_fed_at TEXT',
+        );
+        await database.execute(
+          'ALTER TABLE care_tasks ADD COLUMN removal_hours INTEGER CHECK (removal_hours BETWEEN 1 AND 720)',
+        );
+        await database.execute(
+          'ALTER TABLE care_tasks ADD COLUMN removal_due_at TEXT',
+        );
+      }
+    }
     if (oldVersion >= 25 && oldVersion < 30) {
       await database.execute('''CREATE TABLE milestones_new (
         id TEXT PRIMARY KEY, colony_id TEXT, title TEXT NOT NULL,
@@ -949,77 +969,82 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
   Future<void> saveColony(
     Colony colony, {
     ({String recordId, int speciesIndex, int colonyIndex})? wildCatchResult,
-  }) => _db.transaction((transaction) async {
-    await _applyGrowth(transaction, DateTime.now(), colony.id);
-    final previous = await transaction.query(
-      'colonies',
-      where: 'id = ?',
-      whereArgs: [colony.id],
-    );
-    final original = previous.isEmpty ? null : Colony.fromMap(previous.single);
-    final initialCountsChanged =
-        original != null &&
-        (original.initialEggCount != colony.initialEggCount ||
-            original.initialLarvaCount != colony.initialLarvaCount ||
-            original.initialCocoonCount != colony.initialCocoonCount ||
-            original.initialWorkerCount != colony.initialWorkerCount);
-    final before = initialCountsChanged
-        ? await _growthReplayRecords(transaction, colony.id)
-        : <CareRecord>[];
-    final updated = await transaction.update(
-      'colonies',
-      colony.toMap()..remove('auto_growth_json'),
-      where: 'id = ?',
-      whereArgs: [colony.id],
-    );
-    if (updated == 0) {
-      await transaction.insert('colonies', colony.toMap());
-    }
-    if (initialCountsChanged) {
-      final previousColony = original;
-      await _recalculateGrowthEstimates(
-        transaction,
-        colony.id,
-        before,
-        recalculateAll: true,
-        previousInitial: GrowthPopulation(
-          eggs: previousColony.initialEggCount,
-          larvae: previousColony.initialLarvaCount,
-          cocoons: previousColony.initialCocoonCount,
-          workers: previousColony.initialWorkerCount,
-        ),
-      );
-    }
-    if (previous.isEmpty || previous.single['nest_type'] != colony.nestType) {
-      await transaction.update(
-        'nest_entries',
-        {'is_current': 0},
-        where: 'colony_id = ? AND is_current = 1',
-        whereArgs: [colony.id],
-      );
-      if (colony.nestType?.trim().isNotEmpty == true) {
-        await transaction.insert(
-          'nest_entries',
-          NestEntry(
-            id: const Uuid().v4(),
-            colonyId: colony.id,
-            nestType: colony.nestType!,
-            createdAt: DateTime.now(),
-            isCurrent: true,
-          ).toMap(),
+  }) => _db
+      .transaction((transaction) async {
+        await _applyGrowth(transaction, DateTime.now(), colony.id);
+        final previous = await transaction.query(
+          'colonies',
+          where: 'id = ?',
+          whereArgs: [colony.id],
         );
-      }
-    }
-    if (wildCatchResult != null) {
-      await _linkWildCatchColony(
-        transaction,
-        recordId: wildCatchResult.recordId,
-        speciesIndex: wildCatchResult.speciesIndex,
-        colonyIndex: wildCatchResult.colonyIndex,
-        colonyId: colony.id,
-      );
-    }
-  });
+        final original = previous.isEmpty
+            ? null
+            : Colony.fromMap(previous.single);
+        final initialCountsChanged =
+            original != null &&
+            (original.initialEggCount != colony.initialEggCount ||
+                original.initialLarvaCount != colony.initialLarvaCount ||
+                original.initialCocoonCount != colony.initialCocoonCount ||
+                original.initialWorkerCount != colony.initialWorkerCount);
+        final before = initialCountsChanged
+            ? await _growthReplayRecords(transaction, colony.id)
+            : <CareRecord>[];
+        final updated = await transaction.update(
+          'colonies',
+          colony.toMap()..remove('auto_growth_json'),
+          where: 'id = ?',
+          whereArgs: [colony.id],
+        );
+        if (updated == 0) {
+          await transaction.insert('colonies', colony.toMap());
+        }
+        if (initialCountsChanged) {
+          final previousColony = original;
+          await _recalculateGrowthEstimates(
+            transaction,
+            colony.id,
+            before,
+            recalculateAll: true,
+            previousInitial: GrowthPopulation(
+              eggs: previousColony.initialEggCount,
+              larvae: previousColony.initialLarvaCount,
+              cocoons: previousColony.initialCocoonCount,
+              workers: previousColony.initialWorkerCount,
+            ),
+          );
+        }
+        if (previous.isEmpty ||
+            previous.single['nest_type'] != colony.nestType) {
+          await transaction.update(
+            'nest_entries',
+            {'is_current': 0},
+            where: 'colony_id = ? AND is_current = 1',
+            whereArgs: [colony.id],
+          );
+          if (colony.nestType?.trim().isNotEmpty == true) {
+            await transaction.insert(
+              'nest_entries',
+              NestEntry(
+                id: const Uuid().v4(),
+                colonyId: colony.id,
+                nestType: colony.nestType!,
+                createdAt: DateTime.now(),
+                isCurrent: true,
+              ).toMap(),
+            );
+          }
+        }
+        if (wildCatchResult != null) {
+          await _linkWildCatchColony(
+            transaction,
+            recordId: wildCatchResult.recordId,
+            speciesIndex: wildCatchResult.speciesIndex,
+            colonyIndex: wildCatchResult.colonyIndex,
+            colonyId: colony.id,
+          );
+        }
+      })
+      .whenComplete(_notifyCareTasks);
 
   Future<Colony> updateColonyDiaryRules(
     String id, {
@@ -1215,6 +1240,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, task_type TEXT NOT NULL,
       interval_days INTEGER NOT NULL CHECK (interval_days BETWEEN 1 AND 365),
       next_due_on TEXT NOT NULL, last_completed_on TEXT,
+      last_fed_at TEXT, removal_hours INTEGER CHECK (removal_hours BETWEEN 1 AND 720),
+      removal_due_at TEXT,
       UNIQUE (colony_id, task_type),
       FOREIGN KEY (colony_id) REFERENCES colonies(id) ON DELETE CASCADE
     )''');
@@ -1242,6 +1269,20 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         where: 'id = ?',
         whereArgs: [task.id],
       );
+      final siblings = (await transaction.query(
+        'care_tasks',
+        where: 'colony_id = ?',
+        whereArgs: [task.colonyId],
+      )).map(CareTask.fromMap);
+      if (task.type.isFeeding &&
+          siblings.any(
+            (other) =>
+                other.id != task.id &&
+                other.type.isFeeding &&
+                other.type.isSplitFeeding != task.type.isSplitFeeding,
+          )) {
+        throw StateError('普通投喂与分类投喂不能同时启用');
+      }
       if (existing.isEmpty) {
         await transaction.insert('care_tasks', task.toMap());
       } else {
@@ -1257,10 +1298,67 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         );
       }
     });
+    _notifyCareTasks();
   }
 
-  Future<void> deleteCareTask(String id) async =>
-      _db.delete('care_tasks', where: 'id = ?', whereArgs: [id]);
+  Future<void> deleteCareTask(String id) async {
+    await _db.delete('care_tasks', where: 'id = ?', whereArgs: [id]);
+    _notifyCareTasks();
+  }
+
+  Future<void> setSplitFeeding(String colonyId, bool split) async {
+    await _db.transaction((txn) async {
+      final colonies = await txn.query(
+        'colonies',
+        where: 'id = ?',
+        whereArgs: [colonyId],
+      );
+      if (colonies.isEmpty || colonies.single['archived'] == 1) {
+        throw StateError('蚁群已归档或不存在');
+      }
+      final feeding = (await txn.query(
+        'care_tasks',
+        where: 'colony_id = ?',
+        whereArgs: [colonyId],
+      )).map(CareTask.fromMap).where((t) => t.type.isFeeding).toList();
+      if (feeding.isNotEmpty &&
+          feeding.every((t) => t.type.isSplitFeeding == split)) {
+        return;
+      }
+      for (final task in feeding) {
+        await txn.delete('care_tasks', where: 'id = ?', whereArgs: [task.id]);
+      }
+      final now = DateTime.now();
+      for (final type
+          in split
+              ? [CareTaskType.protein, CareTaskType.sugar, CareTaskType.seeds]
+              : [CareTaskType.feeding]) {
+        await txn.insert(
+          'care_tasks',
+          CareTask(
+            id: const Uuid().v4(),
+            colonyId: colonyId,
+            type: type,
+            intervalDays: feeding.firstOrNull?.intervalDays ?? 7,
+            nextDueOn:
+                feeding.firstOrNull?.nextDueOn ??
+                DateTime(now.year, now.month, now.day),
+          ).toMap(),
+        );
+      }
+    });
+    _notifyCareTasks();
+  }
+
+  Future<void> completeFoodRemoval(String id) async {
+    await _db.update(
+      'care_tasks',
+      {'removal_due_at': null},
+      where: 'id = ? AND colony_id IN (SELECT id FROM colonies WHERE archived = 0)',
+      whereArgs: [id],
+    );
+    _notifyCareTasks();
+  }
 
   Future<void> postponeCareTask(CareTask task) async {
     final now = DateTime.now();
@@ -1273,8 +1371,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     );
   }
 
-  Future<void> completeCareTask(String id) async =>
-      _db.transaction((transaction) async {
+  Future<void> completeCareTask(String id) async => _db
+      .transaction((transaction) async {
         final tasks = await transaction.query(
           'care_tasks',
           where: 'id = ?',
@@ -1292,7 +1390,8 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
           throw StateError('蚁群已归档或不存在');
         }
         await _advanceCareTask(transaction, task, DateTime.now());
-      });
+      })
+      .whenComplete(_notifyCareTasks);
 
   static Future<void> _advanceCareTask(
     DatabaseExecutor database,
@@ -1303,6 +1402,12 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     await database.update(
       'care_tasks',
       {
+        if (task.type.isFeeding) ...{
+          'last_fed_at': now.toIso8601String(),
+          'removal_due_at': task.removalHours == null
+              ? null
+              : now.add(Duration(hours: task.removalHours!)).toIso8601String(),
+        },
         'last_completed_on': done.toIso8601String(),
         'next_due_on': DateTime(
           done.year,
@@ -1343,66 +1448,90 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     bool recalculateAllGrowth = false,
     String? completingTaskId,
     Milestone? milestone,
-  }) => _db.transaction((transaction) async {
-    if (milestone != null) {
-      milestone.validate();
-      if (milestone.colonyId != record.colonyId ||
-          milestone.occurredAt != record.occurredAt) {
-        throw StateError('里程碑与日记的蚁群或时间不一致');
-      }
-    }
-    await _applyGrowth(transaction, DateTime.now(), record.colonyId);
-    final before = await _growthReplayRecords(transaction, record.colonyId);
-    _requireGrowthConfirmation(before, [
-      record.occurredAt,
-    ], recalculateAllGrowth);
-    var resolved = record;
-    if (incremental) {
-      final rows = await transaction.query(
-        'colonies',
-        where: 'id = ?',
-        whereArgs: [record.colonyId],
-      );
-      if (rows.isEmpty) throw StateError('蚁群已不存在');
-      final history = await transaction.query(
-        'care_records',
-        where: 'colony_id = ?',
-        whereArgs: [record.colonyId],
-      );
-      resolved = resolveRecordIncrement(
-        Colony.fromMap(rows.single),
-        history.map(CareRecord.fromMap),
-        record,
-      );
-    }
-    await transaction.insert('care_records', resolved.toMap());
-    if (milestone != null) {
-      await transaction.insert('milestones', milestone.toMap());
-    }
-    if (completingTaskId != null) {
-      final tasks = await transaction.query(
-        'care_tasks',
-        where: 'id = ? AND colony_id = ?',
-        whereArgs: [completingTaskId, record.colonyId],
-      );
-      if (tasks.isEmpty) throw StateError('待办已不存在');
-      final task = CareTask.fromMap(tasks.single);
-      if (task.type.recordType != record.type) throw StateError('待办类型与日记不一致');
-      await _advanceCareTask(transaction, task, DateTime.now());
-    }
-    await _recalculateGrowthEstimates(
-      transaction,
-      record.colonyId,
-      before,
-      recalculateAll: recalculateAllGrowth,
-    );
-    await transaction.update(
-      'colonies',
-      {'updated_at': DateTime.now().toIso8601String()},
-      where: 'id = ?',
-      whereArgs: [record.colonyId],
-    );
-  });
+  }) => _db
+      .transaction((transaction) async {
+        if (milestone != null) {
+          milestone.validate();
+          if (milestone.colonyId != record.colonyId ||
+              milestone.occurredAt != record.occurredAt) {
+            throw StateError('里程碑与日记的蚁群或时间不一致');
+          }
+        }
+        await _applyGrowth(transaction, DateTime.now(), record.colonyId);
+        final before = await _growthReplayRecords(transaction, record.colonyId);
+        _requireGrowthConfirmation(before, [
+          record.occurredAt,
+        ], recalculateAllGrowth);
+        var resolved = record;
+        if (incremental) {
+          final rows = await transaction.query(
+            'colonies',
+            where: 'id = ?',
+            whereArgs: [record.colonyId],
+          );
+          if (rows.isEmpty) throw StateError('蚁群已不存在');
+          final history = await transaction.query(
+            'care_records',
+            where: 'colony_id = ?',
+            whereArgs: [record.colonyId],
+          );
+          resolved = resolveRecordIncrement(
+            Colony.fromMap(rows.single),
+            history.map(CareRecord.fromMap),
+            record,
+          );
+        }
+        await transaction.insert('care_records', resolved.toMap());
+        if (milestone != null) {
+          await transaction.insert('milestones', milestone.toMap());
+        }
+        if (completingTaskId != null) {
+          final colonies = await transaction.query(
+            'colonies',
+            where: 'id = ?',
+            whereArgs: [record.colonyId],
+          );
+          if (colonies.isEmpty || colonies.single['archived'] == 1) {
+            throw StateError('蚁群已归档或不存在');
+          }
+          final tasks = await transaction.query(
+            'care_tasks',
+            where: 'id = ? AND colony_id = ?',
+            whereArgs: [completingTaskId, record.colonyId],
+          );
+          if (tasks.isEmpty) throw StateError('待办已不存在');
+          final task = CareTask.fromMap(tasks.single);
+          if (task.type.recordType != record.type ||
+              (task.type.isSplitFeeding &&
+                  task.type.storageValue != record.feedingCategory)) {
+            throw StateError('待办类型与日记不一致');
+          }
+          if (task.type.isFeeding) {
+            if (record.occurredAt.isAfter(DateTime.now())) {
+              throw StateError('投喂时间不能在未来');
+            }
+            if (task.lastFedAt == null ||
+                !record.occurredAt.isBefore(task.lastFedAt!)) {
+              await _advanceCareTask(transaction, task, record.occurredAt);
+            }
+          } else {
+            await _advanceCareTask(transaction, task, DateTime.now());
+          }
+        }
+        await _recalculateGrowthEstimates(
+          transaction,
+          record.colonyId,
+          before,
+          recalculateAll: recalculateAllGrowth,
+        );
+        await transaction.update(
+          'colonies',
+          {'updated_at': DateTime.now().toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [record.colonyId],
+        );
+      })
+      .whenComplete(_notifyCareTasks);
 
   /// Save one confirmed care event per colony as a single local operation.
   /// A missing colony or failed insert rolls back every record in the batch.

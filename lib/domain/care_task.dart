@@ -2,6 +2,9 @@ import 'models.dart';
 
 enum CareTaskType {
   feeding('feeding', '投喂', CareRecordType.feeding),
+  protein('feeding_protein', '蛋白', CareRecordType.feeding),
+  sugar('feeding_sugar', '糖类', CareRecordType.feeding),
+  seeds('feeding_seeds', '种子', CareRecordType.feeding),
   watering('watering', '补水', CareRecordType.watering),
   cleaning('cleaning', '清洁', CareRecordType.cleaning);
 
@@ -9,6 +12,9 @@ enum CareTaskType {
   final String storageValue;
   final String label;
   final CareRecordType recordType;
+
+  bool get isFeeding => recordType == CareRecordType.feeding;
+  bool get isSplitFeeding => isFeeding && this != feeding;
 
   static CareTaskType fromStorage(String value) => values.firstWhere(
     (type) => type.storageValue == value,
@@ -24,6 +30,9 @@ class CareTask {
     required this.intervalDays,
     required this.nextDueOn,
     this.lastCompletedOn,
+    this.lastFedAt,
+    this.removalHours,
+    this.removalDueAt,
   });
 
   final String id;
@@ -32,6 +41,18 @@ class CareTask {
   final int intervalDays;
   final DateTime nextDueOn;
   final DateTime? lastCompletedOn;
+
+  final DateTime? lastFedAt;
+
+  /// Null means removal reminders are disabled for this food.
+  final int? removalHours;
+  final DateTime? removalDueAt;
+
+  bool removalIsDue(DateTime now) =>
+      removalDueAt != null && !removalDueAt!.isAfter(now);
+  bool needsAttention(DateTime now) => isDue(now) || removalIsDue(now);
+  String attentionLabel(DateTime now) =>
+      removalIsDue(now) ? '${type.label}撤食' : type.label;
 
   bool isDue(DateTime now) => !DateTime(
     nextDueOn.year,
@@ -47,9 +68,28 @@ class CareTask {
         intervalDays: intervalDays,
         nextDueOn: nextDueOn ?? this.nextDueOn,
         lastCompletedOn: lastCompletedOn ?? this.lastCompletedOn,
+        lastFedAt: lastFedAt,
+        removalHours: removalHours,
+        removalDueAt: removalDueAt,
       );
 
   factory CareTask.fromMap(Map<String, Object?> row) {
+    final type = CareTaskType.fromStorage(row['task_type'] as String);
+    final hours = row['removal_hours'] as int?;
+    final fed = row['last_fed_at'] == null
+        ? null
+        : DateTime.parse(row['last_fed_at'] as String);
+    final removal = row['removal_due_at'] == null
+        ? null
+        : DateTime.parse(row['removal_due_at'] as String);
+    if (hours != null && (!type.isFeeding || hours < 1 || hours > 720)) {
+      throw const FormatException('撤食时长需为 1～720 小时，且仅适用于投喂');
+    }
+    if ((!type.isFeeding && fed != null) ||
+        (removal != null &&
+            (hours == null || fed == null || !removal.isAfter(fed)))) {
+      throw const FormatException('撤食计时状态无效');
+    }
     final interval = row['interval_days'] as int;
     if (interval < 1 || interval > 365) {
       throw const FormatException('待办周期需为 1～365 天');
@@ -65,7 +105,10 @@ class CareTask {
     return CareTask(
       id: row['id'] as String,
       colonyId: row['colony_id'] as String,
-      type: CareTaskType.fromStorage(row['task_type'] as String),
+      type: type,
+      lastFedAt: fed,
+      removalHours: hours,
+      removalDueAt: removal,
       intervalDays: interval,
       nextDueOn: date(row['next_due_on']),
       lastCompletedOn: row['last_completed_on'] == null
@@ -78,6 +121,9 @@ class CareTask {
     'id': id,
     'colony_id': colonyId,
     'task_type': type.storageValue,
+    'last_fed_at': lastFedAt?.toIso8601String(),
+    'removal_hours': removalHours,
+    'removal_due_at': removalDueAt?.toIso8601String(),
     'interval_days': intervalDays,
     'next_due_on': DateTime(
       nextDueOn.year,

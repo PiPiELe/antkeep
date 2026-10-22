@@ -1,3 +1,6 @@
+import '../domain/care_task.dart';
+import '../domain/models.dart';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -94,6 +97,78 @@ class LocalNotificationService {
   Future<void> cancelDailyCareReminder() async {
     await initialize();
     await _plugin.cancel(id: _dailyCareReminderId);
+  }
+
+  /// Leave room below iOS's pending-notification limit for the daily reminder.
+  /// Past deadlines stay visible in the task list without replaying notifications.
+  Future<void> syncFoodReminders(
+    List<CareTask> tasks,
+    List<Colony> colonies,
+  ) async {
+    await initialize();
+    final now = DateTime.now();
+    final active = {
+      for (final c in colonies)
+        if (!c.archived) c.id: c,
+    };
+    final due =
+        tasks
+            .where(
+              (t) =>
+                  t.removalHours != null &&
+                  t.removalDueAt != null &&
+                  active.containsKey(t.colonyId),
+            )
+            .toList()
+          ..sort((a, b) {
+            final time = a.removalDueAt!.compareTo(b.removalDueAt!);
+            return time == 0 ? a.id.compareTo(b.id) : time;
+          });
+    final pending = await _plugin.pendingNotificationRequests();
+    final managed = pending
+        .where((n) => n.payload?.startsWith('food-removal:') == true)
+        .toList();
+    String payload(CareTask t) =>
+        'food-removal:${t.id}:${t.removalDueAt!.toIso8601String()}';
+    final candidates = due
+        .where(
+          (t) =>
+              t.removalDueAt!.isAfter(now) ||
+              managed.any((n) => n.payload == payload(t)),
+        )
+        .take(50)
+        .toList();
+    final wanted = candidates.map(payload).toSet();
+    for (final item in managed) {
+      if (!wanted.contains(item.payload)) await _plugin.cancel(id: item.id);
+    }
+    final used = pending.map((n) => n.id).toSet();
+    for (final task in candidates) {
+      if (managed.any((n) => n.payload == payload(task))) continue;
+      var id = 20000;
+      while (used.contains(id)) {
+        id++;
+      }
+      used.add(id);
+      await _plugin.zonedSchedule(
+        id: id,
+        title: '${active[task.colonyId]!.name} · ${task.type.label}撤食',
+        body: '已到设定的撤食时间，处理后可在养护待办中标记已撤食。',
+        payload: payload(task),
+        scheduledDate: tz.TZDateTime.from(task.removalDueAt!, tz.local),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'food_removal',
+            '撤食提醒',
+            channelDescription: '各类食物独立的本地撤食提醒',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    }
   }
 
   tz.TZDateTime _nextOccurrence(int minuteOfDay) {

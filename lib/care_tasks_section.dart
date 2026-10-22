@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import 'data/app_database.dart';
+import 'data/local_notification_service.dart';
+import 'data/food_reminder_coordinator.dart';
 import 'domain/care_task.dart';
 import 'domain/models.dart';
 
@@ -24,10 +28,142 @@ class CareTasksSection extends StatefulWidget {
 class _CareTasksSectionState extends State<CareTasksSection> {
   late Future<List<CareTask>> _tasks = _load();
   bool _busy = false;
+  Timer? _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
+  }
+
+  List<CareTaskType> _available(List<CareTask> tasks, [CareTask? old]) {
+    final split = tasks.any((task) => task.type.isSplitFeeding);
+    return CareTaskType.values
+        .where(
+          (type) =>
+              (type.isFeeding ? type.isSplitFeeding == split : true) &&
+              (old?.type == type || !tasks.any((task) => task.type == type)),
+        )
+        .toList();
+  }
+
+  Future<void> _split(bool value) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(value ? '拆分投喂计时？' : '恢复普通投喂？'),
+        content: Text(
+          value
+              ? '将投喂计划拆成蛋白、糖类、种子，分别设置周期和撤食提醒。旧投喂日记保留；各类从下次实际投喂开始计时，撤食提醒默认关闭。'
+              : '合并为一个普通投喂计划。分类日记保留，当前分类计时和撤食提醒会清除。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _change(
+        () => AppDatabase.instance.setSplitFeeding(widget.colony.id, value),
+      );
+    }
+  }
+
+  Widget _feedingStatus(CareTask task) {
+    final now = DateTime.now();
+    final elapsed = task.lastFedAt == null
+        ? null
+        : now.difference(task.lastFedAt!);
+    final remaining = task.removalDueAt?.difference(now);
+    String duration(Duration value) {
+      final minutes = value.inMinutes.clamp(0, 9999999);
+      if (minutes < 60) return '$minutes 分钟';
+      if (minutes < 1440) return '${minutes ~/ 60} 小时 ${minutes % 60} 分钟';
+      return '${minutes ~/ 1440} 天 ${minutes % 1440 ~/ 60} 小时';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            elapsed == null ? '尚未开始投喂计时' : '距上次投喂 ${duration(elapsed)}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (remaining != null)
+            Wrap(
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  remaining.isNegative || remaining == Duration.zero
+                      ? '已到撤食时间'
+                      : '${duration(remaining)}后撤食',
+                  style: TextStyle(
+                    color: task.removalIsDue(now)
+                        ? Theme.of(context).colorScheme.error
+                        : null,
+                  ),
+                ),
+                if (!widget.colony.archived)
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _change(
+                            () => AppDatabase.instance.completeFoodRemoval(
+                              task.id,
+                            ),
+                          ),
+                    child: const Text('已撤食'),
+                  ),
+              ],
+            )
+          else
+            Text(
+              task.removalHours == null
+                  ? '撤食提醒关闭'
+                  : '撤食提醒：投喂后 ${task.removalHours} 小时',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          if (!widget.colony.archived && !task.isDue(now))
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () => _change(
+                      () => AppDatabase.instance.completeCareTask(task.id),
+                    ),
+              icon: const Icon(Icons.restaurant, size: 16),
+              label: const Text('现在投喂'),
+            ),
+        ],
+      ),
+    );
+  }
+
   late bool _expanded = widget.compact;
 
-  Future<List<CareTask>> _load() =>
-      AppDatabase.instance.listCareTasks(colonyId: widget.colony.id);
+  Future<List<CareTask>> _load() async {
+    final tasks = await AppDatabase.instance.listCareTasks(
+      colonyId: widget.colony.id,
+    );
+    return tasks..sort((a, b) => a.type.index.compareTo(b.type.index));
+  }
 
   void _reload() => setState(() {
     _tasks = _load();
@@ -38,7 +174,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
     setState(() => _busy = true);
     try {
       await action();
-      _reload();
+      if (mounted) _reload();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -50,16 +186,15 @@ class _CareTasksSectionState extends State<CareTasksSection> {
   }
 
   Future<void> _edit(List<CareTask> tasks, [CareTask? old]) async {
-    final available = CareTaskType.values
-        .where(
-          (type) =>
-              old?.type == type || !tasks.any((task) => task.type == type),
-        )
-        .toList();
+    final available = _available(tasks, old);
     if (available.isEmpty) return;
     var type = old?.type ?? available.first;
     final interval = TextEditingController(text: '${old?.intervalDays ?? 7}');
     var due = old?.nextDueOn ?? DateUtils.dateOnly(DateTime.now());
+    var removalEnabled = old?.removalHours != null;
+    final removalHours = TextEditingController(
+      text: '${old?.removalHours ?? 24}',
+    );
     final form = GlobalKey<FormState>();
     try {
       final result = await showDialog<CareTask>(
@@ -96,6 +231,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                       decoration: const InputDecoration(
                         labelText: '每隔几天',
                         helperText: '1～365 天；完成后从完成当天重新计算',
+                        helperMaxLines: 3,
                       ),
                       validator: (value) {
                         final days = int.tryParse(value?.trim() ?? '');
@@ -104,6 +240,32 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                             : null;
                       },
                     ),
+                    if (type.isFeeding) ...[
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('撤食提醒'),
+                        subtitle: const Text('仅提醒这一类食物；每次投喂重新计时'),
+                        value: removalEnabled,
+                        onChanged: (value) =>
+                            update(() => removalEnabled = value),
+                      ),
+                      if (removalEnabled)
+                        TextFormField(
+                          controller: removalHours,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: '投喂后几小时撤食',
+                            helperText: '1～720 小时；系统通知可能受省电设置影响',
+                            helperMaxLines: 3,
+                          ),
+                          validator: (value) {
+                            final hours = int.tryParse(value?.trim() ?? '');
+                            return hours == null || hours < 1 || hours > 720
+                                ? '请输入 1～720 小时'
+                                : null;
+                          },
+                        ),
+                    ],
                     const SizedBox(height: 12),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -143,6 +305,20 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                       intervalDays: int.parse(interval.text.trim()),
                       nextDueOn: due,
                       lastCompletedOn: old?.lastCompletedOn,
+                      lastFedAt: old?.lastFedAt,
+                      removalHours: type.isFeeding && removalEnabled
+                          ? int.parse(removalHours.text.trim())
+                          : null,
+                      removalDueAt:
+                          type.isFeeding &&
+                              removalEnabled &&
+                              old?.removalDueAt != null
+                          ? old!.lastFedAt!.add(
+                              Duration(
+                                hours: int.parse(removalHours.text.trim()),
+                              ),
+                            )
+                          : null,
                     ),
                   );
                 },
@@ -153,10 +329,26 @@ class _CareTasksSectionState extends State<CareTasksSection> {
         ),
       );
       if (result != null && mounted) {
-        await _change(() => AppDatabase.instance.saveCareTask(result));
+        await _change(() async {
+          await AppDatabase.instance.saveCareTask(result);
+          if (result.removalHours != null && old?.removalHours == null) {
+            var allowed = false;
+            try {
+              allowed = await LocalNotificationService.instance
+                  .requestPermission();
+            } catch (_) {}
+            if (!allowed && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('撤食计时已开启，系统通知未获授权；仍可在待办中查看。')),
+              );
+            }
+            await FoodReminderCoordinator.instance.refresh();
+          }
+        });
       }
     } finally {
       interval.dispose();
+      removalHours.dispose();
     }
   }
 
@@ -221,8 +413,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  if (!widget.colony.archived &&
-                      tasks.length < CareTaskType.values.length)
+                  if (!widget.colony.archived && _available(tasks).isNotEmpty)
                     TextButton.icon(
                       onPressed: _busy ? null : () => _edit(tasks),
                       icon: const Icon(Icons.add),
@@ -239,6 +430,14 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                   ),
                 ],
               ),
+              if (_expanded && !widget.colony.archived && snapshot.hasData)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('细分食物投喂'),
+                  subtitle: const Text('蛋白、糖类、种子分别计时'),
+                  value: tasks.any((task) => task.type.isSplitFeeding),
+                  onChanged: _busy ? null : _split,
+                ),
               if (!_expanded)
                 const SizedBox.shrink()
               else if (snapshot.hasError)
@@ -253,18 +452,16 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                   ),
                 )
               else
-                for (final task in tasks)
+                for (final task in tasks) ...[
                   if (widget.compact)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 5),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: .4),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                      child: Material(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: .4),
+                        borderRadius: BorderRadius.circular(10),
                         child: ListTile(
                           dense: true,
                           contentPadding: const EdgeInsets.symmetric(
@@ -436,6 +633,8 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                           ),
                       ],
                     ),
+                  if (task.type.isFeeding) _feedingStatus(task),
+                ],
             ],
           );
         },

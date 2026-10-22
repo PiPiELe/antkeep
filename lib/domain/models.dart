@@ -214,6 +214,7 @@ class CareRecord {
     this.workerCount,
     this.workerMortalityCount,
     this.queenMortalityCount,
+    this.feedingCategory,
     this.feedingFood,
     this.feedingAmount,
     this.feedingResponse,
@@ -235,6 +236,7 @@ class CareRecord {
   final int? workerCount;
   final int? workerMortalityCount;
   final int? queenMortalityCount;
+  final String? feedingCategory;
   final String? feedingFood;
   final String? feedingAmount;
   final FeedingResponse? feedingResponse;
@@ -295,6 +297,7 @@ class CareRecord {
     workerCount: map['worker_count'] as int?,
     workerMortalityCount: map['worker_mortality_count'] as int?,
     queenMortalityCount: map['queen_mortality_count'] as int?,
+    feedingCategory: _feedingCategory(map['feeding_category']),
     feedingFood: map['feeding_food'] as String?,
     feedingAmount: map['feeding_amount'] as String?,
     feedingResponse: map['feeding_response'] == null
@@ -325,6 +328,7 @@ class CareRecord {
     'worker_count': workerCount,
     'worker_mortality_count': workerMortalityCount,
     'queen_mortality_count': queenMortalityCount,
+    'feeding_category': feedingCategory,
     'feeding_food': feedingFood,
     'feeding_amount': feedingAmount,
     'feeding_response': feedingResponse?.storageValue,
@@ -787,4 +791,17 @@ DateTime _addMonths(DateTime value, int months) {
 List<String> _stringList(Object? value) {
   if (value is! String || value.isEmpty) return const [];
   return (jsonDecode(value) as List<dynamic>).cast<String>();
+}
+
+String? _feedingCategory(Object? value) {
+  if (value == null) return null;
+  if (value is! String ||
+      !const {
+        'feeding_protein',
+        'feeding_sugar',
+        'feeding_seeds',
+      }.contains(value)) {
+    throw const FormatException('无效的投喂分类');
+  }
+  return value;
 }

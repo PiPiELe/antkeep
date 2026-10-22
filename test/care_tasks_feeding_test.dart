@@ -351,7 +351,11 @@ void main() {
       updatedAt: now,
     );
     await tester.runAsync(() async {
-      for (final type in CareTaskType.values) {
+      for (final type in [
+        CareTaskType.feeding,
+        CareTaskType.watering,
+        CareTaskType.cleaning,
+      ]) {
         await database.saveCareTask(
           CareTask(
             id: type.storageValue,
@@ -391,7 +395,11 @@ void main() {
     expect(find.text('完成并记日记'), findsNothing);
     expect(find.text('顺延至明天'), findsNothing);
     expect(find.textContaining('下次'), findsNWidgets(3));
-    for (final type in CareTaskType.values) {
+    for (final type in [
+      CareTaskType.feeding,
+      CareTaskType.watering,
+      CareTaskType.cleaning,
+    ]) {
       expect(find.text(type.label), findsOneWidget);
     }
     expect(find.byTooltip('待办操作'), findsNWidgets(3));

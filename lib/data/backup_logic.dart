@@ -10,7 +10,7 @@ import 'backup_data.dart';
 
 enum BackupRestoreMode { incremental, overwrite }
 
-const backupVersion = 14;
+const backupVersion = 15;
 
 mixin BackupLogic {
   AppDatabase get database;
@@ -118,7 +118,17 @@ mixin BackupLogic {
           continue;
         }
         if (table == 'care_tasks' &&
-            !taskTypes.add((row['colony_id'], row['task_type']))) {
+            (taskTypes.any(
+                  (key) =>
+                      key.$1 == row['colony_id'] &&
+                      (key.$2 == 'feeding' &&
+                              (row['task_type'] as String).startsWith(
+                                'feeding_',
+                              ) ||
+                          row['task_type'] == 'feeding' &&
+                              (key.$2 as String).startsWith('feeding_')),
+                ) ||
+                !taskTypes.add((row['colony_id'], row['task_type'])))) {
           continue;
         }
         if (table == 'winter_cycles' &&
@@ -217,6 +227,7 @@ mixin BackupLogic {
             manifest['version'] != 11 &&
             manifest['version'] != 12 &&
             manifest['version'] != 13 &&
+            manifest['version'] != 14 &&
             manifest['version'] != backupVersion) ||
         data is! Map<String, dynamic> ||
         data['colonies'] is! List ||

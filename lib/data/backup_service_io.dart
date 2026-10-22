@@ -139,6 +139,9 @@ class BackupService with BackupLogic {
     );
   });
 
+  Future<bool> exportExistingFile(File file, String name) =>
+      _operation((_) => _saveExport(file, name, 'application/zip'));
+
   Future<bool> _saveExport(File file, String name, String mimeType) async {
     if (Platform.isAndroid || Platform.isIOS) {
       return await BackupResources.channel.invokeMethod<bool>('saveBackup', {

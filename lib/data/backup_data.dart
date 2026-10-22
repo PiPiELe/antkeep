@@ -94,6 +94,16 @@ class BackupData {
         throw const FormatException('备份中有无效或重复的蚁群待办。');
       }
     }
+    for (final task in tasks) {
+      if (task['task_type'] == 'feeding' &&
+          tasks.any(
+            (other) =>
+                other['colony_id'] == task['colony_id'] &&
+                (other['task_type'] as String).startsWith('feeding_'),
+          )) {
+        throw const FormatException('备份中普通投喂与分类投喂重复。');
+      }
+    }
     final memorials = _rows(
       data,
       'memorials',

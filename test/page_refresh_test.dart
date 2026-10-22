@@ -1477,7 +1477,11 @@ void main() {
             ).toMap(),
           );
         }
-        for (final type in CareTaskType.values) {
+        for (final type in [
+          CareTaskType.feeding,
+          CareTaskType.watering,
+          CareTaskType.cleaning,
+        ]) {
           tables['care_tasks']!.add(
             CareTask(
               id: 'due-${type.storageValue}',
@@ -1681,7 +1685,13 @@ void main() {
         ).toMap(),
       );
       for (final type
-          in id == 'short' ? [CareTaskType.cleaning] : CareTaskType.values) {
+          in id == 'short'
+              ? [CareTaskType.cleaning]
+              : [
+                  CareTaskType.feeding,
+                  CareTaskType.watering,
+                  CareTaskType.cleaning,
+                ]) {
         tables['care_tasks']!.add(
           CareTask(
             id: '$id-${type.storageValue}',

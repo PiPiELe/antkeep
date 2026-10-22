@@ -1,3 +1,5 @@
+import 'data/food_reminder_coordinator.dart';
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -8,6 +10,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_preferences.dart';
+import 'auto_backup_page.dart';
+import 'colony_label_page.dart';
+import 'colony_scan_page.dart';
+import 'data/auto_backup_runtime.dart';
 import 'colony_display_styles.dart';
 import 'colony_dense_layout.dart';
 import 'diary_preferences.dart';
@@ -139,6 +145,11 @@ Future<void> main() async {
     } catch (_) {
       // A notification integration failure must not block access to local data.
     }
+    try {
+      await autoBackupController.load();
+    } catch (_) {
+      // Backup preferences must not prevent access to husbandry data.
+    }
     runApp(const AntKeepApp());
   } catch (error) {
     runApp(_StartupError(error: error));
@@ -154,21 +165,72 @@ class AntKeepApp extends StatefulWidget {
   State<AntKeepApp> createState() => _AntKeepAppState();
 }
 
-class _AntKeepAppState extends State<AntKeepApp> {
+class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   String? _shownRequiredPolicy;
   bool _updateDialogOpen = false;
   bool _announcementDialogOpen = false;
+  bool _backupPromptOpen = false;
+  Timer? _backupTimer;
+
+  void _checkAutoBackup() {
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed ||
+        WidgetsBinding.instance.lifecycleState == null) {
+      unawaited(autoBackupController.run());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAutoBackup();
+      unawaited(FoodReminderCoordinator.instance.refresh());
+    }
+  }
+
+  void _showBackupConsentIfNeeded() {
+    if (!themeController.onboardingCompleted ||
+        !autoBackupController.needsConsent ||
+        _backupPromptOpen ||
+        _updateDialogOpen ||
+        _announcementDialogOpen) {
+      return;
+    }
+    _backupPromptOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final dialogContext = _navigatorKey.currentContext;
+      if (!mounted || dialogContext == null) {
+        _backupPromptOpen = false;
+        return;
+      }
+      await showAutoBackupConsent(dialogContext, autoBackupController);
+      _backupPromptOpen = false;
+      if (!mounted) return;
+      _checkAutoBackup();
+      _showUpdatePromptIfNeeded();
+      _showAnnouncementIfNeeded();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     onlineController.addListener(_showAnnouncementIfNeeded);
+    WidgetsBinding.instance.addObserver(this);
+    _backupTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => _checkAutoBackup(),
+    );
+    _checkAutoBackup();
+    FoodReminderCoordinator.instance.start();
   }
 
   @override
   void dispose() {
+    FoodReminderCoordinator.instance.stop();
     onlineController.removeListener(_showAnnouncementIfNeeded);
+    WidgetsBinding.instance.removeObserver(this);
+    _backupTimer?.cancel();
     super.dispose();
   }
 
@@ -177,6 +239,8 @@ class _AntKeepAppState extends State<AntKeepApp> {
     if (!mounted ||
         !themeController.onboardingCompleted ||
         _updateDialogOpen ||
+        _backupPromptOpen ||
+        autoBackupController.needsConsent ||
         _announcementDialogOpen ||
         announcement == null) {
       return;
@@ -215,6 +279,7 @@ class _AntKeepAppState extends State<AntKeepApp> {
   }
 
   void _showUpdatePromptIfNeeded() {
+    if (_backupPromptOpen || autoBackupController.needsConsent) return;
     final policy = appUpdateController.policy;
     if (policy == null) {
       return;
@@ -329,6 +394,7 @@ class _AntKeepAppState extends State<AntKeepApp> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: Listenable.merge([themeController, appUpdateController]),
     builder: (context, _) {
+      _showBackupConsentIfNeeded();
       _showUpdatePromptIfNeeded();
       _showAnnouncementIfNeeded();
       return MaterialApp(
@@ -428,6 +494,7 @@ class _HomePageState extends State<HomePage>
   void _checkCompetitionUpdates() {
     if (!mounted ||
         _competitionPromptBusy ||
+        autoBackupController.needsConsent ||
         !onlineController.enabled ||
         onlineController.user == null ||
         onlineController.busy) {
@@ -682,27 +749,48 @@ class _HomePageState extends State<HomePage>
                 ),
               )
             : Text(titles[pageIndex]),
-        actions: denseHeader
-            ? []
-            : [
-                if (!themeController.simpleMode)
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const PopulationAnalysisPage(),
-                      ),
+        actions: [
+          if (pageIndex == 0)
+            IconButton(
+              tooltip: '扫描蚁群标签',
+              icon: const Icon(Icons.qr_code_scanner),
+              onPressed: () async {
+                final id = await Navigator.of(context).push<String>(
+                  MaterialPageRoute(
+                    builder: (_) => ColonyScanPage(
+                      exists: (id) async =>
+                          await AppDatabase.instance.findColony(id) != null,
                     ),
-                    icon: const Icon(Icons.show_chart),
-                    label: const Text('分析'),
                   ),
-                IconButton(
-                  tooltip: '分享',
-                  icon: const Icon(Icons.ios_share_outlined),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ShareContentPage()),
+                );
+                if (id == null || !context.mounted) return;
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ColonyDetailPage(colonyId: id),
+                  ),
+                );
+              },
+            ),
+          if (!denseHeader) ...[
+            if (!themeController.simpleMode)
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PopulationAnalysisPage(),
                   ),
                 ),
-              ],
+                icon: const Icon(Icons.show_chart),
+                label: const Text('分析'),
+              ),
+            IconButton(
+              tooltip: '分享',
+              icon: const Icon(Icons.ios_share_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ShareContentPage()),
+              ),
+            ),
+          ],
+        ],
       ),
       body: Column(
         children: [
@@ -947,7 +1035,8 @@ class _ColoniesPageState extends State<ColoniesPage> {
           dueTasks: tasks
               .where(
                 (task) =>
-                    task.colonyId == colony.id && task.isDue(DateTime.now()),
+                    task.colonyId == colony.id &&
+                    task.needsAttention(DateTime.now()),
               )
               .toList(),
         );
@@ -1463,9 +1552,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
                   queens: entry.queens,
                   records: entry.records,
                   tagOrder: themeController.colonyTagOrder,
-                  dueFeeding: entry.dueTasks.any(
-                    (task) => task.type == CareTaskType.feeding,
-                  ),
+                  dueFeeding: entry.dueTasks.any((task) => task.type.isFeeding),
                   cover: entry.colony.coverPhotoPath == null
                       ? null
                       : _StoredImage(
@@ -1979,7 +2066,7 @@ class _ColonyCard extends StatelessWidget {
         colony.priceTier != null;
     final dueText = dueTasks.isEmpty
         ? null
-        : '今日待办：${dueTasks.map((task) => task.type.label).join('、')}';
+        : '今日待办：${dueTasks.map((task) => task.attentionLabel(DateTime.now())).join('、')}';
     List<Widget> lowerMetadata() => <Widget>[
       if (hasTags) ...[
         const SizedBox(height: 6),
@@ -3891,6 +3978,15 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               : Text(colony.name),
           actions: [
             IconButton(
+              tooltip: '蚁群二维码标签',
+              icon: const Icon(Icons.qr_code_2),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ColonyLabelPage(colony: colony),
+                ),
+              ),
+            ),
+            IconButton(
               tooltip: '生成分享图',
               icon: const Icon(Icons.ios_share_outlined),
               onPressed: () => Navigator.of(context).push(
@@ -5044,6 +5140,25 @@ class _RecordFormPageState extends State<RecordFormPage> {
   var _incremental = true;
   late Colony _colony = widget.colony;
 
+  List<CareTask> _feedingPlans = [];
+  CareTask? _selectedFeedingPlan;
+  CareTask? get _feedingPlan => widget.task ?? _selectedFeedingPlan;
+
+  Future<void> _loadFeedingPlans() async {
+    try {
+      final tasks = await AppDatabase.instance.listCareTasks(
+        colonyId: widget.colony.id,
+      );
+      if (mounted) {
+        setState(
+          () => _feedingPlans = tasks.where((t) => t.type.isFeeding).toList(),
+        );
+      }
+    } catch (_) {
+      // Recording a diary must remain available if plans cannot be loaded.
+    }
+  }
+
   Future<void> _settings() async {
     final updated = await _openDiarySettings(
       context,
@@ -5066,9 +5181,16 @@ class _RecordFormPageState extends State<RecordFormPage> {
   void initState() {
     super.initState();
     _incremental = themeController.diary.incremental;
+    if (widget.record == null && widget.task == null) _loadFeedingPlans();
     final record = widget.record;
     if (record == null) {
-      if (widget.task != null) _type = widget.task!.type.recordType;
+      if (widget.task != null) {
+        _type = widget.task!.type.recordType;
+        if (widget.task!.type.isFeeding) {
+          _occurredAt = DateTime.now();
+          _hasSpecificTime = true;
+        }
+      }
       return;
     }
     _type = record.type;
@@ -5210,6 +5332,11 @@ class _RecordFormPageState extends State<RecordFormPage> {
           queenMortalityCount: _type == CareRecordType.mortality
               ? int.tryParse(_queenMortality.text.trim())
               : null,
+          feedingCategory: _type == CareRecordType.feeding
+              ? (_feedingPlan?.type.isSplitFeeding == true
+                    ? _feedingPlan!.type.storageValue
+                    : widget.record?.feedingCategory)
+              : null,
           feedingFood: _type == CareRecordType.feeding
               ? _textOrNull(_feedingFood.text)
               : null,
@@ -5231,7 +5358,11 @@ class _RecordFormPageState extends State<RecordFormPage> {
             record,
             incremental: _incremental,
             recalculateAllGrowth: globalUpdate,
-            completingTaskId: widget.task?.id,
+            completingTaskId:
+                widget.task?.id ??
+                (_type == CareRecordType.feeding
+                    ? _selectedFeedingPlan?.id
+                    : null),
             milestone: _addMilestone
                 ? Milestone(
                     id: 'diary:$recordId',
@@ -5432,8 +5563,44 @@ class _RecordFormPageState extends State<RecordFormPage> {
                 ),
                 if (_type == CareRecordType.feeding) ...[
                   const SizedBox(height: 16),
+                  if (widget.task == null &&
+                      widget.record == null &&
+                      _feedingPlans.isNotEmpty) ...[
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedFeedingPlan?.id ?? '',
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: '食物分类与计时'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: '',
+                          child: Text('只记日记，不更新计时'),
+                        ),
+                        for (final task in _feedingPlans)
+                          DropdownMenuItem(
+                            value: task.id,
+                            child: Text('${task.type.label} · 更新计时'),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _selectedFeedingPlan = _feedingPlans
+                            .where((t) => t.id == value)
+                            .firstOrNull;
+                        if (_selectedFeedingPlan != null &&
+                            !_hasSpecificTime &&
+                            DateUtils.isSameDay(_occurredAt, DateTime.now())) {
+                          _occurredAt = DateTime.now();
+                          _hasSpecificTime = true;
+                        }
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (widget.record?.feedingCategory != null)
+                    const Text('修改日记不会重置已完成的待办计时。'),
                   Text(
-                    '投喂结果（可选）',
+                    _feedingPlan?.type.isSplitFeeding == true
+                        ? '${_feedingPlan!.type.label}投喂结果（可选）'
+                        : '投喂结果（可选）',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -6084,6 +6251,8 @@ class _RecordCardState extends State<_RecordCard> {
         ? remaining!.eggs! + remaining.larvae! + remaining.cocoons!
         : null;
     final facts = <String>[
+      if (record.feedingCategory != null)
+        '分类 ${CareTaskType.fromStorage(record.feedingCategory!).label}',
       if (record.type == CareRecordType.feeding && record.feedingFood != null)
         '食物 ${record.feedingFood}',
       if (record.type == CareRecordType.feeding && record.feedingAmount != null)
@@ -7490,6 +7659,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 controller: onlineController,
                 loadItems: AppDatabase.instance.listInventory,
               ),
+            ),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.backup_outlined),
+          title: const Text('自动本地备份'),
+          subtitle: const Text('自动保存、查看与恢复本机备份'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => AutoBackupPage(controller: autoBackupController),
             ),
           ),
         ),

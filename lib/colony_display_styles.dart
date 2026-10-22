@@ -556,7 +556,7 @@ class ColonyShowcaseCard extends StatelessWidget {
                             children: [
                               for (final task in dueTasks)
                                 _Tag(
-                                  task.type.label,
+                                  task.attentionLabel(DateTime.now()),
                                   _blue,
                                   icon: _taskIcon(task.type),
                                 ),
@@ -565,7 +565,11 @@ class ColonyShowcaseCard extends StatelessWidget {
                         ] else ...[
                           const SizedBox(height: 6),
                           Text(
-                            dueTasks.map((task) => task.type.label).join(' · '),
+                            dueTasks
+                                .map(
+                                  (task) => task.attentionLabel(DateTime.now()),
+                                )
+                                .join(' · '),
                             style: TextStyle(
                               color: _ShowcasePalette(context).muted,
                               fontSize: 12,
@@ -653,7 +657,10 @@ class _Identity extends StatelessWidget {
 }
 
 IconData _taskIcon(CareTaskType type) => switch (type) {
-  CareTaskType.feeding => Icons.restaurant_rounded,
+  CareTaskType.feeding ||
+  CareTaskType.protein ||
+  CareTaskType.sugar ||
+  CareTaskType.seeds => Icons.restaurant_rounded,
   CareTaskType.watering => Icons.water_drop_rounded,
   CareTaskType.cleaning => Icons.cleaning_services_rounded,
 };
