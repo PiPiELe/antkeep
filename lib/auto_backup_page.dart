@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'busy_task.dart';
 import 'data/auto_backup_controller.dart';
 import 'data/auto_backup_model.dart';
 
@@ -85,13 +88,14 @@ class _AutoBackupPageState extends State<AutoBackupPage> {
   List<LocalBackupEntry> _entries = [];
   String? _error;
   bool _loading = true;
+  int _readGeneration = 0;
   AutoBackupController get controller => widget.controller;
 
   @override
   void initState() {
     super.initState();
     controller.addListener(_changed);
-    _refresh();
+    _refresh(loadSettings: true);
   }
 
   @override
@@ -101,14 +105,21 @@ class _AutoBackupPageState extends State<AutoBackupPage> {
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // Invalidate reads started before a backup or rotation changed the files.
+    _readGeneration++;
+    setState(() {});
+    if (!controller.busy) unawaited(_refresh());
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({bool loadSettings = false}) async {
+    if (!mounted || controller.busy) return;
+    final generation = ++_readGeneration;
     try {
-      await controller.load();
+      if (loadSettings || !controller.loaded) await controller.load();
+      if (!mounted || generation != _readGeneration) return;
       final entries = await controller.storage.list();
-      if (mounted) {
+      if (mounted && generation == _readGeneration) {
         setState(() {
           _entries = entries;
           _error = null;
@@ -116,7 +127,7 @@ class _AutoBackupPageState extends State<AutoBackupPage> {
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && generation == _readGeneration) {
         setState(() {
           _error = '无法读取本地备份，请重试。';
           _loading = false;
@@ -168,7 +179,11 @@ class _AutoBackupPageState extends State<AutoBackupPage> {
     if (incremental == null || !mounted) return;
     await _act(
       () => controller.withBackup(() async {
-        await controller.storage.restore(entry, incremental: incremental);
+        await runBusyTask(
+          context,
+          () => controller.storage.restore(entry, incremental: incremental),
+          message: '正在恢复备份，请稍候…',
+        );
         if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text('恢复完成，可在数据管理中撤销。')));
