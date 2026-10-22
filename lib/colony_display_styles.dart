@@ -465,68 +465,50 @@ class ColonyShowcaseCard extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(11),
                     decoration: _panelDecoration(context, inset: true),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.assignment_turned_in_outlined,
-                              color: accent,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '今日待办',
-                              style: TextStyle(
-                                color: _ShowcasePalette(context).foreground,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              '${dueTasks.length} 项',
-                              style: const TextStyle(color: _orange),
-                            ),
-                            if (compact) ...[
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: FadingHorizontalScroll(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      for (final (index, task)
-                                          in dueTasks.indexed) ...[
-                                        if (index > 0) const SizedBox(width: 6),
-                                        _Tag(
-                                          task.type.label,
-                                          _blue,
-                                          icon: _taskIcon(task.type),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ] else
-                              const Spacer(),
-                            Icon(
-                              Icons.chevron_right,
-                              color: _ShowcasePalette(context).muted,
-                              size: 19,
-                            ),
-                          ],
+                        Icon(
+                          Icons.assignment_turned_in_outlined,
+                          color: accent,
+                          size: 18,
                         ),
-                        if (!compact) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            dueTasks.map((task) => task.type.label).join(' · '),
-                            style: TextStyle(
-                              color: _ShowcasePalette(context).muted,
-                              fontSize: 12,
+                        const SizedBox(width: 6),
+                        Text(
+                          '今日待办',
+                          style: TextStyle(
+                            color: _ShowcasePalette(context).foreground,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${dueTasks.length} 项',
+                          style: const TextStyle(color: _orange),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FadingHorizontalScroll(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (final (index, task)
+                                    in dueTasks.indexed) ...[
+                                  if (index > 0) const SizedBox(width: 6),
+                                  _Tag(
+                                    task.type.label,
+                                    _blue,
+                                    icon: _taskIcon(task.type),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        ],
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: _ShowcasePalette(context).muted,
+                          size: 19,
+                        ),
                       ],
                     ),
                   ),
