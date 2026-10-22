@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/app_preferences.dart';
+import 'package:antkeep/colony_dense_layout.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/diary_preferences.dart';
 import 'package:antkeep/diary_settings_page.dart';
@@ -1158,9 +1159,10 @@ void main() {
 
     await themeController.setUltraSimpleMode(true);
     await tester.pumpAndSettle();
+    expect(find.byType(ColonyDenseList), findsOneWidget);
     expect(find.byKey(const ValueKey('due')), findsOneWidget);
     expect(find.byKey(const ValueKey('quiet')), findsOneWidget);
-    await tester.tap(find.widgetWithText(OutlinedButton, '筛选'));
+    await tester.tap(find.byTooltip('筛选'));
     await tester.pumpAndSettle();
     expect(find.text('是否待办'), findsNothing);
     expect(find.text('查看 2 群'), findsOneWidget);

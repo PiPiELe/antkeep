@@ -357,10 +357,18 @@ class AppPreferences extends ChangeNotifier {
   Future<void> setUltraSimpleMode(bool enabled) async {
     await store.writeSettings({
       'ultra_simple_mode': enabled.toString(),
-      if (enabled) 'simple_mode': 'false',
+      if (enabled) ...{
+        'simple_mode': 'false',
+        'interface_style': InterfaceStyle.current.name,
+        'colony_display_style': ColonyDisplayStyle.dense.name,
+      },
     });
     ultraSimpleMode = enabled;
-    if (enabled) simpleMode = false;
+    if (enabled) {
+      simpleMode = false;
+      interfaceStyle = InterfaceStyle.current;
+      colonyDisplayStyle = ColonyDisplayStyle.dense;
+    }
     notifyListeners();
   }
 

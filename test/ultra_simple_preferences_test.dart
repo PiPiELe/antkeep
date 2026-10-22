@@ -31,6 +31,10 @@ void main() {
     await preferences.setUltraSimpleMode(true);
     expect(preferences.simpleMode, isFalse);
     expect(preferences.ultraSimpleMode, isTrue);
+    expect(preferences.interfaceStyle, InterfaceStyle.current);
+    expect(preferences.colonyDisplayStyle, ColonyDisplayStyle.dense);
+    expect(store.values['interface_style'], 'current');
+    expect(store.values['colony_display_style'], 'dense');
     expect(preferences.showFeature(UltraSimpleFeature.inventory), isTrue);
     expect(preferences.showFeature(UltraSimpleFeature.careTasks), isFalse);
     expect(preferences.showFeature(UltraSimpleFeature.nestHistory), isFalse);
@@ -43,6 +47,8 @@ void main() {
     await restarted.load();
     expect(restarted.ultraSimpleMode, isTrue);
     expect(restarted.simpleMode, isFalse);
+    expect(restarted.interfaceStyle, InterfaceStyle.current);
+    expect(restarted.colonyDisplayStyle, ColonyDisplayStyle.dense);
     expect(restarted.showFeature(UltraSimpleFeature.memorial), isTrue);
     expect(restarted.showFeature(UltraSimpleFeature.nestHistory), isTrue);
     expect(restarted.showFeature(UltraSimpleFeature.winterCycle), isFalse);
@@ -51,10 +57,15 @@ void main() {
     expect(restarted.ultraSimpleMode, isFalse);
     expect(restarted.simpleMode, isTrue);
     expect(restarted.showFeature(UltraSimpleFeature.inventory), isTrue);
+    expect(restarted.colonyDisplayStyle, ColonyDisplayStyle.dense);
 
+    await restarted.setInterfaceStyle(InterfaceStyle.classic);
+    await restarted.setColonyDisplayStyle(ColonyDisplayStyle.showcase);
     store.failWrites = true;
     await expectLater(restarted.setUltraSimpleMode(true), throwsStateError);
     expect(restarted.simpleMode, isTrue);
     expect(restarted.ultraSimpleMode, isFalse);
+    expect(restarted.interfaceStyle, InterfaceStyle.classic);
+    expect(restarted.colonyDisplayStyle, ColonyDisplayStyle.showcase);
   });
 }

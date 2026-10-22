@@ -7413,7 +7413,7 @@ class _SettingsPageState extends State<SettingsPage> {
         SwitchListTile(
           secondary: const Icon(Icons.filter_alt_outlined),
           title: const Text('超极简模式'),
-          subtitle: const Text('以简化模式为基础，自选蚁群模块和物品栏；仅控制入口显示'),
+          subtitle: const Text('开启后自动切换密集型列表；可自选蚁群模块和物品栏'),
           value: themeController.ultraSimpleMode,
           onChanged: _savingSimpleMode || _savingUltraSimpleMode
               ? null

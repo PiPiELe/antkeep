@@ -489,6 +489,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(themeController.ultraSimpleMode, isTrue);
     expect(themeController.simpleMode, isFalse);
+    expect(themeController.interfaceStyle, InterfaceStyle.current);
+    expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.dense);
+    expect(settings['colony_display_style'], 'dense');
     expect(find.text('自选显示内容'), findsOneWidget);
     expect(find.byKey(const ValueKey('ultra-inventory')), findsNothing);
     await tester.tap(find.text('自选显示内容'));
@@ -519,26 +522,27 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(NavigationDestination, '蚁群'));
     await tester.pumpAndSettle();
+    final denseTabs = find.byType(ColonyDenseTabs);
     expect(
-      find.descendant(of: find.byType(TabBar), matching: find.text('英灵殿')),
+      find.descendant(of: denseTabs, matching: find.text('英灵殿')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: find.byType(TabBar), matching: find.text('里程碑')),
+      find.descendant(of: denseTabs, matching: find.text('里程碑')),
       findsOneWidget,
     );
     await tester.tap(
-      find.descendant(of: find.byType(TabBar), matching: find.text('英灵殿')),
+      find.descendant(of: denseTabs, matching: find.text('英灵殿')),
     );
     await tester.pumpAndSettle();
     await themeController.setUltraFeature(UltraSimpleFeature.memorial, false);
     await tester.pumpAndSettle();
     expect(
-      find.descendant(of: find.byType(TabBar), matching: find.text('英灵殿')),
+      find.descendant(of: denseTabs, matching: find.text('英灵殿')),
       findsNothing,
     );
     expect(
-      find.descendant(of: find.byType(TabBar), matching: find.text('里程碑')),
+      find.descendant(of: denseTabs, matching: find.text('里程碑')),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
@@ -577,8 +581,6 @@ void main() {
   testWidgets('dense milestone rename uses the visible tab identity', (
     tester,
   ) async {
-    await themeController.setInterfaceStyle(InterfaceStyle.current);
-    await themeController.setColonyDisplayStyle(ColonyDisplayStyle.dense);
     await themeController.setUltraSimpleMode(true);
     await themeController.setUltraFeature(UltraSimpleFeature.milestones, true);
     await tester.pumpWidget(const MaterialApp(home: HomePage()));
