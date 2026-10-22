@@ -11,7 +11,7 @@ CareRecord resolveRecordIncrement(
   CareRecord record,
 ) {
   final base = colony.currentPopulation(
-    history.where((r) => !r.occurredAt.isAfter(record.occurredAt)),
+    history.where((r) => CareRecord.comparePopulationOrder(r, record) < 0),
   );
   final withCocoons = colony.developmentPath == GrowthPath.eggToCocoonToWorker;
   final inputs = [

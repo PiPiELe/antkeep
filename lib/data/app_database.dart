@@ -1115,12 +1115,14 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       if (growth == null || colony.archived) continue;
       var cycle = growth.completedCycles;
       if (growth.dueAt(cycle + 1).isAfter(now)) continue;
-      final records = (await txn.query(
-        'care_records',
-        where: 'colony_id = ?',
-        whereArgs: [colony.id],
-        orderBy: 'occurred_at ASC, created_at ASC, id ASC',
-      )).map(CareRecord.fromMap).toList();
+      final records =
+          (await txn.query(
+              'care_records',
+              where: 'colony_id = ?',
+              whereArgs: [colony.id],
+              orderBy: 'occurred_at ASC, created_at ASC, id ASC',
+            )).map(CareRecord.fromMap).toList()
+            ..sort(CareRecord.comparePopulationOrder);
       final recordIds = records.map((record) => record.id).toSet();
       var population = GrowthPopulation(
         eggs: colony.initialEggCount,
