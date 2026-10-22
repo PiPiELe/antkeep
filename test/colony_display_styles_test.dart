@@ -96,6 +96,12 @@ void main() {
           expect(find.text('一号群 · 黑金弓背蚁'), findsOneWidget);
           expect(find.text('今日待办'), findsOneWidget);
           expect(find.text('2 项'), findsOneWidget);
+          if (style == ColonyDisplayStyle.compact) {
+            expect(
+              tester.getCenter(find.text('今日待办')).dy,
+              closeTo(tester.getCenter(find.text('投喂')).dy, 1),
+            );
+          }
           expect(find.text('235'), findsWidgets);
           await tester.tap(find.text('一号群 · 黑金弓背蚁'));
           expect(opened, isTrue);

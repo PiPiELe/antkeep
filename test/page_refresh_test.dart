@@ -350,6 +350,34 @@ void main() {
     );
   });
 
+  testWidgets('classic home announcement appears only once', (tester) async {
+    Widget page({required bool active}) => MaterialApp(
+      builder: (context, child) =>
+          InterfaceStyleScope(style: InterfaceStyle.classic, child: child!),
+      home: ColoniesPage(active: active),
+    );
+
+    await tester.pumpWidget(page(active: false));
+    await tester.pumpAndSettle();
+    expect(themeController.classicUpgradeBannerSeen, isFalse);
+
+    await tester.pumpWidget(page(active: true));
+    await tester.pumpAndSettle();
+    expect(find.text('新版界面已发布'), findsOneWidget);
+    expect(themeController.classicUpgradeBannerSeen, isTrue);
+
+    await tester.pumpWidget(page(active: false));
+    await tester.pumpWidget(page(active: true));
+    await tester.pumpAndSettle();
+    expect(find.text('新版界面已发布'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await themeController.load();
+    await tester.pumpWidget(page(active: true));
+    await tester.pumpAndSettle();
+    expect(find.text('新版界面已发布'), findsNothing);
+  });
+
   for (final archived in [false, true]) {
     testWidgets(
       'diary presets preserve records and allow full detail, archived=$archived',

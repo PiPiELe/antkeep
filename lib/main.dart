@@ -592,7 +592,11 @@ class _HomePageState extends State<HomePage>
         children: [
           for (final tab in _shownColonyTabs)
             switch (tab) {
-              ColonyTab.colonies => const ColoniesPage(),
+              ColonyTab.colonies => ColoniesPage(
+                active:
+                    pageIndex == 0 &&
+                    _shownColonyTabs[_colonyTabs.index] == ColonyTab.colonies,
+              ),
               ColonyTab.overview => ColonyOverviewPage(
                 active:
                     pageIndex == 0 &&
@@ -880,7 +884,10 @@ Future<bool> _editColonyAcquiredOn(BuildContext context, Colony colony) async {
 }
 
 class ColoniesPage extends StatefulWidget {
-  const ColoniesPage({super.key});
+  const ColoniesPage({super.key, this.active = true});
+
+  final bool active;
+
   @override
   State<ColoniesPage> createState() => _ColoniesPageState();
 }
@@ -942,6 +949,8 @@ class _ColoniesPageState extends State<ColoniesPage> {
   bool _savingOrder = false;
   bool _dragging = false;
   bool _switchingInterfaceStyle = false;
+  late bool _showClassicUpgradeBanner;
+  bool _classicUpgradeBannerWriteScheduled = false;
 
   StreamSubscription<void>? _memorialChanges;
   Timer? _growthTimer;
@@ -968,6 +977,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
   @override
   void initState() {
     super.initState();
+    _showClassicUpgradeBanner = !themeController.classicUpgradeBannerSeen;
     themeController.addListener(_refreshDisplay);
     _reload();
     _memorialChanges = AppDatabase.instance.memorialChanges.listen(
@@ -978,6 +988,16 @@ class _ColoniesPageState extends State<ColoniesPage> {
       (_) => _refreshGrowth(),
     );
     _growthLifecycle = AppLifecycleListener(onResume: _refreshGrowth);
+  }
+
+  @override
+  void didUpdateWidget(covariant ColoniesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active &&
+        !widget.active &&
+        _classicUpgradeBannerWriteScheduled) {
+      _showClassicUpgradeBanner = false;
+    }
   }
 
   void _reload() {
@@ -1094,6 +1114,22 @@ class _ColoniesPageState extends State<ColoniesPage> {
     } finally {
       if (mounted) setState(() => _switchingInterfaceStyle = false);
     }
+  }
+
+  void _rememberClassicUpgradeBanner() {
+    if (!widget.active || _classicUpgradeBannerWriteScheduled) return;
+    _classicUpgradeBannerWriteScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !widget.active) {
+        _classicUpgradeBannerWriteScheduled = false;
+        return;
+      }
+      try {
+        await themeController.markClassicUpgradeBannerSeen();
+      } catch (_) {
+        _classicUpgradeBannerWriteScheduled = false;
+      }
+    });
   }
 
   Widget _buildClassicUpgradeBanner(BuildContext context) {
@@ -1488,9 +1524,11 @@ class _ColoniesPageState extends State<ColoniesPage> {
                 workerOrder: _filter.workerOrder,
               );
         if (InterfaceStyleScope.of(context) == InterfaceStyle.classic) {
+          if (_showClassicUpgradeBanner) _rememberClassicUpgradeBanner();
           return Column(
             children: [
-              _buildClassicUpgradeBanner(context),
+              if (_showClassicUpgradeBanner)
+                _buildClassicUpgradeBanner(context),
               Expanded(child: _buildLegacyColonyList(context, allColonies)),
             ],
           );

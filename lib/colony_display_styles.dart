@@ -540,7 +540,28 @@ class ColonyShowcaseCard extends StatelessWidget {
                               '${dueTasks.length} 项',
                               style: const TextStyle(color: _orange),
                             ),
-                            const Spacer(),
+                            if (compact) ...[
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: FadingHorizontalScroll(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      for (final (index, task)
+                                          in dueTasks.indexed) ...[
+                                        if (index > 0) const SizedBox(width: 6),
+                                        _Tag(
+                                          task.type.label,
+                                          _blue,
+                                          icon: _taskIcon(task.type),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ] else
+                              const Spacer(),
                             Icon(
                               Icons.chevron_right,
                               color: _ShowcasePalette(context).muted,
@@ -548,21 +569,7 @@ class ColonyShowcaseCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        if (compact) ...[
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              for (final task in dueTasks)
-                                _Tag(
-                                  task.type.label,
-                                  _blue,
-                                  icon: _taskIcon(task.type),
-                                ),
-                            ],
-                          ),
-                        ] else ...[
+                        if (!compact) ...[
                           const SizedBox(height: 6),
                           Text(
                             dueTasks.map((task) => task.type.label).join(' · '),

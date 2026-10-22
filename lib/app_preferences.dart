@@ -153,6 +153,7 @@ class AppPreferences extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
   InterfaceStyle interfaceStyle = InterfaceStyle.classic;
+  bool classicUpgradeBannerSeen = false;
   FontColor fontColor = FontColor.theme;
   List<String> _colonyOrder = const [];
   List<String> get colonyOrder => _colonyOrder;
@@ -268,6 +269,7 @@ class AppPreferences extends ChangeNotifier {
       (style) => style.name == values['interface_style'],
       orElse: () => InterfaceStyle.classic,
     );
+    classicUpgradeBannerSeen = values['classic_upgrade_banner_seen'] == 'true';
     fontColor = FontColor.values.firstWhere(
       (color) => color.name == values['font_color'],
       orElse: () => FontColor.theme,
@@ -312,6 +314,12 @@ class AppPreferences extends ChangeNotifier {
     await store.writeSettings({'interface_style': style.name});
     interfaceStyle = style;
     notifyListeners();
+  }
+
+  Future<void> markClassicUpgradeBannerSeen() async {
+    if (classicUpgradeBannerSeen) return;
+    await store.writeSettings({'classic_upgrade_banner_seen': 'true'});
+    classicUpgradeBannerSeen = true;
   }
 
   Future<void> setFontColor(FontColor color) async {
