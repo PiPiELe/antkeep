@@ -33,7 +33,10 @@ void main() {
     expect(preferences.ultraSimpleMode, isTrue);
     expect(preferences.showFeature(UltraSimpleFeature.inventory), isTrue);
     expect(preferences.showFeature(UltraSimpleFeature.careTasks), isFalse);
+    expect(preferences.showFeature(UltraSimpleFeature.nestHistory), isFalse);
+    expect(preferences.showFeature(UltraSimpleFeature.winterCycle), isFalse);
     await preferences.setUltraFeature(UltraSimpleFeature.memorial, true);
+    await preferences.setUltraFeature(UltraSimpleFeature.nestHistory, true);
     await preferences.setUltraFeature(UltraSimpleFeature.inventory, false);
 
     final restarted = AppPreferences(store);
@@ -41,6 +44,8 @@ void main() {
     expect(restarted.ultraSimpleMode, isTrue);
     expect(restarted.simpleMode, isFalse);
     expect(restarted.showFeature(UltraSimpleFeature.memorial), isTrue);
+    expect(restarted.showFeature(UltraSimpleFeature.nestHistory), isTrue);
+    expect(restarted.showFeature(UltraSimpleFeature.winterCycle), isFalse);
     expect(restarted.showFeature(UltraSimpleFeature.inventory), isFalse);
     await restarted.setSimpleMode(true);
     expect(restarted.ultraSimpleMode, isFalse);

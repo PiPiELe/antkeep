@@ -3962,6 +3962,12 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
       final showMilestones = themeController.showFeature(
         UltraSimpleFeature.milestones,
       );
+      final showNestHistory = themeController.showFeature(
+        UltraSimpleFeature.nestHistory,
+      );
+      final showWinterCycle = themeController.showFeature(
+        UltraSimpleFeature.winterCycle,
+      );
       final diaryTypeFilter = !showMilestones && _diaryTypeFilter == 'milestone'
           ? ''
           : _diaryTypeFilter;
@@ -4127,8 +4133,10 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 },
                 itemBuilder: (context) => [
                   if (modern) ...[
-                    const PopupMenuItem(value: 'nest', child: Text('巢体履历')),
-                    const PopupMenuItem(value: 'winter', child: Text('越冬周期')),
+                    if (showNestHistory)
+                      const PopupMenuItem(value: 'nest', child: Text('巢体履历')),
+                    if (showWinterCycle)
+                      const PopupMenuItem(value: 'winter', child: Text('越冬周期')),
                     if (showMilestones)
                       const PopupMenuItem(
                         value: 'milestone',
@@ -4184,47 +4192,52 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                     ? null
                     : () => _editAcquiredOn(colony),
               ),
-            if (!modern)
+            if (!modern &&
+                (showNestHistory || showWinterCycle || showMilestones))
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: shortcutStyle,
-                      icon: const Icon(Icons.home_work_outlined),
-                      label: const Text(
-                        '巢体履历',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                  if (showNestHistory)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: shortcutStyle,
+                        icon: const Icon(Icons.home_work_outlined),
+                        label: const Text(
+                          '巢体履历',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          await Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) => NestHistoryPage(colony: colony),
+                            ),
+                          );
+                          if (mounted) setState(_reload);
+                        },
                       ),
-                      onPressed: () async {
-                        await Navigator.of(context).push<void>(
-                          MaterialPageRoute(
-                            builder: (_) => NestHistoryPage(colony: colony),
-                          ),
-                        );
-                        if (mounted) setState(_reload);
-                      },
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: shortcutStyle,
-                      icon: const Icon(Icons.ac_unit),
-                      label: const Text(
-                        '越冬周期',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => WinterCyclePage(colony: colony),
+                  if (showWinterCycle) ...[
+                    if (showNestHistory) const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: shortcutStyle,
+                        icon: const Icon(Icons.ac_unit),
+                        label: const Text(
+                          '越冬周期',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => WinterCyclePage(colony: colony),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                   if (showMilestones) ...[
-                    const SizedBox(width: 8),
+                    if (showNestHistory || showWinterCycle)
+                      const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
                         style: shortcutStyle,
@@ -7156,7 +7169,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _savingEdition = false;
-  bool _savingInterfaceStyle = false;
   bool _savingSimpleMode = false;
   bool _savingUltraSimpleMode = false;
   UltraSimpleFeature? _savingUltraFeature;
@@ -7212,20 +7224,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _setInterfaceStyle(InterfaceStyle style) async {
-    if (_savingInterfaceStyle || themeController.interfaceStyle == style) {
-      return;
-    }
-    setState(() => _savingInterfaceStyle = true);
-    try {
-      await themeController.setInterfaceStyle(style);
-    } catch (error) {
-      if (mounted) _showError(context, error);
-    } finally {
-      if (mounted) setState(() => _savingInterfaceStyle = false);
-    }
-  }
-
   Future<void> _setColonyOverview(bool enabled) async {
     if (_savingColonyOverview) return;
     setState(() => _savingColonyOverview = true);
@@ -7240,12 +7238,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _setColonyDisplayStyle(ColonyDisplayStyle style) async {
     if (_savingColonyDisplayStyle ||
-        themeController.colonyDisplayStyle == style) {
+        (themeController.interfaceStyle == InterfaceStyle.current &&
+            themeController.colonyDisplayStyle == style)) {
       return;
     }
     setState(() => _savingColonyDisplayStyle = true);
     try {
-      await themeController.setColonyDisplayStyle(style);
+      if (themeController.colonyDisplayStyle != style) {
+        await themeController.setColonyDisplayStyle(style);
+      }
+      if (themeController.interfaceStyle != InterfaceStyle.current) {
+        await themeController.setInterfaceStyle(InterfaceStyle.current);
+      }
     } catch (error) {
       if (mounted) _showError(context, error);
     } finally {
@@ -7417,16 +7421,25 @@ class _SettingsPageState extends State<SettingsPage> {
               : _setUltraSimpleMode,
         ),
         if (themeController.ultraSimpleMode)
-          for (final feature in UltraSimpleFeature.values)
-            SwitchListTile(
-              key: ValueKey('ultra-${feature.name}'),
-              contentPadding: const EdgeInsets.only(left: 32, right: 16),
-              title: Text(feature.label),
-              value: themeController.ultraFeatureEnabled(feature),
-              onChanged: _savingUltraFeature == null
-                  ? (enabled) => _setUltraFeature(feature, enabled)
-                  : null,
+          ExpansionTile(
+            key: const ValueKey('ultra-feature-options'),
+            title: const Text('自选显示内容'),
+            subtitle: Text(
+              '已开启 ${UltraSimpleFeature.values.where(themeController.ultraFeatureEnabled).length} 项',
             ),
+            children: [
+              for (final feature in UltraSimpleFeature.values)
+                SwitchListTile(
+                  key: ValueKey('ultra-${feature.name}'),
+                  contentPadding: const EdgeInsets.only(left: 32, right: 16),
+                  title: Text(feature.label),
+                  value: themeController.ultraFeatureEnabled(feature),
+                  onChanged: _savingUltraFeature == null
+                      ? (enabled) => _setUltraFeature(feature, enabled)
+                      : null,
+                ),
+            ],
+          ),
         if (themeController.interfaceStyle == InterfaceStyle.current)
           SwitchListTile(
             secondary: const Icon(Icons.analytics_outlined),
@@ -7526,47 +7539,32 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
       ]),
-      _section(context, '界面样式', [
-        for (final style in InterfaceStyle.values)
+      _section(context, '蚁群列表风格', [
+        for (final style in ColonyDisplayStyle.values)
           ListTile(
             leading: Icon(
-              style == InterfaceStyle.current
-                  ? Icons.auto_awesome_outlined
-                  : Icons.history_outlined,
+              style == ColonyDisplayStyle.classic
+                  ? Icons.view_agenda_outlined
+                  : style == ColonyDisplayStyle.showcase
+                  ? Icons.dashboard_customize_outlined
+                  : Icons.view_compact_outlined,
             ),
             title: Text(style.label),
             subtitle: Text(style.description),
-            selected: themeController.interfaceStyle == style,
-            trailing: themeController.interfaceStyle == style
+            trailing:
+                (themeController.interfaceStyle == InterfaceStyle.classic
+                    ? style == ColonyDisplayStyle.classic
+                    : themeController.colonyDisplayStyle == style)
                 ? const Icon(Icons.check_circle)
                 : null,
-            onTap: _savingInterfaceStyle
+            selected: themeController.interfaceStyle == InterfaceStyle.classic
+                ? style == ColonyDisplayStyle.classic
+                : themeController.colonyDisplayStyle == style,
+            onTap: _savingColonyDisplayStyle
                 ? null
-                : () => _setInterfaceStyle(style),
+                : () => _setColonyDisplayStyle(style),
           ),
       ]),
-      if (themeController.interfaceStyle == InterfaceStyle.current)
-        _section(context, '蚁群列表风格', [
-          for (final style in ColonyDisplayStyle.values)
-            ListTile(
-              leading: Icon(
-                style == ColonyDisplayStyle.classic
-                    ? Icons.view_agenda_outlined
-                    : style == ColonyDisplayStyle.showcase
-                    ? Icons.dashboard_customize_outlined
-                    : Icons.view_compact_outlined,
-              ),
-              title: Text(style.label),
-              subtitle: Text(style.description),
-              trailing: themeController.colonyDisplayStyle == style
-                  ? const Icon(Icons.check_circle)
-                  : null,
-              selected: themeController.colonyDisplayStyle == style,
-              onTap: _savingColonyDisplayStyle
-                  ? null
-                  : () => _setColonyDisplayStyle(style),
-            ),
-        ]),
     ],
     SettingsCategory.online => [
       _section(context, '资料模式与账号', [

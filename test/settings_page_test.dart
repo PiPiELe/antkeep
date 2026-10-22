@@ -171,33 +171,33 @@ void main() {
     expect(settings['show_colony_overview'], 'false');
   });
 
-  testWidgets('appearance setting switches and saves the interface style', (
-    tester,
-  ) async {
-    expect(themeController.interfaceStyle, InterfaceStyle.classic);
-    await tester.pumpWidget(app());
-    await tester.pumpAndSettle();
-    await openCategory(tester, '外观与展示');
-    await tester.dragUntilVisible(
-      find.text('经典界面'),
-      find.byType(ListView).last,
-      const Offset(0, -250),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('新版界面'));
-    await tester.pumpAndSettle();
-    expect(themeController.interfaceStyle, InterfaceStyle.current);
-    expect(settings['interface_style'], 'current');
-    await tester.tap(find.text('经典界面'));
-    await tester.pumpAndSettle();
-    expect(themeController.interfaceStyle, InterfaceStyle.classic);
-    expect(settings['interface_style'], 'classic');
-    failWrites = true;
-    await tester.tap(find.text('新版界面'));
-    await tester.pumpAndSettle();
-    expect(themeController.interfaceStyle, InterfaceStyle.classic);
-    expect(find.byType(SnackBar), findsOneWidget);
-  });
+  testWidgets(
+    'appearance setting shows four list styles without interface choices',
+    (tester) async {
+      expect(themeController.interfaceStyle, InterfaceStyle.classic);
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      await openCategory(tester, '外观与展示');
+      expect(find.text('界面样式'), findsNothing);
+      expect(find.text('新版界面'), findsNothing);
+      expect(find.text('经典界面'), findsNothing);
+      for (final style in ColonyDisplayStyle.values) {
+        await tester.scrollUntilVisible(
+          find.text(style.label),
+          250,
+          scrollable: find.byType(Scrollable).last,
+        );
+        expect(find.text(style.label), findsOneWidget);
+      }
+      await tester.ensureVisible(find.text('经典'));
+      await tester.tap(find.text('经典'));
+      await tester.pumpAndSettle();
+      expect(themeController.interfaceStyle, InterfaceStyle.current);
+      expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.classic);
+      expect(settings['interface_style'], 'current');
+      expect(settings['colony_display_style'], 'classic');
+    },
+  );
 
   testWidgets('appearance setting switches and saves colony list style', (
     tester,
@@ -445,13 +445,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(themeController.ultraSimpleMode, isTrue);
     expect(themeController.simpleMode, isFalse);
+    expect(find.text('自选显示内容'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ultra-inventory')), findsNothing);
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
     for (final feature in UltraSimpleFeature.values) {
       expect(find.byKey(ValueKey('ultra-${feature.name}')), findsOneWidget);
     }
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('ultra-inventory')), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(NavigationDestination), findsNWidgets(3));
     await openCategory(tester, '外观与展示');
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
     final inventory = find.byKey(const ValueKey('ultra-inventory'));
     await tester.ensureVisible(inventory);
     await tester.tap(inventory);
@@ -510,11 +519,13 @@ void main() {
     await themeController.setUltraSimpleMode(true);
     await tester.pumpWidget(app());
     await openCategory(tester, '外观与展示');
+    await tester.ensureVisible(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
     for (final feature in UltraSimpleFeature.values) {
-      await tester.scrollUntilVisible(
-        find.byKey(ValueKey('ultra-${feature.name}')),
-        160,
-      );
+      await tester.ensureVisible(find.byKey(ValueKey('ultra-${feature.name}')));
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }
   });

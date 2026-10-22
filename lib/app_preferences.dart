@@ -98,6 +98,8 @@ enum UltraSimpleFeature {
   careTasks('养殖待办', false),
   populationAnalysis('数量分析', false),
   mortalityAnalysis('死亡分析', false),
+  nestHistory('巢体履历', false),
+  winterCycle('越冬周期', false),
   memorial('英灵殿', false),
   milestones('里程碑', false);
 

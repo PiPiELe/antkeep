@@ -306,6 +306,74 @@ void main() {
     },
   );
 
+  testWidgets('ultra simple controls nest and winter entries independently', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    await AppDatabase.instance.saveColony(
+      Colony(
+        id: 'ultra-history',
+        name: '极简履历蚁群',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await themeController.setUltraSimpleMode(true);
+
+    Future<void> pumpDetail() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        const MaterialApp(home: ColonyDetailPage(colonyId: 'ultra-history')),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> expectEntries({
+      required bool nest,
+      required bool winter,
+    }) async {
+      if (themeController.interfaceStyle == InterfaceStyle.current) {
+        await tester.tap(find.byTooltip('更多操作'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('巢体履历'), nest ? findsOneWidget : findsNothing);
+      expect(find.text('越冬周期'), winter ? findsOneWidget : findsNothing);
+    }
+
+    for (final style in InterfaceStyle.values) {
+      await themeController.setInterfaceStyle(style);
+      await themeController.setUltraFeature(
+        UltraSimpleFeature.nestHistory,
+        false,
+      );
+      await themeController.setUltraFeature(
+        UltraSimpleFeature.winterCycle,
+        false,
+      );
+      await pumpDetail();
+      await expectEntries(nest: false, winter: false);
+
+      await themeController.setUltraFeature(
+        UltraSimpleFeature.nestHistory,
+        true,
+      );
+      await pumpDetail();
+      await expectEntries(nest: true, winter: false);
+
+      await themeController.setUltraFeature(
+        UltraSimpleFeature.nestHistory,
+        false,
+      );
+      await themeController.setUltraFeature(
+        UltraSimpleFeature.winterCycle,
+        true,
+      );
+      await pumpDetail();
+      await expectEntries(nest: false, winter: true);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('classic home announcement switches to the current interface', (
     tester,
   ) async {
