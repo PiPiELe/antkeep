@@ -390,6 +390,7 @@ class _CurrentPanel extends StatelessWidget {
 
 class _CurrentPopulationPanel extends StatefulWidget {
   const _CurrentPopulationPanel({
+    super.key,
     required this.colony,
     required this.records,
     required this.details,
@@ -491,7 +492,11 @@ class _CurrentPopulationPanelState extends State<_CurrentPopulationPanel> {
 }
 
 class _CurrentMortalityPanel extends StatefulWidget {
-  const _CurrentMortalityPanel({required this.records, required this.colony});
+  const _CurrentMortalityPanel({
+    super.key,
+    required this.records,
+    required this.colony,
+  });
   final List<CareRecord> records;
   final Colony colony;
   @override
@@ -733,12 +738,14 @@ class _CurrentDiaryCard extends StatelessWidget {
 class _CurrentDiaryFilters extends StatelessWidget {
   const _CurrentDiaryFilters({
     required this.type,
+    required this.showMilestones,
     required this.timeLabel,
     required this.onType,
     required this.onTime,
     required this.onSearch,
   });
   final String type;
+  final bool showMilestones;
   final String timeLabel;
   final ValueChanged<String> onType;
   final ValueChanged<_DiaryTimeFilter> onTime;
@@ -773,7 +780,8 @@ class _CurrentDiaryFilters extends StatelessWidget {
         const PopupMenuItem(value: '', child: Text('全部类别')),
         for (final value in CareRecordType.values)
           PopupMenuItem(value: value.storageValue, child: Text(value.label)),
-        const PopupMenuItem(value: 'milestone', child: Text('里程碑')),
+        if (showMilestones)
+          const PopupMenuItem(value: 'milestone', child: Text('里程碑')),
       ],
       child: label(
         Icons.category_outlined,

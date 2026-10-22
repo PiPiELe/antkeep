@@ -389,9 +389,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   var _index = 0;
-  late final TabController _colonyTabs;
+  late TabController _colonyTabs;
+  late List<ColonyTab> _shownColonyTabs;
   bool _fadeColonyTabsOnLeft = false;
   late BeginnerCareNotice _beginnerCareNotice;
   late List<BeginnerCareNotice> _careNotices;
@@ -504,7 +505,9 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
-    _colonyTabs = TabController(length: ColonyTab.values.length, vsync: this);
+    _shownColonyTabs = _visibleColonyTabs();
+    _colonyTabs = TabController(length: _shownColonyTabs.length, vsync: this);
+    themeController.addListener(_syncColonyTabs);
     _careNotices = onlineController.content.beginnerCareNotices;
     _beginnerCareNotice = randomBeginnerCareNotice(notices: _careNotices);
     onlineController.addListener(_updateCareNotices);
@@ -516,6 +519,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
+    themeController.removeListener(_syncColonyTabs);
     _colonyTabs.dispose();
     onlineController.removeListener(_updateCareNotices);
     onlineController.removeListener(_checkCompetitionUpdates);
@@ -542,36 +546,89 @@ class _HomePageState extends State<HomePage>
     builder: (context, _) => _buildPage(context),
   );
 
+  List<ColonyTab> _visibleColonyTabs() => [
+    ColonyTab.colonies,
+    ColonyTab.overview,
+    if (themeController.showFeature(UltraSimpleFeature.memorial))
+      ColonyTab.memorial,
+    if (themeController.showFeature(UltraSimpleFeature.milestones))
+      ColonyTab.milestones,
+  ];
+
+  void _syncColonyTabs() {
+    final tabs = _visibleColonyTabs();
+    if (tabs.length == _shownColonyTabs.length &&
+        tabs.asMap().entries.every(
+          (entry) => entry.value == _shownColonyTabs[entry.key],
+        )) {
+      return;
+    }
+    final selected = _shownColonyTabs[_colonyTabs.index];
+    _colonyTabs.dispose();
+    _shownColonyTabs = tabs;
+    _colonyTabs = TabController(
+      length: tabs.length,
+      initialIndex: tabs.contains(selected) ? tabs.indexOf(selected) : 0,
+      vsync: this,
+    );
+    setState(() {});
+  }
+
   Widget _buildPage(BuildContext context) {
     const titles = ['我的蚁群', '物品', 'DLC 养殖', '发现', '设置'];
-    final visiblePages = themeController.simpleMode ? [0, 4] : [0, 1, 2, 3, 4];
+    final visiblePages = themeController.ultraSimpleMode
+        ? [
+            0,
+            if (themeController.showFeature(UltraSimpleFeature.inventory)) 1,
+            4,
+          ]
+        : themeController.simpleMode
+        ? [0, 4]
+        : [0, 1, 2, 3, 4];
     final pageIndex = visiblePages.contains(_index) ? _index : 0;
     final pages = [
       IndexedStack(
         index: _colonyTabs.index,
         children: [
-          const ColoniesPage(),
-          ColonyOverviewPage(
-            active:
-                pageIndex == 0 && _colonyTabs.index == ColonyTab.overview.index,
-            onOpenColonies: () =>
-                setState(() => _colonyTabs.index = ColonyTab.colonies.index),
-            onOpenMemorial: () =>
-                setState(() => _colonyTabs.index = ColonyTab.memorial.index),
-          ),
-          MemorialPage(
-            preferences: themeController,
-            onOpenColony: (context, id) async {
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => ColonyDetailPage(colonyId: id),
+          for (final tab in _shownColonyTabs)
+            switch (tab) {
+              ColonyTab.colonies => const ColoniesPage(),
+              ColonyTab.overview => ColonyOverviewPage(
+                active:
+                    pageIndex == 0 &&
+                    _shownColonyTabs[_colonyTabs.index] == ColonyTab.overview,
+                showMemorial: themeController.showFeature(
+                  UltraSimpleFeature.memorial,
                 ),
-              );
+                onOpenColonies: () => setState(
+                  () => _colonyTabs.index = _shownColonyTabs.indexOf(
+                    ColonyTab.colonies,
+                  ),
+                ),
+                onOpenMemorial:
+                    themeController.showFeature(UltraSimpleFeature.memorial)
+                    ? () => setState(
+                        () => _colonyTabs.index = _shownColonyTabs.indexOf(
+                          ColonyTab.memorial,
+                        ),
+                      )
+                    : null,
+              ),
+              ColonyTab.memorial => MemorialPage(
+                preferences: themeController,
+                onOpenColony: (context, id) async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ColonyDetailPage(colonyId: id),
+                    ),
+                  );
+                },
+              ),
+              ColonyTab.milestones => MilestonesOverviewPage(
+                active:
+                    _shownColonyTabs[_colonyTabs.index] == ColonyTab.milestones,
+              ),
             },
-          ),
-          MilestonesOverviewPage(
-            active: _colonyTabs.index == ColonyTab.milestones.index,
-          ),
         ],
       ),
       const InventoryPage(),
@@ -590,18 +647,18 @@ class _HomePageState extends State<HomePage>
         title: denseHeader
             ? ColonyDenseTabs(
                 labels: [
-                  for (final tab in ColonyTab.values)
+                  for (final tab in _shownColonyTabs)
                     themeController.colonyTabName(tab),
                 ],
                 selectedIndex: _colonyTabs.index,
                 onSelected: (index) =>
                     setState(() => _colonyTabs.index = index),
                 onRename: (index) =>
-                    _renameColonyTab(context, ColonyTab.values[index]),
+                    _renameColonyTab(context, _shownColonyTabs[index]),
                 onShare: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ShareContentPage()),
                 ),
-                onAnalysis: themeController.simpleMode
+                onAnalysis: themeController.simplifiedPresentation
                     ? null
                     : () => Navigator.of(context).push(
                         MaterialPageRoute(
@@ -669,7 +726,7 @@ class _HomePageState extends State<HomePage>
                         ?.copyWith(fontSize: 16),
                     onTap: (_) => setState(() {}),
                     tabs: [
-                      for (final tab in ColonyTab.values)
+                      for (final tab in _shownColonyTabs)
                         Tab(
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
@@ -685,7 +742,7 @@ class _HomePageState extends State<HomePage>
         actions: denseHeader
             ? []
             : [
-                if (!themeController.simpleMode)
+                if (!themeController.simplifiedPresentation)
                   TextButton.icon(
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
@@ -756,12 +813,14 @@ class _HomePageState extends State<HomePage>
             selectedIcon: Icon(Icons.hive),
             label: '蚁群',
           ),
-          if (!themeController.simpleMode) ...[
+          if (!themeController.simpleMode &&
+              themeController.showFeature(UltraSimpleFeature.inventory))
             const NavigationDestination(
               icon: Icon(Icons.inventory_2_outlined),
               selectedIcon: Icon(Icons.inventory_2),
               label: '物品',
             ),
+          if (!themeController.simplifiedPresentation) ...[
             const NavigationDestination(
               icon: Icon(Icons.pets_outlined),
               selectedIcon: Icon(Icons.pets),
@@ -1085,7 +1144,9 @@ class _ColoniesPageState extends State<ColoniesPage> {
     var species = _filter.species;
     var nestType = _filter.nestType;
     var newQueen = _filter.newQueen;
-    var todo = _filter.todo;
+    var todo = themeController.showFeature(UltraSimpleFeature.careTasks)
+        ? _filter.todo
+        : ColonyTodoFilter.all;
     var workerOrder = _filter.workerOrder;
     final speciesOptions = {
       for (final entry in colonies)
@@ -1211,23 +1272,26 @@ class _ColoniesPageState extends State<ColoniesPage> {
                           () => newQueen = ColonyNewQueenFilter.other,
                         ),
                       ]),
-                      group('是否待办', [
-                        choice(
-                          '全部',
-                          todo == ColonyTodoFilter.all,
-                          () => todo = ColonyTodoFilter.all,
-                        ),
-                        choice(
-                          '今日有待办',
-                          todo == ColonyTodoFilter.due,
-                          () => todo = ColonyTodoFilter.due,
-                        ),
-                        choice(
-                          '今日无待办',
-                          todo == ColonyTodoFilter.none,
-                          () => todo = ColonyTodoFilter.none,
-                        ),
-                      ]),
+                      if (themeController.showFeature(
+                        UltraSimpleFeature.careTasks,
+                      ))
+                        group('是否待办', [
+                          choice(
+                            '全部',
+                            todo == ColonyTodoFilter.all,
+                            () => todo = ColonyTodoFilter.all,
+                          ),
+                          choice(
+                            '今日有待办',
+                            todo == ColonyTodoFilter.due,
+                            () => todo = ColonyTodoFilter.due,
+                          ),
+                          choice(
+                            '今日无待办',
+                            todo == ColonyTodoFilter.none,
+                            () => todo = ColonyTodoFilter.none,
+                          ),
+                        ]),
                       group('工蚁数量', [
                         choice(
                           '手动顺序',
@@ -1364,7 +1428,10 @@ class _ColoniesPageState extends State<ColoniesPage> {
                   population: entry.population,
                   queens: entry.queens,
                   workers: entry.workers,
-                  dueTasks: entry.dueTasks,
+                  dueTasks:
+                      themeController.showFeature(UltraSimpleFeature.careTasks)
+                      ? entry.dueTasks
+                      : const [],
                   onDurationTap: () => _editAcquiredOn(entry.colony),
                   onTap: () async {
                     await Navigator.of(context).push(
@@ -1410,6 +1477,16 @@ class _ColoniesPageState extends State<ColoniesPage> {
           return _ErrorState('读取蚁群失败：${snapshot.error}');
         }
         final allColonies = snapshot.data!;
+        final visibleFilter =
+            themeController.showFeature(UltraSimpleFeature.careTasks)
+            ? _filter
+            : ColonyListFilter(
+                scale: _filter.scale,
+                species: _filter.species,
+                nestType: _filter.nestType,
+                newQueen: _filter.newQueen,
+                workerOrder: _filter.workerOrder,
+              );
         if (InterfaceStyleScope.of(context) == InterfaceStyle.classic) {
           return Column(
             children: [
@@ -1422,12 +1499,12 @@ class _ColoniesPageState extends State<ColoniesPage> {
         final query = style == ColonyDisplayStyle.classic
             ? _colonySearch.text.trim().toLowerCase()
             : '';
-        final colonies = _filter.activeCount == 0 && query.isEmpty
+        final colonies = visibleFilter.activeCount == 0 && query.isEmpty
             ? allColonies
             : allColonies
                   .where(
                     (entry) =>
-                        _filter.matches(
+                        visibleFilter.matches(
                           entry.colony,
                           entry.workers,
                           entry.dueTasks.isNotEmpty,
@@ -1439,13 +1516,16 @@ class _ColoniesPageState extends State<ColoniesPage> {
                             )),
                   )
                   .toList();
-        if (_filter.workerOrder != ColonyWorkerOrder.manual) {
+        if (visibleFilter.workerOrder != ColonyWorkerOrder.manual) {
           final savedOrder = {
             for (var i = 0; i < allColonies.length; i++)
               allColonies[i].colony.id: i,
           };
           colonies.sort((first, second) {
-            final count = _filter.compareWorkers(first.workers, second.workers);
+            final count = visibleFilter.compareWorkers(
+              first.workers,
+              second.workers,
+            );
             return count != 0
                 ? count
                 : savedOrder[first.colony.id]!.compareTo(
@@ -1455,6 +1535,9 @@ class _ColoniesPageState extends State<ColoniesPage> {
         }
         if (style == ColonyDisplayStyle.dense) {
           return ColonyDenseList(
+            showCareTasks: themeController.showFeature(
+              UltraSimpleFeature.careTasks,
+            ),
             entries: [
               for (final entry in colonies)
                 DenseColonyEntry(
@@ -1463,9 +1546,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
                   queens: entry.queens,
                   records: entry.records,
                   tagOrder: themeController.colonyTagOrder,
-                  dueFeeding: entry.dueTasks.any(
-                    (task) => task.type == CareTaskType.feeding,
-                  ),
+                  dueFeeding:
+                      themeController.showFeature(
+                        UltraSimpleFeature.careTasks,
+                      ) &&
+                      entry.dueTasks.any(
+                        (task) => task.type == CareTaskType.feeding,
+                      ),
                   cover: entry.colony.coverPhotoPath == null
                       ? null
                       : _StoredImage(
@@ -1492,13 +1579,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
             },
             onDuration: _editAcquiredOn,
             onDelete: _deleteColony,
-            onReorder: _filter.activeCount == 0
+            onReorder: visibleFilter.activeCount == 0
                 ? (oldIndex, newIndex) =>
                       _reorderColonies(colonies, oldIndex, newIndex)
                 : null,
           );
         }
-        final filterActive = _filter.activeCount > 0;
+        final filterActive = visibleFilter.activeCount > 0;
         final canReorder = !filterActive && query.isEmpty;
         final canBatchCare =
             colonies.where((entry) => !entry.colony.archived).length > 1;
@@ -1544,11 +1631,12 @@ class _ColoniesPageState extends State<ColoniesPage> {
                         visibleCount: colonies.length,
                         totalCount: allColonies.length,
                         filterCount:
-                            _filter.activeCount -
-                            (_filter.workerOrder == ColonyWorkerOrder.manual
+                            visibleFilter.activeCount -
+                            (visibleFilter.workerOrder ==
+                                    ColonyWorkerOrder.manual
                                 ? 0
                                 : 1),
-                        workerOrder: _filter.workerOrder,
+                        workerOrder: visibleFilter.workerOrder,
                         canBatchCare: canBatchCare,
                         onBatchCare: () => _batchCare(colonies),
                         onWorkerOrder: _setWorkerOrder,
@@ -1684,7 +1772,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
                                 const SizedBox(width: 4),
                                 Text(
                                   filterActive
-                                      ? '筛选 ${_filter.activeCount}'
+                                      ? '筛选 ${visibleFilter.activeCount}'
                                       : '筛选',
                                   style: const TextStyle(fontSize: 13),
                                 ),
@@ -1745,7 +1833,12 @@ class _ColoniesPageState extends State<ColoniesPage> {
                                 population: colonies[index].population,
                                 queens: colonies[index].queens,
                                 workers: colonies[index].workers,
-                                dueTasks: colonies[index].dueTasks,
+                                dueTasks:
+                                    themeController.showFeature(
+                                      UltraSimpleFeature.careTasks,
+                                    )
+                                    ? colonies[index].dueTasks
+                                    : const [],
                                 onDurationTap: () =>
                                     _editAcquiredOn(colonies[index].colony),
                                 onTap: () async {
@@ -1766,7 +1859,12 @@ class _ColoniesPageState extends State<ColoniesPage> {
                                 population: colonies[index].population,
                                 queens: colonies[index].queens,
                                 workers: colonies[index].workers,
-                                dueTasks: colonies[index].dueTasks,
+                                dueTasks:
+                                    themeController.showFeature(
+                                      UltraSimpleFeature.careTasks,
+                                    )
+                                    ? colonies[index].dueTasks
+                                    : const [],
                                 cover:
                                     colonies[index].colony.coverPhotoPath ==
                                         null
@@ -2501,7 +2599,9 @@ class _ColonyFormPageState extends State<ColonyFormPage> {
           [widget.colony!.coverPhotoPath!],
         );
       }
-      if (widget.colony == null && !themeController.simpleMode && mounted) {
+      if (widget.colony == null &&
+          !themeController.simplifiedPresentation &&
+          mounted) {
         final colony = await AppDatabase.instance.findColony(colonyId);
         if (colony != null && mounted) {
           await Navigator.of(context).push<bool>(
@@ -3821,7 +3921,13 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
       final colony = detail!.colony!;
       final modern = themeController.interfaceStyle == InterfaceStyle.current;
       final today = DateUtils.dateOnly(DateTime.now());
-      final showingMilestones = _diaryTypeFilter == 'milestone';
+      final showMilestones = themeController.showFeature(
+        UltraSimpleFeature.milestones,
+      );
+      final diaryTypeFilter = !showMilestones && _diaryTypeFilter == 'milestone'
+          ? ''
+          : _diaryTypeFilter;
+      final showingMilestones = diaryTypeFilter == 'milestone';
       final visibleDiaryRecords = detail.records
           .where(
             (record) =>
@@ -3831,8 +3937,8 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                     '${record.type.label} ${record.note ?? ''}'
                         .toLowerCase()
                         .contains(_diarySearch.toLowerCase())) &&
-                (_diaryTypeFilter.isEmpty ||
-                    record.type.storageValue == _diaryTypeFilter) &&
+                (diaryTypeFilter.isEmpty ||
+                    record.type.storageValue == diaryTypeFilter) &&
                 _matchesDiaryTime(record.occurredAt, today),
           )
           .toList();
@@ -3851,7 +3957,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
           : <Milestone>[];
       final diaryCountLabel = showingMilestones
           ? '${visibleMilestones.length} / ${detail.milestones.length} 条里程碑'
-          : _diaryTypeFilter.isEmpty && _diaryTimeFilter == _DiaryTimeFilter.all
+          : diaryTypeFilter.isEmpty && _diaryTimeFilter == _DiaryTimeFilter.all
           ? '${detail.records.length} 条记录'
           : '${visibleDiaryRecords.length} / ${detail.records.length} 条记录';
       final compactAppBar = modern || MediaQuery.sizeOf(context).width < 400;
@@ -3900,7 +4006,9 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ),
               ),
             ),
-            if (!colony.archived && !compactAppBar)
+            if (!colony.archived &&
+                !compactAppBar &&
+                themeController.showFeature(UltraSimpleFeature.memorial))
               IconButton(
                 tooltip: '移入英灵殿',
                 icon: const SkullIcon(),
@@ -3983,15 +4091,22 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   if (modern) ...[
                     const PopupMenuItem(value: 'nest', child: Text('巢体履历')),
                     const PopupMenuItem(value: 'winter', child: Text('越冬周期')),
-                    const PopupMenuItem(value: 'milestone', child: Text('里程碑')),
-                    if (!themeController.simpleMode)
+                    if (showMilestones)
+                      const PopupMenuItem(
+                        value: 'milestone',
+                        child: Text('里程碑'),
+                      ),
+                    if (!themeController.simplifiedPresentation)
                       const PopupMenuItem(value: 'species', child: Text('百科')),
                   ],
                   if (!colony.archived) ...[
-                    const PopupMenuItem(
-                      value: 'memorial',
-                      child: Text('移入英灵殿'),
-                    ),
+                    if (themeController.showFeature(
+                      UltraSimpleFeature.memorial,
+                    ))
+                      const PopupMenuItem(
+                        value: 'memorial',
+                        child: Text('移入英灵殿'),
+                      ),
                     const PopupMenuItem(value: 'delete', child: Text('删除蚁群')),
                   ],
                 ],
@@ -4070,26 +4185,28 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: shortcutStyle,
-                      icon: const Icon(Icons.flag_outlined),
-                      label: const Text(
-                        '里程碑',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                  if (showMilestones) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: shortcutStyle,
+                        icon: const Icon(Icons.flag_outlined),
+                        label: const Text(
+                          '里程碑',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => MilestonePage(colony: colony),
+                            ),
+                          );
+                          if (mounted) setState(_reload);
+                        },
                       ),
-                      onPressed: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => MilestonePage(colony: colony),
-                          ),
-                        );
-                        if (mounted) setState(_reload);
-                      },
                     ),
-                  ),
+                  ],
                 ],
               ),
             if (colony.targetTemperatureLower != null ||
@@ -4100,22 +4217,29 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
               _ColonySummary(colony: colony),
             ],
             const SizedBox(height: 4),
-            CareTasksSection(
-              compact: modern,
-              colony: colony,
-              onRecord: (task) async {
-                final saved = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => RecordFormPage(colony: colony, task: task),
-                  ),
-                );
-                if (saved == true && mounted) setState(_reload);
-                return saved == true;
-              },
-            ),
+            if (themeController.showFeature(UltraSimpleFeature.careTasks))
+              CareTasksSection(
+                key: const ValueKey('colony-care-tasks'),
+                compact: modern,
+                colony: colony,
+                onRecord: (task) async {
+                  final saved = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          RecordFormPage(colony: colony, task: task),
+                    ),
+                  );
+                  if (saved == true && mounted) setState(_reload);
+                  return saved == true;
+                },
+              ),
             const SizedBox(height: 4),
-            if (modern)
+            if (themeController.showFeature(
+                  UltraSimpleFeature.populationAnalysis,
+                ) &&
+                modern)
               _CurrentPopulationPanel(
+                key: const ValueKey('colony-population-analysis'),
                 colony: colony,
                 records: detail.records,
                 details: _PopulationTimeline(
@@ -4131,7 +4255,7 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                       ? null
                       : (record) => _editRecord(colony, record),
                   onConfigureGrowth:
-                      themeController.simpleMode || colony.archived
+                      themeController.simplifiedPresentation || colony.archived
                       ? null
                       : () async {
                           await Navigator.of(context).push(
@@ -4143,15 +4267,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                         },
                 ),
               )
-            else
+            else if (themeController.showFeature(
+              UltraSimpleFeature.populationAnalysis,
+            ))
               _PopulationTimeline(
+                key: const ValueKey('colony-population-analysis'),
                 colony: colony,
                 records: detail.records,
                 includeBrood: _includeBrood,
                 expanded: _populationExpanded,
                 showForecast: _showForecast,
                 forecastHorizon: _forecastHorizon,
-                onConfigureGrowth: themeController.simpleMode || colony.archived
+                onConfigureGrowth:
+                    themeController.simplifiedPresentation || colony.archived
                     ? null
                     : () async {
                         final saved = await Navigator.of(context).push<bool>(
@@ -4175,9 +4303,18 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                 ),
               ),
             const SizedBox(height: 4),
-            if (modern)
-              _CurrentMortalityPanel(records: detail.records, colony: colony)
-            else
+            if (themeController.showFeature(
+                  UltraSimpleFeature.mortalityAnalysis,
+                ) &&
+                modern)
+              _CurrentMortalityPanel(
+                key: const ValueKey('colony-mortality-analysis'),
+                records: detail.records,
+                colony: colony,
+              )
+            else if (themeController.showFeature(
+              UltraSimpleFeature.mortalityAnalysis,
+            ))
               WorkerMortalityAnalysisCard(
                 key: const ValueKey('colony-mortality-analysis'),
                 expanded: _mortalityExpanded,
@@ -4253,7 +4390,8 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                   ),
                   if (modern)
                     _CurrentDiaryFilters(
-                      type: _diaryTypeFilter,
+                      type: diaryTypeFilter,
+                      showMilestones: showMilestones,
                       timeLabel: _diaryTimeLabel,
                       onType: (value) =>
                           setState(() => _diaryTypeFilter = value),
@@ -4289,18 +4427,19 @@ class _ColonyDetailPageState extends State<ColonyDetailPage> {
                                 value: type.storageValue,
                                 child: Text(type.label),
                               ),
-                            const PopupMenuItem(
-                              value: 'milestone',
-                              child: Text('里程碑'),
-                            ),
+                            if (showMilestones)
+                              const PopupMenuItem(
+                                value: 'milestone',
+                                child: Text('里程碑'),
+                              ),
                           ],
                           child: Chip(
                             label: Text(
                               showingMilestones
                                   ? '里程碑'
-                                  : _diaryTypeFilter.isEmpty
+                                  : diaryTypeFilter.isEmpty
                                   ? '全部类别'
-                                  : CareRecordType.fromStorage(_diaryTypeFilter)
+                                  : CareRecordType.fromStorage(diaryTypeFilter)
                                         .label,
                             ),
                             avatar: const Icon(
@@ -4622,7 +4761,7 @@ class _ColonyProfileSummary extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
-                if (!themeController.simpleMode &&
+                if (!themeController.simplifiedPresentation &&
                     colony.species?.trim().isNotEmpty == true)
                   TextButton.icon(
                     style: TextButton.styleFrom(
@@ -4715,6 +4854,7 @@ class _ColonyProfileSummary extends StatelessWidget {
 
 class _PopulationTimeline extends StatelessWidget {
   const _PopulationTimeline({
+    super.key,
     required this.colony,
     required this.records,
     required this.includeBrood,
@@ -5514,7 +5654,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
                           : '工蚁总数留空时自动扣减，最低为 0；填写总数则以总数为准，未知时仅记录死亡数',
                     ),
                   ),
-                  if ((int.tryParse(_queenMortality.text.trim()) ?? 0) > 0)
+                  if (themeController.showFeature(
+                        UltraSimpleFeature.memorial,
+                      ) &&
+                      (int.tryParse(_queenMortality.text.trim()) ?? 0) > 0)
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('保存后添加蚁后纪念到英灵殿'),
@@ -5523,7 +5666,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
                       onChanged: (value) =>
                           setState(() => _addQueenMemorial = value ?? false),
                     ),
-                  if ((int.tryParse(_workerMortality.text.trim()) ?? 0) > 0)
+                  if (themeController.showFeature(
+                        UltraSimpleFeature.memorial,
+                      ) &&
+                      (int.tryParse(_workerMortality.text.trim()) ?? 0) > 0)
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('保存后添加工蚁纪念到英灵殿'),
@@ -5582,7 +5728,10 @@ class _RecordFormPageState extends State<RecordFormPage> {
                     alignLabelWithHint: true,
                   ),
                 ),
-                if (widget.record == null) ...[
+                if (widget.record == null &&
+                    themeController.showFeature(
+                      UltraSimpleFeature.milestones,
+                    )) ...[
                   const SizedBox(height: 14),
                   Material(
                     color: Theme.of(context).colorScheme.primaryContainer
@@ -6971,6 +7120,8 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _savingEdition = false;
   bool _savingInterfaceStyle = false;
   bool _savingSimpleMode = false;
+  bool _savingUltraSimpleMode = false;
+  UltraSimpleFeature? _savingUltraFeature;
   bool _savingColonyOverview = false;
   bool _savingColonyDisplayStyle = false;
 
@@ -6985,7 +7136,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _setSimpleMode(bool enabled) async {
-    if (_savingSimpleMode) return;
+    if (_savingSimpleMode || _savingUltraSimpleMode) return;
     setState(() => _savingSimpleMode = true);
     try {
       await themeController.setSimpleMode(enabled);
@@ -6993,6 +7144,33 @@ class _SettingsPageState extends State<SettingsPage> {
       if (mounted) _showError(context, error);
     } finally {
       if (mounted) setState(() => _savingSimpleMode = false);
+    }
+  }
+
+  Future<void> _setUltraSimpleMode(bool enabled) async {
+    if (_savingSimpleMode || _savingUltraSimpleMode) return;
+    setState(() => _savingUltraSimpleMode = true);
+    try {
+      await themeController.setUltraSimpleMode(enabled);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _savingUltraSimpleMode = false);
+    }
+  }
+
+  Future<void> _setUltraFeature(
+    UltraSimpleFeature feature,
+    bool enabled,
+  ) async {
+    if (_savingUltraFeature != null) return;
+    setState(() => _savingUltraFeature = feature);
+    try {
+      await themeController.setUltraFeature(feature, enabled);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _savingUltraFeature = null);
     }
   }
 
@@ -7166,7 +7344,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _categorySection(context, '通用', [
         SettingsCategory.appearance,
         SettingsCategory.online,
-        if (themeController.simpleMode) SettingsCategory.reminders,
+        if (themeController.simplifiedPresentation) SettingsCategory.reminders,
       ]),
       _categorySection(context, '数据与支持', [
         SettingsCategory.data,
@@ -7187,8 +7365,30 @@ class _SettingsPageState extends State<SettingsPage> {
           title: const Text('简化模式'),
           subtitle: const Text('只展示蚁群、日常记录和设置；关闭后恢复全部功能入口，已有数据保留'),
           value: themeController.simpleMode,
-          onChanged: _savingSimpleMode ? null : _setSimpleMode,
+          onChanged: _savingSimpleMode || _savingUltraSimpleMode
+              ? null
+              : _setSimpleMode,
         ),
+        SwitchListTile(
+          secondary: const Icon(Icons.filter_alt_outlined),
+          title: const Text('超极简模式'),
+          subtitle: const Text('以简化模式为基础，自选蚁群模块和物品栏；仅控制入口显示'),
+          value: themeController.ultraSimpleMode,
+          onChanged: _savingSimpleMode || _savingUltraSimpleMode
+              ? null
+              : _setUltraSimpleMode,
+        ),
+        if (themeController.ultraSimpleMode)
+          for (final feature in UltraSimpleFeature.values)
+            SwitchListTile(
+              key: ValueKey('ultra-${feature.name}'),
+              contentPadding: const EdgeInsets.only(left: 32, right: 16),
+              title: Text(feature.label),
+              value: themeController.ultraFeatureEnabled(feature),
+              onChanged: _savingUltraFeature == null
+                  ? (enabled) => _setUltraFeature(feature, enabled)
+                  : null,
+            ),
         if (themeController.interfaceStyle == InterfaceStyle.current)
           SwitchListTile(
             secondary: const Icon(Icons.analytics_outlined),

@@ -233,6 +233,79 @@ void main() {
     themeController.simpleMode = false;
   });
 
+  testWidgets(
+    'ultra simple independently controls detail panels in both layouts',
+    (tester) async {
+      final now = DateTime.now();
+      await AppDatabase.instance.saveColony(
+        Colony(
+          id: 'ultra-detail',
+          name: '极简蚁群',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await themeController.setUltraSimpleMode(true);
+
+      List<Key?> panelKeys() {
+        final list = tester.widget<ListView>(find.byType(ListView).first);
+        return (list.childrenDelegate as SliverChildListDelegate).children
+            .map((child) => child.key)
+            .toList();
+      }
+
+      for (final style in InterfaceStyle.values) {
+        await themeController.setInterfaceStyle(style);
+        for (final feature in [
+          UltraSimpleFeature.careTasks,
+          UltraSimpleFeature.populationAnalysis,
+          UltraSimpleFeature.mortalityAnalysis,
+        ]) {
+          await themeController.setUltraFeature(feature, false);
+        }
+        await tester.pumpWidget(
+          const MaterialApp(home: ColonyDetailPage(colonyId: 'ultra-detail')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          panelKeys(),
+          isNot(contains(const ValueKey('colony-care-tasks'))),
+        );
+        expect(
+          panelKeys(),
+          isNot(contains(const ValueKey('colony-population-analysis'))),
+        );
+        expect(
+          panelKeys(),
+          isNot(contains(const ValueKey('colony-mortality-analysis'))),
+        );
+
+        for (final feature in [
+          UltraSimpleFeature.careTasks,
+          UltraSimpleFeature.populationAnalysis,
+          UltraSimpleFeature.mortalityAnalysis,
+        ]) {
+          await themeController.setUltraFeature(feature, true);
+        }
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(
+          const MaterialApp(home: ColonyDetailPage(colonyId: 'ultra-detail')),
+        );
+        await tester.pumpAndSettle();
+        expect(panelKeys(), contains(const ValueKey('colony-care-tasks')));
+        expect(
+          panelKeys(),
+          contains(const ValueKey('colony-population-analysis')),
+        );
+        expect(
+          panelKeys(),
+          contains(const ValueKey('colony-mortality-analysis')),
+        );
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
   testWidgets('classic home announcement switches to the current interface', (
     tester,
   ) async {
@@ -949,6 +1022,52 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1/4 群'), findsOneWidget);
     expect(find.byKey(const ValueKey('q')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hidden care filter uses the visible colony count', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    for (final id in ['due', 'quiet']) {
+      tables['colonies']!.add(
+        Colony(id: id, name: id, createdAt: now, updatedAt: now).toMap(),
+      );
+    }
+    tables['care_tasks']!.add(
+      CareTask(
+        id: 'due-task',
+        colonyId: 'due',
+        type: CareTaskType.feeding,
+        intervalDays: 3,
+        nextDueOn: DateTime(now.year, now.month, now.day),
+      ).toMap(),
+    );
+    await themeController.setInterfaceStyle(InterfaceStyle.current);
+    await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, '筛选'));
+    await tester.pumpAndSettle();
+    final due = find.widgetWithText(ChoiceChip, '今日有待办');
+    await tester.scrollUntilVisible(
+      due,
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(due);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('查看 1 群'));
+    await tester.pumpAndSettle();
+    expect(find.text('1/2 群'), findsOneWidget);
+
+    await themeController.setUltraSimpleMode(true);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('due')), findsOneWidget);
+    expect(find.byKey(const ValueKey('quiet')), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, '筛选'));
+    await tester.pumpAndSettle();
+    expect(find.text('是否待办'), findsNothing);
+    expect(find.text('查看 2 群'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

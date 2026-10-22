@@ -78,12 +78,14 @@ class ColonyDenseList extends StatefulWidget {
     required this.onDelete,
     required this.onRefresh,
     this.onReorder,
+    this.showCareTasks = true,
   });
   final List<DenseColonyEntry> entries;
   final VoidCallback onAdd, onFilter;
   final ValueChanged<Colony> onOpen, onDuration, onDelete;
   final Future<void> Function() onRefresh;
   final void Function(int, int)? onReorder;
+  final bool showCareTasks;
   @override
   State<ColonyDenseList> createState() => _ColonyDenseListState();
 }
@@ -94,10 +96,18 @@ class _ColonyDenseListState extends State<ColonyDenseList> {
   @override
   Widget build(BuildContext context) {
     final p = _Palette(context);
+    final quickFilters = widget.showCareTasks
+        ? _QuickFilter.values
+        : _QuickFilter.values
+              .where((value) => value != _QuickFilter.feeding)
+              .toList();
+    final activeFilter = !widget.showCareTasks && filter == _QuickFilter.feeding
+        ? _QuickFilter.all
+        : filter;
     final entries = widget.entries
         .where(
           (e) =>
-              filter.matches(e) &&
+              activeFilter.matches(e) &&
               '${e.colony.name} ${e.colony.species ?? ''} ${e.colony.id} ${_labels(e).map((t) => t.$1).join(' ')}'
                   .toLowerCase()
                   .contains(query.toLowerCase().trim()),
@@ -106,7 +116,7 @@ class _ColonyDenseListState extends State<ColonyDenseList> {
     final canReorder =
         widget.onReorder != null &&
         query.trim().isEmpty &&
-        filter == _QuickFilter.all;
+        activeFilter == _QuickFilter.all;
     return ColoredBox(
       color: p.background,
       child: Column(
@@ -178,11 +188,11 @@ class _ColonyDenseListState extends State<ColonyDenseList> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               scrollDirection: Axis.horizontal,
-              itemCount: _QuickFilter.values.length,
+              itemCount: quickFilters.length,
               separatorBuilder: (_, index) => const SizedBox(width: 5),
               itemBuilder: (context, index) {
-                final item = _QuickFilter.values[index];
-                final selected = filter == item;
+                final item = quickFilters[index];
+                final selected = activeFilter == item;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: InkWell(

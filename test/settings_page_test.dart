@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:antkeep/app_preferences.dart';
+import 'package:antkeep/colony_dense_layout.dart';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/milestones_overview_page.dart';
@@ -430,6 +431,117 @@ void main() {
           .value,
       isFalse,
     );
+  });
+
+  testWidgets('ultra simple switches update navigation and colony tabs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, '设置'));
+    await tester.pumpAndSettle();
+    await openCategory(tester, '外观与展示');
+    await tester.tap(find.text('超极简模式'));
+    await tester.pumpAndSettle();
+    expect(themeController.ultraSimpleMode, isTrue);
+    expect(themeController.simpleMode, isFalse);
+    for (final feature in UltraSimpleFeature.values) {
+      expect(find.byKey(ValueKey('ultra-${feature.name}')), findsOneWidget);
+    }
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationDestination), findsNWidgets(3));
+    await openCategory(tester, '外观与展示');
+    final inventory = find.byKey(const ValueKey('ultra-inventory'));
+    await tester.ensureVisible(inventory);
+    await tester.tap(inventory);
+    await tester.pumpAndSettle();
+    expect(themeController.showFeature(UltraSimpleFeature.inventory), isFalse);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationDestination), findsNWidgets(2));
+
+    await themeController.setUltraFeature(UltraSimpleFeature.memorial, true);
+    await themeController.setUltraFeature(UltraSimpleFeature.milestones, true);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, '蚁群'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(TabBar), matching: find.text('英灵殿')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(TabBar), matching: find.text('里程碑')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(of: find.byType(TabBar), matching: find.text('英灵殿')),
+    );
+    await tester.pumpAndSettle();
+    await themeController.setUltraFeature(UltraSimpleFeature.memorial, false);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(TabBar), matching: find.text('英灵殿')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: find.byType(TabBar), matching: find.text('里程碑')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    final restarted = AppPreferences(AppDatabase.instance);
+    await restarted.load();
+    expect(restarted.ultraSimpleMode, isTrue);
+    expect(restarted.showFeature(UltraSimpleFeature.inventory), isFalse);
+    expect(restarted.showFeature(UltraSimpleFeature.memorial), isFalse);
+    expect(restarted.showFeature(UltraSimpleFeature.milestones), isTrue);
+  });
+
+  testWidgets('ultra simple controls remain reachable on a small screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await themeController.setUltraSimpleMode(true);
+    await tester.pumpWidget(app());
+    await openCategory(tester, '外观与展示');
+    for (final feature in UltraSimpleFeature.values) {
+      await tester.scrollUntilVisible(
+        find.byKey(ValueKey('ultra-${feature.name}')),
+        160,
+      );
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('dense milestone rename uses the visible tab identity', (
+    tester,
+  ) async {
+    await themeController.setInterfaceStyle(InterfaceStyle.current);
+    await themeController.setColonyDisplayStyle(ColonyDisplayStyle.dense);
+    await themeController.setUltraSimpleMode(true);
+    await themeController.setUltraFeature(UltraSimpleFeature.milestones, true);
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+
+    final milestone = find.descendant(
+      of: find.byType(ColonyDenseTabs),
+      matching: find.text('里程碑'),
+    );
+    await tester.longPress(milestone);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '成长大事记');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(themeController.colonyTabName(ColonyTab.milestones), '成长大事记');
+    expect(themeController.colonyTabName(ColonyTab.memorial), '英灵殿');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('colony tab names persist, validate, cancel and reset', (
