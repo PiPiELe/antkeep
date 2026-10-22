@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'app_preferences.dart';
 import 'online/online_widgets.dart';
 import 'online/runtime.dart';
+import 'widgets/fading_horizontal_scroll.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key, required this.preferences});
@@ -617,15 +618,15 @@ class ThemeColorPicker extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onChanged,
+    this.scrollable = false,
   });
   final ThemeColor selected;
   final ValueChanged<ThemeColor>? onChanged;
+  final bool scrollable;
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: [
+  Widget build(BuildContext context) {
+    final chips = [
       for (final color in ThemeColor.values)
         ChoiceChip(
           avatar: DecoratedBox(
@@ -642,8 +643,14 @@ class ThemeColorPicker extends StatelessWidget {
           selected: selected == color,
           onSelected: onChanged == null ? null : (_) => onChanged!(color),
         ),
-    ],
-  );
+    ];
+    if (scrollable) {
+      return FadingHorizontalScroll(
+        child: Row(mainAxisSize: MainAxisSize.min, spacing: 8, children: chips),
+      );
+    }
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
 }
 
 class FontColorPicker extends StatelessWidget {
@@ -658,24 +665,41 @@ class FontColorPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final color in FontColor.values)
-          ChoiceChip(
-            avatar: color == FontColor.theme
-                ? const Icon(Icons.format_color_reset, size: 18)
-                : CircleAvatar(backgroundColor: color.resolve(dark)),
-            label: Text(
-              color == FontColor.theme
-                  ? color.label
-                  : '${color.label} ${color.hex(dark)}',
+    ChoiceChip chip(FontColor color) => ChoiceChip(
+      avatar: color == FontColor.theme
+          ? const Icon(Icons.format_color_reset, size: 18)
+          : CircleAvatar(backgroundColor: color.resolve(dark)),
+      label: Text(
+        color == FontColor.theme
+            ? color.label
+            : '${color.label} ${color.hex(dark)}',
+      ),
+      selected: selected == color,
+      onSelected: (_) => onChanged(color),
+    );
+
+    return FadingHorizontalScroll(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var index = 0; index < FontColor.values.length; index += 2)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  chip(FontColor.values[index]),
+                  if (index + 1 < FontColor.values.length) ...[
+                    const SizedBox(height: 8),
+                    chip(FontColor.values[index + 1]),
+                  ],
+                ],
+              ),
             ),
-            selected: selected == color,
-            onSelected: (_) => onChanged(color),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

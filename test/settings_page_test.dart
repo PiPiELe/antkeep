@@ -5,8 +5,10 @@ import 'package:antkeep/colony_dense_layout.dart';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/milestones_overview_page.dart';
+import 'package:antkeep/onboarding.dart';
 import 'package:antkeep/online/app_update.dart';
 import 'package:antkeep/online/runtime.dart';
+import 'package:antkeep/widgets/fading_horizontal_scroll.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -156,6 +158,44 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('appearance colors use one and two horizontal rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await openCategory(tester, '外观与展示');
+
+    final themePicker = find.byType(ThemeColorPicker);
+    final fontPicker = find.byType(FontColorPicker);
+    expect(
+      find.descendant(
+        of: themePicker,
+        matching: find.byType(FadingHorizontalScroll),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: fontPicker,
+        matching: find.byType(FadingHorizontalScroll),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '森林绿')).dy,
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '纯白')).dy,
+    );
+    expect(
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '跟随主题')).dy,
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '石墨灰 #424242')).dy,
+    );
+    expect(
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '跟随主题')).dy,
+      isNot(
+        tester.getTopLeft(find.widgetWithText(ChoiceChip, '墨黑 #000000')).dy,
+      ),
+    );
+  });
+
   testWidgets('appearance setting controls colony overview card', (
     tester,
   ) async {
@@ -185,11 +225,15 @@ void main() {
         await tester.scrollUntilVisible(
           find.text(style.label),
           250,
-          scrollable: find.byType(Scrollable).last,
+          scrollable: find.byType(Scrollable).first,
         );
         expect(find.text(style.label), findsOneWidget);
       }
-      await tester.ensureVisible(find.text('经典'));
+      await Scrollable.ensureVisible(
+        tester.element(find.text('经典')),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('经典'));
       await tester.pumpAndSettle();
       expect(themeController.interfaceStyle, InterfaceStyle.current);
@@ -209,7 +253,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('紧凑'),
       250,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('紧凑'));
@@ -652,7 +696,11 @@ void main() {
       await tester.pumpWidget(app());
       await tester.pumpAndSettle();
       await openCategory(tester, '外观与展示');
-      await tester.tap(find.text('英灵殿菜单名称'));
+      expect(find.text('菜单名称'), findsOneWidget);
+      expect(find.text('英灵殿'), findsNothing);
+      await tester.tap(find.text('菜单名称'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('英灵殿'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField), '纪念馆');
       failWrites = true;

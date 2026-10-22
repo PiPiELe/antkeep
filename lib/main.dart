@@ -7459,14 +7459,23 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ),
-        for (final tab in ColonyTab.values)
-          ListTile(
-            leading: const Icon(Icons.edit_outlined),
-            title: Text('${tab.defaultName}菜单名称'),
-            subtitle: Text(themeController.colonyTabName(tab)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _renameColonyTab(context, tab),
-          ),
+        ExpansionTile(
+          leading: const Icon(Icons.edit_outlined),
+          title: const Text('菜单名称'),
+          subtitle: const Text('自定义蚁群顶部菜单'),
+          children: [
+            for (final tab in ColonyTab.values)
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 56, right: 16),
+                title: Text(themeController.colonyTabName(tab)),
+                subtitle: themeController.colonyTabName(tab) == tab.defaultName
+                    ? null
+                    : Text('默认：${tab.defaultName}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _renameColonyTab(context, tab),
+              ),
+          ],
+        ),
       ]),
       _section(context, '外观与偏好', [
         const ListTile(
@@ -7478,6 +7487,7 @@ class _SettingsPageState extends State<SettingsPage> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: ThemeColorPicker(
             selected: themeController.themeColor,
+            scrollable: true,
             onChanged: (color) async {
               try {
                 await themeController.setThemeColor(color);
