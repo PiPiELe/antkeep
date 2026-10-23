@@ -45,6 +45,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
     }
   }
 
+  int get _totalSteps => _beginner == false ? 3 : 4;
+  String get _progress =>
+      _beginner == null ? '步骤 ${_step + 1}' : '${_step + 1} / $_totalSteps';
+
   void _back() => setState(() {
     _step--;
     _error = null;
@@ -76,7 +80,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: Semantics(
-                  label: '引导进度：第 ${_step + 1} 步，共 4 步',
+                  label: '引导进度：$_progress',
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -88,7 +92,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         vertical: 5,
                       ),
                       child: Text(
-                        '${_step + 1} / 4',
+                        _progress,
                         style: Theme.of(context).textTheme.labelMedium,
                       ),
                     ),
@@ -139,14 +143,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                       ),
                                       const SizedBox(height: 8),
                                       const Text(
-                                        '先决定资料来源。养殖记录、照片和备份始终只保存在你的设备上。',
+                                        '先决定资料来源。养殖记录和照片默认保存在本机，不会自动上传；账号备份存档需另行确认。',
                                         style: TextStyle(height: 1.5),
                                       ),
                                       const SizedBox(height: 24),
                                       _editionCard(
                                         context,
                                         AppEdition.offline,
-                                        '使用内置资料，启动时会联网检查 Android 更新；蚁群、记录和照片始终只保存在本机。',
+                                        '使用内置资料，核心记录离线可用；启动时会联网检查 Android 更新，不上传养殖记录和照片。',
                                         Icons.phonelink_lock_outlined,
                                       ),
                                       const SizedBox(height: 12),

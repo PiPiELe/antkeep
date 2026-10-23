@@ -88,7 +88,7 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
         builder: (context) => AlertDialog(
           title: const Text('确认推送物品数据'),
           content: Text(
-            '将向 B 端推送所选的 ${items.length} 条物品数据，包括名称、分组、用途、购买状态、数量、购入价和日期、有效期信息。成功后今天不能再次推送，并消耗码值一次使用次数。',
+            '将向蚁记管理后台推送所选的 ${items.length} 条物品数据，包括名称、分组、用途、购买状态、数量、购入价和日期、有效期信息。成功后今天不能再次推送，并消耗码值一次使用次数。',
           ),
           actions: [
             TextButton(
@@ -123,7 +123,7 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
           'itemCount': receipt['itemCount'],
         };
         _statusUser = userId;
-        _message = '推送成功，B 端已收到 ${receipt['itemCount']} 条物品数据。';
+        _message = '推送成功，蚁记管理后台已收到 ${receipt['itemCount']} 条物品数据。';
         _pendingOperationId = null;
         _pendingPayload = null;
       });
@@ -139,7 +139,7 @@ class _InventoryPushPageState extends State<InventoryPushPage> {
         _status = status;
         _statusUser = userId;
         _message = status?['pushedToday'] == true
-            ? 'B 端确认今日已收到 ${status!['itemCount']} 条物品数据，今天不能再次推送。'
+            ? '蚁记管理后台确认今日已收到 ${status!['itemCount']} 条物品数据，今天不能再次推送。'
             : _errorText(error);
       });
     } finally {

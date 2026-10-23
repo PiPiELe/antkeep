@@ -4,6 +4,7 @@ Future<T?> _sheet<T>(BuildContext context, Widget child) =>
     showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
+      constraints: const BoxConstraints(maxWidth: 680),
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Theme(data: _inventoryTheme(context), child: child),
@@ -940,6 +941,7 @@ class _RecordEditorState extends State<_RecordEditor> {
                             Expanded(
                               child: TextFormField(
                                 controller: _quantity,
+                                onChanged: (_) => setState(() {}),
                                 textAlign: TextAlign.center,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
@@ -984,13 +986,14 @@ class _RecordEditorState extends State<_RecordEditor> {
                   Expanded(
                     child: Column(
                       children: [
-                        _label('入手成本', hint: '选填'),
+                        _label('本批总成本（元）', hint: '选填'),
                         TextFormField(
                           controller: _cost,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          decoration: const InputDecoration(hintText: '¥ 0.00'),
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(hintText: '未填写'),
                           validator: (value) =>
                               (value?.trim().isEmpty ?? true) ||
                                   parsePurchasePrice(value!) != null
@@ -1002,6 +1005,17 @@ class _RecordEditorState extends State<_RecordEditor> {
                   ),
                 ],
               ),
+              if ((int.tryParse(_quantity.text.trim()) ?? 0) > 0 &&
+                  parsePurchasePrice(_cost.text) != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    '折合单价约 ¥${(parsePurchasePrice(_cost.text)! / 100 / int.parse(_quantity.text.trim())).toStringAsFixed(2)} / 件',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
               if (widget.record != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),

@@ -114,7 +114,9 @@ class _BackupUploadPageState extends State<BackupUploadPage> {
       final refreshed = await _reload();
       if (mounted) {
         setState(
-          () => _message = refreshed ? '备份上传成功。' : '备份上传成功，列表暂时无法刷新，请稍后重试。',
+          () => _message = refreshed
+              ? '账号存档上传成功；目前不能从账号恢复，请保留本地备份。'
+              : '账号存档上传成功，列表暂时无法刷新；请继续保留本地备份。',
         );
       }
     } catch (error) {
@@ -192,7 +194,7 @@ class _BackupUploadPageState extends State<BackupUploadPage> {
   Widget build(BuildContext context) {
     final account = widget.controller.user;
     return Scaffold(
-      appBar: AppBar(title: const Text('备份上传')),
+      appBar: AppBar(title: const Text('账号备份存档')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -214,7 +216,7 @@ class _BackupUploadPageState extends State<BackupUploadPage> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    '仅在你点击确认后上传。单份最多 512 MB；账号最多保存 10 份、合计 2 GB。本机备份不会被删除。',
+                    '仅在你点击确认后上传账号存档。目前不支持从账号下载或恢复，换机请使用本地导出与恢复。单份最多 512 MB；账号最多保存 10 份、合计 2 GB。本机备份不会被删除。',
                   ),
                   const SizedBox(height: 16),
                   FilledButton.icon(

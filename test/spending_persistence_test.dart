@@ -110,8 +110,8 @@ void main() {
       '蚁群',
       '已购物品',
       '蚁群',
-      'DLC 养殖',
-      'DLC 养殖',
+      '活饵养殖',
+      '活饵养殖',
     ]);
     expect(summary.topEntries.last.occurredAt, date);
     await db.update(

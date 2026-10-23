@@ -19,11 +19,10 @@ class _ShowcasePalette {
   ColorScheme get scheme => Theme.of(context).colorScheme;
   bool get dark => scheme.brightness == Brightness.dark;
   Color get foreground => scheme.onSurface;
-  Color get muted => dark ? const Color(0xffadbbce) : scheme.onSurfaceVariant;
-  Color get panel =>
-      dark ? const Color(0xff111a25) : scheme.surfaceContainerLow;
-  Color get inset => dark ? const Color(0xff1b2531) : scheme.surfaceContainer;
-  Color get line => dark ? const Color(0xff304157) : scheme.outlineVariant;
+  Color get muted => scheme.onSurfaceVariant;
+  Color get panel => scheme.surfaceContainerLow;
+  Color get inset => scheme.surfaceContainer;
+  Color get line => scheme.outlineVariant;
 }
 
 const _orange = Color(0xffff823d);

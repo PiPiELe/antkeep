@@ -1753,7 +1753,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
                  '已购物品', purchase_price_cents, NULL, NULL
           FROM inventory_items WHERE purchased = 1 AND purchase_price_cents > 0
           UNION ALL
-          SELECT id, feeder_type, 'DLC 养殖', purchase_price_cents,
+          SELECT id, feeder_type, '活饵养殖', purchase_price_cents,
                  record_type, occurred_at
           FROM feeder_records WHERE purchase_price_cents > 0
           ORDER BY cents DESC, category ASC, id ASC

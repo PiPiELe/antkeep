@@ -16,7 +16,7 @@ class SpendingSummary {
   List<({String label, int cents})> get categories => [
     (label: '蚁群', cents: coloniesCents),
     (label: '已购物品', cents: inventoryCents),
-    (label: 'DLC 养殖', cents: feedersCents),
+    (label: '活饵养殖', cents: feedersCents),
   ];
 }
 

@@ -38,6 +38,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
     setState(() => _busy = true);
     try {
       await action();
+      if (!mounted) return;
       _reload();
     } catch (error) {
       if (mounted) {
@@ -47,6 +48,25 @@ class _CareTasksSectionState extends State<CareTasksSection> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _recordTask(CareTask task) => _change(() async {
+    await widget.onRecord(task);
+  });
+
+  String _taskSummary(CareTask task) {
+    final days = DateUtils.dateOnly(task.nextDueOn)
+        .difference(DateUtils.dateOnly(DateTime.now()))
+        .inDays;
+    final status = days < 0
+        ? '逾期 ${-days} 天'
+        : days == 0
+        ? '今天到期'
+        : '$days 天后';
+    final schedule = days <= 0
+        ? '$status · 每 ${task.intervalDays} 天'
+        : '$status · ${task.nextDueOn.month}月${task.nextDueOn.day}日';
+    return '$schedule${task.lastCompletedOn == null ? '' : '\n上次完成 ${_date(task.lastCompletedOn!)}'}';
   }
 
   Future<void> _edit(List<CareTask> tasks, [CareTask? old]) async {
@@ -96,6 +116,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                       decoration: const InputDecoration(
                         labelText: '每隔几天',
                         helperText: '1～365 天；完成后从完成当天重新计算',
+                        helperMaxLines: 3,
                       ),
                       validator: (value) {
                         final days = int.tryParse(value?.trim() ?? '');
@@ -257,83 +278,85 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                   if (widget.compact)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 5),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: .4),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                      child: Material(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: .4),
+                        borderRadius: BorderRadius.circular(10),
                         child: ListTile(
                           dense: true,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 6,
                           ),
-                          leading: Checkbox(
-                            value: false,
-                            onChanged:
-                                widget.colony.archived ||
-                                    _busy ||
-                                    !task.isDue(DateTime.now())
-                                ? null
-                                : (_) => _change(
-                                    () => AppDatabase.instance.completeCareTask(
-                                      task.id,
-                                    ),
-                                  ),
+                          leading: Icon(
+                            task.isDue(DateTime.now())
+                                ? Icons.event_available_outlined
+                                : Icons.schedule,
                           ),
                           title: Text(task.type.label),
-                          subtitle: Text(
-                            task.isDue(DateTime.now())
-                                ? '今天 · 待完成'
-                                : '${task.nextDueOn.difference(DateUtils.dateOnly(DateTime.now())).inDays} 天后',
-                          ),
+                          subtitle: Text(_taskSummary(task)),
                           onTap: widget.colony.archived || _busy
                               ? null
                               : () => _edit(tasks, task),
-                          trailing: PopupMenuButton<String>(
-                            enabled: !widget.colony.archived && !_busy,
-                            onSelected: (value) async {
-                              if (value == 'edit') _edit(tasks, task);
-                              if (value == 'delete') _delete(task);
-                              if (value == 'postpone') {
-                                _change(
-                                  () => AppDatabase.instance.postponeCareTask(
-                                    task,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (task.isDue(DateTime.now()) &&
+                                  !widget.colony.archived)
+                                FilledButton.tonal(
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _recordTask(task),
+                                  child: const Text('完成并记录'),
+                                ),
+                              PopupMenuButton<String>(
+                                enabled: !widget.colony.archived && !_busy,
+                                onSelected: (value) async {
+                                  if (value == 'reminder') {
+                                    _change(
+                                      () => AppDatabase.instance
+                                          .completeCareTask(task.id),
+                                    );
+                                  }
+                                  if (value == 'edit') _edit(tasks, task);
+                                  if (value == 'delete') _delete(task);
+                                  if (value == 'postpone') {
+                                    _change(
+                                      () => AppDatabase.instance
+                                          .postponeCareTask(task),
+                                    );
+                                  }
+                                  if (value == 'record') {
+                                    await _recordTask(task);
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                  if (task.isDue(DateTime.now())) ...[
+                                    const PopupMenuItem(
+                                      value: 'reminder',
+                                      child: Text('仅完成提醒（不记日记）'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'postpone',
+                                      child: Text('顺延至明天'),
+                                    ),
+                                  ],
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('编辑计划'),
                                   ),
-                                );
-                              }
-                              if (value == 'record' &&
-                                  await widget.onRecord(task) &&
-                                  mounted) {
-                                _reload();
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              if (task.isDue(DateTime.now())) ...[
-                                const PopupMenuItem(
-                                  value: 'record',
-                                  child: Text('完成并记日记'),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('删除计划'),
+                                  ),
+                                ],
+                                child: const Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: Icon(Icons.chevron_right, size: 18),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'postpone',
-                                  child: Text('顺延至明天'),
-                                ),
-                              ],
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('编辑计划'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text('删除计划'),
                               ),
                             ],
-                            child: const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: Icon(Icons.chevron_right, size: 18),
-                            ),
                           ),
                         ),
                       ),
@@ -344,9 +367,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(task.type.label),
-                          subtitle: Text(
-                            '${task.isDue(DateTime.now()) ? '已到期' : '下次'} ${_date(task.nextDueOn)} · 每 ${task.intervalDays} 天',
-                          ),
+                          subtitle: Text(_taskSummary(task)),
                           trailing: widget.colony.archived
                               ? null
                               : PopupMenuButton<String>(
@@ -390,7 +411,7 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                                               .completeCareTask(task.id),
                                         ),
                                   icon: const Icon(Icons.check),
-                                  label: const Text('快速完成'),
+                                  label: const Text('仅完成提醒'),
                                 ),
                                 const SizedBox(width: 4),
                                 FilledButton.tonalIcon(
@@ -404,14 +425,9 @@ class _CareTasksSectionState extends State<CareTasksSection> {
                                   ),
                                   onPressed: _busy
                                       ? null
-                                      : () async {
-                                          if (await widget.onRecord(task) &&
-                                              mounted) {
-                                            _reload();
-                                          }
-                                        },
+                                      : () => _recordTask(task),
                                   icon: const Icon(Icons.check),
-                                  label: const Text('完成并记日记'),
+                                  label: const Text('完成并记录'),
                                 ),
                                 const SizedBox(width: 4),
                                 TextButton(

@@ -131,7 +131,7 @@ class _SpendingAnalysisViewState extends State<SpendingAnalysisView> {
             ),
             const SizedBox(height: 12),
             Text(
-              '统计当前保存的全部购入价：蚁群（含已归档）、已购物品及 DLC 养殖记录，'
+              '统计当前保存的全部购入价：蚁群（含已归档）、已购物品及 活饵养殖记录，'
               '不限日期。未填金额、未购物品不计入；0 元不占扇区。'
               '每笔录入金额计入一次，不再乘数量。百分比四舍五入至 1 位小数。',
               style: Theme.of(context).textTheme.bodySmall,

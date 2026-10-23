@@ -44,7 +44,7 @@ void main() {
                   ),
                   SpendingEntry(
                     name: '杜比亚 · 观察',
-                    category: 'DLC 养殖',
+                    category: '活饵养殖',
                     cents: 1501,
                     occurredAt: DateTime(2026, 9, 1),
                   ),
@@ -60,7 +60,7 @@ void main() {
       expect(find.text('¥200.00'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('¥15.01'), 200);
       expect(find.text('杜比亚 · 观察'), findsOneWidget);
-      expect(find.text('DLC 养殖 · 2026-09-01'), findsOneWidget);
+      expect(find.text('活饵养殖 · 2026-09-01'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -84,19 +84,19 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('analysis-subject')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('DLC · 杜比亚').last);
+      await tester.tap(find.text('活饵 · 杜比亚').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('消费占比'));
       await tester.pumpAndSettle();
       expect(find.text('¥200.01'), findsOneWidget);
       expect(find.text('蚁群\n¥100.01 · 50.0%'), findsOneWidget);
       expect(find.text('已购物品\n¥50.00 · 25.0%'), findsOneWidget);
-      expect(find.text('DLC 养殖\n¥50.00 · 25.0%'), findsOneWidget);
+      expect(find.text('活饵养殖\n¥50.00 · 25.0%'), findsOneWidget);
       expect(find.byKey(const ValueKey('spending-pie')), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('数量分析'));
       await tester.pumpAndSettle();
-      expect(find.text('DLC · 杜比亚'), findsOneWidget);
+      expect(find.text('活饵 · 杜比亚'), findsOneWidget);
       expect(find.textContaining('暂无有效数量记录'), findsOneWidget);
     },
   );

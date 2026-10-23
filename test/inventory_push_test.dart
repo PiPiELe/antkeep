@@ -277,7 +277,7 @@ void main() {
       await tester.tap(find.text('确认推送'));
       await settle(tester);
       expect(h.uploads.length, 1);
-      expect(find.text('推送成功，B 端已收到 1 条物品数据。'), findsOneWidget);
+      expect(find.text('推送成功，蚁记管理后台已收到 1 条物品数据。'), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(find.widgetWithText(FilledButton, '今日已推送'))
@@ -327,7 +327,7 @@ void main() {
       await open(tester, h);
       await chooseAndConfirm(tester);
       expect(h.uploads.length, 1);
-      expect(find.text('B 端确认今日已收到 1 条物品数据，今天不能再次推送。'), findsOneWidget);
+      expect(find.text('蚁记管理后台确认今日已收到 1 条物品数据，今天不能再次推送。'), findsOneWidget);
     },
   );
 
