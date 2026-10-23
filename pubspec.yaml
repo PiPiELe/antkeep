@@ -54,6 +54,7 @@ dependencies:
   package_info_plus: ^10.2.1
   share_plus: ^13.3.0
   geolocator: ^14.1.1
+  geocoding: ^5.0.0
 
 dev_dependencies:
   flutter_test:
@@ -82,6 +83,7 @@ flutter:
   assets:
     - docs/data/antden-species-import.json
     - assets/branding/antkeep-app-icon.png
+    - assets/regions/china_province_cities.json
     - assets/community/
     - assets/competition/ants/
     - assets/memorial/

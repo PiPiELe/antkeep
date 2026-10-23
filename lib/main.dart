@@ -37,6 +37,7 @@ import 'online/inventory_push_page.dart';
 import 'online/backup_upload_page.dart';
 import 'online/feedback_page.dart';
 import 'online/competition_page.dart';
+import 'online/exchange_page.dart';
 import 'online/app_update.dart';
 import 'online/online_widgets.dart';
 import 'online/update_release_notes.dart';
@@ -5020,6 +5021,9 @@ class _RecordCardState extends State<_RecordCard> {
 class DiscoverPage extends StatelessWidget {
   const DiscoverPage({super.key});
 
+  // Pause both exchange entries until the buyer/seller communication flow is settled.
+  static const bool _showExchange = false;
+
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(16),
@@ -5090,6 +5094,49 @@ class DiscoverPage extends StatelessWidget {
           ).push(MaterialPageRoute<void>(builder: (_) => const LotteryPage())),
         ),
       ),
+      if (_showExchange) ...[
+        Card(
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            leading: Icon(
+              Icons.storefront_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            title: const Text('交易所'),
+            subtitle: const Text('查看经审核的售卖信息 · 无站内交易'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ExchangePage(controller: onlineController),
+              ),
+            ),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            leading: Icon(
+              Icons.article_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            title: const Text('我的发布'),
+            subtitle: const Text('发布售卖信息并查看审核结果'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    ExchangePage(controller: onlineController, mine: true),
+              ),
+            ),
+          ),
+        ),
+      ],
       Card(
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(

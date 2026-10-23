@@ -372,6 +372,40 @@ class OnlineController extends ChangeNotifier {
     );
   }
 
+  Future<Map<String, dynamic>> exchangeListings(
+    int page, {
+    String query = '',
+    String category = '',
+  }) async {
+    final uri = Uri(
+      path: '/api/public/exchange-listings',
+      queryParameters: {'page': '$page', 'query': query, 'category': category},
+    );
+    return jsonDecode(await api.request(uri.toString()))
+        as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> myExchangeListings() async => (jsonDecode(
+    await _authenticatedRaw('/api/app/exchange-listings/mine'),
+  ) as List<dynamic>).cast<Map<String, dynamic>>();
+
+  Future<Map<String, dynamic>> submitExchangeListing(
+    Map<String, dynamic> listing,
+  ) => _authenticatedRequest('/api/app/exchange-listings', body: listing);
+
+  Future<void> removeExchangeListing(String id) async {
+    final token = _token;
+    if (!enabled || user == null || token == null) {
+      throw const ApiFailure('请切换在线版并登录后使用。');
+    }
+    await api.request(
+      '/api/app/exchange-listings/$id',
+      method: 'DELETE',
+      token: token,
+    );
+    if (!enabled || _token != token) throw const ApiFailure('账号状态已变化，请重新打开页面。');
+  }
+
   Future<List<Map<String, dynamic>>> competitions() async {
     return (await _competitionRequest('/api/app/competitions') as List<dynamic>)
         .cast<Map<String, dynamic>>();
