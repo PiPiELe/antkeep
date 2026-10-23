@@ -9,6 +9,7 @@ import '../domain/models.dart';
 import '../widgets/photo_source_picker.dart';
 import '../widgets/photo_save_preview.dart';
 import 'competition_poster_page.dart';
+import 'competition_rules.dart';
 import 'online_api.dart';
 import 'online_controller.dart';
 import 'online_widgets.dart';
@@ -444,11 +445,7 @@ class _CompetitionPageState extends State<CompetitionPage> {
     }
   }
 
-  String _mode(String? mode) => switch (mode) {
-    'WORKER_GROWTH' => '工蚁净增长',
-    'TOTAL_GROWTH' => '虫口净增长',
-    _ => '积分制',
-  };
+  String _mode(String? mode) => competitionScoreModeLabel(mode);
   String _state(String? state) => switch (state) {
     'UPCOMING' => '未开始',
     'ENDED' => '已结束',
@@ -590,8 +587,8 @@ class _CompetitionPageState extends State<CompetitionPage> {
       ),
       const SizedBox(height: 8),
       Text(
-        '排名以报名时的数量为基线。${d['scoreMode'] == 'POINTS' ? '纯新后且报名时无卵幼蛹，基础获得 ${d['queenBasePoints'] ?? 10} 分；已有工蚁或卵幼蛹从 0 分开始。亲工工蚁净增每只 ${d['workerGrowthPoints'] ?? 2} 分，卵及亲工幼蛹茧净增每只 ${d['broodGrowthPoints'] ?? (d['broodPointsEnabled'] == false ? 0 : 1)} 分。' : ''}'
-        '已有工蚁的蚁群可报名，须标注合工与亲工数量；合工不计分。',
+        '排名以报名时的数量为基线。${competitionScoreRule(d)}'
+        '已有工蚁的蚁群可报名，须标注合工与亲工数量。',
       ),
       if (d['reviewStatus'] == 'APPROVED' && d['enabled'] == true) ...[
         const SizedBox(height: 12),

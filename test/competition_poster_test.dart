@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:antkeep/online/competition_poster_page.dart';
+import 'package:antkeep/online/competition_rules.dart';
 
 void main() {
   final detail = <String, dynamic>{
@@ -76,8 +77,15 @@ void main() {
       );
 
       testWidgets(
-        'promotion ${style.label} ${size.label} shows schedule and rules with long title',
+        'promotion ${style.label} ${size.label} shows maximum points and long title',
         (tester) async {
+          final posterDetail = {
+            ...detail,
+            'title': '很长的比赛名称' * 10,
+            'queenBasePoints': 100,
+            'workerGrowthPoints': 100,
+            'broodGrowthPoints': 100,
+          };
           tester.view.physicalSize = const Size(1200, 2400);
           tester.view.devicePixelRatio = 3;
           addTearDown(() {
@@ -89,7 +97,7 @@ void main() {
               home: Scaffold(
                 body: Center(
                   child: CompetitionPoster(
-                    detail: {...detail, 'title': '很长的比赛名称' * 10},
+                    detail: posterDetail,
                     kind: CompetitionPosterKind.promotion,
                     size: size,
                     style: style,
@@ -99,9 +107,11 @@ void main() {
             ),
           );
           expect(find.text('2026-10-01 — 长期进行'), findsOneWidget);
+          final rule = find.text(competitionScoreRule(posterDetail));
+          expect(rule, findsOneWidget);
           expect(
-            find.textContaining('新后 5 分 · 新增工蚁 +4 分 · 卵幼蛹 +3 分'),
-            findsOneWidget,
+            tester.renderObject<RenderParagraph>(rule).didExceedMaxLines,
+            isFalse,
           );
           expect(find.textContaining('打开蚁记在线版'), findsOneWidget);
           expect(tester.takeException(), isNull);

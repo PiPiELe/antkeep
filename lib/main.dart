@@ -22,6 +22,7 @@ import 'share_cards_page.dart';
 import 'share_content_page.dart';
 import 'community_groups_page.dart';
 import 'date_display.dart';
+import 'record_date_time.dart';
 import 'husbandry_duration.dart';
 import 'lottery_page.dart';
 import 'inventory_page.dart';
@@ -5488,44 +5489,24 @@ class _RecordFormPageState extends State<RecordFormPage> {
   }
 
   Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-      initialDate: _occurredAt,
+    final date = await pickRecordDate(
+      context,
+      _occurredAt,
+      hasSpecificTime: _hasSpecificTime,
     );
     if (date == null || !mounted) return;
-    setState(
-      () => _occurredAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        _hasSpecificTime ? _occurredAt.hour : 0,
-        _hasSpecificTime ? _occurredAt.minute : 0,
-      ),
-    );
+    setState(() => _occurredAt = date);
   }
 
   Future<bool> _changeSpecificTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _hasSpecificTime
-          ? TimeOfDay.fromDateTime(_occurredAt)
-          : TimeOfDay.now(),
+    final time = await pickRecordTime(
+      context,
+      _occurredAt,
+      hasSpecificTime: _hasSpecificTime,
     );
-    if (time != null && mounted) {
-      setState(
-        () => _occurredAt = DateTime(
-          _occurredAt.year,
-          _occurredAt.month,
-          _occurredAt.day,
-          time.hour,
-          time.minute,
-        ),
-      );
-      return true;
-    }
-    return false;
+    if (time == null || !mounted) return false;
+    setState(() => _occurredAt = time);
+    return true;
   }
 
   Future<void> _setSpecificTime(bool enabled) async {
@@ -6797,44 +6778,24 @@ class _FeederRecordFormPageState extends State<FeederRecordFormPage> {
   }
 
   Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-      initialDate: _occurredAt,
+    final date = await pickRecordDate(
+      context,
+      _occurredAt,
+      hasSpecificTime: _hasSpecificTime,
     );
     if (date == null || !mounted) return;
-    setState(
-      () => _occurredAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        _hasSpecificTime ? _occurredAt.hour : 0,
-        _hasSpecificTime ? _occurredAt.minute : 0,
-      ),
-    );
+    setState(() => _occurredAt = date);
   }
 
   Future<bool> _changeSpecificTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _hasSpecificTime
-          ? TimeOfDay.fromDateTime(_occurredAt)
-          : TimeOfDay.now(),
+    final time = await pickRecordTime(
+      context,
+      _occurredAt,
+      hasSpecificTime: _hasSpecificTime,
     );
-    if (time != null && mounted) {
-      setState(
-        () => _occurredAt = DateTime(
-          _occurredAt.year,
-          _occurredAt.month,
-          _occurredAt.day,
-          time.hour,
-          time.minute,
-        ),
-      );
-      return true;
-    }
-    return false;
+    if (time == null || !mounted) return false;
+    setState(() => _occurredAt = time);
+    return true;
   }
 
   Future<void> _setSpecificTime(bool enabled) async {

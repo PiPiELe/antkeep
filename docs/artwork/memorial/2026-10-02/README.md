@@ -43,7 +43,7 @@
 | `assets/memorial/ant-brood-v2.png` | 幼体-巢毁殇亡版-原图.png |
 | `assets/memorial/ant-brood-v3.png` | 幼体-残蛹版-原图.png |
 
-归档存放在 `docs` 中，未加入 Flutter 资源声明，不额外增加应用包体积。当前采用第三版幼体插画；旧版保留供追溯。
+归档存放在 `docs` 中，未加入 Flutter 资源声明，不额外增加应用包体积。当前采用第三版幼体插画；旧版保留供追溯。Flutter 资源清单仅声明当前使用的图片，`assets/memorial` 中保留的旧幼体插画和骷髅图变体不随应用打包。
 
 `SHA256SUMS.txt` 记录所有原图和提示词的 SHA-256。在此目录运行以下命令可验证文件完整性：
 
