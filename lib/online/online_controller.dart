@@ -411,12 +411,18 @@ class OnlineController extends ChangeNotifier {
         '/api/app/competition-updates/$id/photo',
         token: token,
       );
-      if (!_current(generation) || user?.id != sessionUser.id) {
+      if (!_current(generation) ||
+          _token != token ||
+          user?.id != sessionUser.id) {
         throw const ApiFailure('在线状态已改变，请重新登录后查看比赛。');
       }
       return bytes;
     } catch (error) {
-      if (_current(generation) && error is ApiFailure && error.status == 401) {
+      if (_current(generation) &&
+          _token == token &&
+          user?.id == sessionUser.id &&
+          error is ApiFailure &&
+          error.status == 401) {
         await _failure(error);
         notifyListeners();
       }
@@ -468,12 +474,18 @@ class OnlineController extends ChangeNotifier {
         token: token,
         body: body,
       );
-      if (!_current(generation) || user?.id != sessionUser.id) {
+      if (!_current(generation) ||
+          _token != token ||
+          user?.id != sessionUser.id) {
         throw const ApiFailure('在线状态已改变，请重新登录后查看比赛。');
       }
       return jsonDecode(raw) as Object;
     } catch (error) {
-      if (_current(generation) && error is ApiFailure && error.status == 401) {
+      if (_current(generation) &&
+          _token == token &&
+          user?.id == sessionUser.id &&
+          error is ApiFailure &&
+          error.status == 401) {
         await _failure(error);
         notifyListeners();
       }

@@ -212,7 +212,7 @@ void main() {
       await select('蚁群 · 二号蚁群');
       expect(find.text('工蚁 · 最近 50 只 · 1 个时间点'), findsOneWidget);
       expect(find.text('数据不足'), findsOneWidget);
-      await select('DLC · 杜比亚');
+      await select('活饵 · 杜比亚');
       expect(find.text('总数量 · 最近 5 只 · 1 个时间点'), findsOneWidget);
       await tester.tap(find.text('成体'));
       await tester.pumpAndSettle();
@@ -450,7 +450,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('analysis-subject')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('DLC · 杜比亚').last);
+      await tester.tap(find.text('活饵 · 杜比亚').last);
       await tester.pumpAndSettle();
       expect(find.text('数量读取失败，点击重试'), findsOneWidget);
       fail = false;

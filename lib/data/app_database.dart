@@ -1140,12 +1140,14 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
       if (growth == null || colony.archived) continue;
       var cycle = growth.completedCycles;
       if (growth.dueAt(cycle + 1).isAfter(now)) continue;
-      final records = (await txn.query(
-        'care_records',
-        where: 'colony_id = ?',
-        whereArgs: [colony.id],
-        orderBy: 'occurred_at ASC, created_at ASC, id ASC',
-      )).map(CareRecord.fromMap).toList();
+      final records =
+          (await txn.query(
+              'care_records',
+              where: 'colony_id = ?',
+              whereArgs: [colony.id],
+              orderBy: 'occurred_at ASC, created_at ASC, id ASC',
+            )).map(CareRecord.fromMap).toList()
+            ..sort(CareRecord.comparePopulationOrder);
       final recordIds = records.map((record) => record.id).toSet();
       var population = GrowthPopulation(
         eggs: colony.initialEggCount,
@@ -1371,7 +1373,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
     );
   }
 
-  Future<void> completeCareTask(String id) async => _db
+  Future<void> completeCareTask(String id, {bool markFed = true}) async => _db
       .transaction((transaction) async {
         final tasks = await transaction.query(
           'care_tasks',
@@ -1389,20 +1391,26 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
         if (colonies.isEmpty || colonies.single['archived'] == 1) {
           throw StateError('蚁群已归档或不存在');
         }
-        await _advanceCareTask(transaction, task, DateTime.now());
+        await _advanceCareTask(
+          transaction,
+          task,
+          DateTime.now(),
+          markFed: markFed,
+        );
       })
       .whenComplete(_notifyCareTasks);
 
   static Future<void> _advanceCareTask(
     DatabaseExecutor database,
     CareTask task,
-    DateTime now,
-  ) async {
+    DateTime now, {
+    bool markFed = true,
+  }) async {
     final done = DateTime(now.year, now.month, now.day);
     await database.update(
       'care_tasks',
       {
-        if (task.type.isFeeding) ...{
+        if (task.type.isFeeding && markFed) ...{
           'last_fed_at': now.toIso8601String(),
           'removal_due_at': task.removalHours == null
               ? null
@@ -1880,7 +1888,7 @@ class AppDatabase implements AntKeepRepository, AppSettingsStore {
                  '已购物品', purchase_price_cents, NULL, NULL
           FROM inventory_items WHERE purchased = 1 AND purchase_price_cents > 0
           UNION ALL
-          SELECT id, feeder_type, 'DLC 养殖', purchase_price_cents,
+          SELECT id, feeder_type, '活饵养殖', purchase_price_cents,
                  record_type, occurred_at
           FROM feeder_records WHERE purchase_price_cents > 0
           ORDER BY cents DESC, category ASC, id ASC

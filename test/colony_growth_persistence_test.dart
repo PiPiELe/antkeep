@@ -241,7 +241,69 @@ void main() {
     );
     expect(estimate.workerCount, 16);
     expect(colony.currentWorkerCount(records), 16);
+    await db.applyColonyGrowth(
+      now: start.add(const Duration(days: 2)),
+      colonyId: colony.id,
+    );
+    expect(colony.currentWorkerCount(await db.listRecords(colony.id)), 17);
   });
+
+  test(
+    'same-time manual totals remain ordered during later settlement',
+    () async {
+      final colony = await seed('same-time-total');
+      final due = start.add(const Duration(days: 1));
+      await db.applyColonyGrowth(now: due, colonyId: colony.id);
+      await db.saveRecord(
+        CareRecord(
+          id: 'same-time-total-entry',
+          colonyId: colony.id,
+          type: CareRecordType.observation,
+          occurredAt: due,
+          createdAt: due.add(const Duration(hours: 1)),
+          workerCount: 100,
+        ),
+      );
+      expect(colony.currentWorkerCount(await db.listRecords(colony.id)), 101);
+      await db.applyColonyGrowth(
+        now: start.add(const Duration(days: 2)),
+        colonyId: colony.id,
+      );
+      expect(colony.currentWorkerCount(await db.listRecords(colony.id)), 102);
+    },
+  );
+
+  test(
+    'same-time increments precede estimates without counting a cycle twice',
+    () async {
+      final colony = await seed('same-time-increment');
+      final due = start.add(const Duration(days: 1));
+      await db.applyColonyGrowth(now: due, colonyId: colony.id);
+      await db.saveRecord(
+        CareRecord(
+          id: 'same-time-increment-entry',
+          colonyId: colony.id,
+          type: CareRecordType.observation,
+          occurredAt: due,
+          createdAt: due.add(const Duration(hours: 1)),
+          workerCount: 1,
+        ),
+        incremental: true,
+      );
+      final records = await db.listRecords(colony.id);
+      final manual = records.singleWhere(
+        (r) => r.id == 'same-time-increment-entry',
+      );
+      final estimate = records.singleWhere((r) => r.isAutomaticGrowthEstimate);
+      expect([manual.workerCount, manual.larvaCount], [21, 9]);
+      expect([estimate.workerCount, estimate.larvaCount], [22, 8]);
+      await db.applyColonyGrowth(
+        now: start.add(const Duration(days: 2)),
+        colonyId: colony.id,
+      );
+      expect(colony.currentWorkerCount(await db.listRecords(colony.id)), 23);
+    },
+  );
 
   test('older than 30 days requires explicit global replay', () async {
     final now = DateTime.now();

@@ -133,6 +133,28 @@ void main() {
     expect((await task(CareTaskType.protein)).removalHours, 8);
   });
 
+  test(
+    'completing only a reminder preserves feeding and removal timers',
+    () async {
+      await db.setSplitFeeding('c', true);
+      await configure(CareTaskType.protein, 12);
+      final beforeFeeding = await task(CareTaskType.protein);
+      await db.completeCareTask(beforeFeeding.id, markFed: false);
+      final reminderOnly = await task(CareTaskType.protein);
+      expect(reminderOnly.lastFedAt, isNull);
+      expect(reminderOnly.removalDueAt, isNull);
+      expect(reminderOnly.lastCompletedOn, isNotNull);
+      expect(reminderOnly.nextDueOn.isAfter(beforeFeeding.nextDueOn), isTrue);
+
+      await db.completeCareTask(beforeFeeding.id);
+      final fed = await task(CareTaskType.protein);
+      await db.completeCareTask(beforeFeeding.id, markFed: false);
+      final after = await task(CareTaskType.protein);
+      expect(after.lastFedAt, fed.lastFedAt);
+      expect(after.removalDueAt, fed.removalDueAt);
+    },
+  );
+
   test('backdated classified diary does not rewind a newer timer, mismatch rolls back', () async {
     await db.setSplitFeeding('c', true);
     await configure(CareTaskType.protein, 12);

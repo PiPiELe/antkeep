@@ -93,6 +93,22 @@ enum ColonyTab {
   final String settingKey;
 }
 
+enum UltraSimpleFeature {
+  inventory('物品栏', true),
+  careTasks('养殖待办', false),
+  populationAnalysis('数量分析', false),
+  mortalityAnalysis('死亡分析', false),
+  nestHistory('巢体履历', false),
+  winterCycle('越冬周期', false),
+  memorial('英灵殿', false),
+  milestones('里程碑', false);
+
+  const UltraSimpleFeature(this.label, this.defaultEnabled);
+  final String label;
+  final bool defaultEnabled;
+  String get settingKey => 'ultra_simple_${name}_visible';
+}
+
 enum ColonyDisplayStyle {
   classic('经典', '保留当前蚁群列表样式'),
   showcase('舒展', '大号养殖天数与宽松卡片'),
@@ -121,6 +137,15 @@ class AppPreferences extends ChangeNotifier {
   bool onboardingCompleted = false;
   bool beginner = false;
   bool simpleMode = false;
+  bool ultraSimpleMode = false;
+  bool get simplifiedPresentation => simpleMode || ultraSimpleMode;
+  final _ultraSimpleFeatures = <UltraSimpleFeature, bool>{};
+
+  bool ultraFeatureEnabled(UltraSimpleFeature feature) =>
+      _ultraSimpleFeatures[feature] ?? feature.defaultEnabled;
+
+  bool showFeature(UltraSimpleFeature feature) =>
+      !ultraSimpleMode || ultraFeatureEnabled(feature);
   bool showColonyOverview = true;
   ColonyDisplayStyle colonyDisplayStyle = ColonyDisplayStyle.showcase;
   bool memorialGrouped = true;
@@ -130,6 +155,7 @@ class AppPreferences extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   ThemeColor themeColor = ThemeColor.forest;
   InterfaceStyle interfaceStyle = InterfaceStyle.classic;
+  bool classicUpgradeBannerSeen = false;
   FontColor fontColor = FontColor.theme;
   List<String> _colonyOrder = const [];
   List<String> get colonyOrder => _colonyOrder;
@@ -207,6 +233,15 @@ class AppPreferences extends ChangeNotifier {
     onboardingCompleted = values['onboarding_completed'] == 'true';
     beginner = values['keeper_experience'] == 'beginner';
     simpleMode = values['simple_mode'] == 'true';
+    ultraSimpleMode = values['ultra_simple_mode'] == 'true';
+    if (ultraSimpleMode) simpleMode = false;
+    _ultraSimpleFeatures.clear();
+    for (final feature in UltraSimpleFeature.values) {
+      final value = values[feature.settingKey];
+      if (value == 'true' || value == 'false') {
+        _ultraSimpleFeatures[feature] = value == 'true';
+      }
+    }
     showColonyOverview = values['show_colony_overview'] != 'false';
     colonyDisplayStyle = ColonyDisplayStyle.values.firstWhere(
       (style) => style.name == values['colony_display_style'],
@@ -236,6 +271,7 @@ class AppPreferences extends ChangeNotifier {
       (style) => style.name == values['interface_style'],
       orElse: () => InterfaceStyle.classic,
     );
+    classicUpgradeBannerSeen = values['classic_upgrade_banner_seen'] == 'true';
     fontColor = FontColor.values.firstWhere(
       (color) => color.name == values['font_color'],
       orElse: () => FontColor.theme,
@@ -282,6 +318,12 @@ class AppPreferences extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> markClassicUpgradeBannerSeen() async {
+    if (classicUpgradeBannerSeen) return;
+    await store.writeSettings({'classic_upgrade_banner_seen': 'true'});
+    classicUpgradeBannerSeen = true;
+  }
+
   Future<void> setFontColor(FontColor color) async {
     await store.writeSettings({'font_color': color.name});
     fontColor = color;
@@ -303,8 +345,36 @@ class AppPreferences extends ChangeNotifier {
   }
 
   Future<void> setSimpleMode(bool enabled) async {
-    await store.writeSettings({'simple_mode': enabled.toString()});
+    await store.writeSettings({
+      'simple_mode': enabled.toString(),
+      if (enabled) 'ultra_simple_mode': 'false',
+    });
     simpleMode = enabled;
+    if (enabled) ultraSimpleMode = false;
+    notifyListeners();
+  }
+
+  Future<void> setUltraSimpleMode(bool enabled) async {
+    await store.writeSettings({
+      'ultra_simple_mode': enabled.toString(),
+      if (enabled) ...{
+        'simple_mode': 'false',
+        'interface_style': InterfaceStyle.current.name,
+        'colony_display_style': ColonyDisplayStyle.dense.name,
+      },
+    });
+    ultraSimpleMode = enabled;
+    if (enabled) {
+      simpleMode = false;
+      interfaceStyle = InterfaceStyle.current;
+      colonyDisplayStyle = ColonyDisplayStyle.dense;
+    }
+    notifyListeners();
+  }
+
+  Future<void> setUltraFeature(UltraSimpleFeature feature, bool enabled) async {
+    await store.writeSettings({feature.settingKey: enabled.toString()});
+    _ultraSimpleFeatures[feature] = enabled;
     notifyListeners();
   }
 

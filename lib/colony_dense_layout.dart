@@ -5,6 +5,7 @@ import 'domain/models.dart';
 import 'domain/colony_tag.dart';
 import 'domain/purchase_price.dart';
 import 'widgets/fading_horizontal_scroll.dart';
+import 'widgets/readable_width.dart';
 
 /// Values come from local records; absent observations remain unknown.
 class DenseColonyEntry {
@@ -39,11 +40,11 @@ class _Palette {
   _Palette(BuildContext context) : scheme = Theme.of(context).colorScheme;
   final ColorScheme scheme;
   bool get dark => scheme.brightness == Brightness.dark;
-  Color get background => dark ? scheme.surface : const Color(0xfff5f8fa);
-  Color get card => dark ? scheme.surfaceContainerLow : Colors.white;
-  Color get inset => dark ? scheme.surfaceContainer : const Color(0xfff3f6f9);
+  Color get background => scheme.surface;
+  Color get card => scheme.surfaceContainerLow;
+  Color get inset => scheme.surfaceContainer;
   Color get ink => scheme.onSurface;
-  Color get muted => dark ? scheme.onSurfaceVariant : const Color(0xff738096);
+  Color get muted => scheme.onSurfaceVariant;
   Color get accent => scheme.primary;
 }
 
@@ -78,12 +79,17 @@ class ColonyDenseList extends StatefulWidget {
     required this.onDelete,
     required this.onRefresh,
     this.onReorder,
+    this.showCareTasks = true,
+    this.header,
+    this.emptyActions,
   });
   final List<DenseColonyEntry> entries;
   final VoidCallback onAdd, onFilter;
   final ValueChanged<Colony> onOpen, onDuration, onDelete;
   final Future<void> Function() onRefresh;
   final void Function(int, int)? onReorder;
+  final bool showCareTasks;
+  final Widget? header, emptyActions;
   @override
   State<ColonyDenseList> createState() => _ColonyDenseListState();
 }
@@ -94,137 +100,158 @@ class _ColonyDenseListState extends State<ColonyDenseList> {
   @override
   Widget build(BuildContext context) {
     final p = _Palette(context);
-    final entries = widget.entries
-        .where(
-          (e) =>
-              filter.matches(e) &&
-              '${e.colony.name} ${e.colony.species ?? ''} ${e.colony.id} ${_labels(e).map((t) => t.$1).join(' ')}'
-                  .toLowerCase()
-                  .contains(query.toLowerCase().trim()),
-        )
-        .toList();
+    final quickFilters = widget.showCareTasks
+        ? _QuickFilter.values
+        : _QuickFilter.values
+              .where((value) => value != _QuickFilter.feeding)
+              .toList();
+    final activeFilter = !widget.showCareTasks && filter == _QuickFilter.feeding
+        ? _QuickFilter.all
+        : filter;
+    final entries = widget.header != null
+        ? widget.entries
+        : widget.entries
+              .where(
+                (e) =>
+                    activeFilter.matches(e) &&
+                    '${e.colony.name} ${e.colony.species ?? ''} ${e.colony.id} ${_labels(e).map((t) => t.$1).join(' ')}'
+                        .toLowerCase()
+                        .contains(query.toLowerCase().trim()),
+              )
+              .toList();
     final canReorder =
         widget.onReorder != null &&
         query.trim().isEmpty &&
-        filter == _QuickFilter.all;
+        activeFilter == _QuickFilter.all;
     return ColoredBox(
       color: p.background,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 40,
-                    child: TextField(
-                      onChanged: (value) => setState(() => query = value),
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: '搜索品种 / 编号 / 标签',
-                        hintStyle: TextStyle(color: p.muted, fontSize: 13),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: p.muted,
-                          size: 23,
-                        ),
-                        filled: true,
-                        fillColor: p.inset,
-                        contentPadding: EdgeInsets.zero,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 9),
-                IconButton.filled(
-                  onPressed: widget.onAdd,
-                  tooltip: '新增蚁群',
-                  style: IconButton.styleFrom(
-                    backgroundColor: p.accent,
-                    foregroundColor: p.scheme.onPrimary,
-                    minimumSize: const Size(38, 38),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: EdgeInsets.zero,
-                  ),
-                  icon: const Icon(Icons.add, size: 29),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: widget.onFilter,
-                  tooltip: '筛选',
-                  style: IconButton.styleFrom(
-                    backgroundColor: p.inset,
-                    foregroundColor: p.muted,
-                    minimumSize: const Size(38, 38),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: EdgeInsets.zero,
-                  ),
-                  icon: const Icon(Icons.tune, size: 22),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: 30,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              scrollDirection: Axis.horizontal,
-              itemCount: _QuickFilter.values.length,
-              separatorBuilder: (_, index) => const SizedBox(width: 5),
-              itemBuilder: (context, index) {
-                final item = _QuickFilter.values[index];
-                final selected = filter == item;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => setState(() => filter = item),
-                    child: Container(
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: selected ? p.accent : p.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: selected
-                              ? p.accent
-                              : p.scheme.outlineVariant.withValues(alpha: .3),
-                        ),
-                      ),
-                      child: Text(
-                        '${item.label} (${widget.entries.where(item.matches).length})',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: selected ? p.scheme.onPrimary : p.muted,
+          if (widget.header != null)
+            widget.header!
+          else ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: TextField(
+                        onChanged: (value) => setState(() => query = value),
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: '搜索品种 / 编号 / 标签',
+                          hintStyle: TextStyle(color: p.muted, fontSize: 13),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: p.muted,
+                            size: 23,
+                          ),
+                          filled: true,
+                          fillColor: p.inset,
+                          contentPadding: EdgeInsets.zero,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                );
-              },
+                  const SizedBox(width: 9),
+                  IconButton.filled(
+                    onPressed: widget.onAdd,
+                    tooltip: '新增蚁群',
+                    style: IconButton.styleFrom(
+                      backgroundColor: p.accent,
+                      foregroundColor: p.scheme.onPrimary,
+                      minimumSize: const Size(38, 38),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: EdgeInsets.zero,
+                    ),
+                    icon: const Icon(Icons.add, size: 29),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: widget.onFilter,
+                    tooltip: '筛选',
+                    style: IconButton.styleFrom(
+                      backgroundColor: p.inset,
+                      foregroundColor: p.muted,
+                      minimumSize: const Size(38, 38),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: EdgeInsets.zero,
+                    ),
+                    icon: const Icon(Icons.tune, size: 22),
+                  ),
+                ],
+              ),
             ),
-          ),
+            SizedBox(
+              height: 30,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                scrollDirection: Axis.horizontal,
+                itemCount: quickFilters.length,
+                separatorBuilder: (_, index) => const SizedBox(width: 5),
+                itemBuilder: (context, index) {
+                  final item = quickFilters[index];
+                  final selected = activeFilter == item;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => setState(() => filter = item),
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: selected ? p.accent : p.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? p.accent
+                                : p.scheme.outlineVariant.withValues(alpha: .3),
+                          ),
+                        ),
+                        child: Text(
+                          '${item.label} (${widget.entries.where(item.matches).length})',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: selected ? p.scheme.onPrimary : p.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           Expanded(
             child: RefreshIndicator(
               onRefresh: widget.onRefresh,
               child: ReorderableListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(5, 0, 5, 12),
+                padding: readablePagePadding(
+                  context,
+                  maxWidth: 1040,
+                  minHorizontal: 5,
+                  top: 0,
+                  bottom: 12,
+                ),
                 buildDefaultDragHandles: false,
                 header: entries.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('没有符合条件的蚁群'),
-                      )
+                    ? widget.emptyActions ??
+                          const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Text('没有符合条件的蚁群'),
+                          )
                     : null,
                 itemCount: entries.length,
                 onReorderItem: (a, b) {

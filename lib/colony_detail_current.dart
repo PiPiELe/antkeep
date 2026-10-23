@@ -7,10 +7,11 @@ class _CurrentColonyProfile extends StatelessWidget {
     required this.colony,
     required this.records,
     this.onDurationTap,
+    this.onEdit,
   });
   final Colony colony;
   final List<CareRecord> records;
-  final VoidCallback? onDurationTap;
+  final VoidCallback? onDurationTap, onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +64,7 @@ class _CurrentColonyProfile extends StatelessWidget {
       children: [
         LayoutBuilder(
           builder: (context, box) {
-            final height = (box.maxWidth * .29).clamp(108.0, 180.0);
+            final height = (box.maxWidth * .24).clamp(88.0, 132.0);
             return SizedBox(
               height: height,
               child: Row(
@@ -242,53 +243,73 @@ class _CurrentColonyProfile extends StatelessWidget {
               ),
               (Icons.home_outlined, '饲养环境', colony.nestType ?? '未填写'),
             ];
-            return Wrap(
-              spacing: 6,
-              runSpacing: 6,
+            final missing = entries.any((entry) => entry.$3 == '未填写');
+            entries.removeWhere((entry) => entry.$3 == '未填写');
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final entry in entries)
-                  SizedBox(
-                    width: (box.maxWidth - 6 * (columns - 1)) / columns,
-                    child: _DetailSurface(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 10,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                if (missing && onEdit != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('补充蚁群档案'),
+                    ),
+                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final entry in entries)
+                      SizedBox(
+                        width: (box.maxWidth - 6 * (columns - 1)) / columns,
+                        child: _DetailSurface(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 10,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(entry.$1, size: 15, color: colors.primary),
-                                const SizedBox(width: 4),
-                                Flexible(
+                                Row(
+                                  children: [
+                                    Icon(
+                                      entry.$1,
+                                      size: 15,
+                                      color: colors.primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        entry.$2,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 5),
+                                FadingHorizontalScroll(
                                   child: Text(
-                                    entry.$2,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: colors.onSurfaceVariant,
+                                    entry.$3,
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 5),
-                            FadingHorizontalScroll(
-                              child: Text(
-                                entry.$3,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                  ],
+                ),
               ],
             );
           },
@@ -324,7 +345,9 @@ class _CurrentPanel extends StatelessWidget {
     required this.toggle,
     required this.child,
     required this.details,
+    required this.summary,
   });
+  final String summary;
   final String title;
   final IconData icon;
   final bool expanded;
@@ -349,21 +372,21 @@ class _CurrentPanel extends StatelessWidget {
                   child: Icon(icon, size: 16),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                IconButton(
-                  onPressed: toggle,
-                  tooltip: expanded ? '折叠$title' : '展开$title',
-                  icon: Icon(
-                    expanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        summary,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  visualDensity: VisualDensity.compact,
                 ),
-                const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -378,6 +401,16 @@ class _CurrentPanel extends StatelessWidget {
                   ),
                   child: const Text('详情 ›'),
                 ),
+                IconButton(
+                  onPressed: toggle,
+                  tooltip: expanded ? '折叠$title' : '展开$title',
+                  icon: Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
               ],
             ),
             if (expanded) child,
@@ -390,10 +423,16 @@ class _CurrentPanel extends StatelessWidget {
 
 class _CurrentPopulationPanel extends StatefulWidget {
   const _CurrentPopulationPanel({
+    super.key,
     required this.colony,
     required this.records,
     required this.details,
+    required this.expanded,
+    required this.includeBrood,
+    required this.onExpandedChanged,
   });
+  final bool expanded, includeBrood;
+  final ValueChanged<bool> onExpandedChanged;
   final Colony colony;
   final List<CareRecord> records;
   final Widget details;
@@ -404,13 +443,12 @@ class _CurrentPopulationPanel extends StatefulWidget {
 
 class _CurrentPopulationPanelState extends State<_CurrentPopulationPanel> {
   int days = 30;
-  bool expanded = true;
   @override
   Widget build(BuildContext context) {
     final all = colonyPopulationTotal(
       widget.colony,
       widget.records,
-      includeBrood: true,
+      includeBrood: widget.includeBrood,
     );
     final cutoff = DateTime.now().subtract(Duration(days: days));
     final points = days == 0
@@ -419,9 +457,11 @@ class _CurrentPopulationPanelState extends State<_CurrentPopulationPanel> {
     final population = widget.colony.currentPopulation(widget.records);
     return _CurrentPanel(
       title: '种群数量',
+      summary:
+          '${all.isEmpty ? '暂无已知数量' : '当前已知合计 ${all.last.count}'} · ${widget.includeBrood ? '含卵幼茧' : '成年个体'}',
       icon: Icons.show_chart,
-      expanded: expanded,
-      toggle: () => setState(() => expanded = !expanded),
+      expanded: widget.expanded,
+      toggle: () => widget.onExpandedChanged(!widget.expanded),
       details: widget.details,
       child: Column(
         children: [
@@ -442,7 +482,12 @@ class _CurrentPopulationPanelState extends State<_CurrentPopulationPanel> {
             ),
           ),
           const SizedBox(height: 8),
-          if (points.isEmpty)
+          if (points.length == 1)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('已有 1 个数量时间点；继续记录后查看变化趋势'),
+            )
+          else if (points.isEmpty)
             const Padding(
               padding: EdgeInsets.all(24),
               child: Text('此时间范围暂无数量记录'),
@@ -483,7 +528,10 @@ class _CurrentPopulationPanelState extends State<_CurrentPopulationPanel> {
                 ),
             ],
           ),
-          const Text('曲线为种群总数（含卵幼茧）', style: TextStyle(fontSize: 10)),
+          Text(
+            '曲线为${widget.includeBrood ? '含卵幼茧' : '成年个体'}的已知数量合计；未填写项不按零估算',
+            style: const TextStyle(fontSize: 11),
+          ),
         ],
       ),
     );
@@ -491,7 +539,15 @@ class _CurrentPopulationPanelState extends State<_CurrentPopulationPanel> {
 }
 
 class _CurrentMortalityPanel extends StatefulWidget {
-  const _CurrentMortalityPanel({required this.records, required this.colony});
+  const _CurrentMortalityPanel({
+    super.key,
+    required this.records,
+    required this.colony,
+    required this.expanded,
+    required this.onExpandedChanged,
+  });
+  final bool expanded;
+  final ValueChanged<bool> onExpandedChanged;
   final List<CareRecord> records;
   final Colony colony;
   @override
@@ -499,7 +555,6 @@ class _CurrentMortalityPanel extends StatefulWidget {
 }
 
 class _CurrentMortalityPanelState extends State<_CurrentMortalityPanel> {
-  bool expanded = true;
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -521,9 +576,12 @@ class _CurrentMortalityPanelState extends State<_CurrentMortalityPanel> {
         : '${list.fold<int>(0, (sum, point) => sum + point.count)}';
     return _CurrentPanel(
       title: '死亡分析',
+      summary: points.isEmpty
+          ? '近30天暂无工蚁死亡数量记录'
+          : '近30天记录 ${total(points)} 只工蚁死亡',
       icon: Icons.monitor_heart_outlined,
-      expanded: expanded,
-      toggle: () => setState(() => expanded = !expanded),
+      expanded: widget.expanded,
+      toggle: () => widget.onExpandedChanged(!widget.expanded),
       details: WorkerMortalityAnalysisCard(points: all),
       child: Column(
         children: [
@@ -733,12 +791,14 @@ class _CurrentDiaryCard extends StatelessWidget {
 class _CurrentDiaryFilters extends StatelessWidget {
   const _CurrentDiaryFilters({
     required this.type,
+    required this.showMilestones,
     required this.timeLabel,
     required this.onType,
     required this.onTime,
     required this.onSearch,
   });
   final String type;
+  final bool showMilestones;
   final String timeLabel;
   final ValueChanged<String> onType;
   final ValueChanged<_DiaryTimeFilter> onTime;
@@ -773,7 +833,8 @@ class _CurrentDiaryFilters extends StatelessWidget {
         const PopupMenuItem(value: '', child: Text('全部类别')),
         for (final value in CareRecordType.values)
           PopupMenuItem(value: value.storageValue, child: Text(value.label)),
-        const PopupMenuItem(value: 'milestone', child: Text('里程碑')),
+        if (showMilestones)
+          const PopupMenuItem(value: 'milestone', child: Text('里程碑')),
       ],
       child: label(
         Icons.category_outlined,

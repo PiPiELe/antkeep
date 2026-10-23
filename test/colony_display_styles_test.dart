@@ -96,6 +96,10 @@ void main() {
           expect(find.text('一号群 · 黑金弓背蚁'), findsOneWidget);
           expect(find.text('今日待办'), findsOneWidget);
           expect(find.text('2 项'), findsOneWidget);
+          expect(
+            tester.getCenter(find.text('今日待办')).dy,
+            closeTo(tester.getCenter(find.text('投喂')).dy, 1),
+          );
           expect(find.text('235'), findsWidgets);
           await tester.tap(find.text('一号群 · 黑金弓背蚁'));
           expect(opened, isTrue);
@@ -105,62 +109,59 @@ void main() {
     }
   }
 
-  for (final style in [
-    ColonyDisplayStyle.showcase,
-    ColonyDisplayStyle.compact,
-  ]) {
-    testWidgets('${style.label} toolbar exposes count, sort and filters', (
-      tester,
-    ) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(320, 800);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.view.resetPhysicalSize);
-      ColonyWorkerOrder? selectedOrder;
-      var filtered = false;
-      var batched = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: antKeepTheme(ThemeColor.amber, dark: true),
-          home: Scaffold(
-            body: Padding(
-              padding: const EdgeInsets.all(16),
-              child: ColonyShowcaseToolbar(
-                style: style,
-                visibleCount: 2,
-                totalCount: 4,
-                filterCount: 5,
-                workerOrder: ColonyWorkerOrder.manual,
-                canBatchCare: true,
-                onBatchCare: () => batched = true,
-                onWorkerOrder: (value) => selectedOrder = value,
-                onFilter: () => filtered = true,
-              ),
+  testWidgets('showcase and compact share the single-row toolbar', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    ColonyWorkerOrder? selectedOrder;
+    var filtered = false;
+    var batched = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: antKeepTheme(ThemeColor.amber, dark: true),
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: ColonyShowcaseToolbar(
+              visibleCount: 2,
+              totalCount: 4,
+              filterCount: 5,
+              workerOrder: ColonyWorkerOrder.manual,
+              canBatchCare: true,
+              onBatchCare: () => batched = true,
+              onWorkerOrder: (value) => selectedOrder = value,
+              onFilter: () => filtered = true,
             ),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('2 / 4 群'), findsOneWidget);
-      expect(find.text('默认排序'), findsOneWidget);
-      expect(find.text('筛选 5'), findsOneWidget);
-      if (style == ColonyDisplayStyle.compact) {
-        expect(find.text('卡片右滑删除\n长按滑动排序'), findsOneWidget);
-      }
-      await tester.tap(find.text('筛选 5'));
-      expect(filtered, isTrue);
-      await tester.tap(find.text('默认排序'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('工蚁多到少'));
-      await tester.pumpAndSettle();
-      expect(selectedOrder, ColonyWorkerOrder.descending);
-      if (style == ColonyDisplayStyle.showcase) {
-        await tester.tap(find.text('批量养护记录'));
-        expect(batched, isTrue);
-      }
-      expect(tester.takeException(), isNull);
-    });
-  }
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 4 群'), findsOneWidget);
+    expect(find.text('默认排序'), findsOneWidget);
+    expect(find.text('筛选 5'), findsOneWidget);
+    expect(find.text('卡片右滑删除\n长按滑动排序'), findsOneWidget);
+    expect(find.text('批量养护记录'), findsNothing);
+    expect(
+      tester.getSize(find.byType(ColonyShowcaseToolbar)).height,
+      lessThan(70),
+    );
+    await tester.tap(find.text('筛选 5'));
+    expect(filtered, isTrue);
+    await tester.tap(find.text('默认排序'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('工蚁多到少'));
+    await tester.pumpAndSettle();
+    expect(selectedOrder, ColonyWorkerOrder.descending);
+    await tester.tap(find.text('默认排序'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('批量养护记录'));
+    expect(batched, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('showcase layout follows the selected light color theme', (
     tester,

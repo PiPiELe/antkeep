@@ -75,6 +75,12 @@ void main() {
       ]) {
         await old.execute('ALTER TABLE inventory_items DROP COLUMN $column');
       }
+      await old.execute(
+        'ALTER TABLE care_records DROP COLUMN feeding_category',
+      );
+      for (final column in ['last_fed_at', 'removal_hours', 'removal_due_at']) {
+        await old.execute('ALTER TABLE care_tasks DROP COLUMN $column');
+      }
       await old.setVersion(29);
       await old.close();
 
@@ -93,7 +99,7 @@ void main() {
       expect((await app.listAllMilestones()).length, 2);
       await app.close();
       final upgraded = await openDatabase(path);
-      expect(await upgraded.getVersion(), 34);
+      expect(await upgraded.getVersion(), 35);
       expect(await upgraded.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       await upgraded.close();
     },

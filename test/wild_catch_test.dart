@@ -913,6 +913,10 @@ void main() {
       'place': '旧地点',
       'created_at': now.toIso8601String(),
     });
+    await raw.execute('ALTER TABLE care_records DROP COLUMN feeding_category');
+    for (final column in ['last_fed_at', 'removal_hours', 'removal_due_at']) {
+      await raw.execute('ALTER TABLE care_tasks DROP COLUMN $column');
+    }
     await raw.execute('PRAGMA user_version = 26');
     await raw.close();
 
@@ -966,6 +970,10 @@ void main() {
       'longitude': 121.45678,
       'created_at': now.toIso8601String(),
     });
+    await raw.execute('ALTER TABLE care_records DROP COLUMN feeding_category');
+    for (final column in ['last_fed_at', 'removal_hours', 'removal_due_at']) {
+      await raw.execute('ALTER TABLE care_tasks DROP COLUMN $column');
+    }
     await raw.execute('PRAGMA user_version = 27');
     await raw.close();
 
@@ -1006,6 +1014,10 @@ void main() {
       'place': '旧地点',
       'created_at': now.toIso8601String(),
     });
+    await raw.execute('ALTER TABLE care_records DROP COLUMN feeding_category');
+    for (final column in ['last_fed_at', 'removal_hours', 'removal_due_at']) {
+      await raw.execute('ALTER TABLE care_tasks DROP COLUMN $column');
+    }
     await raw.execute('PRAGMA user_version = 28');
     await raw.close();
 

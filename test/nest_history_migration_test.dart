@@ -38,6 +38,12 @@ void main() {
         await applicationDatabasePath(),
         version: 22,
         onCreate: (db, _) async {
+          await db.execute('CREATE TABLE care_records (id TEXT PRIMARY KEY)');
+          await db.execute('''CREATE TABLE care_tasks (
+            id TEXT PRIMARY KEY, colony_id TEXT NOT NULL, task_type TEXT NOT NULL,
+            interval_days INTEGER NOT NULL, next_due_on TEXT NOT NULL,
+            last_completed_on TEXT
+          )''');
           await db.execute('''CREATE TABLE colonies (
           id TEXT PRIMARY KEY, name TEXT NOT NULL, nest_type TEXT,
           archived INTEGER NOT NULL DEFAULT 0,

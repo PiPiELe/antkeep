@@ -130,6 +130,7 @@ void main() {
       expect(previewBrightness(), Brightness.light);
       await tapText(tester, '下一步');
       await tapText(tester, '我是老玩家');
+      expect(find.text('3 / 3'), findsOneWidget);
       await tapText(tester, '开始使用');
       expect(store.values['theme_mode'], 'system');
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
@@ -156,7 +157,7 @@ void main() {
     await tester.pumpWidget(testApp(preferences));
     expect(find.text('选择使用版本'), findsOneWidget);
     expect(find.text('从第一窝蚁群开始'), findsOneWidget);
-    expect(find.text('1 / 4'), findsOneWidget);
+    expect(find.text('步骤 1'), findsOneWidget);
     expect(find.byType(BackButton), findsNothing);
     expect(
       tester
@@ -212,6 +213,7 @@ void main() {
       await tapText(tester, '琥珀橙');
       await tapText(tester, '下一步');
       await tapText(tester, '我是老玩家');
+      expect(find.text('3 / 3'), findsOneWidget);
       expect(find.byType(BeginnerTips), findsNothing);
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
@@ -229,6 +231,7 @@ void main() {
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
       await tapText(tester, '我是老玩家');
+      expect(find.text('3 / 3'), findsOneWidget);
       await tapText(tester, '开始使用');
       expect(preferences.beginner, isFalse);
       expect(find.text('已进入首页'), findsOneWidget);
@@ -246,6 +249,7 @@ void main() {
     await tapText(tester, '玫瑰粉');
     await tapText(tester, '下一步');
     await tapText(tester, '我是老玩家');
+    expect(find.text('3 / 3'), findsOneWidget);
     await tapText(tester, '开始使用');
     expect(find.text('设置未能保存，请重试。'), findsOneWidget);
     expect(preferences.onboardingCompleted, isFalse);
@@ -266,6 +270,7 @@ void main() {
       await tapText(tester, '下一步');
       await tapText(tester, '下一步');
       await tapText(tester, '我是老玩家');
+      expect(find.text('3 / 3'), findsOneWidget);
       await tapText(tester, '开始使用');
       expect(
         tester

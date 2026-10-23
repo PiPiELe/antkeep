@@ -464,15 +464,16 @@ class _InventoryPageState extends State<InventoryPage> {
                           ],
                         ),
                         const SizedBox(height: 5),
-                        Text(
-                          '用途：${item.purpose ?? '可补充物品用途'}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _palette(context).muted,
+                        if (item.purpose?.trim().isNotEmpty == true)
+                          Text(
+                            '用途：${item.purpose ?? ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _palette(context).muted,
+                            ),
                           ),
-                        ),
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 5,
@@ -739,36 +740,21 @@ class _InventoryFilter {
 ({Color background, Color surface, Color line, Color muted, Color warning})
 _palette(BuildContext context) {
   final scheme = Theme.of(context).colorScheme;
-  return scheme.brightness == Brightness.dark
-      ? (
-          background: const Color(0xff081521),
-          surface: const Color(0xff15283b),
-          line: const Color(0xff304b65),
-          muted: const Color(0xffa0b7cc),
-          warning: const Color(0xffedc48e),
-        )
-      : (
-          background: scheme.surface,
-          surface: scheme.surfaceContainerLow,
-          line: scheme.outlineVariant,
-          muted: scheme.onSurfaceVariant,
-          warning: const Color(0xff946016),
-        );
+  return (
+    background: scheme.surface,
+    surface: scheme.surfaceContainerLow,
+    line: scheme.outlineVariant,
+    muted: scheme.onSurfaceVariant,
+    warning: scheme.brightness == Brightness.dark
+        ? const Color(0xffedc48e)
+        : const Color(0xff946016),
+  );
 }
 
 ThemeData _inventoryTheme(BuildContext context) {
   final theme = Theme.of(context);
   final colors = _palette(context);
-  final scheme = theme.brightness == Brightness.dark
-      ? theme.colorScheme.copyWith(
-          primary: const Color(0xffb7d6fd),
-          onPrimary: const Color(0xff092139),
-          surface: colors.surface,
-          onSurface: const Color(0xfff1f6fd),
-          onSurfaceVariant: colors.muted,
-          outline: colors.line,
-        )
-      : theme.colorScheme;
+  final scheme = theme.colorScheme;
   final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
   return theme.copyWith(
     colorScheme: scheme,

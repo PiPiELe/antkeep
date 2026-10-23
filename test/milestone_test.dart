@@ -262,6 +262,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(home: RecordFormPage(colony: colony)),
       );
+      await settleDatabase(tester);
       expect(find.text('记录类型'), findsOneWidget);
       expect(find.text('保存日记'), findsOneWidget);
       for (final (title, subtitle) in [
@@ -287,6 +288,7 @@ void main() {
     }
     tester.view.physicalSize = const Size(360, 720);
     await tester.pumpWidget(MaterialApp(home: RecordFormPage(colony: colony)));
+    await settleDatabase(tester);
     final timeOption = find.widgetWithText(CheckboxListTile, '记录具体时间');
     final option = find.widgetWithText(CheckboxListTile, '设为里程碑');
     expect(timeOption, findsOneWidget);

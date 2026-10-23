@@ -175,6 +175,10 @@ void main() {
     ]) {
       await old.execute('ALTER TABLE inventory_items DROP COLUMN $column');
     }
+    await old.execute('ALTER TABLE care_records DROP COLUMN feeding_category');
+    for (final column in ['last_fed_at', 'removal_hours', 'removal_due_at']) {
+      await old.execute('ALTER TABLE care_tasks DROP COLUMN $column');
+    }
     await old.execute('PRAGMA user_version = 33');
     await old.close();
     await db.open();

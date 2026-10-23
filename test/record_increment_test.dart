@@ -143,6 +143,33 @@ void main() {
       expect(result.larvaCount, 10);
     },
   );
+  test('same-time increments use only preceding manual records', () {
+    CareRecord atCreated(String id, int workers, DateTime createdAt) =>
+        CareRecord.fromMap({
+          ...record(id: id, workers: workers).toMap(),
+          'created_at': createdAt.toIso8601String(),
+        });
+    final history = [
+      atCreated('earlier', 30, now.subtract(const Duration(hours: 1))),
+      atCreated('later', 100, now.add(const Duration(hours: 1))),
+      CareRecord.fromMap({
+        ...atCreated(
+          'growth:c:1',
+          40,
+          now.subtract(const Duration(hours: 2)),
+        ).toMap(),
+        'note': '自动扩充（估算）',
+      }),
+    ];
+    final result = resolveRecordIncrement(
+      colony(),
+      history,
+      record(workers: 1),
+    );
+    expect(result.workerCount, 31);
+    expect(result.pupaCount, 2);
+  });
+
   test(
     'unknown, insufficient, negative and unsupported quantities are rejected',
     () {

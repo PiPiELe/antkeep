@@ -63,7 +63,7 @@ void main() {
     });
   });
   testWidgets(
-    'split switch, per-food reminder and quick feeding work at 320px with large text',
+    'split switch, per-food reminder and recorded feeding work at 320px with large text',
     (tester) async {
       tester.view.physicalSize = const Size(320, 760);
       tester.view.devicePixelRatio = 1;
@@ -86,7 +86,21 @@ void main() {
                 child: CareTasksSection(
                   colony: colony,
                   compact: true,
-                  onRecord: (_) async => false,
+                  onRecord: (task) async {
+                    final now = DateTime.now();
+                    await db.saveRecord(
+                      CareRecord(
+                        id: 'feeding',
+                        colonyId: colony.id,
+                        type: CareRecordType.feeding,
+                        occurredAt: now,
+                        createdAt: now,
+                        feedingCategory: task.type.storageValue,
+                      ),
+                      completingTaskId: task.id,
+                    );
+                    return true;
+                  },
                 ),
               ),
             ),
@@ -123,7 +137,7 @@ void main() {
         tasks.singleWhere((t) => t.type == CareTaskType.sugar).removalHours,
         isNull,
       );
-      await tester.tap(find.byType(Checkbox).first);
+      await tester.tap(find.text('完成并记录').first);
       await settle(tester);
       await tester.pump(const Duration(seconds: 5));
       await capture(tester, key, 'feeding-split-320');

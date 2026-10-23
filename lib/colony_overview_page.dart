@@ -136,12 +136,14 @@ class ColonyOverviewPage extends StatefulWidget {
   const ColonyOverviewPage({
     super.key,
     required this.active,
+    this.showMemorial = true,
     this.loadStats = loadColonyOverviewStats,
     this.onOpenColonies,
     this.onOpenMemorial,
   });
 
   final bool active;
+  final bool showMemorial;
   final Future<ColonyOverviewStats> Function() loadStats;
   final VoidCallback? onOpenColonies;
   final VoidCallback? onOpenMemorial;
@@ -253,33 +255,36 @@ class _ColonyOverviewPageState extends State<ColonyOverviewPage> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _OverviewSection(
-            title: '英灵殿',
-            subtitle: '归档蚁群数及已保存的蚁后、工蚁纪念数',
-            icon: Icons.account_balance_rounded,
-            illustration: 'assets/overview/memorial.png',
-            onDetails:
-                widget.onOpenMemorial ??
-                () => _showSectionDetails(context, '英灵殿', '归档蚁群数及已保存的蚁后、工蚁纪念数'),
-            metrics: [
-              (
-                label: '蚁群数',
-                value: '${stats.memorialColonies}',
-                kind: _MetricKind.colony,
-              ),
-              (
-                label: '蚁后数',
-                value: '${stats.memorialQueens}',
-                kind: _MetricKind.queen,
-              ),
-              (
-                label: '工蚁数',
-                value: '${stats.memorialWorkers}',
-                kind: _MetricKind.worker,
-              ),
-            ],
-          ),
+          if (widget.showMemorial) ...[
+            const SizedBox(height: 16),
+            _OverviewSection(
+              title: '英灵殿',
+              subtitle: '归档蚁群数及已保存的蚁后、工蚁纪念数',
+              icon: Icons.account_balance_rounded,
+              illustration: 'assets/overview/memorial.png',
+              onDetails:
+                  widget.onOpenMemorial ??
+                  () =>
+                      _showSectionDetails(context, '英灵殿', '归档蚁群数及已保存的蚁后、工蚁纪念数'),
+              metrics: [
+                (
+                  label: '蚁群数',
+                  value: '${stats.memorialColonies}',
+                  kind: _MetricKind.colony,
+                ),
+                (
+                  label: '蚁后数',
+                  value: '${stats.memorialQueens}',
+                  kind: _MetricKind.queen,
+                ),
+                (
+                  label: '工蚁数',
+                  value: '${stats.memorialWorkers}',
+                  kind: _MetricKind.worker,
+                ),
+              ],
+            ),
+          ],
         ],
       );
     },

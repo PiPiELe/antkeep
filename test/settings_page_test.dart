@@ -1,11 +1,14 @@
 import 'dart:io';
 
 import 'package:antkeep/app_preferences.dart';
+import 'package:antkeep/colony_dense_layout.dart';
 import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/main.dart';
 import 'package:antkeep/milestones_overview_page.dart';
+import 'package:antkeep/onboarding.dart';
 import 'package:antkeep/online/app_update.dart';
 import 'package:antkeep/online/runtime.dart';
+import 'package:antkeep/widgets/fading_horizontal_scroll.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -155,6 +158,44 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('appearance colors use one and two horizontal rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await openCategory(tester, '外观与展示');
+
+    final themePicker = find.byType(ThemeColorPicker);
+    final fontPicker = find.byType(FontColorPicker);
+    expect(
+      find.descendant(
+        of: themePicker,
+        matching: find.byType(FadingHorizontalScroll),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: fontPicker,
+        matching: find.byType(FadingHorizontalScroll),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '森林绿')).dy,
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '纯白')).dy,
+    );
+    expect(
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '跟随主题')).dy,
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '石墨灰 #424242')).dy,
+    );
+    expect(
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, '跟随主题')).dy,
+      isNot(
+        tester.getTopLeft(find.widgetWithText(ChoiceChip, '墨黑 #000000')).dy,
+      ),
+    );
+  });
+
   testWidgets('appearance setting controls colony overview card', (
     tester,
   ) async {
@@ -170,33 +211,37 @@ void main() {
     expect(settings['show_colony_overview'], 'false');
   });
 
-  testWidgets('appearance setting switches and saves the interface style', (
-    tester,
-  ) async {
-    expect(themeController.interfaceStyle, InterfaceStyle.classic);
-    await tester.pumpWidget(app());
-    await tester.pumpAndSettle();
-    await openCategory(tester, '外观与展示');
-    await tester.dragUntilVisible(
-      find.text('经典界面'),
-      find.byType(ListView).last,
-      const Offset(0, -250),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('新版界面'));
-    await tester.pumpAndSettle();
-    expect(themeController.interfaceStyle, InterfaceStyle.current);
-    expect(settings['interface_style'], 'current');
-    await tester.tap(find.text('经典界面'));
-    await tester.pumpAndSettle();
-    expect(themeController.interfaceStyle, InterfaceStyle.classic);
-    expect(settings['interface_style'], 'classic');
-    failWrites = true;
-    await tester.tap(find.text('新版界面'));
-    await tester.pumpAndSettle();
-    expect(themeController.interfaceStyle, InterfaceStyle.classic);
-    expect(find.byType(SnackBar), findsOneWidget);
-  });
+  testWidgets(
+    'appearance setting shows four list styles without interface choices',
+    (tester) async {
+      expect(themeController.interfaceStyle, InterfaceStyle.classic);
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      await openCategory(tester, '外观与展示');
+      expect(find.text('界面样式'), findsNothing);
+      expect(find.text('新版界面'), findsNothing);
+      expect(find.text('经典界面'), findsNothing);
+      for (final style in ColonyDisplayStyle.values) {
+        await tester.scrollUntilVisible(
+          find.text(style.label),
+          250,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.text(style.label), findsOneWidget);
+      }
+      await Scrollable.ensureVisible(
+        tester.element(find.text('经典')),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('经典'));
+      await tester.pumpAndSettle();
+      expect(themeController.interfaceStyle, InterfaceStyle.current);
+      expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.classic);
+      expect(settings['interface_style'], 'current');
+      expect(settings['colony_display_style'], 'classic');
+    },
+  );
 
   testWidgets('appearance setting switches and saves colony list style', (
     tester,
@@ -208,7 +253,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('紧凑'),
       250,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('紧凑'));
@@ -241,9 +286,9 @@ void main() {
       expect(find.text('数据推送'), findsNothing);
       await openCategory(tester, '数据管理');
       expect(find.text('数据推送'), findsOneWidget);
-      expect(find.text('备份上传'), findsOneWidget);
+      expect(find.text('账号备份存档'), findsOneWidget);
       expect(find.text('导出备份'), findsOneWidget);
-      await tester.tap(find.text('备份上传'));
+      await tester.tap(find.text('账号备份存档'));
       await tester.pumpAndSettle();
       expect(find.text('请先开启在线模式并登录账号。'), findsOneWidget);
       await tester.pageBack();
@@ -432,6 +477,130 @@ void main() {
     );
   });
 
+  testWidgets('ultra simple switches update navigation and colony tabs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, '设置'));
+    await tester.pumpAndSettle();
+    await openCategory(tester, '外观与展示');
+    await tester.tap(find.text('超极简模式'));
+    await tester.pumpAndSettle();
+    expect(themeController.ultraSimpleMode, isTrue);
+    expect(themeController.simpleMode, isFalse);
+    expect(themeController.interfaceStyle, InterfaceStyle.current);
+    expect(themeController.colonyDisplayStyle, ColonyDisplayStyle.dense);
+    expect(settings['colony_display_style'], 'dense');
+    expect(find.text('自选显示内容'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ultra-inventory')), findsNothing);
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
+    for (final feature in UltraSimpleFeature.values) {
+      expect(find.byKey(ValueKey('ultra-${feature.name}')), findsOneWidget);
+    }
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('ultra-inventory')), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationDestination), findsNWidgets(3));
+    await openCategory(tester, '外观与展示');
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
+    final inventory = find.byKey(const ValueKey('ultra-inventory'));
+    await tester.ensureVisible(inventory);
+    await tester.tap(inventory);
+    await tester.pumpAndSettle();
+    expect(themeController.showFeature(UltraSimpleFeature.inventory), isFalse);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationDestination), findsNWidgets(2));
+
+    await themeController.setUltraFeature(UltraSimpleFeature.memorial, true);
+    await themeController.setUltraFeature(UltraSimpleFeature.milestones, true);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, '蚁群'));
+    await tester.pumpAndSettle();
+    final denseTabs = find.byType(ColonyDenseTabs);
+    expect(
+      find.descendant(of: denseTabs, matching: find.text('英灵殿')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: denseTabs, matching: find.text('里程碑')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(of: denseTabs, matching: find.text('英灵殿')),
+    );
+    await tester.pumpAndSettle();
+    await themeController.setUltraFeature(UltraSimpleFeature.memorial, false);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: denseTabs, matching: find.text('英灵殿')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: denseTabs, matching: find.text('里程碑')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    final restarted = AppPreferences(AppDatabase.instance);
+    await restarted.load();
+    expect(restarted.ultraSimpleMode, isTrue);
+    expect(restarted.showFeature(UltraSimpleFeature.inventory), isFalse);
+    expect(restarted.showFeature(UltraSimpleFeature.memorial), isFalse);
+    expect(restarted.showFeature(UltraSimpleFeature.milestones), isTrue);
+  });
+
+  testWidgets('ultra simple controls remain reachable on a small screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await themeController.setUltraSimpleMode(true);
+    await tester.pumpWidget(app());
+    await openCategory(tester, '外观与展示');
+    await tester.ensureVisible(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自选显示内容'));
+    await tester.pumpAndSettle();
+    for (final feature in UltraSimpleFeature.values) {
+      await tester.ensureVisible(find.byKey(ValueKey('ultra-${feature.name}')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('dense milestone rename uses the visible tab identity', (
+    tester,
+  ) async {
+    await themeController.setUltraSimpleMode(true);
+    await themeController.setUltraFeature(UltraSimpleFeature.milestones, true);
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+    await tester.pumpAndSettle();
+
+    final milestone = find.descendant(
+      of: find.byType(ColonyDenseTabs),
+      matching: find.text('里程碑'),
+    );
+    await tester.longPress(milestone);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '成长大事记');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(themeController.colonyTabName(ColonyTab.milestones), '成长大事记');
+    expect(themeController.colonyTabName(ColonyTab.memorial), '英灵殿');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('colony tab names persist, validate, cancel and reset', (
     tester,
   ) async {
@@ -529,7 +698,11 @@ void main() {
       await tester.pumpWidget(app());
       await tester.pumpAndSettle();
       await openCategory(tester, '外观与展示');
-      await tester.tap(find.text('英灵殿菜单名称'));
+      expect(find.text('菜单名称'), findsOneWidget);
+      expect(find.text('英灵殿'), findsNothing);
+      await tester.tap(find.text('菜单名称'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('英灵殿'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField), '纪念馆');
       failWrites = true;

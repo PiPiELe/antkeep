@@ -132,7 +132,7 @@ void main() {
       Future<void> select(String id) async {
         await tester.tap(find.byKey(const ValueKey('mortality-subject')));
         await tester.pumpAndSettle();
-        expect(find.text('DLC · 杜比亚'), findsNothing);
+        expect(find.text('活饵 · 杜比亚'), findsNothing);
         await tester.tap(find.text('蚁群 · $id').last);
         await tester.pumpAndSettle();
       }
@@ -171,7 +171,7 @@ void main() {
       expect(find.text('已记录死亡量上升'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('analysis-subject')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('DLC · 杜比亚').last);
+      await tester.tap(find.text('活饵 · 杜比亚').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('死亡分析'));
       await tester.pumpAndSettle();

@@ -232,9 +232,9 @@ void main() {
       await tester.enterText(find.widgetWithText(TextFormField, '每隔几天'), '2');
       await tester.tap(find.text('保存'));
       await settleDatabase(tester);
-      expect(find.textContaining('已到期'), findsOneWidget);
+      expect(find.textContaining('今天到期'), findsOneWidget);
 
-      await tester.tap(find.text('完成并记日记'));
+      await tester.tap(find.text('完成并记录'));
       await settleDatabase(tester);
       expect(find.text('投喂结果（可选）'), findsOneWidget);
       await tester.ensureVisible(find.widgetWithText(TextField, '食物'));
@@ -255,8 +255,8 @@ void main() {
             .lastCompletedOn,
         isNotNull,
       );
-      expect(find.text('快速完成'), findsNothing);
-      expect(find.text('完成并记日记'), findsNothing);
+      expect(find.text('仅完成提醒'), findsNothing);
+      expect(find.text('完成并记录'), findsNothing);
       expect(find.text('顺延至明天'), findsNothing);
     },
   );
@@ -300,8 +300,8 @@ void main() {
 
     await tester.tap(find.byTooltip('展开养护待办'));
     await settleDatabase(tester);
-    final quickButton = find.text('快速完成');
-    final journalButton = find.text('完成并记日记');
+    final quickButton = find.text('仅完成提醒');
+    final journalButton = find.text('完成并记录');
     final postponeButton = find.text('顺延至明天');
     expect(
       tester.getTopLeft(quickButton).dy,
@@ -319,10 +319,10 @@ void main() {
       tester.getBottomRight(postponeButton).dx,
       lessThanOrEqualTo(tester.getRect(actionViewport).right),
     );
-    await tester.tap(find.text('快速完成'));
+    await tester.tap(find.text('仅完成提醒'));
     await settleDatabase(tester);
 
-    expect(find.textContaining('下次'), findsOneWidget);
+    expect(find.textContaining('天后'), findsOneWidget);
     expect(quickButton, findsNothing);
     expect(journalButton, findsNothing);
     expect(postponeButton, findsNothing);
@@ -383,18 +383,22 @@ void main() {
     await tester.tap(find.byTooltip('展开养护待办'));
     await settleDatabase(tester);
 
-    expect(find.text('快速完成'), findsOneWidget);
-    expect(find.text('完成并记日记'), findsOneWidget);
+    expect(find.text('仅完成提醒'), findsOneWidget);
+    expect(find.text('完成并记录'), findsOneWidget);
     expect(find.text('顺延至明天'), findsOneWidget);
-    expect(find.textContaining('下次'), findsNWidgets(2));
+    expect(find.textContaining('天后'), findsNWidgets(2));
 
-    await tester.tap(find.text('快速完成'));
+    await tester.tap(find.text('仅完成提醒'));
     await settleDatabase(tester);
 
-    expect(find.text('快速完成'), findsNothing);
-    expect(find.text('完成并记日记'), findsNothing);
+    expect(find.text('仅完成提醒'), findsNothing);
+    expect(find.text('完成并记录'), findsNothing);
     expect(find.text('顺延至明天'), findsNothing);
-    expect(find.textContaining('下次'), findsNWidgets(3));
+    expect(find.textContaining('天后'), findsNWidgets(3));
+    final completed = (await tester.runAsync(() => database.listCareTasks()))!
+        .singleWhere((task) => task.type == CareTaskType.feeding);
+    expect(completed.lastFedAt, isNull);
+    expect(completed.removalDueAt, isNull);
     for (final type in [
       CareTaskType.feeding,
       CareTaskType.watering,

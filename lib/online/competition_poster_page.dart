@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../data/share_image_export.dart';
 import 'online_controller.dart';
+import 'competition_rules.dart';
 
 /// Publicly shareable posters use only the anonymous leaderboard projection.
 enum CompetitionPosterKind { promotion, leaderboard }
@@ -326,18 +327,9 @@ class CompetitionPoster extends StatelessWidget {
   bool get _isChallenge => style == CompetitionPosterStyle.challenge;
   Color get _accent => _isChallenge ? _gold : _mint;
 
-  String get _mode => switch (detail['scoreMode']) {
-    'WORKER_GROWTH' => '工蚁净增长',
-    'TOTAL_GROWTH' => '虫口净增长',
-    _ => '积分制',
-  };
+  String get _mode => competitionScoreModeLabel(detail['scoreMode']);
 
-  String get _rule => switch (detail['scoreMode']) {
-    'WORKER_GROWTH' => '按报名后新增的工蚁数量排名',
-    'TOTAL_GROWTH' => '按报名后工蚁与卵幼蛹的净增长排名',
-    _ =>
-      '新后 ${detail['queenBasePoints'] ?? 10} 分 · 新增工蚁 +${detail['workerGrowthPoints'] ?? 2} 分 · 卵幼蛹 +${detail['broodGrowthPoints'] ?? (detail['broodPointsEnabled'] == false ? 0 : 1)} 分',
-  };
+  String get _rule => competitionScoreRule(detail);
 
   String get _period =>
       '${detail['startDate']} — ${detail['endDate'] ?? '长期进行'}';
@@ -605,7 +597,7 @@ class CompetitionPoster extends StatelessWidget {
         height: size == CompetitionPosterSize.square
             ? 7
             : size == CompetitionPosterSize.portrait
-            ? 10
+            ? 5
             : 16,
       ),
       _info('排名方式', _mode),
@@ -613,7 +605,7 @@ class CompetitionPoster extends StatelessWidget {
         height: size == CompetitionPosterSize.square
             ? 7
             : size == CompetitionPosterSize.portrait
-            ? 10
+            ? 5
             : 16,
       ),
       _info('计分规则', _rule),
@@ -650,15 +642,17 @@ class CompetitionPoster extends StatelessWidget {
       SizedBox(height: size == CompetitionPosterSize.story ? 4 : 1),
       Text(
         value,
-        maxLines: size == CompetitionPosterSize.story
+        maxLines: label == '计分规则'
+            ? 4
+            : size == CompetitionPosterSize.story
             ? 3
-            : label == '计分规则'
-            ? 2
             : 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: _green,
-          fontSize: size == CompetitionPosterSize.story ? 15 : 12,
+          fontSize: size == CompetitionPosterSize.story && label != '计分规则'
+              ? 15
+              : 12,
           height: 1.35,
           fontWeight: FontWeight.w700,
         ),

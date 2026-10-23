@@ -32,6 +32,18 @@ class PopulationPoint {
   final int count;
 }
 
+/// The archive's initial quantity is a seed, never a later observation.
+/// Backdated records must not leave a stale initial point after their result.
+DateTime populationBaselineTime(Colony colony, Iterable<CareRecord> records) {
+  var start = colony.acquiredOn ?? colony.createdAt;
+  for (final record in records) {
+    if (record.colonyId == colony.id && record.occurredAt.isBefore(start)) {
+      start = record.occurredAt;
+    }
+  }
+  return start;
+}
+
 /// Uses observed stage counts and replays worker deaths against the latest total.
 /// Unknown quantities remain unknown. Duplicate instants keep the last result.
 List<PopulationPoint> colonyPopulation(
@@ -53,7 +65,7 @@ List<PopulationPoint> colonyPopulation(
     }
   }
 
-  add(colony.acquiredOn ?? colony.createdAt, initial);
+  add(populationBaselineTime(colony, records), initial);
   final ordered = records.where((r) => r.colonyId == colony.id).toList()
     ..sort(CareRecord.comparePopulationOrder);
   var workers = colony.initialWorkerCount;
@@ -115,7 +127,7 @@ List<PopulationPoint> colonyPopulationTotal(
     }
   }
 
-  add(colony.acquiredOn ?? colony.createdAt);
+  add(populationBaselineTime(colony, records));
   final ordered = records.where((r) => r.colonyId == colony.id).toList()
     ..sort(CareRecord.comparePopulationOrder);
   for (final record in ordered) {

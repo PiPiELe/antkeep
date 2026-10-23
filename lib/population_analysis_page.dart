@@ -123,7 +123,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
   }
 
   String? get _forecastUnavailableReason => _colony == null
-      ? 'DLC 暂无自动扩充规则'
+      ? '活饵暂无自动扩充规则'
       : _colony!.growth == null
       ? '请先在群落自动扩充中设置增长规则'
       : null;
@@ -164,9 +164,8 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('刷新增长规则失败，请重新进入分析页重试')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('刷新增长规则失败，请重新进入分析页重试')));
     }
   }
 
@@ -296,7 +295,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                           : _selectedId,
                       isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: _showMortality ? '选择蚁群' : '选择蚁群或 DLC 养殖',
+                        labelText: _showMortality ? '选择蚁群' : '选择蚁群或 活饵养殖',
                       ),
                       items: [
                         for (final colony in colonies)
@@ -311,7 +310,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                           for (final feeder in FeederType.values)
                             DropdownMenuItem(
                               value: 'feeder:${feeder.name}',
-                              child: Text('DLC · ${feeder.label}'),
+                              child: Text('活饵 · ${feeder.label}'),
                             ),
                       ],
                       onChanged: (id) {
@@ -326,7 +325,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                         child: Text(
                           _showMortality
                               ? '选择一窝蚁群，查看工蚁死亡量变化。'
-                              : '选择一窝蚁群或一种 DLC 养殖，查看数量变化。',
+                              : '选择一窝蚁群或一种 活饵养殖，查看数量变化。',
                           textAlign: TextAlign.center,
                         ),
                       )
@@ -351,8 +350,9 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                           enabled: _showForecast,
                           horizon: _forecastHorizon,
                           unavailableReason: _forecastUnavailableReason,
-                          onConfigureGrowth:
-                              _colony == null ? null : _configureGrowth,
+                          onConfigureGrowth: _colony == null
+                              ? null
+                              : _configureGrowth,
                           onEnabledChanged: (value) => setState(() {
                             _showForecast = value;
                             _reloadPoints();
@@ -409,7 +409,7 @@ class _PopulationAnalysisPageState extends State<PopulationAnalysisPage> {
                         const SizedBox(height: 16),
                         Text(
                           '按所选时间范围内有效记录的实际发生时间展示；空白数量不计入，0 会保留。'
-                          '${_colony != null ? "初始数量以入手日期（未填写时用建档时间）计入。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
+                          '${_colony != null ? "初始数量以入手日期或建档时间计入；有更早补记时前移显示基线。" : "总数量仅使用同时填写幼体和成体的记录，不重复扣除死亡数量。"}'
                           '同一时刻的同一指标使用最后录入的有效值。连线仅连接记录点，不代表期间每天的数量。',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),

@@ -58,6 +58,7 @@ void main() {
         ..remove('worker_mortality_count')
         ..remove('queen_mortality_count')
         ..remove('auto_growth_rule_json')
+        ..remove('feeding_category')
         ..remove('feeding_food')
         ..remove('feeding_amount')
         ..remove('feeding_response')
