@@ -1063,6 +1063,86 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'quick tags only show existing colony badges and filter by them',
+    (tester) async {
+      final now = DateTime.now();
+      for (final (id, workers, price, wild) in [
+        ('queen', 0, 1000000, false),
+        ('large', 3000, null, false),
+        ('unknown', null, null, false),
+      ]) {
+        tables['colonies']!.add(
+          Colony(
+            id: id,
+            name: id,
+            initialWorkerCount: workers,
+            purchasePriceCents: price,
+            wildCatchLinked: wild,
+            createdAt: now,
+            updatedAt: now,
+          ).toMap(),
+        );
+      }
+      // Scale tags follow current workers, rather than the initial count.
+      tables['care_records']!.add(
+        CareRecord(
+          id: 'grown',
+          colonyId: 'large',
+          type: CareRecordType.observation,
+          occurredAt: now,
+          createdAt: now,
+          workerCount: 10000,
+        ).toMap(),
+      );
+      await tester.pumpWidget(const MaterialApp(home: ColoniesPage()));
+      await tester.pumpAndSettle();
+
+      List<String> quickLabels() => tester
+          .widgetList<ChoiceChip>(find.byType(ChoiceChip))
+          .map((chip) => (chip.label as Text).data!)
+          .toList();
+      expect(quickLabels(), [
+        '全部 (3)',
+        '新后群 (1)',
+        '小群 (1)',
+        '超大群 (1)',
+        '万元级 (1)',
+      ]);
+      final priceChip = find.widgetWithText(ChoiceChip, '万元级 (1)');
+      await tester.ensureVisible(priceChip);
+      await tester.tap(priceChip);
+      await tester.pumpAndSettle();
+      expect(find.text('1/3 群'), findsOneWidget);
+      expect(find.text('queen'), findsOneWidget);
+      expect(find.text('large'), findsNothing);
+      expect(find.text('unknown'), findsNothing);
+      expect(quickLabels(), [
+        '全部 (3)',
+        '新后群 (1)',
+        '小群 (1)',
+        '超大群 (1)',
+        '万元级 (1)',
+      ]);
+
+      // Removing the final matching colony also removes its shortcuts.
+      tables['colonies']!.removeWhere((row) => row['id'] == 'queen');
+      await tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh();
+      await tester.pumpAndSettle();
+      expect(quickLabels(), ['全部 (2)', '超大群 (1)']);
+      expect(find.text('2 群'), findsOneWidget);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '全部 (2)'))
+            .selected,
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('quick filters combine and highlight the entry button', (
     tester,
   ) async {

@@ -1038,7 +1038,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
   late Future<List<_ColonyListEntry>> _colonies;
   ColonyListFilter _filter = const ColonyListFilter();
   final _colonySearch = TextEditingController();
-  int _quickFilter = 0;
+  String _quickFilter = '全部';
   bool _editingAcquiredOn = false;
   bool _savingOrder = false;
   bool _dragging = false;
@@ -1171,13 +1171,13 @@ class _ColoniesPageState extends State<ColoniesPage> {
     }
   }
 
-  bool _matchesQuick(_ColonyListEntry entry, int value) => switch (value) {
-    1 => entry.colony.isNewQueenColony,
-    2 => entry.dueTasks.isNotEmpty,
-    3 => entry.colony.isWildCatch,
-    4 => entry.colony.priceTier == ColonyPriceTier.hundreds,
-    5 => entry.colony.priceTier == ColonyPriceTier.thousands,
-    _ => true,
+  bool _matchesQuick(_ColonyListEntry entry, String label) => switch (label) {
+    '全部' => true,
+    '新后群' => entry.colony.isNewQueenColony,
+    '野采' => entry.colony.isWildCatch,
+    _ =>
+      ColonyScale.fromWorkerCount(entry.workers)?.label == label ||
+          entry.colony.priceTier?.label == label,
   };
 
   String _searchableColony(_ColonyListEntry entry) => [
@@ -1194,7 +1194,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
   void _clearList({bool search = false, bool filters = false}) => setState(() {
     if (search) _colonySearch.clear();
     if (filters) {
-      _quickFilter = 0;
+      _quickFilter = '全部';
       _filter = ColonyListFilter(workerOrder: _filter.workerOrder);
     }
   });
@@ -1248,9 +1248,18 @@ class _ColoniesPageState extends State<ColoniesPage> {
     List<_ColonyListEntry> all,
     List<_ColonyListEntry> visible,
     ColonyListFilter filter,
-    int quick,
+    String quick,
   ) {
-    const labels = ['全部', '新后群', '今日有待办', '野采', '百元级', '千元级'];
+    final quickCounts = <String, int>{
+      for (final label in [
+        '全部',
+        '新后群',
+        '野采',
+        for (final scale in ColonyScale.values) scale.label,
+        for (final tier in ColonyPriceTier.values) tier.label,
+      ])
+        label: all.where((entry) => _matchesQuick(entry, label)).length,
+    };
     final conditions = <(String, String)>[
       if (filter.scale != null) ('scale', filter.scale!.label),
       if (filter.species != null) ('species', filter.species!),
@@ -1284,19 +1293,18 @@ class _ColoniesPageState extends State<ColoniesPage> {
           ? () => _batchCare(visible)
           : null,
       onClear:
-          conditions.isNotEmpty || quick != 0 || _colonySearch.text.isNotEmpty
+          conditions.isNotEmpty ||
+              quick != '全部' ||
+              _colonySearch.text.isNotEmpty
           ? () => _clearList(search: true, filters: true)
           : null,
       quickFilters: [
-        for (final i in [0, 1, 3, 4, 5, 2])
-          if (i != 2 ||
-              themeController.showFeature(UltraSimpleFeature.careTasks))
+        for (final item in quickCounts.entries)
+          if (item.key == '全部' || item.value > 0)
             ChoiceChip(
-              label: Text(
-                '${labels[i]} (${all.where((entry) => _matchesQuick(entry, i)).length})',
-              ),
-              selected: quick == i,
-              onSelected: (_) => setState(() => _quickFilter = i),
+              label: Text('${item.key} (${item.value})'),
+              selected: quick == item.key,
+              onSelected: (_) => setState(() => _quickFilter = item.key),
             ),
       ],
       conditions: [
@@ -1771,10 +1779,9 @@ class _ColoniesPageState extends State<ColoniesPage> {
         final style = themeController.colonyDisplayStyle;
         final query = _colonySearch.text.trim().toLowerCase();
         final quick =
-            !themeController.showFeature(UltraSimpleFeature.careTasks) &&
-                _quickFilter == 2
-            ? 0
-            : _quickFilter;
+            allColonies.any((entry) => _matchesQuick(entry, _quickFilter))
+            ? _quickFilter
+            : '全部';
         final colonies = allColonies
             .where(
               (entry) =>
@@ -1851,14 +1858,14 @@ class _ColoniesPageState extends State<ColoniesPage> {
             onDuration: _editAcquiredOn,
             onDelete: _deleteColony,
             onReorder:
-                visibleFilter.activeCount == 0 && query.isEmpty && quick == 0
+                visibleFilter.activeCount == 0 && query.isEmpty && quick == '全部'
                 ? (oldIndex, newIndex) =>
                       _reorderColonies(colonies, oldIndex, newIndex)
                 : null,
           );
         }
         final filterActive = visibleFilter.activeCount > 0;
-        final canReorder = !filterActive && query.isEmpty && quick == 0;
+        final canReorder = !filterActive && query.isEmpty && quick == '全部';
         if (allColonies.isEmpty) {
           return Column(
             children: [
