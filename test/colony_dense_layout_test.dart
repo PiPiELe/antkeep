@@ -261,12 +261,17 @@ void main() {
     expect(selected, 1);
     await tester.longPress(find.text('我的蚁群'));
     expect(renamed, 0);
+    final sharePosition = tester.getCenter(find.byTooltip('分享'));
+    await tester.tap(find.byTooltip('分享'));
+    expect(shared, isTrue);
+    shared = false;
     await tester.tap(find.text('分析'));
     expect(analyzed, isTrue);
     await tester.drag(find.byType(ListView), const Offset(-300, 0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('里程碑'));
     expect(selected, 3);
+    expect(tester.getCenter(find.byTooltip('分享')), sharePosition);
     await tester.tap(find.byTooltip('分享'));
     expect(shared, isTrue);
     expect(tester.takeException(), isNull);

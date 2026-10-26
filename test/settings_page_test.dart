@@ -517,6 +517,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(NavigationDestination), findsNWidgets(2));
 
+    await tester.tap(find.widgetWithText(NavigationDestination, '蚁群'));
+    await tester.pumpAndSettle();
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    for (final width in [320.0, 400.0]) {
+      await tester.binding.setSurfaceSize(Size(width, 800));
+      await tester.pumpAndSettle();
+      final share = tester.getRect(find.byTooltip('分享'));
+      final scan = tester.getRect(find.byTooltip('扫描蚁群标签'));
+      expect(scan.center.dx - share.center.dx, closeTo(48, .01));
+      expect(share.center.dy, closeTo(scan.center.dy, .5));
+      expect(share.width, lessThanOrEqualTo(48));
+      expect(tester.takeException(), isNull);
+    }
+    await tester.binding.setSurfaceSize(null);
+    await tester.pumpAndSettle();
+
     await themeController.setUltraFeature(UltraSimpleFeature.memorial, true);
     await themeController.setUltraFeature(UltraSimpleFeature.milestones, true);
     await tester.pumpAndSettle();

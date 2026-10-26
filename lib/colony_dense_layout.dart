@@ -686,7 +686,7 @@ String _number(double value) => value == value.roundToDouble()
     ? value.toInt().toString()
     : value.toString();
 
-/// Three tabs fit beside Analysis; further existing destinations remain scrollable.
+/// Scrollable destinations with fixed trailing actions.
 class ColonyDenseTabs extends StatefulWidget {
   const ColonyDenseTabs({
     super.key,
@@ -731,95 +731,81 @@ class _ColonyDenseTabsState extends State<ColonyDenseTabs> {
       child: Row(
         children: [
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth / 3;
-                return AnimatedBuilder(
-                  animation: _scroll,
-                  builder: (context, child) {
-                    final left = _scroll.hasClients && _scroll.offset > .5;
-                    final right =
-                        !_scroll.hasClients ||
-                        _scroll.offset < _scroll.position.maxScrollExtent - .5;
-                    return ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: [
-                          left ? Colors.transparent : Colors.white,
-                          Colors.white,
-                          Colors.white,
-                          right ? Colors.transparent : Colors.white,
-                        ],
-                        stops: const [0, .035, .965, 1],
-                      ).createShader(bounds),
-                      child: child,
-                    );
-                  },
-                  child: ListView(
-                    controller: _scroll,
-                    padding: const EdgeInsets.only(left: 16),
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (var i = 0; i < widget.labels.length; i++)
-                        SizedBox(
-                          width: widget.labels[i].runes.length * 16.0 + 48,
-                          child: InkWell(
-                            onTap: () => widget.onSelected(i),
-                            onLongPress: () => widget.onRename(i),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 5,
-                                  ),
-                                  child: Text(
-                                    widget.labels[i],
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: i == widget.selectedIndex
-                                          ? FontWeight.w700
-                                          : FontWeight.w400,
-                                      color: i == widget.selectedIndex
-                                          ? p.ink
-                                          : p.muted,
+            child: AnimatedBuilder(
+              animation: _scroll,
+              builder: (context, child) {
+                final left = _scroll.hasClients && _scroll.offset > .5;
+                final right =
+                    !_scroll.hasClients ||
+                    _scroll.offset < _scroll.position.maxScrollExtent - .5;
+                return ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (bounds) => LinearGradient(
+                    colors: [
+                      left ? Colors.transparent : Colors.white,
+                      Colors.white,
+                      Colors.white,
+                      right ? Colors.transparent : Colors.white,
+                    ],
+                    stops: const [0, .035, .965, 1],
+                  ).createShader(bounds),
+                  child: child,
+                );
+              },
+              child: ListView(
+                controller: _scroll,
+                padding: const EdgeInsets.only(left: 16),
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (var i = 0; i < widget.labels.length; i++)
+                    SizedBox(
+                      width: widget.labels[i].runes.length * 16.0 + 48,
+                      child: InkWell(
+                        onTap: () => widget.onSelected(i),
+                        onLongPress: () => widget.onRename(i),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                              ),
+                              child: Text(
+                                widget.labels[i],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: i == widget.selectedIndex
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                  color: i == widget.selectedIndex
+                                      ? p.ink
+                                      : p.muted,
+                                ),
+                              ),
+                            ),
+                            if (i == widget.selectedIndex)
+                              Positioned(
+                                bottom: 0,
+                                left: 12,
+                                right: 12,
+                                child: Container(
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: p.accent,
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(3),
                                     ),
                                   ),
                                 ),
-                                if (i == widget.selectedIndex)
-                                  Positioned(
-                                    bottom: 0,
-                                    left: 12,
-                                    right: 12,
-                                    child: Container(
-                                      height: 3,
-                                      decoration: BoxDecoration(
-                                        color: p.accent,
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                              top: Radius.circular(3),
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      SizedBox(
-                        width: width,
-                        child: IconButton(
-                          tooltip: '分享',
-                          onPressed: widget.onShare,
-                          icon: const Icon(Icons.ios_share_outlined),
+                              ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                );
-              },
+                    ),
+                ],
+              ),
             ),
           ),
           if (widget.onAnalysis != null)
@@ -835,6 +821,14 @@ class _ColonyDenseTabsState extends State<ColonyDenseTabs> {
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
               ),
             ),
+          SizedBox(
+            width: 48,
+            child: IconButton(
+              tooltip: '分享',
+              onPressed: widget.onShare,
+              icon: const Icon(Icons.ios_share_outlined),
+            ),
+          ),
         ],
       ),
     );
