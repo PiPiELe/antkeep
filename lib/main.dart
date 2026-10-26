@@ -1288,7 +1288,7 @@ class _ColoniesPageState extends State<ColoniesPage> {
           ? () => _clearList(search: true, filters: true)
           : null,
       quickFilters: [
-        for (var i = 0; i < labels.length; i++)
+        for (final i in [0, 1, 3, 4, 5, 2])
           if (i != 2 ||
               themeController.showFeature(UltraSimpleFeature.careTasks))
             ChoiceChip(
