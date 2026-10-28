@@ -19,9 +19,32 @@ import 'package:antkeep/domain/memorial.dart';
 import 'package:antkeep/domain/milestone.dart';
 import 'package:antkeep/domain/wild_catch_record.dart';
 import 'package:archive/archive.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+class _RecordingFilePicker extends FilePickerPlatform {
+  Uint8List? savedBytes;
+  var saves = 0;
+
+  @override
+  Future<Uri?> saveFile({
+    required String fileName,
+    required Uint8List bytes,
+    required String mimeType,
+    String? dialogTitle,
+    String? initialDirectory,
+    Function(FilePickerStatus)? onFileSaving,
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async {
+    saves++;
+    savedBytes = bytes;
+    return Uri.file('/export/$fileName');
+  }
+}
 
 Map<String, dynamic> fixture() {
   final time = DateTime(2026, 9, 29);
@@ -176,6 +199,68 @@ void main() {
     );
     await service.undoLastRestore();
     expect(await media.readImage('image.jpg'), [1, 2, 3]);
+  });
+
+  test('standalone Excel export rejects data exceeding restore limits before saving', () async {
+    final originalPicker = FilePickerPlatform.instance;
+    final picker = _RecordingFilePicker();
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = originalPicker);
+    final data = await database.snapshot();
+    final record = (data['care_records'] as List).single as Map;
+    data['care_records'] = [
+      for (var index = 0; index < 110; index++)
+        {...record, 'id': 'long-$index', 'note': '蚁' * 32767},
+    ];
+    // Highly compressible notes fit the workbook limit but exceed the manifest
+    // produced by Excel restore. The source workbook is otherwise valid.
+    final workbook = ExcelExport.encode(data);
+    expect(workbook.length, lessThan(ExcelExport.maxInputBytes));
+    expect(ExcelExport.decode(workbook)['care_records'], hasLength(110));
+    await database.replaceAll(data);
+    final before = await database.snapshot();
+
+    await expectLater(
+      service.exportExcel(),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('备份清单超过 8 MB'),
+        ),
+      ),
+    );
+
+    expect(picker.saves, 0);
+    expect(await database.snapshot(), before);
+    expect(await RollbackStore.instance.read(), previousRollback);
+  });
+
+  test('standalone Excel export remains restorable and preserves source photo references', () async {
+    final originalPicker = FilePickerPlatform.instance;
+    final picker = _RecordingFilePicker();
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = originalPicker);
+    final before = await database.snapshot();
+
+    expect(await service.exportExcel(), isTrue);
+
+    expect(picker.saves, 1);
+    expect(await database.snapshot(), before);
+    final exported = ExcelExport.decode(
+      picker.savedBytes!,
+      keepPhotoPaths: true,
+    );
+    expect(
+      (exported['care_records'] as List).single['photos_json'],
+      '["image.jpg"]',
+    );
+    final file = File('${directory.path}/exported-records.xlsx');
+    await file.writeAsBytes(picker.savedBytes!);
+    await service.restoreExcelFile(file);
+    final restored = await database.snapshot();
+    expect((restored['care_records'] as List).single['id'], 'r');
+    expect((restored['care_records'] as List).single['photos_json'], '[]');
   });
 
   test(

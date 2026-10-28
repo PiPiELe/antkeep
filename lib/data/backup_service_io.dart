@@ -100,10 +100,7 @@ class BackupService with BackupLogic {
 
   Future<bool> exportExcel() => _operation((temporary) async {
     final data = await database.snapshot();
-    final bytes = await Isolate.run(() => ExcelExport.encode(data));
-    if (bytes.length > ExcelExport.maxInputBytes) {
-      throw const FormatException('Excel 文件超过 32 MB 的导入上限。');
-    }
+    final bytes = await Isolate.run(() => BackupLogic.encodeExcelBackup(data));
     final file = File(path.join(temporary.path, 'export.xlsx'));
     await file.writeAsBytes(bytes);
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');

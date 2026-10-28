@@ -185,10 +185,22 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _refreshDailyCareReminder() async {
+    if (!themeController.careRemindersEnabled) return;
+    try {
+      await LocalNotificationService.instance.refreshDailyCareReminder(
+        themeController.careReminderMinuteOfDay,
+      );
+    } catch (_) {
+      // A notification integration failure must not block local features.
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkAutoBackup();
+      unawaited(_refreshDailyCareReminder());
       unawaited(FoodReminderCoordinator.instance.refresh());
     }
   }

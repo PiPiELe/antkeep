@@ -5,8 +5,12 @@ import 'package:antkeep/data/app_database.dart';
 import 'package:antkeep/data/backup_service.dart';
 import 'package:antkeep/data/local_media_store.dart';
 import 'package:antkeep/domain/models.dart';
+import 'package:antkeep/online/online_api.dart';
+import 'package:antkeep/online/online_controller.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -17,6 +21,23 @@ class TestPaths extends PathProviderPlatform {
   final String directory;
   @override
   Future<String?> getApplicationSupportPath() async => directory;
+}
+
+class _FailingUploadClient extends http.BaseClient {
+  _FailingUploadClient(this.delegate);
+  final http.Client delegate;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    if (request.url.path == '/api/app/backups') {
+      request.finalize();
+      return Future.error(http.ClientException('connection refused'));
+    }
+    return delegate.send(request);
+  }
+
+  @override
+  void close() => delegate.close();
 }
 
 void main() {
@@ -60,7 +81,7 @@ void main() {
       );
       final before = await db.snapshot();
       final store = fixtures.MemoryOnlineStore();
-      final online = fixtures.controller(store, (request) async {
+      final client = MockClient((request) async {
         switch (request.url.path) {
           case '/api/public/content':
             return fixtures.response(fixtures.snapshot(), 200);
@@ -80,10 +101,27 @@ void main() {
             fail('Unexpected endpoint ${request.url.path}');
         }
       });
+      final online = OnlineController(
+        store: store,
+        api: OnlineApi(
+          baseUrl: 'https://api.example.test',
+          clientFactory: () => _FailingUploadClient(client),
+        ),
+      );
       await online.setEnabled(true);
       await online.login('account-one', 'secret-password');
       final backup = BackupService(db, media);
-      final bytes = await backup.createBackupBytes();
+      await expectLater(
+        backup
+            .uploadBackup(online, expectedUserId: 'account-one')
+            .timeout(const Duration(seconds: 2)),
+        throwsA(isA<ApiFailure>()),
+      );
+      // A failed online upload must release the global backup operation lock,
+      // so exporting local data still works without restarting the application.
+      final bytes = await backup.createBackupBytes().timeout(
+        const Duration(seconds: 2),
+      );
       final zip = ZipDecoder().decodeBytes(bytes);
       expect(zip.files.map((f) => f.name).toSet(), {
         'manifest.json',

@@ -181,32 +181,27 @@ class OnlineApi {
     final client = _clientFactory();
     _active.add(client);
     try {
-      final request = http.StreamedRequest(
+      final request = http.MultipartRequest(
         'POST',
         base.resolve('/api/app/backups'),
       );
-      final boundary =
-          'antkeep-backup-${DateTime.now().microsecondsSinceEpoch}';
-      final prefix = utf8.encode(
-        '--$boundary\r\n'
-        'Content-Disposition: form-data; name="file"; filename="antkeep-backup.zip"\r\n'
-        'Content-Type: application/zip\r\n\r\n',
+      request.files.add(
+        http.MultipartFile(
+          'file',
+          bytes,
+          length,
+          filename: 'antkeep-backup.zip',
+          contentType: http.MediaType('application', 'zip'),
+        ),
       );
-      final suffix = utf8.encode('\r\n--$boundary--\r\n');
       request.headers['Authorization'] = 'Bearer $token';
-      request.headers['Content-Type'] =
-          'multipart/form-data; boundary=$boundary';
       request.headers['Accept'] = 'application/json';
-      request.contentLength = prefix.length + length + suffix.length;
       request.followRedirects = false;
-      final responseFuture = client.send(request);
-      request.sink.add(prefix);
-      await request.sink.addStream(bytes).timeout(const Duration(minutes: 10));
-      request.sink.add(suffix);
-      await request.sink.close();
-      final response = await responseFuture.timeout(
-        const Duration(minutes: 10),
-      );
+      // Let the client consume the file stream after connecting. Await send
+      // immediately so an early connection failure always releases the upload.
+      final response = await client
+          .send(request)
+          .timeout(const Duration(minutes: 10));
       final result = <int>[];
       await for (final chunk in response.stream.timeout(
         const Duration(seconds: 30),

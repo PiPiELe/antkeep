@@ -34,7 +34,7 @@ class BackupService with BackupLogic {
   }
 
   Future<bool> exportExcel() async {
-    final bytes = ExcelExport.encode(await _database.snapshot());
+    final bytes = BackupLogic.encodeExcelBackup(await _database.snapshot());
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
     return await FilePicker.saveFile(
           dialogTitle: '导出蚁记 Excel',

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'app_database.dart';
 import 'backup_archive.dart';
 import 'backup_data.dart';
+import 'excel_export.dart';
 
 enum BackupRestoreMode { incremental, overwrite }
 
@@ -15,7 +16,21 @@ const backupVersion = 15;
 mixin BackupLogic {
   AppDatabase get database;
 
-  Uint8List encodeManifest(Map<String, dynamic> data, Iterable<String> media) {
+  static Uint8List encodeExcelBackup(Map<String, dynamic> data) {
+    final bytes = ExcelExport.encode(data);
+    // Excel restore clears photo references and wraps the decoded rows in a
+    // manifest. Check that exact state before offering the workbook to save.
+    _encodeManifest(ExcelExport.decode(bytes), const []);
+    return bytes;
+  }
+
+  Uint8List encodeManifest(Map<String, dynamic> data, Iterable<String> media) =>
+      _encodeManifest(data, media);
+
+  static Uint8List _encodeManifest(
+    Map<String, dynamic> data,
+    Iterable<String> media,
+  ) {
     BackupData.validate(data);
     if (data['nest_entries'] is! List ||
         data['winter_cycles'] is! List ||

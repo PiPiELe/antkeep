@@ -10,6 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final pending = <int, Map<String, Object?>>{};
   final calls = <MethodCall>[];
+  var timezone = 'Asia/Shanghai';
   final now = DateTime.now();
   final colonies = [
     Colony(id: 'c', name: '小黑', createdAt: now, updatedAt: now),
@@ -31,7 +32,7 @@ void main() {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(
       const MethodChannel('flutter_timezone'),
-      (_) async => 'Asia/Shanghai',
+      (_) async => timezone,
     );
     messenger.setMockMethodCallHandler(
       const MethodChannel('dexterous.com/flutter/local_notifications'),
@@ -60,6 +61,7 @@ void main() {
   setUp(() {
     pending.clear();
     calls.clear();
+    timezone = 'Asia/Shanghai';
   });
   tearDownAll(() {
     debugDefaultTargetPlatformOverride = null;
@@ -127,4 +129,35 @@ void main() {
       isTrue,
     );
   });
+
+  test(
+    'timezone changes retain existing food alarms and new alarm instants',
+    () async {
+      final service = LocalNotificationService.instance;
+      final first = task('p', 8);
+      await service.syncFoodReminders([first], colonies);
+      final originalPending = Map<int, Map<String, Object?>>.from(pending);
+      calls.clear();
+      timezone = 'America/New_York';
+
+      await service.syncFoodReminders([first], colonies);
+      expect(pending, originalPending);
+      expect(calls.where((c) => c.method == 'zonedSchedule'), isEmpty);
+      expect(calls.where((c) => c.method == 'cancel'), isEmpty);
+
+      final second = task('s', 12);
+      await service.syncFoodReminders([first, second], colonies);
+      final added = calls.singleWhere((c) => c.method == 'zonedSchedule');
+      final arguments = added.arguments as Map;
+      final scheduled = DateTime.parse(
+        arguments['scheduledDateTimeISO8601'] as String,
+      );
+      expect(
+        scheduled.millisecondsSinceEpoch ~/ 1000,
+        second.removalDueAt!.millisecondsSinceEpoch ~/ 1000,
+      );
+      expect(second.removalDueAt, now.add(const Duration(hours: 12)));
+      expect(pending.values, containsAll(originalPending.values));
+    },
+  );
 }

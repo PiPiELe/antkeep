@@ -1,6 +1,7 @@
 import '../domain/care_task.dart';
 import '../domain/models.dart';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -14,12 +15,26 @@ class LocalNotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   var _initialized = false;
+  String? _dailyReminderTimezone;
+  int? _dailyReminderMinuteOfDay;
+  Future<void> _dailyReminderOperation = Future<void>.value();
+
+  Future<T> _queueDailyReminderOperation<T>(Future<T> Function() action) {
+    final result = _dailyReminderOperation.then((_) => action());
+    // A failed operation must not block a later cancellation or retry.
+    _dailyReminderOperation = result.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+    return result;
+  }
 
   Future<void> initialize() async {
-    if (_initialized) return;
-    tz.initializeTimeZones();
+    if (!_initialized) tz.initializeTimeZones();
+    // The device can change zones while this process stays alive.
     final timezone = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timezone.identifier));
+    if (_initialized) return;
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -32,6 +47,18 @@ class LocalNotificationService {
     );
     _initialized = true;
   }
+
+  /// Reconcile the local daily time after returning from the background.
+  /// Keep an unchanged alarm, and never request permissions on resume.
+  Future<void> refreshDailyCareReminder(int minuteOfDay) =>
+      _queueDailyReminderOperation(() async {
+        await initialize();
+        if (_dailyReminderTimezone == tz.local.name &&
+            _dailyReminderMinuteOfDay == minuteOfDay) {
+          return;
+        }
+        await _scheduleDailyCareReminder(minuteOfDay);
+      });
 
   Future<bool> requestPermission() async {
     await initialize();
@@ -56,6 +83,16 @@ class LocalNotificationService {
   Future<bool> scheduleDailyCareReminder(
     int minuteOfDay, {
     bool requestExactPermission = false,
+  }) => _queueDailyReminderOperation(
+    () => _scheduleDailyCareReminder(
+      minuteOfDay,
+      requestExactPermission: requestExactPermission,
+    ),
+  );
+
+  Future<bool> _scheduleDailyCareReminder(
+    int minuteOfDay, {
+    bool requestExactPermission = false,
   }) async {
     if (minuteOfDay < 0 || minuteOfDay >= 24 * 60) {
       throw ArgumentError.value(minuteOfDay, 'minuteOfDay');
@@ -71,11 +108,15 @@ class LocalNotificationService {
     if (!exact && requestExactPermission) {
       exact = await android.requestExactAlarmsPermission() ?? false;
     }
+    final location = tz.local;
     await _plugin.zonedSchedule(
       id: _dailyCareReminderId,
       title: '蚁记养护提醒',
       body: '打开蚁记，看看今天的蚁群和待办吧。',
-      scheduledDate: _nextOccurrence(minuteOfDay),
+      scheduledDate: nextDailyCareReminderTime(
+        minuteOfDay,
+        now: tz.TZDateTime.now(location),
+      ),
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           'care_reminders',
@@ -91,13 +132,18 @@ class LocalNotificationService {
           : AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
+    _dailyReminderTimezone = location.name;
+    _dailyReminderMinuteOfDay = minuteOfDay;
     return exact;
   }
 
-  Future<void> cancelDailyCareReminder() async {
-    await initialize();
-    await _plugin.cancel(id: _dailyCareReminderId);
-  }
+  Future<void> cancelDailyCareReminder() =>
+      _queueDailyReminderOperation(() async {
+        await initialize();
+        await _plugin.cancel(id: _dailyCareReminderId);
+        _dailyReminderTimezone = null;
+        _dailyReminderMinuteOfDay = null;
+      });
 
   /// Leave room below iOS's pending-notification limit for the daily reminder.
   /// Past deadlines stay visible in the task list without replaying notifications.
@@ -171,10 +217,13 @@ class LocalNotificationService {
     }
   }
 
-  tz.TZDateTime _nextOccurrence(int minuteOfDay) {
-    final now = tz.TZDateTime.now(tz.local);
+  @visibleForTesting
+  static tz.TZDateTime nextDailyCareReminderTime(
+    int minuteOfDay, {
+    required tz.TZDateTime now,
+  }) {
     var scheduled = tz.TZDateTime(
-      tz.local,
+      now.location,
       now.year,
       now.month,
       now.day,
@@ -182,7 +231,14 @@ class LocalNotificationService {
       minuteOfDay % 60,
     );
     if (!scheduled.isAfter(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+      scheduled = tz.TZDateTime(
+        now.location,
+        now.year,
+        now.month,
+        now.day + 1,
+        minuteOfDay ~/ 60,
+        minuteOfDay % 60,
+      );
     }
     return scheduled;
   }
