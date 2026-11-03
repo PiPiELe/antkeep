@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'deepseek_key_guide.dart';
 import 'online_api.dart';
 import 'online_controller.dart';
 
@@ -204,6 +205,8 @@ class _DeepSeekKeyPageState extends State<DeepSeekKeyPage> {
                 '密钥仅保存在本设备的安全存储中，按当前账号和在线服务地址区分。识别时会随所选照片发送到蚁记在线服务，由服务端转交 DeepSeek；服务端不保存个人密钥。未配置个人密钥时使用服务端密钥（如已提供）。',
               ),
               const SizedBox(height: 20),
+              const DeepSeekKeyGuide(),
+              const SizedBox(height: 16),
               TextField(
                 controller: _input,
                 enabled: !_busy && !_sessionChanged,
