@@ -14,7 +14,10 @@ the issue instead of guessing a base.
 - Android and iOS first; no WeChat mini program in the initial implementation.
 - All husbandry records and media remain local. Optional online mode may use
   accounts, daily check-ins and published public content. No husbandry upload,
-  cloud synchronization, analytics or ads, except explicitly selected inventory
+  cloud synchronization, behavioral tracking or ads. Opt-in anonymous usage counts
+  may send a random installation ID independently of online/offline edition; no
+  account, device metadata or husbandry data is included. Other uploads are limited
+  to explicitly selected inventory
   snapshots submitted by a signed-in user. Local features never require login.
 - Read docs/PREPARATION.md before implementation.
 - Prefer the smallest sufficient implementation; preserve unrelated work.

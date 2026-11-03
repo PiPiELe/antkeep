@@ -1,4 +1,5 @@
 import 'busy_task.dart';
+import 'usage/usage_settings.dart';
 import 'data/food_reminder_coordinator.dart';
 
 import 'dart:async';
@@ -130,6 +131,7 @@ Future<void> main() async {
       LocalMediaStore.instance,
     );
     await themeController.load();
+    await usageController.load();
     AppEdition? appliedEdition;
     void updateOnlineMode() {
       final edition = themeController.edition;
@@ -176,6 +178,8 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
   bool _updateDialogOpen = false;
   bool _announcementDialogOpen = false;
   bool _backupPromptOpen = false;
+  bool _usagePromptOpen = false;
+  bool _usagePromptAttempted = false;
   Timer? _backupTimer;
 
   void _checkAutoBackup() {
@@ -198,6 +202,7 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    usageController.setForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       _checkAutoBackup();
       unawaited(_refreshDailyCareReminder());
@@ -209,6 +214,7 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
     if (!themeController.onboardingCompleted ||
         !autoBackupController.needsConsent ||
         _backupPromptOpen ||
+        _usagePromptOpen ||
         _updateDialogOpen ||
         _announcementDialogOpen) {
       return;
@@ -226,6 +232,7 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
       _checkAutoBackup();
       _showUpdatePromptIfNeeded();
       _showAnnouncementIfNeeded();
+      _showUsageConsentIfNeeded();
     });
   }
 
@@ -240,10 +247,15 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
     );
     _checkAutoBackup();
     FoodReminderCoordinator.instance.start();
+    usageController.setForeground(
+      WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+    );
   }
 
   @override
   void dispose() {
+    usageController.setForeground(false);
     FoodReminderCoordinator.instance.stop();
     onlineController.removeListener(_showAnnouncementIfNeeded);
     WidgetsBinding.instance.removeObserver(this);
@@ -259,6 +271,7 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
         _backupPromptOpen ||
         autoBackupController.needsConsent ||
         _announcementDialogOpen ||
+        _usagePromptOpen ||
         announcement == null) {
       return;
     }
@@ -292,11 +305,16 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
       }
       _announcementDialogOpen = false;
       _showAnnouncementIfNeeded();
+      _showUsageConsentIfNeeded();
     });
   }
 
   void _showUpdatePromptIfNeeded() {
-    if (_backupPromptOpen || autoBackupController.needsConsent) return;
+    if (_backupPromptOpen ||
+        _usagePromptOpen ||
+        autoBackupController.needsConsent) {
+      return;
+    }
     final policy = appUpdateController.policy;
     if (policy == null) {
       return;
@@ -404,6 +422,40 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
       );
       _updateDialogOpen = false;
       _showAnnouncementIfNeeded();
+      _showUsageConsentIfNeeded();
+    });
+  }
+
+  void _showUsageConsentIfNeeded() {
+    if (!mounted ||
+        !themeController.onboardingCompleted ||
+        !usageController.needsConsent ||
+        _usagePromptAttempted ||
+        _usagePromptOpen ||
+        _backupPromptOpen ||
+        autoBackupController.needsConsent ||
+        _updateDialogOpen ||
+        _announcementDialogOpen) {
+      return;
+    }
+    _usagePromptOpen = true;
+    _usagePromptAttempted = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final dialogContext = _navigatorKey.currentContext;
+      if (!mounted || dialogContext == null) {
+        _usagePromptOpen = false;
+        return;
+      }
+      try {
+        await showUsageConsent(dialogContext, usageController);
+      } catch (_) {
+        // A consent preference failure cannot block local use.
+      } finally {
+        _usagePromptOpen = false;
+      }
+      if (!mounted) return;
+      _showUpdatePromptIfNeeded();
+      _showAnnouncementIfNeeded();
     });
   }
 
@@ -414,6 +466,7 @@ class _AntKeepAppState extends State<AntKeepApp> with WidgetsBindingObserver {
       _showBackupConsentIfNeeded();
       _showUpdatePromptIfNeeded();
       _showAnnouncementIfNeeded();
+      _showUsageConsentIfNeeded();
       return MaterialApp(
         navigatorKey: _navigatorKey,
         title: '蚁记',
@@ -8281,6 +8334,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ],
     SettingsCategory.help => [
       _section(context, '帮助与反馈', [
+        UsageSettings(controller: usageController),
         OnlineSettings(
           controller: onlineController,
           section: OnlineSettingsSection.help,
