@@ -80,6 +80,17 @@ void main() {
       await tester.enterText(find.byType(TextField), 'personal-secret');
       await tester.tap(find.text('保存密钥'));
       await tester.pumpAndSettle();
+      expect(find.text('确认使用个人密钥？'), findsOneWidget);
+      expect(find.textContaining('可能产生由你承担的费用'), findsOneWidget);
+      expect(keys.values, isEmpty);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(keys.values, isEmpty);
+
+      await tester.tap(find.text('保存密钥'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('已了解风险，保存密钥'));
+      await tester.pumpAndSettle();
       expect(keys.values['alice'], 'personal-secret');
       expect(find.text('当前账号已配置个人密钥'), findsOneWidget);
       expect(find.text('personal-secret'), findsNothing);
