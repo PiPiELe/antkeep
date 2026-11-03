@@ -14,6 +14,7 @@ void main() {
         expect(request.method, 'POST');
         expect(request.url.path, '/api/app/ai/colony-count');
         expect(request.headers['authorization'], 'Bearer session-token');
+        expect(request.headers['x-deepseek-api-key'], 'personal-secret');
         expect(
           request.headers['content-type'],
           contains('multipart/form-data'),
@@ -26,6 +27,7 @@ void main() {
     final result = await api.estimateColonyCount(
       Uint8List.fromList([0xff, 0xd8, 0xff, 0x01]),
       token: 'session-token',
+      personalKey: 'personal-secret',
     );
     expect(jsonDecode(result)['workerCount'], 5);
   });
@@ -37,5 +39,17 @@ void main() {
       api.estimateColonyCount(Uint8List(5 * 1024 * 1024 + 1), token: 'token'),
       throwsA(isA<ApiFailure>()),
     );
+  });
+
+  test('omits personal key header when using the server key', () async {
+    final api = OnlineApi(
+      baseUrl: 'https://example.com',
+      clientFactory: () => MockClient((request) async {
+        expect(request.headers.containsKey('x-deepseek-api-key'), false);
+        return http.Response('{"workerCount":1,"uncertain":false}', 200);
+      }),
+    );
+    api.setEnabled(true);
+    await api.estimateColonyCount(Uint8List.fromList([0xff]), token: 'session');
   });
 }

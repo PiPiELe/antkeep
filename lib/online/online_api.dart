@@ -159,6 +159,7 @@ class OnlineApi {
   Future<String> estimateColonyCount(
     Uint8List photo, {
     required String token,
+    String? personalKey,
   }) async {
     if (!enabled) throw const ApiFailure('当前为离线模式。');
     final base = Uri.tryParse(baseUrl);
@@ -192,6 +193,9 @@ class OnlineApi {
         ),
       );
       request.headers['Authorization'] = 'Bearer $token';
+      if (personalKey != null) {
+        request.headers['X-DeepSeek-Api-Key'] = personalKey;
+      }
       request.headers['Accept'] = 'application/json';
       request.followRedirects = false;
       final response = await client

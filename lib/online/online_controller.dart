@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../domain/models.dart';
 import 'content.dart';
+import 'deepseek_key_store.dart';
 import 'online_api.dart';
 import 'online_store.dart';
 
@@ -27,9 +28,14 @@ class CheckinSummary {
 }
 
 class OnlineController extends ChangeNotifier {
-  OnlineController({required this.api, required this.store});
+  OnlineController({
+    required this.api,
+    required this.store,
+    DeepSeekKeyStore? deepSeekKeys,
+  }) : deepSeekKeys = deepSeekKeys ?? PlatformDeepSeekKeyStore(api.baseUrl);
   final OnlineApi api;
   final OnlineStore store;
+  final DeepSeekKeyStore deepSeekKeys;
   bool enabled = false, busy = false, refreshing = false;
   OnlineUser? user;
   CheckinSummary? checkin;
@@ -319,13 +325,74 @@ class OnlineController extends ChangeNotifier {
     if (!enabled || token == null || userId == null) {
       throw const ApiFailure('请切换在线版并登录后使用 AI 识别。');
     }
+    final personalKey = await _readDeepSeekKey(userId);
+    if (!enabled || _token != token || user?.id != userId) {
+      throw const ApiFailure('账号状态已变化，请重新登录后识别。');
+    }
     final result = jsonDecode(
-      await api.estimateColonyCount(photo, token: token),
+      await api.estimateColonyCount(
+        photo,
+        token: token,
+        personalKey: personalKey,
+      ),
     ) as Map<String, dynamic>;
     if (!enabled || _token != token || user?.id != userId) {
       throw const ApiFailure('账号状态已变化，请重新登录后识别。');
     }
     return result;
+  }
+
+  Future<String?> _readDeepSeekKey(String userId) async {
+    try {
+      return await deepSeekKeys.read(userId);
+    } catch (_) {
+      throw const ApiFailure('无法读取本机 DeepSeek 密钥，请在设置中检查后重试。');
+    }
+  }
+
+  String _personalKeyUser() {
+    final userId = enabled ? user?.id : null;
+    if (userId == null) throw const ApiFailure('请先切换在线版并登录。');
+    return userId;
+  }
+
+  Future<bool> hasPersonalDeepSeekKey() async {
+    final userId = _personalKeyUser();
+    final key = await _readDeepSeekKey(userId);
+    if (_personalKeyUser() != userId) {
+      throw const ApiFailure('账号状态已变化，请重新打开设置。');
+    }
+    return key != null && key.isNotEmpty;
+  }
+
+  Future<void> savePersonalDeepSeekKey(String value) async {
+    final userId = _personalKeyUser();
+    final key = value.trim();
+    if (key.isEmpty ||
+        key.length > 256 ||
+        !RegExp(r'^[\x21-\x7e]+$').hasMatch(key)) {
+      throw const ApiFailure('请输入有效的 DeepSeek API Key（最多 256 个英文字符）。');
+    }
+    try {
+      await deepSeekKeys.write(userId, key);
+    } catch (_) {
+      throw const ApiFailure('无法安全保存密钥，请检查设备存储后重试。');
+    }
+    if (_personalKeyUser() != userId) {
+      throw const ApiFailure('账号状态已变化，请重新打开设置。');
+    }
+  }
+
+  Future<void> deletePersonalDeepSeekKey() async {
+    final userId = _personalKeyUser();
+    try {
+      await deepSeekKeys.delete(userId);
+    } catch (_) {
+      throw const ApiFailure('无法删除本机密钥，请稍后重试。');
+    }
+    if (_personalKeyUser() != userId) {
+      throw const ApiFailure('账号状态已变化，请重新打开设置。');
+    }
   }
 
   Future<Map<String, dynamic>> backupUploads() =>

@@ -5417,7 +5417,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
         builder: (context) => AlertDialog(
           title: const Text('发送照片进行 AI 识别？'),
           content: const Text(
-            '这张照片将发送至在线服务并转交 DeepSeek 识别可见工蚁数量。照片不会作为养殖记录保存在服务端；结果仅供参考。',
+            '这张照片将发送至在线服务并转交 DeepSeek 识别可见工蚁数量。如已配置个人密钥，密钥也会用于本次请求。照片和密钥不会作为养殖记录保存在服务端；结果仅供参考。',
           ),
           actions: [
             TextButton(

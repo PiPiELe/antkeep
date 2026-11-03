@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'app_update.dart';
 import 'app_update_controller.dart';
 import 'content.dart';
+import 'deepseek_key_page.dart';
 import 'online_controller.dart';
 
 enum OnlineSettingsSection { all, account, updates, help }
@@ -62,6 +63,18 @@ class OnlineSettings extends StatelessWidget {
             TextButton(
               onPressed: controller.busy ? null : controller.logout,
               child: const Text('清除本机会话'),
+            ),
+          if (controller.user != null)
+            ListTile(
+              leading: const Icon(Icons.key_outlined),
+              title: const Text('个人 DeepSeek API Key'),
+              subtitle: const Text('在本机安全保存；AI 识别时优先使用'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DeepSeekKeyPage(controller: controller),
+                ),
+              ),
             ),
           if (controller.user != null)
             Card(
