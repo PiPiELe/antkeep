@@ -51,6 +51,7 @@ import 'online/feedback_page.dart';
 import 'online/competition_page.dart';
 import 'online/app_update.dart';
 import 'online/online_widgets.dart';
+import 'online/worker_count_confirmation.dart';
 import 'online/update_release_notes.dart';
 import 'onboarding.dart';
 import 'data/app_database.dart';
@@ -5396,6 +5397,12 @@ class _RecordFormPageState extends State<RecordFormPage> {
         onlineController.user == null) {
       return;
     }
+    if (widget.record == null &&
+        _incremental &&
+        [_eggs, _larvae, _pupae].any((field) => field.text.trim().isNotEmpty)) {
+      _showError(context, '当前已填写其他数量的增量。请先保存或清空这些数量，再用 AI 结果填写工蚁总数。');
+      return;
+    }
     final source = await choosePhotoSource(context);
     if (source == null || !mounted) return;
     try {
@@ -5440,29 +5447,17 @@ class _RecordFormPageState extends State<RecordFormPage> {
         _showError(context, '照片中无法可靠识别工蚁，请换张照片或手动填写');
         return;
       }
-      final apply = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('AI 识别结果'),
-          content: Text(
-            '可见工蚁约 $count 只。${result['uncertain'] == true ? '画面有遮挡或模糊，结果可能不准确。' : ''}\n\n确认后仅填入本地日记表单，保存前仍可修改。',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('不使用'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('填入工蚁总数'),
-            ),
-          ],
-        ),
+      final total = await confirmWorkerTotal(
+        context,
+        visibleCount: count,
+        uncertain: result['uncertain'] == true,
       );
-      if (apply != true || !mounted) return;
-      if (widget.record == null && _incremental) await _setQuantityMode(false);
-      if (!mounted || _incremental) return;
-      _workers.text = count.toString();
+      if (total == null || !mounted) return;
+      // This one record uses a total; do not alter the user's default mode.
+      if (widget.record == null && _incremental) {
+        setState(() => _incremental = false);
+      }
+      _workers.text = total.toString();
     } catch (error) {
       if (mounted) _showError(context, error);
     } finally {

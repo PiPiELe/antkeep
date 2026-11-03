@@ -15,11 +15,8 @@ void main() {
         expect(request.url.path, '/api/app/ai/colony-count');
         expect(request.headers['authorization'], 'Bearer session-token');
         expect(request.headers['x-deepseek-api-key'], 'personal-secret');
-        expect(
-          request.headers['content-type'],
-          contains('multipart/form-data'),
-        );
-        expect(latin1.decode(request.bodyBytes), contains('name="photo"'));
+        expect(request.headers['content-type'], 'application/octet-stream');
+        expect(request.bodyBytes, [0xff, 0xd8, 0xff, 0x01]);
         return http.Response('{"workerCount":5,"uncertain":false}', 200);
       }),
     );

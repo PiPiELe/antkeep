@@ -181,17 +181,12 @@ class OnlineApi {
     final client = _clientFactory();
     _active.add(client);
     try {
-      final request = http.MultipartRequest(
+      final request = http.Request(
         'POST',
         base.resolve('/api/app/ai/colony-count'),
       );
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'photo',
-          photo,
-          filename: 'colony-photo.jpg',
-        ),
-      );
+      request.headers['Content-Type'] = 'application/octet-stream';
+      request.bodyBytes = photo;
       request.headers['Authorization'] = 'Bearer $token';
       if (personalKey != null) {
         request.headers['X-DeepSeek-Api-Key'] = personalKey;
