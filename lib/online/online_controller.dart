@@ -313,6 +313,21 @@ class OnlineController extends ChangeNotifier {
   Future<Map<String, dynamic>> inventoryPushStatus() =>
       _authenticatedRequest('/api/app/inventory-pushes/status');
 
+  Future<Map<String, dynamic>> estimateColonyCount(Uint8List photo) async {
+    final token = _token;
+    final userId = user?.id;
+    if (!enabled || token == null || userId == null) {
+      throw const ApiFailure('请切换在线版并登录后使用 AI 识别。');
+    }
+    final result = jsonDecode(
+      await api.estimateColonyCount(photo, token: token),
+    ) as Map<String, dynamic>;
+    if (!enabled || _token != token || user?.id != userId) {
+      throw const ApiFailure('账号状态已变化，请重新登录后识别。');
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>> backupUploads() =>
       _authenticatedRequest('/api/app/backups');
 

@@ -156,6 +156,78 @@ class OnlineApi {
     }
   }
 
+  Future<String> estimateColonyCount(
+    Uint8List photo, {
+    required String token,
+  }) async {
+    if (!enabled) throw const ApiFailure('当前为离线模式。');
+    final base = Uri.tryParse(baseUrl);
+    if (base == null ||
+        !base.hasAuthority ||
+        base.userInfo.isNotEmpty ||
+        base.hasQuery ||
+        base.hasFragment ||
+        (base.path.isNotEmpty && base.path != '/') ||
+        (base.scheme != 'https' &&
+            !(kDebugMode &&
+                base.scheme == 'http' &&
+                ['localhost', '127.0.0.1', '10.0.2.2'].contains(base.host)))) {
+      throw const ApiFailure('在线服务尚未配置；本地功能可正常使用。');
+    }
+    if (photo.isEmpty || photo.length > 5 * 1024 * 1024) {
+      throw const ApiFailure('请选择不超过 5 MB 的照片。');
+    }
+    final client = _clientFactory();
+    _active.add(client);
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        base.resolve('/api/app/ai/colony-count'),
+      );
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'photo',
+          photo,
+          filename: 'colony-photo.jpg',
+        ),
+      );
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'application/json';
+      request.followRedirects = false;
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 60));
+      final bytes = <int>[];
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 60),
+      )) {
+        bytes.addAll(chunk);
+        if (bytes.length > 65536) throw const ApiFailure('服务器响应过大。');
+      }
+      final body = utf8.decode(bytes);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        String message = 'AI 识别失败，请稍后重试。';
+        try {
+          final payload = jsonDecode(body) as Map<String, dynamic>;
+          if (payload['message'] is String) {
+            message = payload['message'] as String;
+          }
+        } catch (_) {
+          /* Gateway returned non-JSON. */
+        }
+        throw ApiFailure(message, status: response.statusCode);
+      }
+      return body;
+    } on ApiFailure {
+      rethrow;
+    } catch (_) {
+      throw const ApiFailure('无法连接 AI 服务，请检查网络后重试。');
+    } finally {
+      _active.remove(client);
+      client.close();
+    }
+  }
+
   Future<String> uploadBackup(
     Stream<List<int>> bytes,
     int length, {

@@ -5370,6 +5370,7 @@ class _RecordFormPageState extends State<RecordFormPage> {
   var _occurredAt = DateUtils.dateOnly(DateTime.now());
   var _hasSpecificTime = false;
   var _saving = false;
+  var _recognizing = false;
   var _incremental = true;
   Future<List<CareRecord>>? _quantityHistory;
 
@@ -5385,6 +5386,87 @@ class _RecordFormPageState extends State<RecordFormPage> {
       if (mounted) _showError(context, error);
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _recognizeWorkers() async {
+    if (_saving ||
+        _recognizing ||
+        !onlineController.enabled ||
+        onlineController.user == null) {
+      return;
+    }
+    final source = await choosePhotoSource(context);
+    if (source == null || !mounted) return;
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 75,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+      if (photo == null || !mounted) return;
+      final bytes = await photo.readAsBytes();
+      if (!mounted) return;
+      if (bytes.length > 5 * 1024 * 1024) {
+        _showError(context, '请选择不超过 5 MB 的照片');
+        return;
+      }
+      final consent = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('发送照片进行 AI 识别？'),
+          content: const Text(
+            '这张照片将发送至在线服务并转交 DeepSeek 识别可见工蚁数量。照片不会作为养殖记录保存在服务端；结果仅供参考。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('发送并识别'),
+            ),
+          ],
+        ),
+      );
+      if (consent != true || !mounted) return;
+      setState(() => _recognizing = true);
+      final result = await onlineController.estimateColonyCount(bytes);
+      if (!mounted) return;
+      final count = result['workerCount'];
+      if (count is! int || count < 0 || count > 1000000) {
+        _showError(context, '照片中无法可靠识别工蚁，请换张照片或手动填写');
+        return;
+      }
+      final apply = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('AI 识别结果'),
+          content: Text(
+            '可见工蚁约 $count 只。${result['uncertain'] == true ? '画面有遮挡或模糊，结果可能不准确。' : ''}\n\n确认后仅填入本地日记表单，保存前仍可修改。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('不使用'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('填入工蚁总数'),
+            ),
+          ],
+        ),
+      );
+      if (apply != true || !mounted) return;
+      if (widget.record == null && _incremental) await _setQuantityMode(false);
+      if (!mounted || _incremental) return;
+      _workers.text = count.toString();
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _recognizing = false);
     }
   }
 
@@ -6220,6 +6302,15 @@ class _RecordFormPageState extends State<RecordFormPage> {
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                     ),
+                    if (onlineController.enabled &&
+                        onlineController.user != null)
+                      IconButton(
+                        tooltip: 'AI 识别工蚁数量',
+                        onPressed: _saving || _recognizing
+                            ? null
+                            : _recognizeWorkers,
+                        icon: const Icon(Icons.auto_awesome_outlined),
+                      ),
                     OutlinedButton.icon(
                       onPressed: _saving ? null : _settings,
                       icon: const Icon(Icons.tune, size: 18),
@@ -6231,6 +6322,12 @@ class _RecordFormPageState extends State<RecordFormPage> {
                     ),
                   ],
                 ),
+                if (_recognizing) const LinearProgressIndicator(),
+                if (onlineController.enabled && onlineController.user != null)
+                  Text(
+                    'AI 可识别照片中可见工蚁，需确认后才填入总数。',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 if (widget.record == null)
                   Wrap(
                     spacing: 8,
@@ -7956,7 +8053,7 @@ class _SettingsPageState extends State<SettingsPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
-            '蚁群、记录和照片都只保存在本设备。',
+            '养殖数据默认保存在本设备；在线功能只在你主动确认后发送所选内容。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
